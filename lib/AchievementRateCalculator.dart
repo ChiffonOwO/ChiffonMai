@@ -1,0 +1,685 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+class AchievementRateCalculator extends StatefulWidget {
+  const AchievementRateCalculator({super.key});
+
+  @override
+  State<AchievementRateCalculator> createState() =>
+      _AchievementRateCalculatorState();
+}
+
+class _AchievementRateCalculatorState
+    extends State<AchievementRateCalculator> {
+  // 普通音符的计数器
+  int _tapCp = 0, _tapP = 0, _tapG = 0, _tapGo = 0, _tapM = 0;
+  int _holdCp = 0, _holdP = 0, _holdG = 0, _holdGo = 0, _holdM = 0;
+  int _slideCp = 0, _slideP = 0, _slideG = 0, _slideGo = 0, _slideM = 0;
+  int _touchCp = 0, _touchP = 0, _touchG = 0, _touchGo = 0, _touchM = 0;
+
+  // Break音符的计数器
+  int _breakP = 0, _break50 = 0, _break100 = 0;
+  int _break80 = 0, _break60 = 0, _break50g = 0;
+  int _breakGo = 0, _breakM = 0;
+
+  // TextEditingControllers for all input fields
+  late TextEditingController _tapCpController;
+  late TextEditingController _tapPController;
+  late TextEditingController _tapGController;
+  late TextEditingController _tapGoController;
+  late TextEditingController _tapMController;
+  
+  late TextEditingController _holdCpController;
+  late TextEditingController _holdPController;
+  late TextEditingController _holdGController;
+  late TextEditingController _holdGoController;
+  late TextEditingController _holdMController;
+  
+  late TextEditingController _slideCpController;
+  late TextEditingController _slidePController;
+  late TextEditingController _slideGController;
+  late TextEditingController _slideGoController;
+  late TextEditingController _slideMController;
+  
+  late TextEditingController _touchCpController;
+  late TextEditingController _touchPController;
+  late TextEditingController _touchGController;
+  late TextEditingController _touchGoController;
+  late TextEditingController _touchMController;
+  
+  late TextEditingController _breakPController;
+  late TextEditingController _break50Controller;
+  late TextEditingController _break100Controller;
+  late TextEditingController _break80Controller;
+  late TextEditingController _break60Controller;
+  late TextEditingController _break50gController;
+  late TextEditingController _breakGoController;
+  late TextEditingController _breakMController;
+
+  // 定义各种note的权重
+  static const int tapWeight = 1;
+  static const int holdWeight = 2;
+  static const int slideWeight = 3;
+  static const int touchWeight = 1;
+  static const int breakWeight = 5;
+
+  // 计算达成率的方法
+  void _calculateAchievementRate() {
+    try {
+      // 计算音符总数
+      int tapNum = _tapCp + _tapP + _tapG + _tapGo + _tapM;
+      int holdNum = _holdCp + _holdP + _holdG + _holdGo + _holdM;
+      int slideNum = _slideCp + _slideP + _slideG + _slideGo + _slideM;
+      int touchNum = _touchCp + _touchP + _touchG + _touchGo + _touchM;
+      int breakNum = _breakP + _break50 + _break100 + _break80 + _break60 + _break50g + _breakGo + _breakM;
+
+      // 计算音符权重的总数
+      int totalTapWeight = tapNum * tapWeight;
+      int totalHoldWeight = holdNum * holdWeight;
+      int totalSlideWeight = slideNum * slideWeight;
+      int totalTouchWeight = touchNum * touchWeight;
+      int totalBreakWeight = breakNum * breakWeight;
+
+      int totalWeight = totalTapWeight + totalHoldWeight + totalSlideWeight + totalTouchWeight + totalBreakWeight;
+
+      // 计算基础评价部分 满分100
+      double baseTapWeight = tapWeight * (_tapCp + _tapP + _tapG * 0.80 + _tapGo * 0.50);
+      double baseHoldWeight = holdWeight * (_holdCp + _holdP + _holdG * 0.80 + _holdGo * 0.50);
+      double baseSlideWeight = slideWeight * (_slideCp + _slideP + _slideG * 0.80 + _slideGo * 0.50);
+      double baseTouchWeight = touchWeight * (_touchCp + _touchP + _touchG * 0.80 + _touchGo * 0.50);
+      double baseBreakWeight = breakWeight * (
+          _breakP + (_break50 + _break100) + _break80 * 0.80 + _break60 * 0.60 + _break50g * 0.50 + _breakGo * 0.40
+      );
+      double baseWeight = baseTapWeight + baseHoldWeight + baseSlideWeight + baseTouchWeight + baseBreakWeight;
+
+      // 基础部分 满分100 结果四舍五入保留四位小数
+      double baseScore = (baseWeight / totalWeight) * 100;
+      baseScore = double.parse(baseScore.toStringAsFixed(4));
+
+      // 计算额外评价部分 全由break决定 满分1 结果四舍五入保留四位小数
+      double extraBreakWeight = _breakP + _break100 * 0.50 + _break50 * 0.75 + 
+          (_break80 + _break60 + _break50g) * 0.40 + _breakGo * 0.30;
+      double extraScore = extraBreakWeight / breakNum;
+      extraScore = double.parse(extraScore.toStringAsFixed(4));
+
+      // 最终达成率
+      double totalScore = baseScore + extraScore;
+      totalScore = double.parse(totalScore.toStringAsFixed(4));
+
+      // 显示结果
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('计算结果'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('基础达成率: $baseScore%'),
+              Text('奖励达成率: $extraScore%'),
+              Text('总达成率: $totalScore%'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('确定'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      // 处理除数为0的异常
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('错误'),
+          content: const Text('计算失败：除数不能为0，请确保至少有一个音符输入'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('确定'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Initialize all controllers with current values
+    _tapCpController = TextEditingController(text: _tapCp.toString());
+    _tapPController = TextEditingController(text: _tapP.toString());
+    _tapGController = TextEditingController(text: _tapG.toString());
+    _tapGoController = TextEditingController(text: _tapGo.toString());
+    _tapMController = TextEditingController(text: _tapM.toString());
+    
+    _holdCpController = TextEditingController(text: _holdCp.toString());
+    _holdPController = TextEditingController(text: _holdP.toString());
+    _holdGController = TextEditingController(text: _holdG.toString());
+    _holdGoController = TextEditingController(text: _holdGo.toString());
+    _holdMController = TextEditingController(text: _holdM.toString());
+    
+    _slideCpController = TextEditingController(text: _slideCp.toString());
+    _slidePController = TextEditingController(text: _slideP.toString());
+    _slideGController = TextEditingController(text: _slideG.toString());
+    _slideGoController = TextEditingController(text: _slideGo.toString());
+    _slideMController = TextEditingController(text: _slideM.toString());
+    
+    _touchCpController = TextEditingController(text: _touchCp.toString());
+    _touchPController = TextEditingController(text: _touchP.toString());
+    _touchGController = TextEditingController(text: _touchG.toString());
+    _touchGoController = TextEditingController(text: _touchGo.toString());
+    _touchMController = TextEditingController(text: _touchM.toString());
+    
+    _breakPController = TextEditingController(text: _breakP.toString());
+    _break50Controller = TextEditingController(text: _break50.toString());
+    _break100Controller = TextEditingController(text: _break100.toString());
+    _break80Controller = TextEditingController(text: _break80.toString());
+    _break60Controller = TextEditingController(text: _break60.toString());
+    _break50gController = TextEditingController(text: _break50g.toString());
+    _breakGoController = TextEditingController(text: _breakGo.toString());
+    _breakMController = TextEditingController(text: _breakM.toString());
+  }
+
+  @override
+  void dispose() {
+    // Dispose all controllers to prevent memory leaks
+    _tapCpController.dispose();
+    _tapPController.dispose();
+    _tapGController.dispose();
+    _tapGoController.dispose();
+    _tapMController.dispose();
+    
+    _holdCpController.dispose();
+    _holdPController.dispose();
+    _holdGController.dispose();
+    _holdGoController.dispose();
+    _holdMController.dispose();
+    
+    _slideCpController.dispose();
+    _slidePController.dispose();
+    _slideGController.dispose();
+    _slideGoController.dispose();
+    _slideMController.dispose();
+    
+    _touchCpController.dispose();
+    _touchPController.dispose();
+    _touchGController.dispose();
+    _touchGoController.dispose();
+    _touchMController.dispose();
+    
+    _breakPController.dispose();
+    _break50Controller.dispose();
+    _break100Controller.dispose();
+    _break80Controller.dispose();
+    _break60Controller.dispose();
+    _break50gController.dispose();
+    _breakGoController.dispose();
+    _breakMController.dispose();
+    
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 计算总计
+    int totalCp = _tapCp + _holdCp + _slideCp + _touchCp;
+    int totalP = _tapP + _holdP + _slideP + _touchP;
+    int totalG = _tapG + _holdG + _slideG + _touchG;
+    int totalGo = _tapGo + _holdGo + _slideGo + _touchGo;
+    int totalM = _tapM + _holdM + _slideM + _touchM;
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      resizeToAvoidBottomInset: false, // Prevent keyboard from pushing up the entire layout
+      body: Stack(
+        children: [
+          // 层级1：基础背景图 - 占满整个屏幕，作为页面最底层背景
+          Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/background.png'), // 背景图资源
+                fit: BoxFit.cover, // 覆盖整个容器，拉伸/裁剪适配
+                opacity: 1.0, // 不透明
+              ),
+            ),
+          ),
+
+          // 层级2：第一张虚化装饰图 - 居中显示，轻微向上偏移
+          Center(
+            child: Transform.translate(
+              offset: const Offset(0, -20), // 垂直向上偏移20px
+              child: Transform.scale(
+                scale: 1, // 不缩放
+                child: Image.asset(
+                  'assets/chiffon2.png',
+                  fit: BoxFit.cover,
+                  opacity: const AlwaysStoppedAnimation(1), // 固定不透明
+                ),
+              ),
+            ),
+          ),
+
+          // 页面标题
+          const Positioned(
+            top: 60,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Text(
+                "maimai达成率计算器",
+                style: TextStyle(
+                  color: Color.fromARGB(255, 84, 97, 97),
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                ),
+              ),
+            ),
+          ),
+
+          // 返回按钮
+          Positioned(
+            top: 40,
+            left: 10,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Color.fromARGB(255, 84, 97, 97), size: 24),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+            ),
+          ),
+
+          // 计算按钮
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 20,
+            child: ElevatedButton(
+              onPressed: _calculateAchievementRate,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                textStyle: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+                elevation: 5,
+              ),
+              child: const Text('计算达成率'),
+            ),
+          ),
+
+          // 主要内容区域
+          Positioned(
+            top: 120,
+            left: 20,
+            right: 20,
+            bottom: 80,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(8.0),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 5.0,
+                    offset: Offset(2.0, 2.0),
+                  ),
+                ],
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+            // 普通音符表格
+
+            // 普通音符表格
+            _buildSectionTitle('普通音符'),
+            _buildNormalNoteTable(totalCp, totalP, totalG, totalGo, totalM),
+            const SizedBox(height: 24),
+
+            // BREAK音符区域
+            _buildSectionTitle('BREAK音符'),
+            _buildBreakNoteSection(),
+            const SizedBox(height: 24),
+
+
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 构建区域标题
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 20,
+        fontWeight: FontWeight.bold,
+        color: Colors.blue,
+      ),
+      textAlign: TextAlign.center,
+    );
+  }
+
+  // 构建普通音符表格
+  Widget _buildNormalNoteTable(
+      int totalCp, int totalP, int totalG, int totalGo, int totalM) {
+    return Table(
+      border: TableBorder( // 调整边框样式，确保颜色完全填充
+        horizontalInside: BorderSide(color: Colors.grey),
+        verticalInside: BorderSide(color: Colors.grey),
+        top: BorderSide(color: Colors.grey),
+        bottom: BorderSide(color: Colors.grey),
+        left: BorderSide(color: Colors.grey),
+        right: BorderSide(color: Colors.grey),
+      ),
+      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+      children: [
+        // 表头
+        TableRow(
+          children: [
+            _buildTableCell('', color: Colors.transparent),
+            _buildTableCell('CRITICAL\nPERFECT', color: Colors.yellow[200]!, fontSize: 8.5),
+            _buildTableCell('PERFECT', color: Colors.yellow[400]!, fontSize: 9),
+            _buildTableCell('GREAT', color: Colors.pink[200]!, fontSize: 10),
+            _buildTableCell('GOOD', color: Colors.green[200]!, fontSize: 10),
+            _buildTableCell('MISS', color: Colors.grey[200]!, fontSize: 10),
+          ],
+        ),
+        // TAP行
+        TableRow(
+          decoration: const BoxDecoration(), // 确保行没有额外装饰
+          children: [
+            _buildTableCell('TAP', color: Colors.lightBlue[100]!, fontSize: 11.2),
+            _buildNumberInputCell(_tapCp, (val) => setState(() => _tapCp = val), _tapCpController, color: Colors.yellow[200]),
+            _buildNumberInputCell(_tapP, (val) => setState(() => _tapP = val), _tapPController, color: Colors.yellow[400]),
+            _buildNumberInputCell(_tapG, (val) => setState(() => _tapG = val), _tapGController, color: Colors.pink[200]),
+            _buildNumberInputCell(_tapGo, (val) => setState(() => _tapGo = val), _tapGoController, color: Colors.green[200]),
+            _buildNumberInputCell(_tapM, (val) => setState(() => _tapM = val), _tapMController, color: Colors.grey[200]),
+          ],
+        ),
+        // HOLD行
+        TableRow(
+          decoration: const BoxDecoration(),
+          children: [
+            _buildTableCell('HOLD', color: Colors.lightBlue[100]!, fontSize: 11.2),
+            _buildNumberInputCell(_holdCp, (val) => setState(() => _holdCp = val), _holdCpController, color: Colors.yellow[200]),
+            _buildNumberInputCell(_holdP, (val) => setState(() => _holdP = val), _holdPController, color: Colors.yellow[400]),
+            _buildNumberInputCell(_holdG, (val) => setState(() => _holdG = val), _holdGController, color: Colors.pink[200]),
+            _buildNumberInputCell(_holdGo, (val) => setState(() => _holdGo = val), _holdGoController, color: Colors.green[200]),
+            _buildNumberInputCell(_holdM, (val) => setState(() => _holdM = val), _holdMController, color: Colors.grey[200]),
+          ],
+        ),
+        // SLIDE行
+        TableRow(
+          decoration: const BoxDecoration(),
+          children: [
+            _buildTableCell('SLIDE', color: Colors.lightBlue[100]!, fontSize: 11.2),
+            _buildNumberInputCell(_slideCp, (val) => setState(() => _slideCp = val), _slideCpController, color: Colors.yellow[200]),
+            _buildNumberInputCell(_slideP, (val) => setState(() => _slideP = val), _slidePController, color: Colors.yellow[400]),
+            _buildNumberInputCell(_slideG, (val) => setState(() => _slideG = val), _slideGController, color: Colors.pink[200]),
+            _buildNumberInputCell(_slideGo, (val) => setState(() => _slideGo = val), _slideGoController, color: Colors.green[200]),
+            _buildNumberInputCell(_slideM, (val) => setState(() => _slideM = val), _slideMController, color: Colors.grey[200]),
+          ],
+        ),
+        // TOUCH行
+        TableRow(
+          decoration: const BoxDecoration(),
+          children: [
+            _buildTableCell('TOUCH', color: Colors.lightBlue[100]!, fontSize: 11.2),
+            _buildNumberInputCell(_touchCp, (val) => setState(() => _touchCp = val), _touchCpController, color: Colors.yellow[200]),
+            _buildNumberInputCell(_touchP, (val) => setState(() => _touchP = val), _touchPController, color: Colors.yellow[400]),
+            _buildNumberInputCell(_touchG, (val) => setState(() => _touchG = val), _touchGController, color: Colors.pink[200]),
+            _buildNumberInputCell(_touchGo, (val) => setState(() => _touchGo = val), _touchGoController, color: Colors.green[200]),
+            _buildNumberInputCell(_touchM, (val) => setState(() => _touchM = val), _touchMController, color: Colors.grey[200]),
+          ],
+        ),
+        // 总计行
+        TableRow(
+          decoration: const BoxDecoration(),
+          children: [
+            _buildTableCell('总计', color: Colors.lightBlue[100]!, fontSize: 11.2),
+            _buildTableCell(totalCp.toString(), color: Colors.yellow[200]!),
+            _buildTableCell(totalP.toString(), color: Colors.yellow[400]!),
+            _buildTableCell(totalG.toString(), color: Colors.pink[200]!),
+            _buildTableCell(totalGo.toString(), color: Colors.green[200]!),
+            _buildTableCell(totalM.toString(), color: Colors.grey[200]!),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // 构建BREAK音符区域
+  Widget _buildBreakNoteSection() {
+    return Column(
+      children: [
+        // Perfect部分
+        Container(
+          color: Colors.yellow[400],
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: const Text(
+            'Perfect',
+            style: TextStyle(
+              fontSize: 10.8,
+              fontWeight: FontWeight.bold,
+              color: Colors.orange,
+            ),
+          ),
+        ),
+        _buildBreakRow('大P', _breakP, (val) => setState(() => _breakP = val), _breakPController, fontSize: 9.6),
+        _buildBreakRow('50落', _break50, (val) => setState(() => _break50 = val), _break50Controller, fontSize: 9.6),
+        _buildBreakRow('100落', _break100, (val) => setState(() => _break100 = val), _break100Controller, fontSize: 9.6),
+        const SizedBox(height: 16),
+
+        // Great部分
+        Container(
+          color: Colors.pink[200],
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: const Text(
+            'Great',
+            style: TextStyle(
+              fontSize: 10.8,
+              fontWeight: FontWeight.bold,
+              color: Colors.purple,
+            ),
+          ),
+        ),
+        _buildBreakRow('80%', _break80, (val) => setState(() => _break80 = val), _break80Controller, fontSize: 9.6),
+        _buildBreakRow('60%', _break60, (val) => setState(() => _break60 = val), _break60Controller, fontSize: 9.6),
+        _buildBreakRow('50%', _break50g, (val) => setState(() => _break50g = val), _break50gController, fontSize: 9.6),
+        const SizedBox(height: 16),
+
+        // GOOD和MISS
+        _buildBreakRow('GOOD', _breakGo, (val) => setState(() => _breakGo = val), _breakGoController,
+            color: Colors.green[200], fontSize: 9.6),
+        _buildBreakRow('MISS', _breakM, (val) => setState(() => _breakM = val), _breakMController,
+            color: Colors.grey[200], fontSize: 9.6),
+        const SizedBox(height: 16),
+
+        // Break总数
+        Row(
+          children: [
+            Expanded(
+              flex: 1,
+              child: Container(
+                color: Colors.blue[100],
+                padding: const EdgeInsets.all(12),
+                child: const Text(
+                  'Break总数:',
+                  style: TextStyle(
+                    fontSize: 9.6,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                ),
+                child: TextField(
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    hintText: '0',
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  textAlign: TextAlign.center,
+                  onChanged: (val) {
+                    // 这里可以处理总数输入
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // 构建表格单元格
+  Widget _buildTableCell(String text, {Color? color, double fontSize = 12.0}) {
+    return Container(
+      color: color,
+      padding: const EdgeInsets.symmetric(vertical: 8), // 保持垂直内边距以确保内容居中
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: fontSize,
+        ),
+      ),
+    );
+  }
+
+  // 构建数字输入单元格
+  Widget _buildNumberInputCell(int value, Function(int) onChanged, TextEditingController controller, {Color? color}) {
+    return Container(
+      color: color, // 添加颜色参数
+      padding: EdgeInsets.zero, // 移除所有内边距，确保颜色完全填充
+      margin: EdgeInsets.zero, // 确保没有外边距
+      child: TextField(
+        controller: controller,
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          hintText: value == 0 ? '' : value.toString(),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8), // 设置输入框内边距
+          isDense: true, // 紧凑模式，减少默认高度
+        ),
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontSize: 12,
+        ),
+        onTap: () {
+          if (value == 0) {
+            controller.clear();
+          } else {
+            // 将光标移动到文本末尾
+            controller.selection = TextSelection.fromPosition(
+              TextPosition(offset: controller.text.length),
+            );
+          }
+        },
+        onChanged: (val) {
+          final parsedValue = int.tryParse(val) ?? 0;
+          onChanged(parsedValue);
+          if (val.isEmpty) {
+            controller.text = '0';
+            controller.selection = TextSelection.fromPosition(
+              TextPosition(offset: controller.text.length),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  // 构建BREAK音符行
+  Widget _buildBreakRow(String label, int value, Function(int) onChanged, TextEditingController controller,
+      {Color? color, double fontSize = 9.6}) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 1,
+          child: Container(
+            color: color ?? Colors.yellow[100],
+            padding: const EdgeInsets.all(12),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.bold,
+                color: Colors.orange,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+        Expanded(
+          flex: 3,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey),
+            ),
+            child: TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                hintText: value == 0 ? '' : value.toString(),
+              ),
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              textAlign: TextAlign.center,
+              onTap: () {
+                if (value == 0) {
+                  controller.clear();
+                } else {
+                  // 将光标移动到文本末尾
+                  controller.selection = TextSelection.fromPosition(
+                    TextPosition(offset: controller.text.length),
+                  );
+                }
+              },
+              onChanged: (val) {
+                final parsedValue = int.tryParse(val) ?? 0;
+                onChanged(parsedValue);
+                if (val.isEmpty) {
+                  controller.text = '0';
+                  controller.selection = TextSelection.fromPosition(
+                    TextPosition(offset: controller.text.length),
+                  );
+                }
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
