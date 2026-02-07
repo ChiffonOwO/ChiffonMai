@@ -106,6 +106,20 @@ class _AchievementRateCalculatorState
       double totalScore = baseScore + extraScore;
       totalScore = double.parse(totalScore.toStringAsFixed(4));
 
+      // 计算单个普通note的判定损失
+      double singleTapGreatLoss = double.parse((0.20 * 100.00 * tapWeight / totalWeight).toStringAsFixed(4)) ;
+      double singleTapGoodLoss = double.parse((0.50 * 100.00 * tapWeight / totalWeight).toStringAsFixed(4));
+      double singleTapMissLoss = double.parse((1.00 * 100.00 * tapWeight / totalWeight).toStringAsFixed(4));
+      double singleHoldGreatLoss = double.parse((0.20 * 100.00 * holdWeight / totalWeight).toStringAsFixed(4));
+      double singleHoldGoodLoss = double.parse((0.50 * 100.00 * holdWeight / totalWeight).toStringAsFixed(4));
+      double singleHoldMissLoss = double.parse((1.00 * 100.00 * holdWeight / totalWeight).toStringAsFixed(4));
+      double singleSlideGreatLoss = double.parse((0.20 * 100.00 * slideWeight / totalWeight).toStringAsFixed(4));
+      double singleSlideGoodLoss = double.parse((0.50 * 100.00 * slideWeight / totalWeight).toStringAsFixed(4));
+      double singleSlideMissLoss = double.parse((1.00 * 100.00 * slideWeight / totalWeight).toStringAsFixed(4));
+      double singleTouchGreatLoss = double.parse((0.20 * 100.00 * touchWeight / totalWeight).toStringAsFixed(4));
+      double singleTouchGoodLoss = double.parse((0.50 * 100.00 * touchWeight / totalWeight).toStringAsFixed(4));
+      double singleTouchMissLoss = double.parse((1.00 * 100.00 * touchWeight / totalWeight).toStringAsFixed(4));
+
       // 显示结果
       showDialog(
         context: context,
@@ -118,6 +132,22 @@ class _AchievementRateCalculatorState
               Text('基础达成率: $baseScore%'),
               Text('奖励达成率: $extraScore%'),
               Text('总达成率: $totalScore%'),
+              Text('单个TAP的判定损失:'),
+              Text('GREAT: $singleTapGreatLoss%'),
+              Text('GOOD: $singleTapGoodLoss%'),
+              Text('MISS: $singleTapMissLoss%'),
+              Text('单个HOLD的判定损失:'),
+              Text('GREAT: $singleHoldGreatLoss%'),
+              Text('GOOD: $singleHoldGoodLoss%'),
+              Text('MISS: $singleHoldMissLoss%'),
+              Text('单个SLIDE的判定损失:'),
+              Text('GREAT: $singleSlideGreatLoss%'),
+              Text('GOOD: $singleSlideGoodLoss%'),
+              Text('MISS: $singleSlideMissLoss%'),
+              Text('单个TOUCH的判定损失:'),
+              Text('GREAT: $singleTouchGreatLoss%'),
+              Text('GOOD: $singleTouchGoodLoss%'),
+              Text('MISS: $singleTouchMissLoss%'),
             ],
           ),
           actions: [
@@ -236,7 +266,12 @@ class _AchievementRateCalculatorState
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: false, // Prevent keyboard from pushing up the entire layout
-      body: Stack(
+      body: GestureDetector(
+        // 点击空白区域收起键盘
+        onTap: () {
+          FocusScope.of(context).unfocus();
+        },
+        child: Stack(
         children: [
           // 层级1：基础背景图 - 占满整个屏幕，作为页面最底层背景
           Container(
@@ -362,6 +397,7 @@ class _AchievementRateCalculatorState
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -535,21 +571,17 @@ class _AchievementRateCalculatorState
             Expanded(
               flex: 3,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.grey),
+                  color: Colors.white,
                 ),
-                child: TextField(
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    hintText: '0',
-                  ),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                child: Text(
+                  (_breakP + _break50 + _break100 + _break80 + _break60 + _break50g + _breakGo + _breakM).toString(),
                   textAlign: TextAlign.center,
-                  onChanged: (val) {
-                    // 这里可以处理总数输入
-                  },
+                  style: const TextStyle(
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ),
@@ -608,11 +640,12 @@ class _AchievementRateCalculatorState
         onChanged: (val) {
           final parsedValue = int.tryParse(val) ?? 0;
           onChanged(parsedValue);
-          if (val.isEmpty) {
+        },
+        onEditingComplete: () {
+          // 只在失去焦点时补0
+          if (controller.text.isEmpty) {
             controller.text = '0';
-            controller.selection = TextSelection.fromPosition(
-              TextPosition(offset: controller.text.length),
-            );
+            onChanged(0);
           }
         },
       ),
@@ -669,11 +702,12 @@ class _AchievementRateCalculatorState
               onChanged: (val) {
                 final parsedValue = int.tryParse(val) ?? 0;
                 onChanged(parsedValue);
-                if (val.isEmpty) {
+              },
+              onEditingComplete: () {
+                // 只在失去焦点时补0
+                if (controller.text.isEmpty) {
                   controller.text = '0';
-                  controller.selection = TextSelection.fromPosition(
-                    TextPosition(offset: controller.text.length),
-                  );
+                  onChanged(0);
                 }
               },
             ),

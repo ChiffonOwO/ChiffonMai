@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
-import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 // 应用常量类：集中管理所有硬编码的配置值
@@ -73,37 +72,28 @@ class ImagePreviewDialog extends StatelessWidget {
   // 保存图片到本地
   Future<void> _saveImage(BuildContext context) async {
     try {
-      // // 请求存储权限
-      // if (Platform.isAndroid) {
-      //   final status = await Permission.storage.request();
-      //   if (status != PermissionStatus.granted) {
-      //     _showSnackBar(context, '需要存储权限才能保存图片');
-      //     return;
-      //   }
-      // } else if (Platform.isIOS) {
-      //   final status = await Permission.photos.request();
-      //   if (status != PermissionStatus.granted) {
-      //     _showSnackBar(context, '需要照片权限才能保存图片');
-      //     return;
-      //   }
-      // }
+      // 请求存储权限
+      if (Platform.isAndroid) {
+        final status = await Permission.storage.request();
+        if (status != PermissionStatus.granted) {
+          _showSnackBar(context, '需要存储权限才能保存图片');
+          return;
+        }
+      }
 
       // 加载图片
       final ByteData imageData = await rootBundle.load(imagePath);
       final Uint8List bytes = imageData.buffer.asUint8List();
 
-      // 保存图片到相册
-      final result = await ImageGallerySaverPlus.saveImage(
-        bytes,
-        quality: 100,
-        name: 'maimai_${versionName.replaceAll(' ', '_')}',
-      );
+      // 获取保存目录
+      final Directory directory = await getApplicationDocumentsDirectory();
+      final String fileName = 'maimai_${versionName.replaceAll(' ', '_')}.png';
+      final File file = File('${directory.path}/$fileName');
 
-      if (result['isSuccess']) {
-        _showSnackBar(context, '图片已保存到相册');
-      } else {
-        _showSnackBar(context, '保存失败：${result['errorMessage']}');
-      }
+      // 写入文件
+      await file.writeAsBytes(bytes);
+
+      _showSnackBar(context, '图片已保存到相册');
     } catch (e) {
       _showSnackBar(context, '保存失败：$e');
     }

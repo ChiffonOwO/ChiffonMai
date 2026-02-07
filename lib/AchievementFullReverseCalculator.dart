@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:math';
 
 class AchievementFullReverseCalculator extends StatefulWidget {
   const AchievementFullReverseCalculator({super.key});
