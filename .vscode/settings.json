@@ -1,3 +1,7 @@
 {
-    "cmake.sourceDirectory": "D:/flutterProjects/my_first_flutter_app/linux"
+    "cmake.sourceDirectory": "D:/flutterProjects/my_first_flutter_app/linux",
+    "cSpell.words": [
+        "allprojects"
+    ],
+    "java.configuration.updateBuildConfiguration": "interactive"
 }

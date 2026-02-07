@@ -1,0 +1,15 @@
+# .gitattributes 文件内容
+# 文本文件统一使用LF，Git自动转换
+* text=auto eol=lf
+
+# 二进制文件（如图片、编译产物）不转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.dex binary
+*.so binary
+
+# Android构建产物直接忽略（推荐，因为build目录无需提交）
+android/build/ export-ignore
+android/app/build/ export-ignore
