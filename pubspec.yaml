@@ -100,6 +100,8 @@ flutter:
     - assets/maimai_DX_PRiSM_PLUS.png
     - assets/maimai_DX_CiRCLE.png
     - assets/WuShen.png
+    - assets/b50testdata.json
+    - assets/maimai_music_data.json
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

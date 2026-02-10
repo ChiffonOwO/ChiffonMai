@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_first_flutter_app/B50Page.dart';
 import 'AchievementFullReverseCalculator.dart';
 import 'versionView.dart';
 import 'AchievementRateCalculator.dart';
@@ -344,6 +345,12 @@ class _HomePageState extends State<HomePage> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => AchievementFullReverseCalculator()),
+            );
+          }
+          if (item.title == 'Best50查询') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => B50Page()),
             );
           }
         },
