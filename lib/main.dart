@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/B50Page.dart';
+import 'package:my_first_flutter_app/RecommendByTags.dart';
 import 'package:my_first_flutter_app/SingleRatingCalculator.dart';
 import 'AchievementFullReverseCalculator.dart';
 import 'versionView.dart';
@@ -358,6 +359,12 @@ class _HomePageState extends State<HomePage> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => SingleRatingCalculator()),
+            );
+          }
+          if (item.title == '基于标签推荐') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => RecommendByTags()),
             );
           }
         },

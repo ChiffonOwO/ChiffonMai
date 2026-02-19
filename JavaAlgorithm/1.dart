@@ -3,8 +3,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // 新增：导入rootBundle所需包
-import 'package:path_provider/path_provider.dart'; // 新增：用于获取应用沙盒路径
+import 'package:flutter/material.dart';
 
 // RA 筛选配置常量
 const int MAX_LIMIT = 70; // 最大筛选数量
@@ -57,43 +56,34 @@ class _RecommendByTagsState extends State<RecommendByTags> {
     });
 
     try {
-      // 1.检查并下载 maiTags.json（优先从沙盒读取，无则下载）
-      final String tagAssetPath = "assets/maiTags.json";
-      final String tagLocalPath = await _getLocalFilePath("maiTags.json");
-      final File tagLocalFile = File(tagLocalPath);
+      // 1.检查并下载 maiTags.json
+      final String tagFileName = "maiTags.json";
+      final File tagFile = File("${Directory.current.path}/$tagFileName");
+      print("maiTags.json 文件路径: ${tagFile.path}");
+      
+      if (!await tagFile.exists()) {
+        await downloadMaiTagsFile(tagFileName);
+      }
 
-      if (!await tagLocalFile.exists()) {
-        // 先尝试从assets读取，读取失败则下载
-        try {
-          final String tagContent = await rootBundle.loadString(tagAssetPath);
-          await tagLocalFile.writeAsString(tagContent, encoding: utf8);
-          print("✅ 从assets加载maiTags.json并保存到本地");
-        } catch (e) {
-          print("⚠️ assets中无maiTags.json，开始下载：$e");
-          await downloadMaiTagsFile(tagLocalPath);
+       // 2.读取并筛选玩家游玩记录
+      final String playDataFileName = "userPlayData.json";
+      final File playDataFile = File("${Directory.current.path}/$playDataFileName");
+      print("userPlayData.json 文件路径: ${playDataFile.path}");
+
+      if (await playDataFile.exists()) {
+        // 筛选 RA 数据
+        final List<Record> filteredRecords = await filterRaData(playDataFile);
+        if (filteredRecords.isNotEmpty) {
+          // 按分组统计标签出现次数
+          await countTagsByGroup(filteredRecords, tagFile);
+
+          // 进行曲目推荐
+          await recommendSongs(playDataFile, tagFile, filteredRecords);
+        } else {
+          _errorMessage = "未找到有效的RA数据";
         }
-      }
-
-      // 2.读取玩家游玩记录（从assets读取）
-      final String playDataAssetPath = "assets/userPlayData.json";
-      String playDataContent;
-      try {
-        playDataContent = await rootBundle.loadString(playDataAssetPath);
-      } catch (e) {
-        _errorMessage = "assets中未找到userPlayData.json：$e";
-        return;
-      }
-
-      // 筛选 RA 数据
-      final List<Record> filteredRecords = await filterRaData(playDataContent);
-      if (filteredRecords.isNotEmpty) {
-        // 按分组统计标签出现次数
-        await countTagsByGroup(filteredRecords, tagLocalFile);
-
-        // 进行曲目推荐
-        await recommendSongs(playDataContent, tagLocalFile, filteredRecords);
       } else {
-        _errorMessage = "未找到有效的RA数据";
+        _errorMessage = "测试数据文件不存在，请先准备数据文件";
       }
     } catch (e) {
       _errorMessage = "加载失败：$e";
@@ -102,12 +92,6 @@ class _RecommendByTagsState extends State<RecommendByTags> {
         _isLoading = false;
       });
     }
-  }
-
-  // 获取应用沙盒文件路径
-  Future<String> _getLocalFilePath(String fileName) async {
-    final Directory appDocDir = await getApplicationDocumentsDirectory();
-    return "${appDocDir.path}/$fileName";
   }
 
   // 更新标签计数映射
@@ -495,8 +479,8 @@ Future<Uint8List> responseToBytes(HttpClientResponse response) async {
   return bytesBuilder.toBytes();
 }
 
-/// 下载 maiTags.json 文件（保存到应用沙盒）
-Future<void> downloadMaiTagsFile(String savePath) async {
+/// 下载 maiTags.json 文件（修复 toBytes 方法问题）
+Future<void> downloadMaiTagsFile(String fileName) async {
   final String url = "https://derrakuma.dxrating.net/functions/v1/combined-tags";
   
   final Map<String, String> headers = {
@@ -543,22 +527,22 @@ Future<void> downloadMaiTagsFile(String savePath) async {
     final String body = utf8.decode(responseBytes);
     print("响应内容（前500字符）: ${body.length > 500 ? body.substring(0, 500) : body}");
 
-    final File file = File(savePath);
+    final File file = File(fileName);
     await file.writeAsString(body, encoding: utf8);
-    print("✅ 完整响应已以 UTF-8 编码保存到 $savePath");
+    print("✅ 完整响应已以 UTF-8 编码保存到 $fileName");
 
   } catch (e) {
     print("请求失败: $e");
-    rethrow;
   }
 }
 
-/// 筛选 RA 数据核心逻辑（改为接收字符串内容，而非File）
-Future<List<Record>> filterRaData(String playDataContent) async {
+/// 筛选 RA 数据核心逻辑（修复 JSON 类型不匹配问题）
+Future<List<Record>> filterRaData(File playDataFile) async {
   final List<Record> filteredRecords = [];
   try {
-    // 解析玩家游玩记录 JSON
-    final dynamic rootNode = json.decode(playDataContent); // 修复：先定义为 dynamic 避免类型错误
+    // 读取并解析玩家游玩记录 JSON
+    final String jsonContent = await playDataFile.readAsString(encoding: utf8);
+    final dynamic rootNode = json.decode(jsonContent); // 修复：先定义为 dynamic 避免类型错误
 
     // 提取 records 数组（修复：兼容 Map/List 两种根节点）
     List<dynamic> recordsNode = [];
@@ -631,17 +615,15 @@ Future<List<Record>> filterRaData(String playDataContent) async {
       print("排名 ${i + 1} | RA: ${r.ra} | 标题: ${r.title} | 难度: ${r.level} | FC: ${r.fc}");
     }
 
-    // 保存筛选结果到沙盒（可选）
-    final String filteredPath = await _getLocalFilePath("filtered_records.json");
-    final File filteredFile = File(filteredPath);
+    // 保存筛选结果到文件
+    final File filteredFile = File("filtered_records.json");
     final String filteredJson = json.encode(filteredRecords.map((e) => e.toJson()).toList());
     await filteredFile.writeAsString(filteredJson, encoding: utf8);
     print("----------------------------------------");
-    print("✅ 筛选结果已保存到 $filteredPath");
+    print("✅ 筛选结果已保存到 filtered_records.json");
 
   } catch (e) {
     print("❌ 筛选 RA 数据失败：$e");
-    rethrow;
   }
   return filteredRecords;
 }
@@ -827,12 +809,11 @@ Future<void> countTagsByGroup(List<Record> filteredRecords, File tagFile) async 
 
   } catch (e) {
     print("❌ 按分组统计标签出现次数失败：$e");
-    rethrow;
   }
 }
 
-/// 推荐算法实现（改为接收字符串内容，而非File）
-Future<void> recommendSongs(String playDataContent, File tagFile, List<Record> filteredRecords) async {
+/// 推荐算法实现
+Future<void> recommendSongs(File playDataFile, File tagFile, List<Record> filteredRecords) async {
   try {
     // 1. 检查筛选数据
     print("(1) 使用已筛选的玩家单曲Rating前70位数据...");
@@ -859,10 +840,10 @@ Future<void> recommendSongs(String playDataContent, File tagFile, List<Record> f
 
     // 3. 获取Best55、Best35、Best15数据
     print("(3) 获取玩家的Best55和Best15数据...");
-    final List<Record> allRecords = await getAllRecords(playDataContent);
-    final List<Record> best55 = await getBestNRecords(allRecords, 55, false);
-    final List<Record> best35 = await getBestNRecords(best55, 35, false);
-    final List<Record> best15 = await getBestNRecords(allRecords, 15, true);
+    final List<Record> allRecords = await getAllRecords(playDataFile);
+    final List<Record> best55 = getBestNRecords(allRecords, 55, false);
+    final List<Record> best35 = getBestNRecords(best55, 35, false);
+    final List<Record> best15 = getBestNRecords(allRecords, 15, true);
     
     // 输出调试信息
     print("\n========================================");
@@ -937,15 +918,15 @@ Future<void> recommendSongs(String playDataContent, File tagFile, List<Record> f
 
   } catch (e) {
     print("❌ 推荐算法执行失败：$e");
-    rethrow;
   }
 }
 
-/// 获取所有记录（改为接收字符串内容，而非File）
-Future<List<Record>> getAllRecords(String playDataContent) async {
+/// 获取所有记录（修复 JSON 类型不匹配）
+Future<List<Record>> getAllRecords(File playDataFile) async {
   final List<Record> records = [];
   try {
-    final dynamic rootNode = json.decode(playDataContent); // 修复：定义为 dynamic
+    final String jsonContent = await playDataFile.readAsString(encoding: utf8);
+    final dynamic rootNode = json.decode(jsonContent); // 修复：定义为 dynamic
 
     List<dynamic> recordsNode = [];
     if (rootNode is Map<String, dynamic> && rootNode.containsKey("records") && rootNode["records"] is List) {
@@ -978,36 +959,155 @@ Future<List<Record>> getAllRecords(String playDataContent) async {
     }
   } catch (e) {
     print("❌ 读取所有记录失败：$e");
-    rethrow;
   }
   return records;
 }
 
 /// 获取前N个记录（修复 JSON 解析类型问题）
-Future<List<Record>> getBestNRecords(List<Record> records, int n, bool isNewOnly) async {
+List<Record> getBestNRecords(List<Record> records, int n, bool isNewOnly) {
   try {
-    // 读取maimai_music_data.json（从assets读取）
-    final String musicDataAssetPath = "assets/maimai_music_data.json";
-    String musicDataContent;
-    try {
-      musicDataContent = await rootBundle.loadString(musicDataAssetPath);
-    } catch (e) {
-      print("❌ 读取maimai_music_data.json失败：$e");
-      return [];
+    // 读取maimai_music_data.json
+    final File musicDataFile = File("${Directory.current.path}/maimai_music_data.json");
+    if (!musicDataFile.existsSync()) {
+      print("⚠️ maimai_music_data.json 文件不存在，使用默认排序");
+      return records.toList()
+        ..sort((r1, r2) => r2.ra.compareTo(r1.ra))
+        ..take(n)
+        .toList();
     }
-    final dynamic musicData = json.decode(musicDataContent);
+
+    final String musicJson = musicDataFile.readAsStringSync(encoding: utf8);
+    final dynamic musicDataRoot = json.decode(musicJson);
+    final List<dynamic> musicDataArray = musicDataRoot is List<dynamic> 
+        ? musicDataRoot 
+        : [];
     
-    // 此处补充原逻辑的剩余部分...
-    // （注：原代码片段此处截断，需补充完整逻辑）
+    // 构建songId到isNew的映射
+    final Map<int, bool> songIdToIsNewMap = {};
+    for (final songNode in musicDataArray) {
+      if (songNode is Map<String, dynamic> && songNode.containsKey("id") && songNode.containsKey("basic_info")) {
+        try {
+          final dynamic idValue = songNode["id"];
+          final int songId = idValue is String ? int.parse(idValue) : (idValue as int);
+          final Map<String, dynamic> basicInfo = songNode["basic_info"] as Map<String, dynamic>;
+          final bool isNew = basicInfo.containsKey("is_new") && basicInfo["is_new"] as bool;
+          songIdToIsNewMap[songId] = isNew;
+        } catch (_) {
+          // 跳过非数字ID
+          continue;
+        }
+      }
+    }
     
-    return []; // 临时返回，需补充完整逻辑
+    // 过滤并排序
+    return records.where((record) {
+      final bool? isNew = songIdToIsNewMap[record.songId];
+      if (!isNewOnly) {
+        // Best55：只包含is_new为false的歌曲
+        return isNew != null && !isNew;
+      } else {
+        // Best15：只包含is_new为true的歌曲
+        return isNew != null && isNew;
+      }
+    }).toList()
+      ..sort((r1, r2) => r2.ra.compareTo(r1.ra))
+      ..take(n)
+      .toList();
   } catch (e) {
-    print("❌ 获取前N个记录失败：$e");
-    return [];
+      print("❌ 读取音乐数据失败：$e");
+    // 出错时返回所有记录的前N个
+    return records.toList()
+      ..sort((r1, r2) => r2.ra.compareTo(r1.ra))
+      ..take(n)
+      .toList();
   }
 }
 
-// 以下为缺失的实体类定义（需补充）
+/// 获取Rating范围
+RaRange getRaRange(List<Record> records) {
+  if (records.isEmpty) {
+    return RaRange(0, 0);
+  }
+  
+  int minRa = records.first.ra;
+  int maxRa = records.first.ra;
+  
+  for (final record in records) {
+    if (record.ra < minRa) minRa = record.ra;
+    if (record.ra > maxRa) maxRa = record.ra;
+  }
+  
+  return RaRange(minRa, maxRa);
+}
+
+/// 计算玩家能力向量（占位实现，需补充完整逻辑）
+Future<Map<String, Map<String, double>>> calculatePlayerAbilityVectors(
+  List<Record> filteredRecords, File tagFile
+) async {
+  // 此处为占位实现，需根据实际业务逻辑补充
+  return {
+    "config": {},
+    "difficulty": {},
+    "evaluation": {},
+  };
+}
+
+/// 计算推荐结果（占位实现，需补充完整逻辑）
+Future<List<RecommendationResult>> calculateRecommendations(
+  List<Record> allRecords,
+  File tagFile,
+  Map<String, Map<String, double>> playerAbilityVectors,
+  DifficultyRange diffRange,
+  bool isNewOnly
+) async {
+  // 此处为占位实现，需根据实际业务逻辑补充
+  return [];
+}
+
+/// 展示记录列表
+void showRecords(List<Record> records, String title) {
+  if (records.isEmpty) {
+    print("$title 无数据");
+    return;
+  }
+  
+  for (int i = 0; i < records.length; i++) {
+    final Record r = records[i];
+    print("排名 ${i+1} | RA: ${r.ra} | 标题: ${r.title} | 定数: ${r.ds}");
+  }
+}
+
+/// 展示推荐结果
+void showRecommendations(List<RecommendationResult> recommendations, String title) {
+  if (recommendations.isEmpty) {
+    print("$title 无推荐结果");
+    return;
+  }
+  
+  print("$title 推荐列表：");
+  for (int i = 0; i < recommendations.length; i++) {
+    final RecommendationResult res = recommendations[i];
+    print("推荐 ${i+1} | 标题: ${res.songTitle} | 相似度: ${res.similarity.toStringAsFixed(2)} | 定数: ${res.difficulty}");
+  }
+}
+
+/// 展示定数范围
+void showDifficultyRange(DifficultyRange range, String title) {
+  print("$title 推荐定数范围：${range.minDiff.toStringAsFixed(1)} — ${range.maxDiff.toStringAsFixed(1)}");
+}
+
+/// 获取定数范围（占位实现，需补充完整逻辑）
+DifficultyRange getDifficultyRange(RaRange raRange) {
+  // 根据Rating计算定数范围的核心逻辑
+  return DifficultyRange(
+    (raRange.minRa / 22.4).floorToDouble(),
+    (raRange.maxRa / 21.6).ceilToDouble()
+  );
+}
+
+// 数据模型类
+
+/// 游玩记录实体
 class Record {
   final double achievements;
   final double ds;
@@ -1039,25 +1139,27 @@ class Record {
     required this.type,
   });
 
+  /// 转换为JSON
   Map<String, dynamic> toJson() {
     return {
-      'achievements': achievements,
-      'ds': ds,
-      'dxScore': dxScore,
-      'fc': fc,
-      'fs': fs,
-      'level': level,
-      'level_index': levelIndex,
-      'level_label': levelLabel,
-      'ra': ra,
-      'rate': rate,
-      'song_id': songId,
-      'title': title,
-      'type': type,
+      "achievements": achievements,
+      "ds": ds,
+      "dxScore": dxScore,
+      "fc": fc,
+      "fs": fs,
+      "level": level,
+      "level_index": levelIndex,
+      "level_label": levelLabel,
+      "ra": ra,
+      "rate": rate,
+      "song_id": songId,
+      "title": title,
+      "type": type,
     };
   }
 }
 
+/// 标签信息实体
 class TagInfo {
   final String tagName;
   final int groupId;
@@ -1065,6 +1167,23 @@ class TagInfo {
   TagInfo(this.tagName, this.groupId);
 }
 
+/// Rating范围实体
+class RaRange {
+  final int minRa;
+  final int maxRa;
+
+  RaRange(this.minRa, this.maxRa);
+}
+
+/// 难度（定数）范围实体
+class DifficultyRange {
+  final double minDiff;
+  final double maxDiff;
+
+  DifficultyRange(this.minDiff, this.maxDiff);
+}
+
+/// 推荐结果实体
 class RecommendationResult {
   final String songTitle;
   final double similarity;
@@ -1075,63 +1194,4 @@ class RecommendationResult {
     required this.similarity,
     required this.difficulty,
   });
-}
-
-class RaRange {
-  final int minRa;
-  final int maxRa;
-
-  RaRange({required this.minRa, required this.maxRa});
-}
-
-class DifficultyRange {
-  final double minDiff;
-  final double maxDiff;
-
-  DifficultyRange({required this.minDiff, required this.maxDiff});
-}
-
-// 以下为缺失的工具方法（需补充）
-Future<Map<String, Map<String, double>>> calculatePlayerAbilityVectors(List<Record> records, File tagFile) async {
-  // 补充实现逻辑
-  return {};
-}
-
-void showRecords(List<Record> records, String type) {
-  // 补充实现逻辑
-}
-
-RaRange getRaRange(List<Record> records) {
-  // 补充实现逻辑
-  return RaRange(minRa: 0, maxRa: 0);
-}
-
-DifficultyRange getDifficultyRange(RaRange raRange) {
-  // 补充实现逻辑
-  return DifficultyRange(minDiff: 0, maxDiff: 0);
-}
-
-Future<List<RecommendationResult>> calculateRecommendations(
-  List<Record> allRecords,
-  File tagFile,
-  Map<String, Map<String, double>> playerAbilityVectors,
-  DifficultyRange diffRange,
-  bool isBest15,
-) async {
-  // 补充实现逻辑
-  return [];
-}
-
-void showRecommendations(List<RecommendationResult> recommendations, String type) {
-  // 补充实现逻辑
-}
-
-void showDifficultyRange(DifficultyRange diffRange, String type) {
-  // 补充实现逻辑
-}
-
-// 补充_getLocalFilePath的全局访问（或调整作用域）
-Future<String> _getLocalFilePath(String fileName) async {
-  final Directory appDocDir = await getApplicationDocumentsDirectory();
-  return "${appDocDir.path}/$fileName";
 }

@@ -45,6 +45,9 @@ dependencies:
   http: ^0.13.5
   # 基础依赖：扫描文件并通知系统更新
   media_scanner: ^2.2.0
+  # 图表库
+  syncfusion_flutter_charts: ^20.1.61
+  fl_chart: ^1.1.1
 
 dev_dependencies:
   flutter_test:
@@ -104,6 +107,8 @@ flutter:
     - assets/WuShen.png
     - assets/b50testdata.json
     - assets/maimai_music_data.json
+    - assets/userPlayData.json
+    - assets/maiTags.json
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
