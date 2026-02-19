@@ -85,6 +85,36 @@ class _B50PageState extends State<B50Page> {
             ),
           ),
 
+          // 页面标题
+          const Positioned(
+            top: 60,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Text(
+                "Best50查询",
+                style: TextStyle(
+                  color: Color.fromARGB(255, 84, 97, 97),
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                ),
+              ),
+            ),
+          ),
+
+          // 返回按钮
+          Positioned(
+            top: 40,
+            left: 10,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Color.fromARGB(255, 84, 97, 97), size: 24),
+              onPressed: () {
+                Navigator.pop(context); // 返回到主页
+              },
+            ),
+          ),
+
           // 层级2：第一张虚化装饰图 - 居中显示，轻微向上偏移
           Center(
             child: Transform.translate(
@@ -102,7 +132,7 @@ class _B50PageState extends State<B50Page> {
 
           // 浅白色背景区域
           Positioned(
-            top: 20.0,
+            top: 100.0,
             left: 5.0,
             right: 5.0,
             bottom: 20.0,
@@ -503,7 +533,7 @@ class _B50PageState extends State<B50Page> {
                           style: TextStyle(
                             fontSize: dxFontSize,
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade600,
+                            color: Colors.blue.shade300,
                           ),
                         ),
                       SizedBox(width: 4.0),
@@ -823,8 +853,8 @@ class _B50PageState extends State<B50Page> {
       Colors.green, // level_index 0
       Colors.yellow, // level_index 1
       Colors.red, // level_index 2
-      Colors.purple, // level_index 3
-      Colors.purple.shade300, // level_index 4
+      Colors.purple.shade400, // level_index 3
+      Colors.purple.shade200, // level_index 4
     ];
     return colors[levelIndex.clamp(0, 4)];
   }
@@ -911,6 +941,7 @@ class _B50PageState extends State<B50Page> {
             _b50Data,
             _sdSongs,
             _dxSongs,
+            _maimaiMusicData,
           );
 
           // 显示导出结果

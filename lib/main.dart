@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/B50Page.dart';
+import 'package:my_first_flutter_app/SingleRatingCalculator.dart';
 import 'AchievementFullReverseCalculator.dart';
 import 'versionView.dart';
 import 'AchievementRateCalculator.dart';
@@ -351,6 +352,12 @@ class _HomePageState extends State<HomePage> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => B50Page()),
+            );
+          }
+          if (item.title == '单曲Rating计算') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => SingleRatingCalculator()),
             );
           }
         },

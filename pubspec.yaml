@@ -42,7 +42,9 @@ dependencies:
   # 基础依赖：处理权限（Android 需申请存储权限）
   permission_handler: ^11.3.1
   # 基础依赖：处理字节数据
-  http: ^0.13.5 
+  http: ^0.13.5
+  # 基础依赖：扫描文件并通知系统更新
+  media_scanner: ^2.2.0
 
 dev_dependencies:
   flutter_test:

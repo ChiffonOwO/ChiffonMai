@@ -11,7 +11,7 @@ class B50ConvertToImg {
   static GlobalKey _globalKey = GlobalKey();
 
   // 导出为图片的方法
-  static Future<File?> convertToImage(BuildContext context, Map<String, dynamic>? b50Data, List<Map<String, dynamic>> sdSongs, List<Map<String, dynamic>> dxSongs) async {
+  static Future<File?> convertToImage(BuildContext context, Map<String, dynamic>? b50Data, List<Map<String, dynamic>> sdSongs, List<Map<String, dynamic>> dxSongs, List<dynamic>? maimaiMusicData) async {
     try {
       // 创建一个GlobalKey
       GlobalKey globalKey = GlobalKey();
@@ -19,7 +19,7 @@ class B50ConvertToImg {
       // 创建一个Widget，用于生成图片
       Widget imageWidget = RepaintBoundary(
         key: globalKey,
-        child: _buildExportImageWidget(context, b50Data, sdSongs, dxSongs),
+        child: _buildExportImageWidget(context, b50Data, sdSongs, dxSongs, maimaiMusicData),
       );
 
       // 创建一个OverlayEntry
@@ -90,7 +90,7 @@ class B50ConvertToImg {
   }
 
   // 构建用于导出的Widget
-  static Widget _buildExportImageWidget(BuildContext context, Map<String, dynamic>? b50Data, List<Map<String, dynamic>> sdSongs, List<Map<String, dynamic>> dxSongs) {
+  static Widget _buildExportImageWidget(BuildContext context, Map<String, dynamic>? b50Data, List<Map<String, dynamic>> sdSongs, List<Map<String, dynamic>> dxSongs, List<dynamic>? maimaiMusicData) {
     // 计算各项指标
     int rating = b50Data?['rating'] ?? 0;
     
@@ -118,14 +118,14 @@ class B50ConvertToImg {
       int songId = song['song_id'];
       int levelIndex = song['level_index'];
       int score = song['dxScore'];
-      return sum + _calculateScoreRate(songId, levelIndex, score, b50Data);
+      return sum + _calculateScoreRate(songId, levelIndex, score, maimaiMusicData);
     });
     
     double dxScoreRateSum = dxSongs.fold(0.0, (sum, song) {
       int songId = song['song_id'];
       int levelIndex = song['level_index'];
       int score = song['dxScore'];
-      return sum + _calculateScoreRate(songId, levelIndex, score, b50Data);
+      return sum + _calculateScoreRate(songId, levelIndex, score, maimaiMusicData);
     });
     
     double best50ScoreRateAverage = (sdSongs.length + dxSongs.length) > 0 
@@ -155,7 +155,7 @@ class B50ConvertToImg {
             SizedBox(height: 16.0),
 
             // Best35 卡片网格 (5列)
-            _buildDataCardGrid(sdSongs, 1.8, 5, b50Data),
+            _buildDataCardGrid(sdSongs, 1.8, 5, b50Data, maimaiMusicData),
             SizedBox(height: 24.0),
 
             // Best15 标题区域
@@ -163,7 +163,7 @@ class B50ConvertToImg {
             SizedBox(height: 16.0),
 
             // Best15 卡片网格 (5列)
-            _buildDataCardGrid(dxSongs, 1.8, 5, b50Data),
+            _buildDataCardGrid(dxSongs, 1.8, 5, b50Data, maimaiMusicData),
             SizedBox(height: 20.0),
           ],
         ),
@@ -645,7 +645,7 @@ class B50ConvertToImg {
 
   // 构建数据驱动的卡片网格
   static Widget _buildDataCardGrid(
-      List<Map<String, dynamic>> songs, double childAspectRatio, int crossAxisCount, Map<String, dynamic>? b50Data) {
+      List<Map<String, dynamic>> songs, double childAspectRatio, int crossAxisCount, Map<String, dynamic>? b50Data, List<dynamic>? maimaiMusicData) {
     return GridView.builder(
       shrinkWrap: true,
       physics: NeverScrollableScrollPhysics(),
@@ -658,13 +658,13 @@ class B50ConvertToImg {
       ),
       itemCount: songs.length,
       itemBuilder: (context, index) {
-        return _buildDataGameCard(songs[index], b50Data);
+        return _buildDataGameCard(songs[index], b50Data, maimaiMusicData);
       },
     );
   }
 
   // 根据数据构建游戏卡片
-  static Widget _buildDataGameCard(Map<String, dynamic> songData, Map<String, dynamic>? b50Data) {
+  static Widget _buildDataGameCard(Map<String, dynamic> songData, Map<String, dynamic>? b50Data, List<dynamic>? maimaiMusicData) {
     // 解析数据
     double achievementRate = double.parse(songData['achievements'].toString());
     int score = songData['dxScore'];
@@ -679,7 +679,7 @@ class B50ConvertToImg {
     int songId = songData['song_id'];
     
     // 计算星星等级
-    String stars = _calculateStars(songId, levelIndex, score, b50Data);
+    String stars = _calculateStars(songId, levelIndex, score, maimaiMusicData);
     Color starsColor = _getStarsColor(stars);
 
     // 映射FC属性
@@ -780,13 +780,8 @@ class B50ConvertToImg {
   }
   
   // 计算scoreRate
-  static double _calculateScoreRate(int songId, int levelIndex, int score, Map<String, dynamic>? b50Data) {
-    // 尝试从b50Data中获取maimaiMusicData
-    List<dynamic>? maimaiMusicData = b50Data?['maimaiMusicData'];
-    if (maimaiMusicData == null) {
-      // 简化计算：假设满分是1000000
-      return score / 1000000.0;
-    }
+  static double _calculateScoreRate(int songId, int levelIndex, int score, List<dynamic>? maimaiMusicData) {
+    if (maimaiMusicData == null) return 0.0;
 
     // 查找对应的歌曲
     dynamic songData = maimaiMusicData.firstWhere(
@@ -794,14 +789,14 @@ class B50ConvertToImg {
       orElse: () => null,
     );
 
-    if (songData == null || songData['charts'] == null) return score / 1000000.0;
+    if (songData == null || songData['charts'] == null) return 0.0;
 
     // 查找对应的charts
     List<dynamic> charts = songData['charts'];
-    if (levelIndex < 0 || levelIndex >= charts.length) return score / 1000000.0;
+    if (levelIndex < 0 || levelIndex >= charts.length) return 0.0;
 
     dynamic chart = charts[levelIndex];
-    if (chart['notes'] == null) return score / 1000000.0;
+    if (chart['notes'] == null) return 0.0;
 
     // 计算maxScore
     List<dynamic> notes = chart['notes'];
@@ -813,8 +808,8 @@ class B50ConvertToImg {
   }
 
   // 计算星星等级
-  static String _calculateStars(int songId, int levelIndex, int score, Map<String, dynamic>? b50Data) {
-    double scoreRate = _calculateScoreRate(songId, levelIndex, score, b50Data);
+  static String _calculateStars(int songId, int levelIndex, int score, List<dynamic>? maimaiMusicData) {
+    double scoreRate = _calculateScoreRate(songId, levelIndex, score, maimaiMusicData);
 
     // 确定星星等级
     if (scoreRate >= 0.97) {
