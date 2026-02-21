@@ -5,7 +5,7 @@ import 'dart:convert';
 import 'dart:async';
 
 import 'package:flutter/services.dart';
-import 'B50ConvertToImg.dart';
+import '../service/B50ConvertToImg.dart';
 
 class B50Page extends StatefulWidget {
   @override

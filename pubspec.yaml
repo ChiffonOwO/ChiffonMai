@@ -48,6 +48,7 @@ dependencies:
   # 图表库
   syncfusion_flutter_charts: ^20.1.61
   fl_chart: ^1.1.1
+  archive: ^4.0.9
 
 dev_dependencies:
   flutter_test:

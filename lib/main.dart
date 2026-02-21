@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/B50Page.dart';
-import 'package:my_first_flutter_app/RecommendByTags.dart';
-import 'package:my_first_flutter_app/SingleRatingCalculator.dart';
-import 'AchievementFullReverseCalculator.dart';
-import 'versionView.dart';
-import 'AchievementRateCalculator.dart';
+import 'package:my_first_flutter_app/page/B50Page.dart';
+import 'package:my_first_flutter_app/page/RecommendByTags.dart';
+import 'package:my_first_flutter_app/page/SingleRatingCalculator.dart';
+import 'page/AchievementFullReverseCalculator.dart';
+import 'page/versionView.dart';
+import 'page/AchievementRateCalculator.dart';
 
 // 应用常量类：集中管理所有硬编码的配置值
 class AppConstants {
