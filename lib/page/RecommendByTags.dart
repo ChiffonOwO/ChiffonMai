@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
+import 'package:my_first_flutter_app/entity/RecommendationResult.dart';
 
 class RecommendByTags extends StatefulWidget {
   const RecommendByTags({super.key});
@@ -8,6 +10,42 @@ class RecommendByTags extends StatefulWidget {
 }
 
 class _RecommendByTagsState extends State<RecommendByTags> {
+  // 状态变量
+  Map<String, List<RecommendationResult>> _recommendations = {};
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    // 初始化时获取推荐结果
+    _fetchRecommendations();
+  }
+
+  // 获取推荐结果
+  Future<void> _fetchRecommendations() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = '无错误信息';
+      });
+      
+      // 调用推荐算法获取结果
+      final result = await recommendSongs();
+      
+      setState(() {
+        _recommendations = result;
+        _isLoading = false;
+        _errorMessage = null; // 成功时清除错误信息
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = '获取推荐结果失败：$e';
+        _isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -97,15 +135,52 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // 这里可以添加根据标签推荐的具体内容
-                    const Text(
-                      '根据标签推荐功能开发中...',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey,
-                      ),
-                    ),
+                    // 加载状态
+                    if (_isLoading)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(40.0),
+                          child: Column(
+                            children: [
+                              CircularProgressIndicator(
+                                color: Color.fromARGB(255, 84, 97, 97),
+                              ),
+                              SizedBox(height: 16),
+                              Text('正在计算推荐结果...'),
+                            ],
+                          ),
+                        ),
+                      )
+                    // 错误状态
+                    else if (_errorMessage != null)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(40.0),
+                          child: Column(
+                            children: [
+                              const Icon(
+                                Icons.error_outline,
+                                color: Colors.red,
+                                size: 48,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _errorMessage!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.red),
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _fetchRecommendations,
+                                child: const Text('重试'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    // 展示推荐结果
+                    else
+                      _buildRecommendationContent(),
                   ],
                 ),
               ),
@@ -115,6 +190,129 @@ class _RecommendByTagsState extends State<RecommendByTags> {
       ),
     );
   }
+
+  // 构建推荐内容
+  Widget _buildRecommendationContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Best55推荐
+        _buildRecommendationSection('Best55推荐', _recommendations['Best55'] ?? []),
+        const SizedBox(height: 24),
+        // Best15推荐
+        _buildRecommendationSection('Best15推荐', _recommendations['Best15'] ?? []),
+      ],
+    );
+  }
+
+  // 构建推荐区域
+  Widget _buildRecommendationSection(String title, List<RecommendationResult> results) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 区域标题
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color.fromARGB(255, 84, 97, 97),
+          ),
+        ),
+        const SizedBox(height: 12),
+        
+        // 推荐结果列表
+        if (results.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: Text(
+              '暂无推荐结果',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey),
+            ),
+          )
+        else
+          Column(
+            children: results.map((result) => _buildRecommendationItem(result)).toList(),
+          ),
+      ],
+    );
+  }
+
+  // 构建单个推荐项
+  Widget _buildRecommendationItem(RecommendationResult result) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(8),
+        color: Colors.white,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 歌曲标题和难度
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  result.songTitle,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              Text(
+                result.level,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color.fromARGB(255, 84, 97, 97),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          
+          // 定数、相似度
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('定数: ${result.ds}'),
+              Text('相似度: ${(result.similarity * 100).toStringAsFixed(1)}%'),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // 最低达成率
+          Text('最低达成率: ${result.minAchievement.toStringAsFixed(4)}%'),
+          
+          // 提升Rating信息
+          if (result.ableRiseTotalRating)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Rating提升:' +  result.riseTotalRating,
+                style: const TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            if (!result.ableRiseTotalRating)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                result.riseTotalRating,
+                style: const TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
-
-

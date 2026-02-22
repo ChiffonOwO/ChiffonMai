@@ -2,7 +2,7 @@ import 'RecordItem.dart';
 
 class UserPlayDataEntity {
   final int additionalRating;
-  final int nickname;
+  final String nickname;
   final String plate;
   final int rating;
   final List<RecordItem> records;

@@ -106,7 +106,7 @@ class LocalizedName {
 
   factory LocalizedName.fromJson(Map<String, dynamic> json) {
     return LocalizedName(
-      zhHans: json['zhHans'],
+      zhHans: json['zh-Hans'],
     );
   }
 }

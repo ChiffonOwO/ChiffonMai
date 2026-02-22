@@ -5,7 +5,7 @@ class RecommendationResult {
   final double similarity;
   final double minAchievement;
   final bool ableRiseTotalRating;
-  final int riseTotalRating;
+  final String riseTotalRating;
 
   RecommendationResult({
     required this.songTitle,
