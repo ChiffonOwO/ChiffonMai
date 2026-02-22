@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
 import 'package:my_first_flutter_app/entity/RecommendationResult.dart';
@@ -14,6 +16,12 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   Map<String, List<RecommendationResult>> _recommendations = {};
   bool _isLoading = true;
   String? _errorMessage;
+  
+  // 新增状态变量
+  String _currentTab = 'Best55'; // 当前选中的标签，默认为Best55
+  int _currentPage = 1; // 当前页码
+  int _pageSize = 10; // 每页显示的推荐项数量
+  ScrollController _scrollController = ScrollController(); // 滚动控制器
 
   @override
   void initState() {
@@ -130,59 +138,121 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                   ),
                 ],
               ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // 加载状态
-                    if (_isLoading)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(40.0),
-                          child: Column(
-                            children: [
-                              CircularProgressIndicator(
-                                color: Color.fromARGB(255, 84, 97, 97),
-                              ),
-                              SizedBox(height: 16),
-                              Text('正在计算推荐结果...'),
-                            ],
+              child: Column(
+                children: [
+                  // 切换按钮
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _currentTab = 'Best55';
+                              _currentPage = 1; // 切换标签时重置页码
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _currentTab == 'Best55' 
+                                ? const Color.fromARGB(255, 84, 97, 97) 
+                                : Colors.grey.shade200,
+                            foregroundColor: _currentTab == 'Best55' 
+                                ? Colors.white 
+                                : const Color.fromARGB(255, 84, 97, 97),
                           ),
+                          child: const Text('Best55推荐'),
                         ),
-                      )
-                    // 错误状态
-                    else if (_errorMessage != null)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(40.0),
-                          child: Column(
-                            children: [
-                              const Icon(
-                                Icons.error_outline,
-                                color: Colors.red,
-                                size: 48,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _errorMessage!,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: Colors.red),
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _fetchRecommendations,
-                                child: const Text('重试'),
-                              ),
-                            ],
+                        const SizedBox(width: 16),
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _currentTab = 'Best15';
+                              _currentPage = 1; // 切换标签时重置页码
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _currentTab == 'Best15' 
+                                ? const Color.fromARGB(255, 84, 97, 97) 
+                                : Colors.grey.shade200,
+                            foregroundColor: _currentTab == 'Best15' 
+                                ? Colors.white 
+                                : const Color.fromARGB(255, 84, 97, 97),
                           ),
+                          child: const Text('Best15推荐'),
                         ),
-                      )
-                    // 展示推荐结果
-                    else
-                      _buildRecommendationContent(),
-                  ],
-                ),
+                      ],
+                    ),
+                  ),
+                  
+                  // 内容区域
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // 加载状态
+                          if (_isLoading)
+                            const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(40.0),
+                                child: Column(
+                                  children: [
+                                    CircularProgressIndicator(
+                                      color: Color.fromARGB(255, 84, 97, 97),
+                                    ),
+                                    SizedBox(height: 16),
+                                    Text('正在计算推荐结果...'),
+                                  ],
+                                ),
+                              ),
+                            )
+                          // 错误状态
+                          else if (_errorMessage != null)
+                            Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(40.0),
+                                child: Column(
+                                  children: [
+                                    const Icon(
+                                      Icons.error_outline,
+                                      color: Colors.red,
+                                      size: 48,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      _errorMessage!,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(color: Colors.red),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton(
+                                      onPressed: _fetchRecommendations,
+                                      child: const Text('重试'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          // 展示推荐结果
+                          else
+                            Column(
+                              children: [
+                                _buildRecommendationContent(),
+                                const SizedBox(height: 16),
+                                _buildPagination(),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -193,14 +263,74 @@ class _RecommendByTagsState extends State<RecommendByTags> {
 
   // 构建推荐内容
   Widget _buildRecommendationContent() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    // 根据当前选中的标签获取推荐结果
+    List<RecommendationResult> results = _recommendations[_currentTab] ?? [];
+    
+    // 计算分页
+    int totalItems = results.length;
+    int totalPages = (totalItems / _pageSize).ceil();
+    int startIndex = (_currentPage - 1) * _pageSize;
+    int endIndex = min(startIndex + _pageSize, totalItems);
+    List<RecommendationResult> paginatedResults = [];
+    
+    if (startIndex < totalItems) {
+      paginatedResults = results.sublist(startIndex, endIndex);
+    }
+    
+    return _buildRecommendationSection('${_currentTab}推荐', paginatedResults);
+  }
+  
+  // 构建分页组件
+  Widget _buildPagination() {
+    List<RecommendationResult> results = _recommendations[_currentTab] ?? [];
+    int totalItems = results.length;
+    int totalPages = (totalItems / _pageSize).ceil();
+    
+    if (totalPages <= 1) {
+      return Container(); // 只有一页时不显示分页
+    }
+    
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Best55推荐
-        _buildRecommendationSection('Best55推荐', _recommendations['Best55'] ?? []),
-        const SizedBox(height: 24),
-        // Best15推荐
-        _buildRecommendationSection('Best15推荐', _recommendations['Best15'] ?? []),
+        // 上一页按钮
+        ElevatedButton(
+          onPressed: _currentPage > 1
+              ? () {
+                  setState(() {
+                    _currentPage--;
+                    // 滚动到顶端
+                    _scrollController.animateTo(
+                      0,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    );
+                  });
+                }
+              : null,
+          child: const Text('上一页'),
+        ),
+        const SizedBox(width: 16),
+        // 页码显示
+        Text(' $_currentPage / $totalPages '),
+        const SizedBox(width: 16),
+        // 下一页按钮
+        ElevatedButton(
+          onPressed: _currentPage < totalPages
+              ? () {
+                  setState(() {
+                    _currentPage++;
+                    // 滚动到顶端
+                    _scrollController.animateTo(
+                      0,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    );
+                  });
+                }
+              : null,
+          child: const Text('下一页'),
+        ),
       ],
     );
   }
@@ -286,31 +416,31 @@ class _RecommendByTagsState extends State<RecommendByTags> {
           ),
           const SizedBox(height: 8),
           // 最低达成率
-          Text('最低达成率: ${result.minAchievement.toStringAsFixed(4)}%'),
+          Text('当前:${result.nowAchievement.toStringAsFixed(4)}%→目标:${result.minAchievement.toStringAsFixed(4)}%'),
           
           // 提升Rating信息
-          if (result.ableRiseTotalRating)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                'Rating提升:' +  result.riseTotalRating,
-                style: const TextStyle(
-                  color: Colors.green,
-                  fontWeight: FontWeight.bold,
-                ),
+          if (result.ableRiseTotalRating == true)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              'Rating提升: ' + result.riseTotalRating,
+              style: TextStyle(
+                color: Colors.green,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            if (!result.ableRiseTotalRating)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                result.riseTotalRating,
-                style: const TextStyle(
-                  color: Colors.grey,
-                  fontWeight: FontWeight.bold,
-                ),
+          ),
+          if (result.ableRiseTotalRating == false)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              result.riseTotalRating,
+              style: TextStyle(
+                color: Colors.grey,
+                fontWeight: FontWeight.normal,
               ),
             ),
+          ),
         ],
       ),
     );

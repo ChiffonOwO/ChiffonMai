@@ -64,4 +64,7 @@ class RecordItem {
       type: json['type'],
     );
   }
+  String toString() {
+    return 'RecordItem(achievements: $achievements, ds: $ds, dxScore: $dxScore, fc: $fc, fs: $fs, level: $level, levelIndex: $levelIndex, levelLabel: $levelLabel, ra: $ra, rate: $rate, songId: $songId, title: $title, type: $type)';
+  }
 }

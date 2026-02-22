@@ -3,6 +3,7 @@ class RecommendationResult {
   final String level;
   final double ds;
   final double similarity;
+  final double nowAchievement;
   final double minAchievement;
   final bool ableRiseTotalRating;
   final String riseTotalRating;
@@ -12,6 +13,7 @@ class RecommendationResult {
     required this.level,
     required this.ds,
     required this.similarity,
+    required this.nowAchievement,
     required this.minAchievement,
     required this.ableRiseTotalRating,
     required this.riseTotalRating,
