@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/page/B50Page.dart';
+import 'package:my_first_flutter_app/page/RecommendByBest50.dart';
 import 'package:my_first_flutter_app/page/RecommendByTags.dart';
 import 'package:my_first_flutter_app/page/SingleRatingCalculator.dart';
+import 'package:my_first_flutter_app/page/SongSearchPage.dart';
 import 'page/AchievementFullReverseCalculator.dart';
 import 'page/versionView.dart';
 import 'page/AchievementRateCalculator.dart';
@@ -93,7 +95,6 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.leaderboard, title: 'Best50查询', subtitle: '我去,龙币!'),
     ButtonItem(icon: Icons.analytics, title: '拟合Best50查询', subtitle: '我w55怎么拟合才w52?!'),
     ButtonItem(icon: Icons.grade, title: '基于Best50推荐', subtitle: '基于你的Best50推荐曲目'),
-    ButtonItem(icon: Icons.category, title: '基于流派推荐', subtitle: '基于你游玩的曲目流派推荐曲目'),
     ButtonItem(icon: Icons.label, title: '基于标签推荐', subtitle: '基于你游玩的谱面标签推荐曲目'),
     ButtonItem(icon: Icons.shuffle, title: '随机乐曲', subtitle: '随机选曲1-4首'),
     ButtonItem(icon: Icons.calculate, title: '单曲Rating计算', subtitle: '我鸟加这个有分吃吗？'),
@@ -365,6 +366,12 @@ class _HomePageState extends State<HomePage> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => RecommendByTags()),
+            );
+          }
+          if (item.title == '乐曲查询') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => SongSearchPage()),
             );
           }
         },

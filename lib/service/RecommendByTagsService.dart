@@ -595,13 +595,17 @@ double calculateSimilarity(
 /**
  * 计算推荐结果
  * 基于玩家的能力向量和谱面记录，计算推荐结果
- * @param maimaiMusicData 所有歌曲列表
- * @param allRecords 所有谱面记录列表
- * @param playerAbilityVectors 玩家的能力向量Map（键：分组名称，值：该分组下各标签的能力向量Map）
- * @param best55minRating 玩家的Best55谱面记录列表中最小Rating
- * @param best55maxRating 玩家的Best55谱面记录列表中最大Rating
- * @param isNewOnly 是否仅推荐当前版本的谱面
- * @return 推荐结果列表
+ *  @param maimaiMusicData 所有歌曲列表
+ *  @param allRecords 所有谱面记录列表
+ *  @param playerAbilityVectors 玩家的能力向量Map（键：分组名称，值：该分组下各标签的能力向量Map）
+ *  @param minDs 目标定数下限
+ *  @param maxDs 目标定数上限
+ *  @param minRating 目标Rating下限
+ *  @param maxRating 目标Rating上限
+ *  @param best35minRating 玩家的Best35谱面记录列表中最小Rating
+ *  @param best35maxRating 玩家的Best35谱面记录列表中最大Rating
+ *  @param isNewOnly 是否仅推荐当前版本的谱面
+ *  @return 推荐结果列表
  */
 Future<List<RecommendationResult>> calculateRecommendations(
     List<Song> maimaiMusicData,
