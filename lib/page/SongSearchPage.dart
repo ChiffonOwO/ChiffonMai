@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/service/SongSearchService.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
-import 'package:my_first_flutter_app/page/SongInfoPage.dart';
+import 'dart:async';
+
 
 class SongSearchPage extends StatefulWidget {
   const SongSearchPage({super.key});
@@ -16,10 +17,12 @@ class _SongSearchPageState extends State<SongSearchPage> {
   bool _isSearching = false;
   String? _errorMessage;
   TextEditingController _searchController = TextEditingController();
+  Timer? _searchTimer;
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchTimer?.cancel();
     super.dispose();
   }
 
@@ -53,6 +56,17 @@ class _SongSearchPageState extends State<SongSearchPage> {
         _isSearching = false;
       });
     }
+  }
+
+  // 防抖搜索
+  void _debouncedSearch(String query) {
+    // 取消之前的定时器
+    _searchTimer?.cancel();
+    
+    // 设置新的定时器，300毫秒后执行搜索
+    _searchTimer = Timer(const Duration(milliseconds: 1000), () {
+      _performSearch(query);
+    });
   }
 
   @override
@@ -147,8 +161,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
                     child: TextField(
                       controller: _searchController,
                       onChanged: (value) {
-                        // 实时搜索
-                        _performSearch(value);
+                        // 防抖搜索
+                        _debouncedSearch(value);
                       },
                       decoration: InputDecoration(
                         hintText: '输入歌曲标题、艺术家、BPM或谱师',

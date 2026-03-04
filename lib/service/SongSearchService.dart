@@ -88,12 +88,22 @@ class BasicInfo {
 
 // 搜索服务
 class SongSearchService {
+  // 缓存所有歌曲数据
+  static List<Song>? _cachedSongs;
+
+  // 加载所有歌曲数据（带缓存）
   static Future<List<Song>> loadAllSongs() async {
+    // 如果已经缓存，直接返回
+    if (_cachedSongs != null) {
+      return _cachedSongs!;
+    }
+
     try {
       // 从资产文件加载JSON数据
       final jsonString = await rootBundle.loadString('assets/maimai_music_data.json');
       final List<dynamic> jsonList = json.decode(jsonString);
-      return jsonList.map((json) => Song.fromJson(json)).toList();
+      _cachedSongs = jsonList.map((json) => Song.fromJson(json)).toList();
+      return _cachedSongs!;
     } catch (e) {
       print('加载歌曲数据失败: $e');
       return [];
@@ -119,7 +129,7 @@ class SongSearchService {
         return true;
       }
       // 检查BPM
-      if (song.basicInfo.bpm.toString().contains(lowerQuery)) {
+      if (song.basicInfo.bpm.toString() == lowerQuery) {
         return true;
       }
       // 检查谱师
@@ -127,6 +137,14 @@ class SongSearchService {
         if (chart.charter.toLowerCase().contains(lowerQuery)) {
           return true;
         }
+      }
+      // 检查流派
+      if (song.basicInfo.genre.toLowerCase().contains(lowerQuery)) {
+        return true;
+      }
+      // 检查版本
+      if (song.basicInfo.from.toLowerCase().contains(lowerQuery)) {
+        return true;
       }
       return false;
     }).toList();

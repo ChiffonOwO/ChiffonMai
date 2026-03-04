@@ -49,6 +49,7 @@ dependencies:
   syncfusion_flutter_charts: ^20.1.61
   fl_chart: ^1.1.1
   archive: ^4.0.9
+  marquee: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -111,6 +112,7 @@ flutter:
     - assets/userPlayData.json
     - assets/maiTags.json
     - assets/songDiffData.json
+    - assets/maimai_alias.json
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

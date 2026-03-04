@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:marquee/marquee.dart';
 
 class SongInfoPage extends StatefulWidget {
   final String songId;
@@ -15,9 +16,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
   // 数据加载状态
   bool _isLoading = true;
   Map<String, dynamic>? _songData;
-  Map<String, dynamic>? _diffData;
+  List<dynamic>? _diffData;
   Map<String, dynamic>? _userData;
   List<dynamic>? _tagData;
+  List<dynamic>? _tagSongsData;
+  List<dynamic>? _aliasData; // 别名数据
   
   // 当前选中的难度索引
   int _currentDiffIndex = 3; // 默认选中Master难度
@@ -40,7 +43,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
       );
       
       // 加载难度数据
-      final diffData = await rootBundle.loadString('assets/SongDiffData.json');
+      final diffData = await rootBundle.loadString('assets/songDiffData.json');
       final Map<String, dynamic> diffMap = json.decode(diffData);
       _diffData = diffMap['charts'][widget.songId];
       
@@ -53,6 +56,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
       final tagData = await rootBundle.loadString('assets/maiTags.json');
       final Map<String, dynamic> tagMap = json.decode(tagData);
       _tagData = tagMap['tags'];
+      _tagSongsData = tagMap['tagSongs'];
+      
+      // 加载别名数据
+      final aliasData = await rootBundle.loadString('assets/maimai_alias.json');
+      _aliasData = json.decode(aliasData);
       
     } catch (e) {
       print('加载数据失败: $e');
@@ -71,15 +79,13 @@ class _SongInfoPageState extends State<SongInfoPage> {
     if (records == null) return null;
     
     // 找到对应歌曲的记录
-    final songRecords = records.where((record) => 
+    final songRecord = records.where((record) => 
       record['song_id'].toString() == widget.songId
+      && record['level_index'].toString() == _currentDiffIndex.toString()
     ).toList();
+
+    return songRecord.isNotEmpty ? songRecord.first : null;
     
-    if (songRecords.isEmpty) return null;
-    
-    // 按达成率排序，取最高的
-    songRecords.sort((a, b) => b['achievements'].compareTo(a['achievements']));
-    return songRecords.first;
   }
 
   // 获取标签分组
@@ -90,32 +96,129 @@ class _SongInfoPageState extends State<SongInfoPage> {
       '难度': []
     };
     
-    if (_tagData != null) {
-      for (var tag in _tagData!) {
-        int groupId = tag['group_id'] ?? 0;
-        String groupName;
+    if (_tagData != null && _tagSongsData != null && _songData != null) {
+      // 获取当前曲目的相关信息
+      final String songTitle = _songData!['basic_info']['title'];
+      final String songType = _songData!['type'];
+      final String sheetType = songType == 'DX' ? 'dx' : 'std';
+      
+      // 映射难度索引到sheet_difficulty
+      String sheetDifficulty;
+      switch (_currentDiffIndex) {
+        case 0:
+          sheetDifficulty = 'basic';
+          break;
+        case 1:
+          sheetDifficulty = 'advanced';
+          break;
+        case 2:
+          sheetDifficulty = 'expert';
+          break;
+        case 3:
+          sheetDifficulty = 'master';
+          break;
+        case 4:
+          sheetDifficulty = 'remaster';
+          break;
+        default:
+          sheetDifficulty = 'master';
+      }
+      
+      // 过滤出当前曲目的当前难度的标签ID
+      final List<int> tagIds = _tagSongsData!.where((item) => 
+        item['song_id'] == songTitle &&
+        item['sheet_type'] == sheetType &&
+        item['sheet_difficulty'] == sheetDifficulty
+      ).map((item) => item['tag_id'] as int).toList();
+      
+      // 根据标签ID获取标签详情
+      for (int tagId in tagIds) {
+        final tag = _tagData!.firstWhere(
+          (t) => t['id'] == tagId,
+          orElse: () => null
+        );
         
-        switch (groupId) {
-          case 1:
-            groupName = '配置';
-            break;
-          case 2:
-            groupName = '评价';
-            break;
-          case 3:
-            groupName = '难度';
-            break;
-          default:
-            groupName = '配置';
-        }
-        
-        if (groupedTags.containsKey(groupName)) {
-          groupedTags[groupName]!.add(tag);
+        if (tag != null) {
+          int groupId = tag['group_id'] ?? 0;
+          String groupName;
+          
+          switch (groupId) {
+            case 1:
+              groupName = '配置';
+              break;
+            case 2:
+              groupName = '难度';
+              break;
+            case 3:
+              groupName = '评价';
+              break;
+            default:
+              groupName = '配置';
+          }
+          
+          if (groupedTags.containsKey(groupName)) {
+            groupedTags[groupName]!.add(tag);
+          }
         }
       }
     }
     
     return groupedTags;
+  }
+
+
+  // 根据难度索引获取主题颜色
+  Color _getThemeColor(int diffIndex) {
+    switch (diffIndex) {
+      case 0: // Basic
+        return Color(0xFFE8F5E8); // 浅绿色
+      case 1: // Advan
+        return Color(0xFFFFF8E1); // 浅黄色
+      case 2: // Expert
+        return Color(0xFFFCE4EC); // 浅红色
+      case 3: // Master
+        return Color(0xFFE9D8FF); // 当前颜色不变
+      case 4: // Re:MASTER
+        return Color(0xFFF3E5F5); // 浅粉色
+      default:
+        return Color(0xFFE9D8FF);
+    }
+  }
+
+  // 根据难度索引获取次要主题颜色
+  Color _getSecondaryThemeColor(int diffIndex) {
+    switch (diffIndex) {
+      case 0: // Basic
+        return Color(0xFFC8E6C9); // 浅绿色
+      case 1: // Advan
+        return Color(0xFFFFE0B2); // 浅黄色
+      case 2: // Expert
+        return Color(0xFFF8BBD0); // 浅红色
+      case 3: // Master
+        return Color(0xFFD4BFFF); // 当前颜色不变
+      case 4: // Re:MASTER
+        return Color(0xFFE1BEE7); // 浅粉色
+      default:
+        return Color(0xFFD4BFFF);
+    }
+  }
+
+  // 根据难度索引获取强调颜色
+  Color _getAccentColor(int diffIndex) {
+    switch (diffIndex) {
+      case 0: // Basic
+        return Color(0xFF4CAF50); // 绿色
+      case 1: // Advan
+        return Color(0xFFFF9800); // 橙色
+      case 2: // Expert
+        return Color(0xFFE91E63); // 红色
+      case 3: // Master
+        return Color(0xFF9966CC); // 当前颜色不变
+      case 4: // Re:MASTER
+        return Color(0xFF9C27B0); // 紫色
+      default:
+        return Color(0xFF9966CC);
+    }
   }
 
   @override
@@ -137,6 +240,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
         : null;
     final userRecord = _getUserBestRecord();
     final groupedTags = _getTagsByGroup();
+
+    // 获取当前难度的主题颜色
+    final themeColor = _getThemeColor(_currentDiffIndex);
+    final secondaryThemeColor = _getSecondaryThemeColor(_currentDiffIndex);
+    final accentColor = _getAccentColor(_currentDiffIndex);
 
     // 生成曲绘URL
     String coverUrl = 'https://www.diving-fish.com/covers/${widget.songId.padLeft(5, '0')}.png';
@@ -207,9 +315,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
           // 主要内容区域
           Positioned(
-            top: 120,
-            left: 20,
-            right: 20,
+            top: MediaQuery.of(context).size.height * 0.15,
+            left: MediaQuery.of(context).size.width * 0.02,
+            right: MediaQuery.of(context).size.width * 0.02,
             bottom: 80,
             child: Container(
               decoration: BoxDecoration(
@@ -235,8 +343,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            Color(0xFFE9D8FF),
-                            Color(0xFFD4BFFF),
+                            themeColor,
+                            secondaryThemeColor,
                           ],
                         ),
                         borderRadius: BorderRadius.circular(16),
@@ -295,22 +403,19 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                   children: [
                                     Text(
                                       basicInfo['title'],
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 22,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF2D1B69),
+                                        color: accentColor,
                                       ),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     
-                                    const SizedBox(height: 12),
+                                    // 显示歌曲别名
+                                    _buildAliasSection(basicInfo['title']),
                                     
-                                    // 信息项
-                                    _buildInfoItem('类别', basicInfo['genre']),
-                                    _buildInfoItem('BPM', basicInfo['bpm'].toString()),
-                                    _buildInfoItem('版本', _formatVersion(basicInfo['from'])),
-                                    _buildInfoItem('曲师', basicInfo['artist'].split('/').last),
+                                    const SizedBox(height: 12),
                                   ],
                                 ),
                               ),
@@ -336,8 +441,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(10),
                                       color: _currentDiffIndex == index
-                                          ? Color(0xFF9966CC)
-                                          : Color(0xFFF0E6FF),
+                                          ? accentColor
+                                          : themeColor,
                                     ),
                                     child: Column(
                                       mainAxisAlignment: MainAxisAlignment.center,
@@ -350,7 +455,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                             fontWeight: FontWeight.bold,
                                             color: _currentDiffIndex == index
                                                 ? Colors.white
-                                                : Color(0xFF664499),
+                                                : accentColor,
                                           ),
                                         ),
                                         const SizedBox(height: 4),
@@ -362,7 +467,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                             fontWeight: FontWeight.bold,
                                             color: _currentDiffIndex == index
                                                 ? Colors.white
-                                                : Color(0xFF664499),
+                                                : accentColor,
                                           ),
                                         ),
                                       ],
@@ -379,7 +484,19 @@ class _SongInfoPageState extends State<SongInfoPage> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              _buildStatItem('官方定数', currentDiffData?['diff'] ?? '-'),
+                              _buildStatItem('类别', basicInfo['genre']),
+                              _buildStatItem('BPM', basicInfo['bpm'].toString()),
+                              _buildStatItem('版本', _formatVersion(basicInfo['from'])),
+                              _buildStatItem('曲师', basicInfo['artist'].split('/').last),
+                            ],
+                          ),
+                          
+                          const SizedBox(height: 20),
+
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _buildStatItem('官方定数', _songData!['ds'][_currentDiffIndex].toStringAsFixed(1)),
                               _buildStatItem('拟合难度', currentDiffData != null 
                                   ? currentDiffData['fit_diff'].toStringAsFixed(2) 
                                   : '-'),
@@ -393,21 +510,25 @@ class _SongInfoPageState extends State<SongInfoPage> {
                           const SizedBox(height: 20),
                           
                           // 音符分布网格
-                          GridView.count(
-                            crossAxisCount: 5,
-                            crossAxisSpacing: 8,
-                            mainAxisSpacing: 8,
-                            shrinkWrap: true,
-                            physics: NeverScrollableScrollPhysics(),
-                            children: [
-                              _buildNoteItem('TAP', currentChart['notes'][0].toString()),
-                              _buildNoteItem('HOLD', currentChart['notes'][1].toString()),
-                              _buildNoteItem('SLIDE', currentChart['notes'][2].toString()),
-                              _buildNoteItem('BREAK', currentChart['notes'][3].toString()),
-                              _buildNoteItem('TOUCH', (currentChart['notes'].length > 4 
-                                  ? currentChart['notes'][4] 
-                                  : 0).toString()),
-                            ],
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                _buildNoteItem('TAP', currentChart['notes'][0].toString()),
+                                SizedBox(width: 8),
+                                _buildNoteItem('HOLD', currentChart['notes'][1].toString()),
+                                SizedBox(width: 8),
+                                _buildNoteItem('SLIDE', currentChart['notes'][2].toString()),
+                                SizedBox(width: 8),
+                                _buildNoteItem('BREAK',  currentChart['notes'].length > 4 
+                                    ? currentChart['notes'][4].toString() 
+                                    : currentChart['notes'][3].toString()),
+                                SizedBox(width: 8),
+                                _buildNoteItem('TOUCH', (currentChart['notes'].length > 4 
+                                    ? currentChart['notes'][3] 
+                                    : 0).toString()),
+                              ],
+                            ),
                           ),
                           
                           const SizedBox(height: 20),
@@ -469,6 +590,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                       
                                       Row(
                                         children: [
+                                          Text('连击,同步：'),
                                           if (userRecord != null) ...[
                                             if (userRecord['fc'].isNotEmpty) 
                                               _buildBadge(userRecord['fc']),
@@ -486,14 +608,14 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                   height: 48,
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(24),
-                                    color: Color(0xFFF0E6FF),
+                                    color: themeColor,
                                   ),
-                                  child: const Center(
+                                  child: Center(
                                     child: Text(
                                       '★',
                                       style: TextStyle(
                                         fontSize: 24,
-                                        color: Color(0xFF9966CC),
+                                        color: accentColor,
                                       ),
                                     ),
                                   ),
@@ -509,12 +631,12 @@ class _SongInfoPageState extends State<SongInfoPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  '谱面标签',
+                                Text(
+                                  '谱面标签(数据来自DXRating.net)',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF2D1B69),
+                                    color: accentColor,
                                   ),
                                 ),
                                 
@@ -522,21 +644,21 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                 
                                 // 标签分组
                                 for (var group in groupedTags.entries)
-                                  if (group.value.isNotEmpty)
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          group.key,
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            color: Color(0xFF664499),
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        group.key,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: accentColor,
+                                          fontWeight: FontWeight.w500,
                                         ),
-                                        
-                                        const SizedBox(height: 6),
-                                        
+                                      ),
+                                      
+                                      const SizedBox(height: 6),
+                                      
+                                      if (group.value.isNotEmpty)
                                         Wrap(
                                           spacing: 8,
                                           runSpacing: 8,
@@ -564,11 +686,19 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                               ),
                                             ),
                                           ).toList(),
+                                        )
+                                      else
+                                        Text(
+                                          '当前分类暂无标签',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                          ),
                                         ),
-                                        
-                                        const SizedBox(height: 12),
-                                      ],
-                                    ),
+                                      
+                                      const SizedBox(height: 12),
+                                    ],
+                                  ),
                               ],
                             ),
                           ),
@@ -589,52 +719,70 @@ class _SongInfoPageState extends State<SongInfoPage> {
     );
   }
 
-  // 构建信息项
-  Widget _buildInfoItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          Text(
-            '▌',
-            style: TextStyle(
-              color: Color(0xFF9966CC),
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            '$label: $value',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.grey,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // 构建统计项
   Widget _buildStatItem(String label, String value) {
+    // 获取当前难度的强调颜色
+    final accentColor = _getAccentColor(_currentDiffIndex);
+    
+    final textStyle = TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.bold,
+      color: accentColor,
+    );
+    
     return Expanded(
       child: Column(
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: Color(0xFF664499),
+              color: accentColor,
             ),
           ),
           const SizedBox(height: 4),
+          // 为谱面谱师和曲师添加水平滚动
+          (label == '谱面谱师' || label == '曲师' || label == '版本' || label == '类别') ?
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // 计算文本宽度
+              final TextPainter textPainter = TextPainter(
+                text: TextSpan(text: value, style: textStyle),
+                maxLines: 1,
+                textDirection: TextDirection.ltr,
+              )..layout(minWidth: 0, maxWidth: double.infinity);
+              
+              final textWidth = textPainter.width;
+              final containerWidth = constraints.maxWidth;
+              
+              // 如果文本宽度小于容器宽度，不需要滚动
+              if (textWidth <= containerWidth) {
+                return Text(value, style: textStyle);
+              }
+              
+              // 否则使用Marquee组件
+              return Container(
+                height: 20,
+                child: Marquee(
+                  text: value,
+                  style: textStyle,
+                  scrollAxis: Axis.horizontal,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  blankSpace: 20.0,
+                  velocity: 30.0,
+                  pauseAfterRound: Duration(seconds: 3),
+                  startPadding: 10.0,
+                  accelerationDuration: Duration(seconds: 1),
+                  accelerationCurve: Curves.linear,
+                  decelerationDuration: Duration(milliseconds: 500),
+                  decelerationCurve: Curves.easeOut,
+                ),
+              );
+            },
+          ) :
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2D1B69),
-            ),
+            style: textStyle,
           ),
         ],
       ),
@@ -643,12 +791,16 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
   // 构建音符项
   Widget _buildNoteItem(String type, String count) {
+    // 获取当前难度的强调颜色
+    final accentColor = _getAccentColor(_currentDiffIndex);
+    
     return Container(
+      width: MediaQuery.of(context).size.width * 0.14,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(6),
       child: Column(
         children: [
           Text(
@@ -658,13 +810,13 @@ class _SongInfoPageState extends State<SongInfoPage> {
               color: Colors.grey,
             ),
           ),
-          const SizedBox(height: 4),
+
           Text(
             count,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF664499),
+              color: accentColor,
             ),
           ),
         ],
@@ -678,25 +830,42 @@ class _SongInfoPageState extends State<SongInfoPage> {
     Color textColor;
     
     switch (text) {
+      case 'app':
+        bgColor = Color(0xFFFFF3E0);
+        textColor = Color(0xFFF57C00);
+        text = 'AP+';
+        break;
       case 'ap':
-        bgColor = Color(0xFFD4F4DD);
-        textColor = Color(0xFF2E7D32);
+        bgColor = Color(0xFFFFF3E0);
+        textColor = Color(0xFFF57C00);
         break;
       case 'fcp':
         bgColor = Color(0xFFD4F4DD);
         textColor = Color(0xFF2E7D32);
+        text = 'FC+';
         break;
       case 'fc':
         bgColor = Color(0xFFD4F4DD);
         textColor = Color(0xFF2E7D32);
         break;
       case 'fsp':
-        bgColor = Color(0xFFFFF3E0);
-        textColor = Color(0xFFF57C00);
+        bgColor = Color.fromARGB(255, 224, 244, 255);
+        textColor = Color.fromARGB(255, 0, 135, 245);
+        text = 'FS+';
         break;
       case 'sync':
+        bgColor = Color.fromARGB(255, 224, 244, 255);
+        textColor = Color.fromARGB(255, 0, 135, 245);
+        break;
+      case 'fsd':
         bgColor = Color(0xFFFFF3E0);
         textColor = Color(0xFFF57C00);
+        text = 'FDX';
+        break;
+      case 'fsdp':
+        bgColor = Color(0xFFFFF3E0);
+        textColor = Color(0xFFF57C00);
+        text = 'FDX+';
         break;
       default:
         bgColor = Color(0xFFF0F0F0);
@@ -733,7 +902,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
       case 3:
         return 'Master';
       case 4:
-        return 'Re:MASTER';
+        return 'ReMAS';
       default:
         return '';
     }
@@ -805,5 +974,82 @@ class _SongInfoPageState extends State<SongInfoPage> {
       default:
         return Color(0xFF664499);
     }
+  }
+  
+  // 构建别名区域
+  Widget _buildAliasSection(String songTitle) {
+    if (_aliasData == null) {
+      return SizedBox.shrink();
+    }
+    
+    // 查找当前歌曲的别名
+    final List<String> aliases = _aliasData!.where((item) => 
+      item['song_id'] == songTitle
+    ).map((item) => item['name'] as String).toList();
+    
+    if (aliases.isEmpty) {
+      return SizedBox.shrink();
+    }
+    
+    // 构建别名字符串
+    final String aliasesText = aliases.join(', ');
+    
+    return GestureDetector(
+      onTap: () {
+        // 显示弹窗查看所有别名
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('${songTitle}的别名'),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: aliases.map((alias) => 
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text('- $alias'),
+                    )
+                  ).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('关闭'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '别名: ',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+            SizedBox(height: 2),
+            Text(
+              aliasesText,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[800],
+              ),
+              softWrap: true, // 允许换行
+              overflow: TextOverflow.visible, // 不截断
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
