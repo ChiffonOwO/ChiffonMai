@@ -106,6 +106,9 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    // 获取屏幕尺寸
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
 
     // 页面根布局：Scaffold + Stack 实现多层级叠加布局
     // Stack子组件按书写顺序从上到下叠加，越靠后层级越高
@@ -129,7 +132,7 @@ class _HomePageState extends State<HomePage> {
           // 层级2：第一张虚化装饰图 - 居中显示，轻微向上偏移
           Center(
             child: Transform.translate(
-              offset: const Offset(0, -20), // 垂直向上偏移20px
+              offset: Offset(0, -screenHeight * 0.03), // 垂直向上偏移
               child: Transform.scale(
                 scale: 1, // 不缩放
                 child: Image.asset(
@@ -144,7 +147,7 @@ class _HomePageState extends State<HomePage> {
           // 层级3：第二张虚化装饰图 - 居中显示，与层级2重叠，增强视觉效果
           Center(
             child: Transform.translate(
-              offset: const Offset(0, -20),
+              offset: Offset(0, -screenHeight * 0.03),
               child: Transform.scale(
                 scale: 1,
                 child: Image.asset(
@@ -157,8 +160,8 @@ class _HomePageState extends State<HomePage> {
           ),
 
           // 层级3.5：页面标题
-            const Positioned(
-              top: 60,
+            Positioned(
+              top: screenHeight * 0.08,
               left: 0,
               right: 0,
               child: Column(
@@ -167,17 +170,17 @@ class _HomePageState extends State<HomePage> {
                     "ChiffonMai",
                     style: TextStyle(
                       color: AppConstants.textPrimaryColor,
-                      fontSize: 24, // 减小字号
+                      fontSize: screenWidth * 0.06, // 根据屏幕宽度调整字号
                       fontWeight: FontWeight.bold,
                       letterSpacing: 2,
                     ),
                   ),
-                  SizedBox(height: 8), // 添加间距
+                  SizedBox(height: screenHeight * 0.01), // 添加间距
                   Text(
                     "基本信息",
                     style: TextStyle(
                       color: AppConstants.textPrimaryColor,
-                      fontSize: 18,
+                      fontSize: screenWidth * 0.045,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -187,23 +190,23 @@ class _HomePageState extends State<HomePage> {
 
           // 层级4：个人信息静态文本
             Positioned(
-              left: AppConstants.textLeft,
-              top: AppConstants.textTop,
-              child: _buildUserInfo(),
+              left: screenWidth * 0.5,
+              top: screenHeight * 0.21,
+              child: _buildUserInfo(context),
             ),
 
           
           // 功能中心标题
-          const Positioned(
-            left: AppConstants.gridHorizontalPadding,
-            right: AppConstants.gridHorizontalPadding,
-            bottom: 500, // 在GridView上方定位
+          Positioned(
+            left: screenWidth * 0.04,
+            right: screenWidth * 0.04,
+            bottom: screenHeight * 0.62, // 在GridView上方定位
             child: Center(
               child: Text(
                 "功能中心",
                 style: TextStyle(
                   color: AppConstants.textPrimaryColor,
-                  fontSize: 18,
+                  fontSize: screenWidth * 0.045,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -211,10 +214,10 @@ class _HomePageState extends State<HomePage> {
           ),
           // 层级5：核心功能区 - 直接使用Positioned定位GridView
           Positioned(
-            left: AppConstants.gridHorizontalPadding / 2,
-            right: AppConstants.gridHorizontalPadding / 2,
-            bottom: 40, // 距离底部减小，为版权信息留出空间
-            height: 450.0, // 增加GridView高度到450px
+            left: screenWidth * 0.02,
+            right: screenWidth * 0.02,
+            bottom: screenHeight * 0.06, // 距离底部减小，为版权信息留出空间
+            height: screenHeight * 0.55, // 根据屏幕高度调整
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.5),
@@ -223,21 +226,21 @@ class _HomePageState extends State<HomePage> {
               ),
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.03, vertical: screenHeight * 0.015),
                 child: GridView.builder(
                   padding: EdgeInsets.zero,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: AppConstants.crossAxisCount,
-                    crossAxisSpacing: AppConstants.crossAxisSpacing,
-                    mainAxisSpacing: AppConstants.mainAxisSpacing,
-                    childAspectRatio: AppConstants.childAspectRatio,
+                    crossAxisSpacing: screenWidth * 0.02,
+                    mainAxisSpacing: screenHeight * 0.01,
+                    childAspectRatio: screenWidth > 600 ? 1.3 : 1.2,
                   ),
                   itemCount: buttonItems.length,
                   itemBuilder: (context, index) {
                     final item = buttonItems[index];
-                    return _buildCustomButton(item);
+                    return _buildCustomButton(item, context);
                   },
                 ),
               ),
@@ -245,8 +248,8 @@ class _HomePageState extends State<HomePage> {
           ),
           
           // 层级6：底部版权信息
-          const Positioned(
-            bottom: 10,
+          Positioned(
+            bottom: screenHeight * 0.015,
             left: 0,
             right: 0,
             child: Center(
@@ -254,7 +257,7 @@ class _HomePageState extends State<HomePage> {
                 "ChiffonMai by ChiFFoN 2026",
                 style: TextStyle(
                   color: AppConstants.textPrimaryColor,
-                  fontSize: 12,
+                  fontSize: screenWidth * 0.03,
                   fontWeight: FontWeight.normal,
                 ),
               ),
@@ -267,16 +270,17 @@ class _HomePageState extends State<HomePage> {
 
 
   // 构建用户信息文本
-  Widget _buildUserInfo() {
+  Widget _buildUserInfo(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
-      children: const [
+      children: [
         Text(
           "U+5E78",
           style: TextStyle(
             color: AppConstants.textPrimaryColor,
-            fontSize: 24,
+            fontSize: screenWidth * 0.07,
             fontWeight: FontWeight.w700,
             letterSpacing: 1,
             height: 0.6,
@@ -286,7 +290,7 @@ class _HomePageState extends State<HomePage> {
           "Rating",
           style: TextStyle(
             color: AppConstants.textSecondaryColor,
-            fontSize: 14,
+            fontSize: screenWidth * 0.045,
             fontWeight: FontWeight.normal,
           ),
         ),
@@ -294,7 +298,7 @@ class _HomePageState extends State<HomePage> {
           "15049",
           style: TextStyle(
             color: AppConstants.textSecondaryColor,
-            fontSize: 24,
+            fontSize: screenWidth * 0.07,
             fontWeight: FontWeight.w600,
             height: 0.8,
           ),
@@ -303,7 +307,7 @@ class _HomePageState extends State<HomePage> {
           "10670+4379",
           style: TextStyle(
             color: AppConstants.textSecondaryColor,
-            fontSize: 14,
+            fontSize: screenWidth * 0.04,
             fontWeight: FontWeight.w300,
           ),
         ),
@@ -312,9 +316,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   // 构建自定义功能按钮
-  Widget _buildCustomButton(ButtonItem item) {
+  Widget _buildCustomButton(ButtonItem item, BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
     return SizedBox(
-      height: AppConstants.buttonHeight,
+      height: screenHeight * 0.12,
       child: TextButton(
         style: TextButton.styleFrom(
           backgroundColor: Colors.transparent, // 按钮整体背景设为透明
@@ -388,8 +395,8 @@ class _HomePageState extends State<HomePage> {
                 ),
                 child: Center(
                   child: Container(
-                    width: 36, // 圆形背景的宽度
-                    height: 36, // 圆形背景的高度
+                    width: screenWidth * 0.09, // 圆形背景的宽度
+                    height: screenWidth * 0.09, // 圆形背景的高度
                     decoration: const BoxDecoration(
                       color: Colors.white, // 白色背景
                       shape: BoxShape.circle, // 圆形形状
@@ -398,7 +405,7 @@ class _HomePageState extends State<HomePage> {
                       child: Icon(
                         item.icon,
                         color: AppConstants.textPrimaryColor,
-                        size: 20, // 图标尺寸稍微减小一点
+                        size: screenWidth * 0.05, // 图标尺寸
                       ),
                     ),
                   ),
@@ -421,9 +428,9 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       Text(
                         item.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppConstants.textPrimaryColor,
-                          fontSize: 14,
+                          fontSize: screenWidth * 0.035,
                           fontWeight: FontWeight.bold,
                           fontStyle: FontStyle.normal,
                         ),
@@ -431,12 +438,12 @@ class _HomePageState extends State<HomePage> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
+                      SizedBox(height: screenHeight * 0.005),
                       Text(
                         item.subtitle,
                         style: TextStyle(
                           color: AppConstants.textPrimaryColor.withOpacity(0.8),
-                          fontSize: 10,
+                          fontSize: screenWidth * 0.025,
                           fontWeight: FontWeight.normal,
                         ),
                         textAlign: TextAlign.center,

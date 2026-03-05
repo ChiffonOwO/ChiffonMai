@@ -50,6 +50,7 @@ dependencies:
   fl_chart: ^1.1.1
   archive: ^4.0.9
   marquee: ^2.3.0
+  flutter_screenutil: ^5.2.0 # 屏幕适配
 
 dev_dependencies:
   flutter_test:

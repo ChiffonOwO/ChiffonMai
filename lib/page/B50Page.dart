@@ -111,7 +111,7 @@ class _B50PageState extends State<B50Page> {
               icon: const Icon(Icons.arrow_back, color: Color.fromARGB(255, 84, 97, 97), size: 24),
               onPressed: () {
                 Navigator.pop(context); // 返回到主页
-              },
+              },    
             ),
           ),
 
@@ -132,10 +132,10 @@ class _B50PageState extends State<B50Page> {
 
           // 浅白色背景区域
           Positioned(
-            top: 100.0,
-            left: 5.0,
-            right: 5.0,
-            bottom: 20.0,
+            top: MediaQuery.of(context).size.height * 0.12,
+            left: MediaQuery.of(context).size.width * 0.02,
+            right: MediaQuery.of(context).size.width * 0.02,
+            bottom: MediaQuery.of(context).size.height * 0.03,
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.9),
@@ -149,7 +149,7 @@ class _B50PageState extends State<B50Page> {
                 ],
               ),
               child: SingleChildScrollView(
-                padding: EdgeInsets.all(12.0),
+                padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.03),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -162,16 +162,16 @@ class _B50PageState extends State<B50Page> {
                     SizedBox(height: 12.0),
 
                     // Best35 标题区域
-                    _buildSectionTitle('Best35 | 非当前版本最好成绩'),
+                    _buildSectionTitle('Best35 | 非当前版本最好成绩', context),
 
-                    SizedBox(height: 12.0),
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.015),
 
                     // Best35 卡片网格 (sd数组)
-                    _buildDataCardGrid(_sdSongs, 1.65),
-                    SizedBox(height: 16.0),
+                    _buildDataCardGrid(_sdSongs, MediaQuery.of(context).size.width > 600 ? 1.7 : 1.5),
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.02),
 
                     // Best15 标题区域
-                    _buildSectionTitle('Best15 | 当前版本最好成绩'),
+                    _buildSectionTitle('Best15 | 当前版本最好成绩', context),
 
                     SizedBox(height: 12.0),
 
@@ -261,7 +261,7 @@ class _B50PageState extends State<B50Page> {
                 Text(
                   'Rating',
                   style: TextStyle(
-                    fontSize: 18.0,
+                    fontSize: MediaQuery.of(context).size.width * 0.045,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -273,7 +273,7 @@ class _B50PageState extends State<B50Page> {
                       TextSpan(
                         text: rating.toString(),
                         style: TextStyle(
-                          fontSize: 16.0,
+                          fontSize: MediaQuery.of(context).size.width * 0.04,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
                         ),
@@ -281,7 +281,7 @@ class _B50PageState extends State<B50Page> {
                       TextSpan(
                         text: '(平均${ratingAverage.toStringAsFixed(1)})',
                         style: TextStyle(
-                          fontSize: 12.0,
+                          fontSize: MediaQuery.of(context).size.width * 0.03,
                           color: Colors.black,
                         ),
                       ),
@@ -292,7 +292,7 @@ class _B50PageState extends State<B50Page> {
                 Text(
                   'Best 35',
                   style: TextStyle(
-                    fontSize: 16.0,
+                    fontSize: MediaQuery.of(context).size.width * 0.04,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -303,7 +303,7 @@ class _B50PageState extends State<B50Page> {
                       TextSpan(
                         text: best35Sum.toString(),
                         style: TextStyle(
-                          fontSize: 16.0,
+                          fontSize: MediaQuery.of(context).size.width * 0.04,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
                         ),
@@ -311,7 +311,7 @@ class _B50PageState extends State<B50Page> {
                       TextSpan(
                         text: '(平均${best35Average.toStringAsFixed(1)})',
                         style: TextStyle(
-                          fontSize: 12.0,
+                          fontSize: MediaQuery.of(context).size.width * 0.03,
                           color: Colors.black,
                         ),
                       ),
@@ -322,7 +322,7 @@ class _B50PageState extends State<B50Page> {
                 Text(
                   'Best 15',
                   style: TextStyle(
-                    fontSize: 16.0,
+                    fontSize: MediaQuery.of(context).size.width * 0.04,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -333,7 +333,7 @@ class _B50PageState extends State<B50Page> {
                       TextSpan(
                         text: best15Sum.toString(),
                         style: TextStyle(
-                          fontSize: 16.0,
+                          fontSize: MediaQuery.of(context).size.width * 0.04,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
                         ),
@@ -341,7 +341,7 @@ class _B50PageState extends State<B50Page> {
                       TextSpan(
                         text: '(平均${best15Average.toStringAsFixed(1)})',
                         style: TextStyle(
-                          fontSize: 12.0,
+                          fontSize: MediaQuery.of(context).size.width * 0.03,
                           color: Colors.black,
                         ),
                       ),
@@ -360,7 +360,7 @@ class _B50PageState extends State<B50Page> {
                 Text(
                   'Best 50 平均达成率/DX分达成率',
                   style: TextStyle(
-                    fontSize: 14.0,
+                    fontSize: MediaQuery.of(context).size.width * 0.035,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -371,7 +371,7 @@ class _B50PageState extends State<B50Page> {
                 Text(
                   'Best 35 平均达成率/DX分达成率',
                   style: TextStyle(
-                    fontSize: 14.0,
+                    fontSize: MediaQuery.of(context).size.width * 0.035,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -382,7 +382,7 @@ class _B50PageState extends State<B50Page> {
                 Text(
                   'Best 15平均达成率/DX分达成率',
                   style: TextStyle(
-                    fontSize: 14.0,
+                    fontSize: MediaQuery.of(context).size.width * 0.035,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -398,19 +398,19 @@ class _B50PageState extends State<B50Page> {
   }
 
   // 构建区域标题
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(String title, BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: Colors.black, width: 2.0),
         borderRadius: BorderRadius.circular(8.0),
         color: Colors.grey[200],
       ),
-      padding: EdgeInsets.all(8.0),
+      padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.02),
       child: Center(
         child: Text(
           title,
           style: TextStyle(
-            fontSize: 16.0,
+            fontSize: MediaQuery.of(context).size.width * 0.04,
             fontWeight: FontWeight.bold,
             color: Colors.black,
           ),
@@ -439,48 +439,21 @@ class _B50PageState extends State<B50Page> {
         border: Border.all(color: Colors.black, width: 2.0),
         borderRadius: BorderRadius.circular(8.0),
       ),
-      padding: EdgeInsets.all(8.0),
+      padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.02),
       child: LayoutBuilder(
         builder: (context, constraints) {
           double maxWidth = constraints.maxWidth;
+          double screenWidth = MediaQuery.of(context).size.width;
 
           // 根据宽度动态调整字体大小（3个断点）
-          double songNameFontSize = maxWidth > 160
-              ? 14.0
-              : maxWidth > 140
-                  ? 13.0
-                  : 12.0;
-          double decimalMainFontSize = maxWidth > 160
-              ? 16.0
-              : maxWidth > 140
-                  ? 15.0
-                  : 14.0;
-          double decimalSmallFontSize = maxWidth > 160
-              ? 12.0
-              : maxWidth > 140
-                  ? 11.0
-                  : 10.0;
-          double otherFontSize = maxWidth > 160
-              ? 10.0
-              : maxWidth > 140
-                  ? 9.0
-                  : 8.0;
-          double gradeFontSize = maxWidth > 160
-              ? 9.0
-              : maxWidth > 140
-                  ? 8.5
-                  : 8.0;
-          double dxFontSize = maxWidth > 160
-              ? 10.0
-              : maxWidth > 140
-                  ? 9.0
-                  : 8.0;
+          double songNameFontSize = screenWidth * 0.035;
+          double decimalMainFontSize = screenWidth * 0.04;
+          double decimalSmallFontSize = screenWidth * 0.03;
+          double otherFontSize = screenWidth * 0.025;
+          double gradeFontSize = screenWidth * 0.022;
+          double dxFontSize = screenWidth * 0.025;
 
-          double coverSize = maxWidth > 160
-              ? 50.0
-              : maxWidth > 140
-                  ? 45.0
-                  : 40.0;
+          double coverSize = screenWidth * 0.12;
 
           return Row(
             mainAxisSize: MainAxisSize.min,
@@ -503,8 +476,7 @@ class _B50PageState extends State<B50Page> {
                             errorBuilder: (context, error, stackTrace) {
                               return Center(
                                 child: Text('曲绘',
-                                    style:
-                                        TextStyle(fontSize: coverSize * 0.24)),
+                                    style: TextStyle(fontSize: coverSize * 0.24)),
                               );
                             },
                           )
@@ -513,7 +485,7 @@ class _B50PageState extends State<B50Page> {
                                 style: TextStyle(fontSize: coverSize * 0.24)),
                           ),
                   ),
-                  SizedBox(height: 4.0),
+                  SizedBox(height: screenWidth * 0.01),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
@@ -536,7 +508,7 @@ class _B50PageState extends State<B50Page> {
                             color: Colors.blue.shade300,
                           ),
                         ),
-                      SizedBox(width: 4.0),
+                      SizedBox(width: screenWidth * 0.01),
                       // 难度显示（使用动态字体大小）- 增大整体字号
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -565,7 +537,7 @@ class _B50PageState extends State<B50Page> {
                   ),
                 ],
               ),
-              SizedBox(width: 8.0),
+              SizedBox(width: screenWidth * 0.02),
 
               // 右侧信息
               Expanded(
@@ -585,7 +557,7 @@ class _B50PageState extends State<B50Page> {
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                     ),
-                    SizedBox(height: 3.0),
+                    SizedBox(height: screenWidth * 0.007),
 
                     // 达成率：使用动态字体大小
                     Row(
@@ -654,7 +626,7 @@ class _B50PageState extends State<B50Page> {
   }
 
   // 构建小数文本，整数部分字号大，小数部分和百分号字号小且底部对齐
-  Widget _buildDecimalText(double value,
+  Widget _buildDecimalText(double value, BuildContext context,
       {bool isPercentage = false,
       int decimalPlaces = 4,
       Color color = Colors.white}) {
@@ -675,7 +647,7 @@ class _B50PageState extends State<B50Page> {
         Text(
           integerPart,
           style: TextStyle(
-            fontSize: 16.0,
+            fontSize: MediaQuery.of(context).size.width * 0.04,
             fontWeight: FontWeight.bold,
             color: color,
           ),
@@ -684,7 +656,7 @@ class _B50PageState extends State<B50Page> {
         Text(
           '$decimalPart$percentageSymbol',
           style: TextStyle(
-            fontSize: 12.0,
+            fontSize: MediaQuery.of(context).size.width * 0.03,
             fontWeight: FontWeight.bold,
             color: color,
           ),
@@ -700,12 +672,12 @@ class _B50PageState extends State<B50Page> {
       Color color = Colors.black}) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        double fontSize = constraints.maxWidth > 180 ? 16.0 : 14.0;
+        double fontSize = MediaQuery.of(context).size.width * 0.04;
 
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildDecimalText(value1,
+            _buildDecimalText(value1, context,
                 decimalPlaces: decimalPlaces1, color: color),
             Text(
               '/',
@@ -715,7 +687,7 @@ class _B50PageState extends State<B50Page> {
                 color: color,
               ),
             ),
-            _buildDecimalText(value2,
+            _buildDecimalText(value2, context,
                 decimalPlaces: decimalPlaces2, color: color),
           ],
         );
@@ -732,8 +704,8 @@ class _B50PageState extends State<B50Page> {
       padding: EdgeInsets.zero, // 移除默认padding
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        crossAxisSpacing: 4.0,
-        mainAxisSpacing: 4.0,
+        crossAxisSpacing: MediaQuery.of(context).size.width * 0.01,
+        mainAxisSpacing: MediaQuery.of(context).size.width * 0.01,
         childAspectRatio: childAspectRatio,
       ),
       itemCount: songs.length,
@@ -957,7 +929,7 @@ class _B50PageState extends State<B50Page> {
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.blue,
-          padding: EdgeInsets.symmetric(vertical: 12.0),
+          padding: EdgeInsets.symmetric(vertical: MediaQuery.of(context).size.height * 0.015),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8.0),
           ),
@@ -965,7 +937,7 @@ class _B50PageState extends State<B50Page> {
         child: Text(
           '导出为图片',
           style: TextStyle(
-            fontSize: 16.0,
+            fontSize: MediaQuery.of(context).size.width * 0.04,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
