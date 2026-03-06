@@ -51,6 +51,7 @@ dependencies:
   archive: ^4.0.9
   marquee: ^2.3.0
   flutter_screenutil: ^5.2.0 # 屏幕适配
+  shared_preferences: ^2.4.1 # 本地存储
 
 dev_dependencies:
   flutter_test:
@@ -76,38 +77,13 @@ flutter:
 
    # 图片资源配置（注意缩进：assets 是 flutter 的子项，前面有2个空格）
   assets:
+    - assets/cover/
+    - assets/version/
     - assets/background.png
     - assets/userinfobg.png
     - assets/chiffon.png
     - assets/chiffon2.png
     - assets/menubg.png
-    - assets/chiffonIcon.png
-    - assets/maimai_PLUS.png
-    - assets/maimai_GreeN.png
-    - assets/maimai_GreeN_PLUS.png
-    - assets/maimai_ORANGE.png
-    - assets/maimai_ORANGE_PLUS.png
-    - assets/maimai_PiNK.png
-    - assets/maimai_PiNK_PLUS.png
-    - assets/maimai_MURASAKi.png
-    - assets/maimai_MURASAKi_PLUS.png
-    - assets/maimai_MiLK.png
-    - assets/maimai_MiLK_PLUS.png
-    - assets/maimai_FiNALE.png
-    - assets/maimai_DX.png
-    - assets/maimai_DX_PLUS.png
-    - assets/maimai_DX_Splash.png
-    - assets/maimai_DX_Splash_PLUS.png
-    - assets/maimai_DX_UNiVERSE.png
-    - assets/maimai_DX_UNiVERSE_PLUS.png
-    - assets/maimai_DX_FESTiVAL.png
-    - assets/maimai_DX_FESTiVAL_PLUS.png
-    - assets/maimai_DX_BUDDiES.png
-    - assets/maimai_DX_BUDDiES_PLUS.png
-    - assets/maimai_DX_PRiSM.png
-    - assets/maimai_DX_PRiSM_PLUS.png
-    - assets/maimai_DX_CiRCLE.png
-    - assets/WuShen.png
     - assets/b50testdata.json
     - assets/maimai_music_data.json
     - assets/userPlayData.json

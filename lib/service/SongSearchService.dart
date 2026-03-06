@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:my_first_flutter_app/service/SongAliasManager.dart';
 
 // 歌曲数据模型
 class Song {
@@ -144,6 +145,11 @@ class SongSearchService {
       }
       // 检查版本
       if (song.basicInfo.from.toLowerCase().contains(lowerQuery)) {
+        return true;
+      }
+      // 检查别名
+      final aliases = SongAliasManager.instance.aliases[song.id] ?? [];
+      if (aliases.any((alias) => alias.toLowerCase().contains(lowerQuery))) {
         return true;
       }
       return false;

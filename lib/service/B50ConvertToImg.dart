@@ -422,8 +422,8 @@ class B50ConvertToImg {
                       border: Border.all(color: Colors.black, width: 1.0),
                     ),
                     child: songId != null
-                        ? Image.network(
-                            'https://www.diving-fish.com/covers/${songId.toString().padLeft(5, '0')}.png',
+                        ? Image.asset(
+                            'cover/${songId.toString()}.webp',
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
                               return Center(
@@ -475,14 +475,15 @@ class B50ConvertToImg {
                               color: Colors.white,
                             ),
                           ),
-                          Text(
-                            '.${difficulty.toString().split('.')[1]}',
-                            style: TextStyle(
-                              fontSize: decimalSmallFontSize * 0.9,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                          if (difficulty.toString().split('.').length > 1)
+                            Text(
+                              '.${difficulty.toString().split('.')[1]}',
+                              style: TextStyle(
+                                fontSize: decimalSmallFontSize * 0.9,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ],

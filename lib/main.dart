@@ -3,6 +3,7 @@ import 'package:my_first_flutter_app/page/B50Page.dart';
 import 'package:my_first_flutter_app/page/RecommendByTags.dart';
 import 'package:my_first_flutter_app/page/SingleRatingCalculator.dart';
 import 'package:my_first_flutter_app/page/SongSearchPage.dart';
+import 'package:my_first_flutter_app/service/SongAliasManager.dart';
 import 'page/AchievementFullReverseCalculator.dart';
 import 'page/versionView.dart';
 import 'page/AchievementRateCalculator.dart';
@@ -60,7 +61,9 @@ class ButtonItem {
 }
 
 // 程序入口：运行Flutter应用，根组件为MyApp
-void main() {
+Future<void> main() async {
+  // 初始化歌曲别名管理器
+  await SongAliasManager.instance.init();
   runApp(const MyApp());
 }
 

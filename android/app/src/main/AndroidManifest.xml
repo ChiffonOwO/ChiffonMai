@@ -1,5 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<!-- 必须添加：允许网络访问 -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 可选：允许访问网络状态（判断是否联网） -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <application
+        android:usesCleartextTraffic="true"
         android:label="ChiffonMai"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">

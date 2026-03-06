@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:marquee/marquee.dart';
+import 'package:my_first_flutter_app/service/SongAliasManager.dart';
 
 class SongInfoPage extends StatefulWidget {
   final String songId;
@@ -20,7 +21,6 @@ class _SongInfoPageState extends State<SongInfoPage> {
   Map<String, dynamic>? _userData;
   List<dynamic>? _tagData;
   List<dynamic>? _tagSongsData;
-  List<dynamic>? _aliasData; // 别名数据
   
   // 当前选中的难度索引
   int _currentDiffIndex = 3; // 默认选中Master难度
@@ -57,10 +57,6 @@ class _SongInfoPageState extends State<SongInfoPage> {
       final Map<String, dynamic> tagMap = json.decode(tagData);
       _tagData = tagMap['tags'];
       _tagSongsData = tagMap['tagSongs'];
-      
-      // 加载别名数据
-      final aliasData = await rootBundle.loadString('assets/maimai_alias.json');
-      _aliasData = json.decode(aliasData);
       
     } catch (e) {
       print('加载数据失败: $e');
@@ -246,8 +242,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
     final secondaryThemeColor = _getSecondaryThemeColor(_currentDiffIndex);
     final accentColor = _getAccentColor(_currentDiffIndex);
 
-    // 生成曲绘URL
-    String coverUrl = 'https://www.diving-fish.com/covers/${widget.songId.padLeft(5, '0')}.png';
+    // 生成曲绘路径
+    String coverPath = 'cover/${widget.songId}.webp';
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -373,8 +369,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                 ),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
-                                  child: Image.network(
-                                    coverUrl,
+                                  child: Image.asset(
+                                    coverPath,
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, error, stackTrace) {
                                       return Container(
@@ -911,18 +907,30 @@ class _SongInfoPageState extends State<SongInfoPage> {
   }
 
   // 格式化版本
-  String _formatVersion(String version) {
+   String _formatVersion(String version) {
     if (version == 'maimai') {
       return 'maimai';
     }
     if (version == 'maimai PLUS') {
       return 'maimai+';
     }
-    if (version == 'maimai でらっくす') {
-      return 'DX';
+    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059') {
+      return 'DX 2020';
     }
-    if (version == 'maimai でらっくす PLUS') {
-      return 'DX+';
+    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 Splash'){
+      return 'DX 2021';
+    }
+    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 UNiVERSE'){
+      return 'DX 2022';
+    }
+    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 FESTiVAL') {
+      return 'DX 2023';
+    }
+    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 BUDDiES') {
+      return 'DX 2024';
+    }
+    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM'){
+      return 'DX 2025';
     }
     if (version.contains(' PLUS')) {
       version = version.replaceFirst(' PLUS', '+');
@@ -930,8 +938,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
     if (version.contains('maimai') && version != 'maimai') {
       version = version.replaceFirst('maimai ', '');
     }
-    if (version.contains('でらっくす')) {
-      version = version.replaceFirst('でらっくす ', '');
+    if (version.contains('\u3067\u3089\u3063\u304f\u3059')) {
+      version = version.replaceFirst('\u3067\u3089\u3063\u304f\u3059 ', '');
     }
     return version;
   }
@@ -980,23 +988,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
   
   // 构建别名区域
   Widget _buildAliasSection(String songTitle) {
-    if (_aliasData == null) {
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Text(
-          '别名: 无',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[600],
-          ),
-        ),
-      );
-    }
-    
-    // 查找当前歌曲的别名
-    final List<String> aliases = _aliasData!.where((item) => 
-      item['song_id'] == songTitle
-    ).map((item) => item['name'] as String).toList();
+    // 从 SongAliasManager 获取别名数据
+    final aliases = SongAliasManager.instance.aliases[widget.songId] ?? [];
     
     if (aliases.isEmpty) {
       return Container(
