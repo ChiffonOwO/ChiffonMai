@@ -62,9 +62,9 @@ class ButtonItem {
 
 // 程序入口：运行Flutter应用，根组件为MyApp
 Future<void> main() async {
+  runApp(const MyApp());
   // 初始化歌曲别名管理器
   await SongAliasManager.instance.init();
-  runApp(const MyApp());
 }
 
 /// 应用根组件：无状态组件，配置MaterialApp基础属性

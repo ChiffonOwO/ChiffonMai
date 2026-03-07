@@ -419,6 +419,26 @@ class _B50PageState extends State<B50Page> {
     );
   }
 
+  // 获取曲绘图片URL
+  Future<String> _getCoverImageUrl(String songId) async {
+    // 补全ID到5位数
+    String paddedId = songId.padLeft(5, '0');
+    // 从左开始补1，其余补0
+    String coverId = '1' + paddedId.substring(1);
+    
+    // 本地曲绘路径
+    String localCoverUrl = 'assets/cover/$songId.webp';
+    
+    try {
+      // 检查本地文件是否存在
+      await rootBundle.load(localCoverUrl);
+      return localCoverUrl;
+    } catch (e) {
+      // 本地文件不存在，返回网络URL
+      return 'https://www.diving-fish.com/covers/$coverId.png';
+    }
+  }
+
   // 构建游戏卡片（支持多参数传入，确保响应式显示）
   Widget _buildGameCard({
     required Color cardColor,
@@ -470,14 +490,45 @@ class _B50PageState extends State<B50Page> {
                       border: Border.all(color: Colors.black, width: 1.0),
                     ),
                     child: songId != null
-                        ? Image.asset(
-                            'cover/$songId.webp',
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Center(
-                                child: Text('曲绘',
-                                    style: TextStyle(fontSize: coverSize * 0.24)),
-                              );
+                        ? FutureBuilder<String>(
+                            future: _getCoverImageUrl(songId.toString()),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return Center(
+                                  child: Text('曲绘',
+                                      style: TextStyle(fontSize: coverSize * 0.24)),
+                                );
+                              } else if (snapshot.hasError || !snapshot.hasData) {
+                                return Center(
+                                  child: Text('曲绘',
+                                      style: TextStyle(fontSize: coverSize * 0.24)),
+                                );
+                              } else {
+                                String imageUrl = snapshot.data!;
+                                if (imageUrl.startsWith('http')) {
+                                  return Image.network(
+                                    imageUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Center(
+                                        child: Text('曲绘',
+                                            style: TextStyle(fontSize: coverSize * 0.24)),
+                                      );
+                                    },
+                                  );
+                                } else {
+                                  return Image.asset(
+                                    imageUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Center(
+                                        child: Text('曲绘',
+                                            style: TextStyle(fontSize: coverSize * 0.24)),
+                                      );
+                                    },
+                                  );
+                                }
+                              }
                             },
                           )
                         : Center(

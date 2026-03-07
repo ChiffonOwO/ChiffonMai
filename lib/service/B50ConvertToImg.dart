@@ -423,7 +423,7 @@ class B50ConvertToImg {
                     ),
                     child: songId != null
                         ? Image.asset(
-                            'cover/${songId.toString()}.webp',
+                            'assets/cover/${songId.toString()}.webp',
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
                               return Center(
