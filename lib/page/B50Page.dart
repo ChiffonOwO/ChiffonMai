@@ -8,6 +8,11 @@ import 'package:flutter/services.dart';
 import '../service/B50ConvertToImg.dart';
 
 class B50Page extends StatefulWidget {
+  // 接收外部传入的B50数据
+  final Map<String, dynamic>? b50Data;
+  
+  const B50Page({super.key, this.b50Data});
+  
   @override
   _B50PageState createState() => _B50PageState();
 }
@@ -25,36 +30,57 @@ class _B50PageState extends State<B50Page> {
     _loadB50Data();
   }
 
+  @override
+  void didUpdateWidget(B50Page oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 当widget更新时，检查是否有新的B50数据
+    if (widget.b50Data != null && widget.b50Data != oldWidget.b50Data) {
+      _updateB50Data(widget.b50Data!);
+    }
+  }
+
   Future<void> _loadB50Data() async {
     try {
-      // 加载B50数据
-      final b50Contents =
-          await rootBundle.loadString('assets/b50testdata.json');
-      final b50JsonData = json.decode(b50Contents);
-
       // 加载maimai音乐数据
       final maimaiContents =
           await rootBundle.loadString('assets/maimai_music_data.json');
       final maimaiJsonData = json.decode(maimaiContents);
 
       setState(() {
-        _b50Data = b50JsonData;
         _maimaiMusicData = maimaiJsonData;
-        // 增加空值判断，避免解析失败
-        _dxSongs = b50JsonData['charts']?['dx'] != null
-            ? List<Map<String, dynamic>>.from(b50JsonData['charts']['dx'])
-            : [];
-        _sdSongs = b50JsonData['charts']?['sd'] != null
-            ? List<Map<String, dynamic>>.from(b50JsonData['charts']['sd'])
-            : [];
-        _isLoading = false;
       });
+
+      // 如果有外部传入的B50数据，使用它
+      if (widget.b50Data != null) {
+        _updateB50Data(widget.b50Data!);
+      } else {
+        // 否则加载本地测试数据
+        final b50Contents =
+            await rootBundle.loadString('assets/b50testdata.json');
+        final b50JsonData = json.decode(b50Contents);
+        _updateB50Data(b50JsonData);
+      }
     } catch (e) {
       print('Error loading data: $e');
       setState(() {
         _isLoading = false;
       });
     }
+  }
+
+  // 更新B50数据
+  void _updateB50Data(Map<String, dynamic> newData) {
+    setState(() {
+      _b50Data = newData;
+      // 增加空值判断，避免解析失败
+      _dxSongs = newData['charts']?['dx'] != null
+          ? List<Map<String, dynamic>>.from(newData['charts']['dx'])
+          : [];
+      _sdSongs = newData['charts']?['sd'] != null
+          ? List<Map<String, dynamic>>.from(newData['charts']['sd'])
+          : [];
+      _isLoading = false;
+    });
   }
 
   @override

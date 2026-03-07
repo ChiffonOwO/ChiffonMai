@@ -4,6 +4,7 @@ import 'package:my_first_flutter_app/page/RecommendByTags.dart';
 import 'package:my_first_flutter_app/page/SingleRatingCalculator.dart';
 import 'package:my_first_flutter_app/page/SongSearchPage.dart';
 import 'package:my_first_flutter_app/service/SongAliasManager.dart';
+import 'package:my_first_flutter_app/service/UserBest50Manager.dart';
 import 'page/AchievementFullReverseCalculator.dart';
 import 'page/versionView.dart';
 import 'page/AchievementRateCalculator.dart';
@@ -90,6 +91,9 @@ class HomePage extends StatefulWidget {
 
 /// 首页状态类：处理页面状态、存储数据、实现布局构建
 class _HomePageState extends State<HomePage> {
+  // 加载状态
+  bool _isLoading = false;
+  
   // 按钮数据源：使用类型安全的ButtonItem模型
   final List<ButtonItem> buttonItems = const [
     ButtonItem(icon: Icons.music_note, title: '乐曲查询', subtitle: '查询舞萌曲库的乐曲'),
@@ -104,6 +108,7 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.compare_arrows, title: '版本对照', subtitle: '舞神要打哪些代的歌？'),
     ButtonItem(icon: Icons.replay, title: '达成率反推', subtitle: '根据判定详情推出绝赞详情'),
     ButtonItem(icon: Icons.qr_code, title: '绑定二维码', subtitle: '关联你的舞萌账号'),
+    ButtonItem(icon: Icons.file_upload_sharp, title: '刷新数据', subtitle: '刷新你的舞萌数据'),
     ButtonItem(icon: Icons.update, title: '检查更新', subtitle: '检查应用是否有新版本'),
   ];
 
@@ -265,7 +270,30 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-          )
+          ),
+          
+          // 加载中提示
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: Center(
+                child: Container(
+                  padding: EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 10),
+                      Text('正在刷新Best50数据...'),
+                    ],
+                  ),
+                ),
+              ),
+            )
         ],
       ),
     );
@@ -318,6 +346,94 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // 显示刷新数据对话框
+  void _showRefreshDataDialog(BuildContext context) {
+    final TextEditingController qqController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('刷新Best50数据'),
+          content: TextField(
+            controller: qqController,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: '请输入QQ号',
+              hintText: '例如：488581724',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('取消'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                if (qqController.text.isNotEmpty) {
+                  await _refreshBest50Data(qqController.text);
+                }
+              },
+              child: Text('确认'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // 刷新Best50数据
+  Future<void> _refreshBest50Data(String qq) async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final best50Manager = UserBest50Manager();
+      final best50Data = await best50Manager.getUserBest50(qq);
+      
+      // 转换数据格式为B50Page需要的格式
+      final b50DataMap = {
+        'additional_rating': best50Data.additionalRating,
+        'charts': {
+          'dx': best50Data.charts.dx.map((item) => item.toJson()).toList(),
+          'sd': best50Data.charts.sd.map((item) => item.toJson()).toList(),
+        },
+        'rating': best50Data.charts.dx.fold(0, (sum, item) => sum + item.ra) + 
+                  best50Data.charts.sd.fold(0, (sum, item) => sum + item.ra),
+      };
+      
+      // 显示成功提示
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Best50数据刷新成功！'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      
+      // 导航到B50Page并传递新数据
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => B50Page(b50Data: b50DataMap)),
+      );
+    } catch (e) {
+      // 显示错误提示
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('刷新数据失败：$e'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+  
   // 构建自定义功能按钮
   Widget _buildCustomButton(ButtonItem item, BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -382,6 +498,9 @@ class _HomePageState extends State<HomePage> {
               context,
               MaterialPageRoute(builder: (context) => SongSearchPage()),
             );
+          }
+          if (item.title == '刷新数据') {
+            _showRefreshDataDialog(context);
           }
         },
         child: Column(

@@ -243,7 +243,24 @@ class _SongInfoPageState extends State<SongInfoPage> {
     final accentColor = _getAccentColor(_currentDiffIndex);
 
     // 生成曲绘路径
-    String coverPath = 'cover/${widget.songId}.webp';
+    String coverPath = 'assets/cover/${widget.songId}.webp';
+    
+    // 生成fallback的cover_id
+    String generateCoverId(String songId) {
+      if (songId.length >= 5) {
+        // 如果长度大于等于5，万位补1
+        int songIdInt = int.parse(songId);
+        int tenThousandPlace = (songIdInt ~/ 10000) + 1;
+        int remaining = songIdInt % 10000;
+        return '${tenThousandPlace}${remaining.toString().padLeft(4, '0')}';
+      } else {
+        // 如果长度小于5，补1在万位，其余补0
+        return '1${songId.padLeft(4, '0')}';
+      }
+    }
+    
+    String coverId = generateCoverId(widget.songId);
+    String networkCoverUrl = 'https://www.diving-fish.com/covers/$coverId.png';
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -373,17 +390,16 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                     coverPath,
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        color: Colors.grey.shade200,
-                                        child: Center(
-                                          child: Text(
-                                            '曲绘',
-                                            style: TextStyle(
-                                              fontSize: MediaQuery.of(context).size.width * 0.04,
-                                              color: Colors.grey,
-                                            ),
-                                          ),
-                                        ),
+                                      return Image.network(
+                                        networkCoverUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          // 网络资源也请求失败，显示默认占位符 assets/cover/0.webp
+                                          return Image.asset(
+                                            'assets/cover/0.webp',
+                                            fit: BoxFit.cover,
+                                          );
+                                        }
                                       );
                                     },
                                   ),
@@ -397,6 +413,23 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
+                                     // 当歌曲名长度大于13时，使用Marquee实现自动循环滚动
+                                    (basicInfo['title'].length > 13) ?
+                                    SizedBox(
+                                      height: 40,
+                                      child: Marquee(
+                                        text: basicInfo['title'],
+                                        style: TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          color: accentColor,
+                                        ),
+                                        scrollAxis: Axis.horizontal,
+                                        blankSpace: 20.0,
+                                        velocity: 30.0,
+                                        pauseAfterRound: Duration(seconds: 3),
+                                      ),
+                                    ) :
                                     Text(
                                       basicInfo['title'],
                                       style: TextStyle(
@@ -407,7 +440,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
-                                    
+
+                                    const SizedBox(height: 12),
                                     // 显示歌曲别名
                                     _buildAliasSection(basicInfo['title']),
                                     
@@ -626,7 +660,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '谱面标签(数据来自DXRating.net)',
+                                  '谱面标签',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,

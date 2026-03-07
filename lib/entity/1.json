@@ -1,0 +1,35 @@
+{
+    "additional_rating": 12,
+    "charts": {
+        "dx": [{
+            "achievements": 100.774,
+            "ds": 14.0,
+            "dxScore": 2273,
+            "fc": "fcp",
+            "fs": "fsd",
+            "level": "14",
+            "level_index": 3,
+            "level_label": "Master",
+            "ra": 315,
+            "rate": "sssp",
+            "song_id": 11721,
+            "title": "INFiNiTE ENERZY -Overdoze-",
+            "type": "DX"
+        }],
+        "sd": [{
+            "achievements": 100.5667,
+            "ds": 14.3,
+            "dxScore": 2907,
+            "fc": "fc",
+            "fs": "sync",
+            "level": "14",
+            "level_index": 3,
+            "level_label": "Master",
+            "ra": 321,
+            "rate": "sssp",
+            "song_id": 11475,
+            "title": "SUPER AMBULANCE",
+            "type": "DX"
+        }]
+    }
+}
