@@ -37,11 +37,11 @@ class RecordItem {
       'fc': fc,
       'fs': fs,
       'level': level,
-      'levelIndex': levelIndex,
-      'levelLabel': levelLabel,
+      'level_index': levelIndex,
+      'level_label': levelLabel,
       'ra': ra,
       'rate': rate,
-      'songId': songId,
+      'song_id': songId,
       'title': title,
       'type': type,
     };
@@ -49,19 +49,19 @@ class RecordItem {
 
   factory RecordItem.fromJson(Map<String, dynamic> json) {
     return RecordItem(
-      achievements: json['achievements'],
-      ds: json['ds'],
-      dxScore: json['dxScore'],
-      fc: json['fc'],
-      fs: json['fs'],
-      level: json['level'],
-      levelIndex: json['level_index'],
-      levelLabel: json['level_label'],
-      ra: json['ra'],
-      rate: json['rate'],
-      songId: json['song_id'],
-      title: json['title'],
-      type: json['type'],
+      achievements: json['achievements'] ?? 0.0,
+      ds: json['ds'] ?? 0.0,
+      dxScore: json['dxScore'] ?? 0,
+      fc: json['fc'] ?? '',
+      fs: json['fs'] ?? '',
+      level: json['level'] ?? '',
+      levelIndex: json['level_index'] ?? 0,
+      levelLabel: json['level_label'] ?? '',
+      ra: json['ra'] ?? 0,
+      rate: json['rate'] ?? '',
+      songId: json['song_id'] ?? 0,
+      title: json['title'] ?? '未知歌曲',
+      type: json['type'] ?? '',
     );
   }
   String toString() {

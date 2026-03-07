@@ -5,6 +5,7 @@ import 'package:my_first_flutter_app/page/SingleRatingCalculator.dart';
 import 'package:my_first_flutter_app/page/SongSearchPage.dart';
 import 'package:my_first_flutter_app/service/SongAliasManager.dart';
 import 'package:my_first_flutter_app/service/UserBest50Manager.dart';
+import 'package:my_first_flutter_app/service/MaimaiMusicDataManager.dart';
 import 'page/AchievementFullReverseCalculator.dart';
 import 'page/versionView.dart';
 import 'page/AchievementRateCalculator.dart';
@@ -66,6 +67,8 @@ Future<void> main() async {
   runApp(const MyApp());
   // 初始化歌曲别名管理器
   await SongAliasManager.instance.init();
+  // 从API获取并更新音乐数据
+  await MaimaiMusicDataManager().fetchAndUpdateMusicData();
 }
 
 /// 应用根组件：无状态组件，配置MaterialApp基础属性
@@ -392,8 +395,12 @@ class _HomePageState extends State<HomePage> {
     });
     
     try {
+      // 从API获取并更新音乐数据
+      await MaimaiMusicDataManager().fetchAndUpdateMusicData();
+      
       final best50Manager = UserBest50Manager();
       final best50Data = await best50Manager.getUserBest50(qq);
+      print(best50Data);
       
       // 转换数据格式为B50Page需要的格式
       final b50DataMap = {

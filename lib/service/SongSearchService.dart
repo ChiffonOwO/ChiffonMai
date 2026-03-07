@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:my_first_flutter_app/service/SongAliasManager.dart';
+import 'package:my_first_flutter_app/service/MaimaiMusicDataManager.dart';
 
 // 歌曲数据模型
 class Song {
@@ -90,21 +91,27 @@ class BasicInfo {
 // 搜索服务
 class SongSearchService {
   // 缓存所有歌曲数据
-  static List<Song>? _cachedSongs;
+  static List<Song>? cachedSongs;
 
   // 加载所有歌曲数据（带缓存）
   static Future<List<Song>> loadAllSongs() async {
     // 如果已经缓存，直接返回
-    if (_cachedSongs != null) {
-      return _cachedSongs!;
+    if (cachedSongs != null) {
+      return cachedSongs!;
     }
 
     try {
-      // 从资产文件加载JSON数据
+      // 检查是否已经通过API获取了数据
+      if (MaimaiMusicDataManager().hasCachedData()) {
+        cachedSongs = MaimaiMusicDataManager().getCachedSongs();
+        return cachedSongs!;
+      }
+      
+      // 如果API数据不存在，尝试从资产文件加载JSON数据作为 fallback
       final jsonString = await rootBundle.loadString('assets/maimai_music_data.json');
       final List<dynamic> jsonList = json.decode(jsonString);
-      _cachedSongs = jsonList.map((json) => Song.fromJson(json)).toList();
-      return _cachedSongs!;
+      cachedSongs = jsonList.map((json) => Song.fromJson(json)).toList();
+      return cachedSongs!;
     } catch (e) {
       print('加载歌曲数据失败: $e');
       return [];

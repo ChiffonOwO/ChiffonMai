@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/entity/UserBest50Entity.dart';
 import 'package:my_first_flutter_app/entity/RecordItem.dart';
 
@@ -34,7 +35,10 @@ class UserBest50Manager {
       if (response.statusCode == 200) {
         // 解析响应数据
         final jsonData = json.decode(response.body);
-        print(response.body);
+        
+        // 缓存数据
+        await _cacheBest50Data(qq, jsonData);
+        
         return _parseBest50Data(jsonData);
       } else {
         throw Exception('Failed to load best50 data: ${response.statusCode}');
@@ -42,6 +46,39 @@ class UserBest50Manager {
     } catch (e) {
       print('Error fetching best50 data: $e');
       throw e;
+    }
+  }
+  
+  // 缓存Best50数据
+  Future<void> _cacheBest50Data(String qq, Map<String, dynamic> data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // 缓存数据，使用qq作为key的一部分
+      await prefs.setString('best50_data_$qq', json.encode(data));
+      // 缓存最后使用的qq号
+      await prefs.setString('last_used_qq', qq);
+    } catch (e) {
+      print('Error caching best50 data: $e');
+    }
+  }
+  
+  // 获取缓存的Best50数据
+  Future<Map<String, dynamic>?> getCachedBest50Data() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // 获取最后使用的qq号
+      final lastQQ = prefs.getString('last_used_qq');
+      if (lastQQ != null) {
+        // 获取对应的缓存数据
+        final cachedData = prefs.getString('best50_data_$lastQQ');
+        if (cachedData != null) {
+          return json.decode(cachedData);
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error getting cached best50 data: $e');
+      return null;
     }
   }
   

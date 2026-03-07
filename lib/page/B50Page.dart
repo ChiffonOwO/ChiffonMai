@@ -6,13 +6,15 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import '../service/B50ConvertToImg.dart';
+import '../service/UserBest50Manager.dart';
+import '../service/MaimaiMusicDataManager.dart';
 
 class B50Page extends StatefulWidget {
   // 接收外部传入的B50数据
   final Map<String, dynamic>? b50Data;
-  
+
   const B50Page({super.key, this.b50Data});
-  
+
   @override
   _B50PageState createState() => _B50PageState();
 }
@@ -42,23 +44,63 @@ class _B50PageState extends State<B50Page> {
   Future<void> _loadB50Data() async {
     try {
       // 加载maimai音乐数据
-      final maimaiContents =
-          await rootBundle.loadString('assets/maimai_music_data.json');
-      final maimaiJsonData = json.decode(maimaiContents);
+      // 优先使用缓存的API数据
+      if (MaimaiMusicDataManager().hasCachedData()) {
+        final songs = MaimaiMusicDataManager().getCachedSongs();
+        if (songs != null) {
+          setState(() {
+            _maimaiMusicData = songs.map((song) => {
+              'id': song.id,
+              'title': song.title,
+              'type': song.type,
+              'ds': song.ds,
+              'level': song.level,
+              'cids': song.cids,
+              'charts': song.charts.map((chart) => {
+                'notes': chart.notes,
+                'charter': chart.charter
+              }).toList(),
+              'basic_info': {
+                'title': song.basicInfo.title,
+                'artist': song.basicInfo.artist,
+                'genre': song.basicInfo.genre,
+                'bpm': song.basicInfo.bpm,
+                'release_date': song.basicInfo.releaseDate,
+                'from': song.basicInfo.from,
+                'is_new': song.basicInfo.isNew
+              }
+            }).toList();
+          });
+        }
+      } else {
+        // 如果API数据不存在，尝试从资产文件加载JSON数据作为 fallback
+        final maimaiContents =
+            await rootBundle.loadString('assets/maimai_music_data.json');
+        final maimaiJsonData = json.decode(maimaiContents);
 
-      setState(() {
-        _maimaiMusicData = maimaiJsonData;
-      });
+        setState(() {
+          _maimaiMusicData = maimaiJsonData;
+        });
+      }
 
-      // 如果有外部传入的B50数据，使用它
+      // 直接使用外部传入的B50数据
       if (widget.b50Data != null) {
         _updateB50Data(widget.b50Data!);
       } else {
-        // 否则加载本地测试数据
-        final b50Contents =
-            await rootBundle.loadString('assets/b50testdata.json');
-        final b50JsonData = json.decode(b50Contents);
-        _updateB50Data(b50JsonData);
+        // 如果没有外部数据，尝试加载缓存数据
+        final best50Manager = UserBest50Manager();
+        final cachedData = await best50Manager.getCachedBest50Data();
+        if (cachedData != null) {
+          _updateB50Data(cachedData);
+        } else {
+          // 如果没有缓存数据，显示空状态
+          setState(() {
+            _b50Data = null;
+            _dxSongs = [];
+            _sdSongs = [];
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
       print('Error loading data: $e');
@@ -93,6 +135,126 @@ class _B50PageState extends State<B50Page> {
         ),
       );
     }
+
+    // 如果没有数据，显示空状态
+    if (_b50Data == null || (_dxSongs.isEmpty && _sdSongs.isEmpty)) {
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Stack(
+          children: [
+            // 层级1：基础背景图 - 占满整个屏幕，作为页面最底层背景
+            Container(
+              width: double.infinity,
+              height: double.infinity,
+              decoration: const BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage('assets/background.png'), // 背景图资源
+                  fit: BoxFit.cover, // 覆盖整个容器，拉伸/裁剪适配
+                  opacity: 1.0, // 不透明
+                ),
+              ),
+            ),
+
+            // 页面标题
+            const Positioned(
+              top: 60,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Text(
+                  "Best50查询",
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 84, 97, 97),
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ),
+            ),
+
+            // 返回按钮
+            Positioned(
+              top: 40,
+              left: 10,
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back,
+                    color: Color.fromARGB(255, 84, 97, 97), size: 24),
+                onPressed: () {
+                  Navigator.pop(context); // 返回到主页
+                },
+              ),
+            ),
+
+            // 层级2：第一张虚化装饰图 - 居中显示，轻微向上偏移
+            Center(
+              child: Transform.translate(
+                offset: const Offset(0, -20), // 垂直向上偏移20px
+                child: Transform.scale(
+                  scale: 1, // 不缩放
+                  child: Image.asset(
+                    'assets/chiffon2.png',
+                    fit: BoxFit.cover,
+                    opacity: const AlwaysStoppedAnimation(1), // 固定不透明
+                  ),
+                ),
+              ),
+            ),
+
+            // 浅白色背景区域
+            Positioned(
+              top: MediaQuery.of(context).size.height * 0.12,
+              left: MediaQuery.of(context).size.width * 0.02,
+              right: MediaQuery.of(context).size.width * 0.02,
+              bottom: MediaQuery.of(context).size.height * 0.03,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(12.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 8.0,
+                      offset: Offset(2.0, 2.0),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.refresh,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        '暂无Best50数据',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        '请返回首页点击"刷新数据"按钮获取',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: false, // 防止键盘弹出时挤压背景
@@ -134,10 +296,11 @@ class _B50PageState extends State<B50Page> {
             top: 40,
             left: 10,
             child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Color.fromARGB(255, 84, 97, 97), size: 24),
+              icon: const Icon(Icons.arrow_back,
+                  color: Color.fromARGB(255, 84, 97, 97), size: 24),
               onPressed: () {
                 Navigator.pop(context); // 返回到主页
-              },    
+              },
             ),
           ),
 
@@ -175,7 +338,8 @@ class _B50PageState extends State<B50Page> {
                 ],
               ),
               child: SingleChildScrollView(
-                padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.03),
+                padding:
+                    EdgeInsets.all(MediaQuery.of(context).size.width * 0.03),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -190,10 +354,12 @@ class _B50PageState extends State<B50Page> {
                     // Best35 标题区域
                     _buildSectionTitle('Best35 | 非当前版本最好成绩', context),
 
-                    SizedBox(height: MediaQuery.of(context).size.height * 0.015),
+                    SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.015),
 
                     // Best35 卡片网格 (sd数组)
-                    _buildDataCardGrid(_sdSongs, MediaQuery.of(context).size.width > 600 ? 1.7 : 1.5),
+                    _buildDataCardGrid(_sdSongs,
+                        MediaQuery.of(context).size.width > 600 ? 1.7 : 1.5),
                     SizedBox(height: MediaQuery.of(context).size.height * 0.02),
 
                     // Best15 标题区域
@@ -446,24 +612,7 @@ class _B50PageState extends State<B50Page> {
   }
 
   // 获取曲绘图片URL
-  Future<String> _getCoverImageUrl(String songId) async {
-    // 补全ID到5位数
-    String paddedId = songId.padLeft(5, '0');
-    // 从左开始补1，其余补0
-    String coverId = '1' + paddedId.substring(1);
-    
-    // 本地曲绘路径
-    String localCoverUrl = 'assets/cover/$songId.webp';
-    
-    try {
-      // 检查本地文件是否存在
-      await rootBundle.load(localCoverUrl);
-      return localCoverUrl;
-    } catch (e) {
-      // 本地文件不存在，返回网络URL
-      return 'https://www.diving-fish.com/covers/$coverId.png';
-    }
-  }
+
 
   // 构建游戏卡片（支持多参数传入，确保响应式显示）
   Widget _buildGameCard({
@@ -516,45 +665,25 @@ class _B50PageState extends State<B50Page> {
                       border: Border.all(color: Colors.black, width: 1.0),
                     ),
                     child: songId != null
-                        ? FutureBuilder<String>(
-                            future: _getCoverImageUrl(songId.toString()),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return Center(
-                                  child: Text('曲绘',
-                                      style: TextStyle(fontSize: coverSize * 0.24)),
-                                );
-                              } else if (snapshot.hasError || !snapshot.hasData) {
-                                return Center(
-                                  child: Text('曲绘',
-                                      style: TextStyle(fontSize: coverSize * 0.24)),
-                                );
-                              } else {
-                                String imageUrl = snapshot.data!;
-                                if (imageUrl.startsWith('http')) {
-                                  return Image.network(
-                                    imageUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Center(
-                                        child: Text('曲绘',
-                                            style: TextStyle(fontSize: coverSize * 0.24)),
-                                      );
-                                    },
+                        ? Image.asset(
+                            'assets/cover/${songId.toString()}.webp',
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              // 本地资产加载失败，尝试从网络加载
+                              String paddedId = songId.toString().padLeft(5, '0');
+                              String coverId = '1' + paddedId.substring(1);
+                              String networkUrl = 'https://www.diving-fish.com/covers/$coverId.png';
+                              return Image.network(
+                                networkUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  // 网络图片加载失败，显示默认文本
+                                  return Center(
+                                    child: Text('曲绘',
+                                        style: TextStyle(fontSize: coverSize * 0.24)),
                                   );
-                                } else {
-                                  return Image.asset(
-                                    imageUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Center(
-                                        child: Text('曲绘',
-                                            style: TextStyle(fontSize: coverSize * 0.24)),
-                                      );
-                                    },
-                                  );
-                                }
-                              }
+                                },
+                              );
                             },
                           )
                         : Center(
@@ -914,12 +1043,14 @@ class _B50PageState extends State<B50Page> {
     if (_maimaiMusicData == null) return 0.0;
 
     // 查找对应的歌曲
-    dynamic songData = _maimaiMusicData!.firstWhere(
+    int songIndex = _maimaiMusicData!.indexWhere(
       (item) => item['id'] == songId.toString(),
-      orElse: () => null,
     );
 
-    if (songData == null || songData['charts'] == null) return 0.0;
+    if (songIndex == -1) return 0.0;
+    dynamic songData = _maimaiMusicData![songIndex];
+
+    if (songData['charts'] == null) return 0.0;
 
     // 查找对应的charts
     List<dynamic> charts = songData['charts'];
@@ -1007,7 +1138,8 @@ class _B50PageState extends State<B50Page> {
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.blue,
-          padding: EdgeInsets.symmetric(vertical: MediaQuery.of(context).size.height * 0.015),
+          padding: EdgeInsets.symmetric(
+              vertical: MediaQuery.of(context).size.height * 0.015),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8.0),
           ),

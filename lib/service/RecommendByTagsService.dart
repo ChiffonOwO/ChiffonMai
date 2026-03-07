@@ -9,6 +9,7 @@ import 'package:my_first_flutter_app/entity/MaimaiMusicDataEntity.dart';
 import 'package:my_first_flutter_app/entity/RecommendationResult.dart';
 import 'package:my_first_flutter_app/entity/RecordItem.dart';
 import 'package:my_first_flutter_app/entity/UserPlayDataEntity.dart';
+import 'package:my_first_flutter_app/service/MaimaiMusicDataManager.dart';
 
 class RecommendByTagsService {
   static const int MAX_LIMIT = 70; // 最大推荐数
@@ -320,27 +321,60 @@ Future<List<RecordItem>> getBestNRecords(
     List<RecordItem> allRecords, int n, bool isNewOnly) async {
   // 检查缓存
   if (RecommendByTagsService._cachedSongIdToIsNewMap == null) {
-    // 1. 读取并解析 JSON 文件
-    String maimaiMusicDataString;
-    if (RecommendByTagsService._maimaiMusicDataFileContent == null) {
-      maimaiMusicDataString = await rootBundle
-          .loadString(RecommendByTagsService.MAIMAI_MUSIC_DATA_FILE_PATH);
-      RecommendByTagsService._maimaiMusicDataFileContent =
-          maimaiMusicDataString;
+    // 1. 优先使用 MaimaiMusicDataManager 中的数据
+    if (MaimaiMusicDataManager().hasCachedData()) {
+      final songs = MaimaiMusicDataManager().getCachedSongs();
+      if (songs != null) {
+        // 2. 构建 songId 到 isNew 的映射
+        RecommendByTagsService._cachedSongIdToIsNewMap = {
+          for (var song in songs) song.id: song.basicInfo.isNew,
+        };
+      } else {
+        // 3. 如果 API 数据不存在，尝试从资产文件加载 JSON 数据作为 fallback
+        String maimaiMusicDataString;
+        if (RecommendByTagsService._maimaiMusicDataFileContent == null) {
+          maimaiMusicDataString = await rootBundle
+              .loadString(RecommendByTagsService.MAIMAI_MUSIC_DATA_FILE_PATH);
+          RecommendByTagsService._maimaiMusicDataFileContent =
+              maimaiMusicDataString;
+        } else {
+          maimaiMusicDataString =
+              RecommendByTagsService._maimaiMusicDataFileContent!;
+        }
+
+        final List<dynamic> rawSongList = json.decode(maimaiMusicDataString);
+        final List<Song> maimaiMusicData = rawSongList
+            .map((json) => Song.fromJson(json as Map<String, dynamic>))
+            .toList();
+
+        // 构建 songId 到 isNew 的映射
+        RecommendByTagsService._cachedSongIdToIsNewMap = {
+          for (var song in maimaiMusicData) song.id: song.basicInfo.isNew,
+        };
+      }
     } else {
-      maimaiMusicDataString =
-          RecommendByTagsService._maimaiMusicDataFileContent!;
+      // 4. 如果 MaimaiMusicDataManager 中没有数据，尝试从资产文件加载
+      String maimaiMusicDataString;
+      if (RecommendByTagsService._maimaiMusicDataFileContent == null) {
+        maimaiMusicDataString = await rootBundle
+            .loadString(RecommendByTagsService.MAIMAI_MUSIC_DATA_FILE_PATH);
+        RecommendByTagsService._maimaiMusicDataFileContent =
+            maimaiMusicDataString;
+      } else {
+        maimaiMusicDataString =
+            RecommendByTagsService._maimaiMusicDataFileContent!;
+      }
+
+      final List<dynamic> rawSongList = json.decode(maimaiMusicDataString);
+      final List<Song> maimaiMusicData = rawSongList
+          .map((json) => Song.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      // 构建 songId 到 isNew 的映射
+      RecommendByTagsService._cachedSongIdToIsNewMap = {
+        for (var song in maimaiMusicData) song.id: song.basicInfo.isNew,
+      };
     }
-
-    final List<dynamic> rawSongList = json.decode(maimaiMusicDataString);
-    final List<Song> maimaiMusicData = rawSongList
-        .map((json) => Song.fromJson(json as Map<String, dynamic>))
-        .toList();
-
-    // 2. 构建 songId 到 isNew 的映射
-    RecommendByTagsService._cachedSongIdToIsNewMap = {
-      for (var song in maimaiMusicData) song.id: song.basicInfo.isNew,
-    };
   }
 
   Map<String, bool> songIdToIsNewMap =
@@ -622,20 +656,26 @@ Future<List<RecommendationResult>> calculateRecommendations(
   // 初始化所有歌曲列表
   List<Song> songs;
   if (RecommendByTagsService._cachedMaimaiMusicData == null) {
-    String maimaiMusicDataString;
-    if (RecommendByTagsService._maimaiMusicDataFileContent == null) {
-      maimaiMusicDataString = await rootBundle
-          .loadString(RecommendByTagsService.MAIMAI_MUSIC_DATA_FILE_PATH);
-      RecommendByTagsService._maimaiMusicDataFileContent =
-          maimaiMusicDataString;
+    // 优先使用 MaimaiMusicDataManager 中的数据
+    if (MaimaiMusicDataManager().hasCachedData()) {
+      songs = MaimaiMusicDataManager().getCachedSongs()!.cast<Song>();
     } else {
-      maimaiMusicDataString =
-          RecommendByTagsService._maimaiMusicDataFileContent!;
+      // 如果 API 数据不存在，尝试从资产文件加载 JSON 数据作为 fallback
+      String maimaiMusicDataString;
+      if (RecommendByTagsService._maimaiMusicDataFileContent == null) {
+        maimaiMusicDataString = await rootBundle
+            .loadString(RecommendByTagsService.MAIMAI_MUSIC_DATA_FILE_PATH);
+        RecommendByTagsService._maimaiMusicDataFileContent =
+            maimaiMusicDataString;
+      } else {
+        maimaiMusicDataString =
+            RecommendByTagsService._maimaiMusicDataFileContent!;
+      }
+      final List<dynamic> rawSongList = json.decode(maimaiMusicDataString);
+      songs = rawSongList
+          .map((json) => Song.fromJson(json as Map<String, dynamic>))
+          .toList();
     }
-    final List<dynamic> rawSongList = json.decode(maimaiMusicDataString);
-    songs = rawSongList
-        .map((json) => Song.fromJson(json as Map<String, dynamic>))
-        .toList();
     RecommendByTagsService._cachedMaimaiMusicData = songs;
   } else {
     songs = RecommendByTagsService._cachedMaimaiMusicData!;
