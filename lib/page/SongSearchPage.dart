@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/service/SongSearchService.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
-import 'package:my_first_flutter_app/service/SongAliasManager.dart';
+import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'dart:async';
 
 class SongSearchPage extends StatefulWidget {

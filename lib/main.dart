@@ -3,9 +3,12 @@ import 'package:my_first_flutter_app/page/B50Page.dart';
 import 'package:my_first_flutter_app/page/RecommendByTags.dart';
 import 'package:my_first_flutter_app/page/SingleRatingCalculator.dart';
 import 'package:my_first_flutter_app/page/SongSearchPage.dart';
-import 'package:my_first_flutter_app/service/SongAliasManager.dart';
-import 'package:my_first_flutter_app/service/UserBest50Manager.dart';
-import 'package:my_first_flutter_app/service/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
+import 'package:my_first_flutter_app/manager/UserBest50Manager.dart';
+import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
+import 'package:my_first_flutter_app/entity/RecordItem.dart';
+import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
 import 'page/AchievementFullReverseCalculator.dart';
 import 'page/versionView.dart';
 import 'page/AchievementRateCalculator.dart';
@@ -69,6 +72,8 @@ Future<void> main() async {
   await SongAliasManager.instance.init();
   // 从API获取并更新音乐数据
   await MaimaiMusicDataManager().fetchAndUpdateMusicData();
+  // 初始化标签数据
+  await RecommendByTagsService.initializeTags();
 }
 
 /// 应用根组件：无状态组件，配置MaterialApp基础属性
@@ -96,6 +101,12 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   // 加载状态
   bool _isLoading = false;
+  
+  // 用户数据
+  String _userNickname = "U+5E78";
+  int _best50TotalRA = 15049;
+  int _best35TotalRA = 10670;
+  int _best15TotalRA = 4379;
   
   // 按钮数据源：使用类型安全的ButtonItem模型
   final List<ButtonItem> buttonItems = const [
@@ -291,7 +302,7 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       CircularProgressIndicator(),
                       SizedBox(height: 10),
-                      Text('正在刷新Best50数据...'),
+                      Text('正在刷新数据,这需要一些时间,请稍后...'),
                     ],
                   ),
                 ),
@@ -311,7 +322,7 @@ class _HomePageState extends State<HomePage> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          "U+5E78",
+          _userNickname,
           style: TextStyle(
             color: AppConstants.textPrimaryColor,
             fontSize: screenWidth * 0.07,
@@ -329,7 +340,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         Text(
-          "15049",
+          "$_best50TotalRA",
           style: TextStyle(
             color: AppConstants.textSecondaryColor,
             fontSize: screenWidth * 0.07,
@@ -338,7 +349,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         Text(
-          "10670+4379",
+          "$_best35TotalRA+$_best15TotalRA",
           style: TextStyle(
             color: AppConstants.textSecondaryColor,
             fontSize: screenWidth * 0.04,
@@ -357,13 +368,13 @@ class _HomePageState extends State<HomePage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('刷新Best50数据'),
+          title: Text('刷新数据'),
           content: TextField(
             controller: qqController,
             keyboardType: TextInputType.number,
             decoration: InputDecoration(
               labelText: '请输入QQ号',
-              hintText: '例如：488581724',
+              hintText: '例如:1919810',
             ),
           ),
           actions: [
@@ -398,9 +409,48 @@ class _HomePageState extends State<HomePage> {
       // 从API获取并更新音乐数据
       await MaimaiMusicDataManager().fetchAndUpdateMusicData();
       
+      // 刷新标签数据
+      await RecommendByTagsService.initializeTags();
+      
+      // 从API获取并更新用户游玩数据
+      final userPlayDataManager = UserPlayDataManager();
+      final userPlayData = await userPlayDataManager.fetchUserPlayData(qq);
+      
       final best50Manager = UserBest50Manager();
       final best50Data = await best50Manager.getUserBest50(qq);
       print(best50Data);
+      
+      // 更新用户昵称
+      if (userPlayData != null && userPlayData.containsKey('nickname')) {
+        setState(() {
+          _userNickname = userPlayData['nickname'];
+        });
+      }
+      
+      // 计算Best50、Best35、Best15总RA
+      int totalRA = 0;
+      int best35RA = 0;
+      int best15RA = 0;
+      
+      // 计算Best35总RA (sd charts)
+      for (var record in best50Data.charts.sd) {
+        best35RA += record.ra;
+      }
+      
+      // 计算Best15总RA (dx charts)
+      for (var record in best50Data.charts.dx) {
+        best15RA += record.ra;
+      }
+      
+      // 计算Best50总RA (sd + dx)
+      totalRA = best35RA + best15RA;
+      
+      // 更新状态
+      setState(() {
+        _best50TotalRA = totalRA;
+        _best35TotalRA = best35RA;
+        _best15TotalRA = best15RA;
+      });
       
       // 转换数据格式为B50Page需要的格式
       final b50DataMap = {
@@ -416,7 +466,7 @@ class _HomePageState extends State<HomePage> {
       // 显示成功提示
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Best50数据刷新成功！'),
+          content: Text('数据刷新成功!为您跳转到Best50页面'),
           duration: Duration(seconds: 2),
         ),
       );

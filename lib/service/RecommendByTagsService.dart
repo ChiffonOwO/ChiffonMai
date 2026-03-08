@@ -5,20 +5,29 @@ import 'dart:math';
 
 import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/entity/MaiTagsEntity.dart';
-import 'package:my_first_flutter_app/entity/MaimaiMusicDataEntity.dart';
+import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/entity/RecommendationResult.dart';
 import 'package:my_first_flutter_app/entity/RecordItem.dart';
 import 'package:my_first_flutter_app/entity/UserPlayDataEntity.dart';
-import 'package:my_first_flutter_app/service/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
+import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 
 class RecommendByTagsService {
   static const int MAX_LIMIT = 70; // 最大推荐数
   static const int RA_RANGE_LIMIT = 20; // Rating极差上限
   static const String USER_PLAY_DATA_FILE_PATH =
       'assets/userPlayData.json'; // 玩家游玩记录文件路径
-  static const String MAIN_TAG_FILE_PATH = 'assets/maiTags.json'; // 标签文件路径
+  static const String MAIN_TAG_FILE_PATH = 'assets/maiTags.json'; // 标签文件路径（作为 fallback）
   static const String MAIMAI_MUSIC_DATA_FILE_PATH =
       'assets/maimai_music_data.json'; // 谱面数据文件路径
+
+  /**
+   * 初始化标签数据，在 app 启动时调用，或在刷新数据时调用
+   */
+  static Future<void> initializeTags() async {
+    await MaiTagsManager().initializeTags();
+  }
   static const Map<String, String> TYPE_MAP = {
     "SD": "std",
     "DX": "dx",
@@ -56,41 +65,14 @@ class RecommendByTagsService {
   ];
 
   // 缓存变量
-  static String? _maiTagFileContent;
   static String? _maimaiMusicDataFileContent;
   static String? _userPlayDataFileContent;
-  static MaiTagsEntity? _cachedMaiTagsEntity;
   static List<Song>? _cachedMaimaiMusicData;
   static UserPlayDataEntity? _cachedUserPlayDataEntity;
-  static Map<String, List<int>>? _cachedSongIdToTagIdsMap;
-  static Map<int, String>? _cachedGroupIdToNameMap;
-  static Map<int, (String, int)>? _cachedTagIdToInfoMap;
   static Map<String, bool>? _cachedSongIdToIsNewMap;
 }
 
-/**
- * 构建 谱面标识 = 谱面ID + 谱面类型 + 谱面难度 到 标签ID列表 的映射
- * @param maiTagEntity 标签实体类
- * @return 谱面标识 = 谱面ID + 谱面类型 + 谱面难度 到 标签ID列表 的映射
- */
-Map<String, List<int>> buildSongIdToTagIdsMap(MaiTagsEntity maiTagsEntity) {
-  Map<String, List<int>> songIdToTagIdsMap = {};
-  List<TagSongItem> tagSongs = maiTagsEntity.tagSongs;
-  for (var tagSong in tagSongs) {
-    String songId = tagSong.songId;
-    String sheetType = tagSong.sheetType;
-    String sheetDifficulty = tagSong.sheetDifficulty;
 
-    // 构建 谱面标识 = 谱面ID + 谱面类型 + 谱面难度
-    String songKey = songId + "#" + sheetType + "#" + sheetDifficulty;
-    if (!songIdToTagIdsMap.containsKey(songKey)) {
-      songIdToTagIdsMap[songKey] = [];
-    }
-    // 向 谱面标识 对应的标签ID列表 中添加标签ID
-    songIdToTagIdsMap[songKey]?.add(tagSong.tagId);
-  }
-  return songIdToTagIdsMap;
-}
 
 /**
  * 获取玩家游玩记录中的Records数组
@@ -99,11 +81,24 @@ Map<String, List<int>> buildSongIdToTagIdsMap(MaiTagsEntity maiTagsEntity) {
 Future<List<RecordItem>> getUserPlayDataRecords() async {
   try {
     // 检查缓存
-    if (RecommendByTagsService._cachedUserPlayDataEntity != null) {
-      return RecommendByTagsService._cachedUserPlayDataEntity!.records;
-    }
+  if (RecommendByTagsService._cachedUserPlayDataEntity != null) {
+    return RecommendByTagsService._cachedUserPlayDataEntity!.records;
+  }
 
-    // 读取玩家游玩记录 JSON 文件
+  // 优先从 UserPlayDataManager 获取数据
+  final userPlayDataManager = UserPlayDataManager();
+  final cachedUserData = await userPlayDataManager.getCachedUserPlayData();
+  
+  if (cachedUserData != null) {
+    // 解析最外层的实体：UserPlayDataEntity
+    UserPlayDataEntity userPlayData = UserPlayDataEntity.fromJson(cachedUserData);
+    // 缓存结果
+    RecommendByTagsService._cachedUserPlayDataEntity = userPlayData;
+    // 提取Records数组
+    List<RecordItem> records = userPlayData.records;
+    return records;
+  } else {
+    // 如果缓存中没有数据，尝试从资产文件加载 JSON 数据作为 fallback
     String playDataPath = RecommendByTagsService.USER_PLAY_DATA_FILE_PATH;
     String playDataString;
 
@@ -127,6 +122,7 @@ Future<List<RecordItem>> getUserPlayDataRecords() async {
     List<RecordItem> records = userPlayData.records;
 
     return records;
+  }
   } catch (e) {
     print('json解析失败: $e');
     return [];
@@ -166,74 +162,25 @@ List<RecordItem> filterRecordsByRating(List<RecordItem> records) {
  */
 Future<Map<String, Map<String, int>>> countTagsByGroup(
     List<RecordItem> filteredRecords) async {
-  // 检查缓存
-  if (RecommendByTagsService._cachedMaiTagsEntity == null) {
-    // 读取主要标签 JSON 文件
-    String mainTagPath = RecommendByTagsService.MAIN_TAG_FILE_PATH;
-    String mainTagString;
-
-    // 检查文件内容缓存
-    if (RecommendByTagsService._maiTagFileContent == null) {
-      mainTagString = await rootBundle.loadString(mainTagPath);
-      RecommendByTagsService._maiTagFileContent = mainTagString;
-    } else {
-      mainTagString = RecommendByTagsService._maiTagFileContent!;
-    }
-
-    // 解析为最外层Map
-    Map<String, dynamic> mainTagJson = json.decode(mainTagString);
-
-    // 解析最外层的实体：MaiTagEntity
-    RecommendByTagsService._cachedMaiTagsEntity =
-        MaiTagsEntity.fromJson(mainTagJson);
-  }
-
-  MaiTagsEntity MaiTagEntity = RecommendByTagsService._cachedMaiTagsEntity!;
+  // 获取标签管理器实例
+  final maiTagsManager = MaiTagsManager();
 
   // 第一步：构建分组ID到分组名称的映射，如 1 -> 配置
-  Map<int, String> groupIdToNameMap;
-  if (RecommendByTagsService._cachedGroupIdToNameMap == null) {
-    groupIdToNameMap = {};
-    List<TagGroupItem> tagGroups = MaiTagEntity.tagGroups;
-    if (tagGroups.isNotEmpty) {
-      for (var group in tagGroups) {
-        groupIdToNameMap[group.id] = group.localizedName.zhHans;
-      }
-    } else {
-      print('MaiTagEntity.tagGroups 为空');
-      return {};
-    }
-    RecommendByTagsService._cachedGroupIdToNameMap = groupIdToNameMap;
-  } else {
-    groupIdToNameMap = RecommendByTagsService._cachedGroupIdToNameMap!;
+  Map<int, String> groupIdToNameMap = await maiTagsManager.getGroupIdToNameMap();
+  if (groupIdToNameMap.isEmpty) {
+    print('分组ID到分组名称的映射为空');
+    return {};
   }
 
   // 第二步：构建标签ID → (标签名称, 分组ID) 的映射, 如 22 -> (高物量, 3)
-  Map<int, (String, int)> tagIdToInfoMap;
-  if (RecommendByTagsService._cachedTagIdToInfoMap == null) {
-    tagIdToInfoMap = {};
-    List<TagItem> tags = MaiTagEntity.tags;
-    if (tags.isNotEmpty) {
-      for (var tag in tags) {
-        tagIdToInfoMap[tag.id] = (tag.localizedName.zhHans, tag.groupId);
-      }
-    } else {
-      print('MaiTagEntity.tags 为空');
-      return {};
-    }
-    RecommendByTagsService._cachedTagIdToInfoMap = tagIdToInfoMap;
-  } else {
-    tagIdToInfoMap = RecommendByTagsService._cachedTagIdToInfoMap!;
+  Map<int, (String, int)> tagIdToInfoMap = await maiTagsManager.getTagIdToInfoMap();
+  if (tagIdToInfoMap.isEmpty) {
+    print('标签ID到信息的映射为空');
+    return {};
   }
 
   // 第三步：构建 谱面标识 → 标签ID列表 的映射
-  Map<String, List<int>> songIdToTagIdsMap;
-  if (RecommendByTagsService._cachedSongIdToTagIdsMap == null) {
-    songIdToTagIdsMap = buildSongIdToTagIdsMap(MaiTagEntity);
-    RecommendByTagsService._cachedSongIdToTagIdsMap = songIdToTagIdsMap;
-  } else {
-    songIdToTagIdsMap = RecommendByTagsService._cachedSongIdToTagIdsMap!;
-  }
+  Map<String, List<int>> songIdToTagIdsMap = await maiTagsManager.getSongIdToTagIdsMap();
 
   // 第四步：遍历筛选后的RA谱面，按分组统计标签出现次数
   // 分组名 → (标签名 → 出现次数)
@@ -454,48 +401,27 @@ int calculateSingleRating(double ds, double achievement) {
  */
 Future<Map<String, Map<String, double>>> calculateChartVectors(
     RecordItem recordItem) async {
-  // 检查缓存
-  if (RecommendByTagsService._cachedMaiTagsEntity == null) {
-    // 读取标签 JSON 文件
-    String mainTagPath = RecommendByTagsService.MAIN_TAG_FILE_PATH;
-    String mainTagString;
-
-    if (RecommendByTagsService._maiTagFileContent == null) {
-      mainTagString = await rootBundle.loadString(mainTagPath);
-      RecommendByTagsService._maiTagFileContent = mainTagString;
-    } else {
-      mainTagString = RecommendByTagsService._maiTagFileContent!;
-    }
-
-    // 解析为最外层Map
-    Map<String, dynamic> mainTagJson = json.decode(mainTagString);
-
-    // 解析最外层的实体：MaiTagEntity
-    RecommendByTagsService._cachedMaiTagsEntity =
-        MaiTagsEntity.fromJson(mainTagJson);
-  }
-
-  MaiTagsEntity MaiTagEntity = RecommendByTagsService._cachedMaiTagsEntity!;
+  // 获取标签管理器实例
+  final maiTagsManager = MaiTagsManager();
 
   // 构建 谱面标识 = 谱面ID + 谱面类型 + 谱面难度 到 标签ID列表 的映射
-  Map<String, List<int>> songIdToTagIdsMap;
-  if (RecommendByTagsService._cachedSongIdToTagIdsMap == null) {
-    songIdToTagIdsMap = buildSongIdToTagIdsMap(MaiTagEntity);
-    RecommendByTagsService._cachedSongIdToTagIdsMap = songIdToTagIdsMap;
-  } else {
-    songIdToTagIdsMap = RecommendByTagsService._cachedSongIdToTagIdsMap!;
-  }
+  Map<String, List<int>> songIdToTagIdsMap = await maiTagsManager.getSongIdToTagIdsMap();
 
   // 构建 标签ID 到 标签名称 的映射
   Map<int, String> tagIdToNameMap = {};
-  for (var tag in MaiTagEntity.tags) {
-    tagIdToNameMap[tag.id] = tag.localizedName.zhHans;
+  final maiTagsEntity = await maiTagsManager.getTags();
+  if (maiTagsEntity != null) {
+    for (var tag in maiTagsEntity.tags) {
+      tagIdToNameMap[tag.id] = tag.localizedName.zhHans;
+    }
   }
 
   // 构建 标签ID 到 标签分组ID 的映射
   Map<int, int> tagIdToGroupIdMap = {};
-  for (var tag in MaiTagEntity.tags) {
-    tagIdToGroupIdMap[tag.id] = tag.groupId;
+  if (maiTagsEntity != null) {
+    for (var tag in maiTagsEntity.tags) {
+      tagIdToGroupIdMap[tag.id] = tag.groupId;
+    }
   }
 
   // 按照groupId统计标签出现次数 （键：groupId，值：(标签名 → 出现次数)）

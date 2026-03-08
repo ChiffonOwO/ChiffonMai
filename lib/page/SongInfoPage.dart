@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:marquee/marquee.dart';
-import 'package:my_first_flutter_app/service/SongAliasManager.dart';
-import 'package:my_first_flutter_app/service/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
+import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
 
 class SongInfoPage extends StatefulWidget {
   final String songId;
@@ -71,8 +72,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
         final songData =
             await rootBundle.loadString('assets/maimai_music_data.json');
         final List<dynamic> songList = json.decode(songData);
-        _songData = songList.firstWhere((song) => song['id'] == widget.songId,
-            orElse: () => null);
+        int songIndex =
+            songList.indexWhere((song) => song['id'] == widget.songId);
+        if (songIndex != -1) {
+          _songData = songList[songIndex];
+        }
       }
 
       // 加载难度数据
@@ -81,9 +85,16 @@ class _SongInfoPageState extends State<SongInfoPage> {
       _diffData = diffMap['charts'][widget.songId];
 
       // 加载用户数据
-      final userData = await rootBundle.loadString('assets/userPlayData.json');
-      final Map<String, dynamic> userMap = json.decode(userData);
-      _userData = userMap;
+      final userPlayDataManager = UserPlayDataManager();
+      _userData = await userPlayDataManager.getCachedUserPlayData();
+
+      // 如果缓存中没有用户数据，尝试从资产文件加载 JSON 数据作为 fallback
+      if (_userData == null) {
+        final userData =
+            await rootBundle.loadString('assets/userPlayData.json');
+        final Map<String, dynamic> userMap = json.decode(userData);
+        _userData = userMap;
+      }
 
       // 加载标签数据
       final tagData = await rootBundle.loadString('assets/maiTags.json');
@@ -694,6 +705,35 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                         ),
                                       ),
                                       const SizedBox(height: 8),
+                                      if (userRecord != null) ...[
+                                        RichText(
+                                          text: TextSpan(
+                                            children: [
+                                              TextSpan(
+                                                text: 'DXScore: ${userRecord['dxScore']} / ${_calculateMaxScore(int.parse(widget.songId), _currentDiffIndex)}  ',
+                                                style: TextStyle(
+                                                  fontSize: MediaQuery.of(context)
+                                                          .size
+                                                          .width *
+                                                      0.042,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                              TextSpan(
+                                                text: _calculateStars(int.parse(widget.songId), _currentDiffIndex, userRecord['dxScore']),
+                                                style: TextStyle(
+                                                  fontSize: MediaQuery.of(context)
+                                                          .size
+                                                          .width *
+                                                      0.042,
+                                                  color: _getStarsColor(_calculateStars(int.parse(widget.songId), _currentDiffIndex, userRecord['dxScore'])),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                      ],
                                       Row(
                                         children: [
                                           Text('连击,同步：'),
@@ -706,23 +746,6 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                         ],
                                       ),
                                     ],
-                                  ),
-                                ),
-                                Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(24),
-                                    color: themeColor,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      '★',
-                                      style: TextStyle(
-                                        fontSize: 24,
-                                        color: accentColor,
-                                      ),
-                                    ),
                                   ),
                                 ),
                               ],
@@ -962,6 +985,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
         bgColor = Color(0xFFD4F4DD);
         textColor = Color(0xFF2E7D32);
         break;
+      case 'fs':
+        bgColor = Color.fromARGB(255, 224, 244, 255);
+        textColor = Color.fromARGB(255, 0, 135, 245);
+        text = 'FS';
+        break;
       case 'fsp':
         bgColor = Color.fromARGB(255, 224, 244, 255);
         textColor = Color.fromARGB(255, 0, 135, 245);
@@ -1019,6 +1047,65 @@ class _SongInfoPageState extends State<SongInfoPage> {
         return 'ReMAS';
       default:
         return '';
+    }
+  }
+
+  // 计算maxScore
+  int _calculateMaxScore(int songId, int levelIndex) {
+    if (_songData == null) return 0;
+
+    // 查找对应的charts
+    List<dynamic> charts = _songData!['charts'];
+    if (levelIndex < 0 || levelIndex >= charts.length) return 0;
+
+    dynamic chart = charts[levelIndex];
+    if (chart['notes'] == null) return 0;
+
+    // 计算maxScore
+    List<dynamic> notes = chart['notes'];
+    int notesSum = notes.fold(0, (sum, note) => sum + (note as int));
+    return notesSum * 3;
+  }
+
+  // 计算scoreRate
+  double _calculateScoreRate(int songId, int levelIndex, int score) {
+    int maxScore = _calculateMaxScore(songId, levelIndex);
+    return maxScore > 0 ? score / maxScore : 0.0;
+  }
+
+  // 计算星星等级
+  String _calculateStars(int songId, int levelIndex, int score) {
+    double scoreRate = _calculateScoreRate(songId, levelIndex, score);
+
+    // 确定星星等级
+    if (scoreRate >= 0.97) {
+      return '\u2726 5';
+    } else if (scoreRate >= 0.95) {
+      return '\u2726 4';
+    } else if (scoreRate >= 0.93) {
+      return '\u2726 3';
+    } else if (scoreRate >= 0.90) {
+      return '\u2726 2';
+    } else if (scoreRate >= 0.85) {
+      return '\u2726 1';
+    } else {
+      return '\u2726 0';
+    }
+  }
+
+  // 获取星星颜色
+  Color _getStarsColor(String stars) {
+    switch (stars) {
+      case '\u2726 5':
+        return Colors.yellow;
+      case '\u2726 4':
+      case '\u2726 3':
+        return Colors.orange;
+      case '\u2726 2':
+      case '\u2726 1':
+        return Colors.green.shade300;
+      default:
+        return Colors.white;
     }
   }
 

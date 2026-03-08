@@ -6,8 +6,8 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import '../service/B50ConvertToImg.dart';
-import '../service/UserBest50Manager.dart';
-import '../service/MaimaiMusicDataManager.dart';
+import '../manager/UserBest50Manager.dart';
+import '../manager/MaimaiMusicDataManager.dart';
 
 class B50Page extends StatefulWidget {
   // 接收外部传入的B50数据
@@ -1074,30 +1074,30 @@ class _B50PageState extends State<B50Page> {
 
     // 确定星星等级
     if (scoreRate >= 0.97) {
-      return '※5';
+      return '\u27265';
     } else if (scoreRate >= 0.95) {
-      return '※4';
+      return '\u27264';
     } else if (scoreRate >= 0.93) {
-      return '※3';
+      return '\u27263';
     } else if (scoreRate >= 0.90) {
-      return '※2';
+      return '\u27262';
     } else if (scoreRate >= 0.85) {
-      return '※1';
+      return '\u27261';
     } else {
-      return '※0';
+      return '\u27260';
     }
   }
 
   // 获取星星颜色
   Color _getStarsColor(String stars) {
     switch (stars) {
-      case '※5':
+      case '\u27265':
         return Colors.yellow;
-      case '※4':
-      case '※3':
+      case '\u27264':
+      case '\u27263':
         return Colors.orange;
-      case '※2':
-      case '※1':
+      case '\u27262':
+      case '\u27261':
         return Colors.green.shade300;
       default:
         return Colors.white;

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/service/SongSearchService.dart';
 
 class MaimaiMusicDataManager {
