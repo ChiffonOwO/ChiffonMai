@@ -78,12 +78,8 @@ class SongAliasManager {
             
             // 确保别名列表中的每个元素都是字符串
             List<String> aliases = song.alias.map((alias) {
-              if (alias is String) {
-                return alias;
-              } else {
-                return alias.toString();
-              }
-            }).toList();
+              return alias;
+                        }).toList();
             
             newAliases[songIdKey] = aliases;
           }

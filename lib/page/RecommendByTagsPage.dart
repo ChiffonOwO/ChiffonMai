@@ -56,6 +56,10 @@ class _RecommendByTagsState extends State<RecommendByTags> {
 
   @override
   Widget build(BuildContext context) {
+    // 获取屏幕尺寸
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: false, // 防止键盘弹出时挤压背景
@@ -77,7 +81,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
           // 层级2：第一张虚化装饰图 - 居中显示，轻微向上偏移
           Center(
             child: Transform.translate(
-              offset: const Offset(0, -20), // 垂直向上偏移20px
+              offset: Offset(0, -screenHeight * 0.02), // 垂直向上偏移屏幕高度的2%
               child: Transform.scale(
                 scale: 1, // 不缩放
                 child: Image.asset(
@@ -90,8 +94,8 @@ class _RecommendByTagsState extends State<RecommendByTags> {
           ),
 
           // 页面标题
-          const Positioned(
-            top: 60,
+          Positioned(
+            top: screenHeight * 0.08, // 距离顶部为屏幕高度的8%
             left: 0,
             right: 0,
             child: Center(
@@ -99,7 +103,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                 "根据标签推荐",
                 style: TextStyle(
                   color: Color.fromARGB(255, 84, 97, 97),
-                  fontSize: 24,
+                  fontSize: screenWidth * 0.06, // 字体大小为屏幕宽度的6%
                   fontWeight: FontWeight.bold,
                   letterSpacing: 2,
                 ),
@@ -109,11 +113,12 @@ class _RecommendByTagsState extends State<RecommendByTags> {
 
           // 返回按钮
           Positioned(
-            top: 40,
-            left: 10,
+            top: screenHeight * 0.05, // 距离顶部为屏幕高度的5%
+            left: screenWidth * 0.03, // 距离左侧为屏幕宽度的3%
             child: IconButton(
-              icon: const Icon(Icons.arrow_back,
-                  color: Color.fromARGB(255, 84, 97, 97), size: 24),
+              icon: Icon(Icons.arrow_back,
+                  color: Color.fromARGB(255, 84, 97, 97), 
+                  size: screenWidth * 0.06), // 图标大小为屏幕宽度的6%
               onPressed: () {
                 Navigator.pop(context);
               },
@@ -122,10 +127,10 @@ class _RecommendByTagsState extends State<RecommendByTags> {
 
           // 主要内容区域
           Positioned(
-            top: 120,
-            left: 20,
-            right: 20,
-            bottom: 80,
+            top: screenHeight * 0.15, // 距离顶部为屏幕高度的15%
+            left: screenWidth * 0.03, // 距离左侧为屏幕宽度的3%
+            right: screenWidth * 0.03, // 距离右侧为屏幕宽度的3%
+            bottom: screenHeight * 0.03, // 距离底部为屏幕高度的3%
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.9),
@@ -142,7 +147,10 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                 children: [
                   // 切换按钮
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: screenWidth * 0.04, // 水平 padding 为屏幕宽度的4%
+                      vertical: screenHeight * 0.01, // 垂直 padding 为屏幕高度的1%
+                    ),
                     decoration: BoxDecoration(
                       border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
                     ),
@@ -166,7 +174,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                           ),
                           child: const Text('Best55推荐'),
                         ),
-                        const SizedBox(width: 16),
+                        SizedBox(width: screenWidth * 0.04), // 间距为屏幕宽度的4%
                         ElevatedButton(
                           onPressed: () {
                             setState(() {
@@ -192,21 +200,21 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                   Expanded(
                     child: SingleChildScrollView(
                       controller: _scrollController,
-                      padding: const EdgeInsets.all(16.0),
+                      padding: EdgeInsets.all(screenWidth * 0.04), // padding 为屏幕宽度的4%
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           // 加载状态
                           if (_isLoading)
-                            const Center(
+                            Center(
                               child: Padding(
-                                padding: EdgeInsets.all(40.0),
+                                padding: EdgeInsets.all(screenHeight * 0.05), // padding 为屏幕高度的5%
                                 child: Column(
                                   children: [
                                     CircularProgressIndicator(
                                       color: Color.fromARGB(255, 84, 97, 97),
                                     ),
-                                    SizedBox(height: 16),
+                                    SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
                                     Text('正在计算推荐结果...'),
                                   ],
                                 ),
@@ -216,21 +224,21 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                           else if (_errorMessage != null)
                             Center(
                               child: Padding(
-                                padding: const EdgeInsets.all(40.0),
+                                padding: EdgeInsets.all(screenHeight * 0.05), // padding 为屏幕高度的5%
                                 child: Column(
                                   children: [
-                                    const Icon(
+                                    Icon(
                                       Icons.error_outline,
                                       color: Colors.red,
-                                      size: 48,
+                                      size: screenWidth * 0.12, // 图标大小为屏幕宽度的12%
                                     ),
-                                    const SizedBox(height: 16),
+                                    SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
                                     Text(
                                       _errorMessage!,
                                       textAlign: TextAlign.center,
                                       style: const TextStyle(color: Colors.red),
                                     ),
-                                    const SizedBox(height: 16),
+                                    SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
                                     ElevatedButton(
                                       onPressed: _fetchRecommendations,
                                       child: const Text('重试'),
@@ -241,17 +249,24 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                             )
                           // 展示推荐结果
                           else
-                            Column(
-                              children: [
-                                _buildRecommendationContent(),
-                                const SizedBox(height: 16),
-                                _buildPagination(),
-                              ],
-                            ),
+                            _buildRecommendationContent(),
                         ],
                       ),
                     ),
                   ),
+                  
+                  // 分页组件 - 固定在滚动区域下方
+                  if (!_isLoading && _errorMessage == null)
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        vertical: screenHeight * 0.015, // 垂直 padding 为屏幕高度的1.5%
+                        horizontal: screenWidth * 0.04, // 水平 padding 为屏幕宽度的4%
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                      ),
+                      child: _buildPagination(),
+                    ),
                 ],
               ),
             ),
@@ -268,7 +283,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
     
     // 计算分页
     int totalItems = results.length;
-    int totalPages = (totalItems / _pageSize).ceil();
+    //int totalPages = (totalItems / _pageSize).ceil();
     int startIndex = (_currentPage - 1) * _pageSize;
     int endIndex = min(startIndex + _pageSize, totalItems);
     List<RecommendationResult> paginatedResults = [];
@@ -282,6 +297,8 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   
   // 构建分页组件
   Widget _buildPagination() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    
     List<RecommendationResult> results = _recommendations[_currentTab] ?? [];
     int totalItems = results.length;
     int totalPages = (totalItems / _pageSize).ceil();
@@ -310,10 +327,10 @@ class _RecommendByTagsState extends State<RecommendByTags> {
               : null,
           child: const Text('上一页'),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: screenWidth * 0.04), // 间距为屏幕宽度的4%
         // 页码显示
         Text(' $_currentPage / $totalPages '),
-        const SizedBox(width: 16),
+        SizedBox(width: screenWidth * 0.04), // 间距为屏幕宽度的4%
         // 下一页按钮
         ElevatedButton(
           onPressed: _currentPage < totalPages
@@ -337,28 +354,31 @@ class _RecommendByTagsState extends State<RecommendByTags> {
 
   // 构建推荐区域
   Widget _buildRecommendationSection(String title, List<RecommendationResult> results) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // 区域标题
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 18,
+          style: TextStyle(
+            fontSize: screenWidth * 0.045, // 字体大小为屏幕宽度的4.5%
             fontWeight: FontWeight.bold,
             color: Color.fromARGB(255, 84, 97, 97),
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: screenHeight * 0.015), // 间距为屏幕高度的1.5%
         
         // 推荐结果列表
         if (results.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 20),
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: screenHeight * 0.025), // 垂直 padding 为屏幕高度的2.5%
             child: Text(
               '暂无推荐结果',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
+              style: const TextStyle(color: Colors.grey),
             ),
           )
         else
@@ -371,9 +391,12 @@ class _RecommendByTagsState extends State<RecommendByTags> {
 
   // 构建单个推荐项
   Widget _buildRecommendationItem(RecommendationResult result) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      margin: EdgeInsets.only(bottom: screenHeight * 0.015), // 底部 margin 为屏幕高度的1.5%
+      padding: EdgeInsets.all(screenWidth * 0.03), // padding 为屏幕宽度的3%
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey.shade200),
         borderRadius: BorderRadius.circular(8),
@@ -389,22 +412,23 @@ class _RecommendByTagsState extends State<RecommendByTags> {
               Expanded(
                 child: Text(
                   result.songTitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                    fontSize: screenWidth * 0.04, // 字体大小为屏幕宽度的4%
                   ),
                 ),
               ),
               Text(
                 result.level,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Color.fromARGB(255, 84, 97, 97),
+                  fontSize: screenWidth * 0.035, // 字体大小为屏幕宽度的3.5%
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: screenHeight * 0.01), // 间距为屏幕高度的1%
           
           // 定数、相似度
           Row(
@@ -414,14 +438,14 @@ class _RecommendByTagsState extends State<RecommendByTags> {
               Text('相似度: ${(result.similarity * 100).toStringAsFixed(1)}%'),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: screenHeight * 0.01), // 间距为屏幕高度的1%
           // 最低达成率
           Text('当前:${result.nowAchievement.toStringAsFixed(4)}%→目标:${result.minAchievement.toStringAsFixed(4)}%'),
           
           // 提升Rating信息
           if (result.ableRiseTotalRating == true)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: EdgeInsets.only(top: screenHeight * 0.01), // 顶部 padding 为屏幕高度的1%
             child: Text(
               'Rating提升: ' + result.riseTotalRating,
               style: TextStyle(
@@ -432,7 +456,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
           ),
           if (result.ableRiseTotalRating == false)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: EdgeInsets.only(top: screenHeight * 0.01), // 顶部 padding 为屏幕高度的1%
             child: Text(
               result.riseTotalRating,
               style: TextStyle(

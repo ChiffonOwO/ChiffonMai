@@ -147,23 +147,23 @@ class B50ConvertToImg {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // 评分区域
-            _buildRatingSection(rating, ratingAverage, best35Sum, best35Average, best15Sum, best15Average, best50AchievementAverage, best35AchievementAverage, best15AchievementAverage, best50ScoreRateAverage, best35ScoreRateAverage, best15ScoreRateAverage),
+            _buildRatingSection(context, rating, ratingAverage, best35Sum, best35Average, best15Sum, best15Average, best50AchievementAverage, best35AchievementAverage, best15AchievementAverage, best50ScoreRateAverage, best35ScoreRateAverage, best15ScoreRateAverage),
             SizedBox(height: 20.0),
 
             // Best35 标题区域
-            _buildSectionTitle('Best35 | 非当前版本最好成绩'),
+            _buildSectionTitle(context, 'Best35 | 非当前版本最好成绩'),
             SizedBox(height: 16.0),
 
             // Best35 卡片网格 (5列)
-            _buildDataCardGrid(sdSongs, 1.8, 5, b50Data, maimaiMusicData),
+            _buildDataCardGrid(context, sdSongs, 1.8, 5, b50Data, maimaiMusicData),
             SizedBox(height: 24.0),
 
             // Best15 标题区域
-            _buildSectionTitle('Best15 | 当前版本最好成绩'),
+            _buildSectionTitle(context, 'Best15 | 当前版本最好成绩'),
             SizedBox(height: 16.0),
 
             // Best15 卡片网格 (5列)
-            _buildDataCardGrid(dxSongs, 1.8, 5, b50Data, maimaiMusicData),
+            _buildDataCardGrid(context, dxSongs, 1.8, 5, b50Data, maimaiMusicData),
             SizedBox(height: 20.0),
           ],
         ),
@@ -172,7 +172,16 @@ class B50ConvertToImg {
   }
 
   // 构建评分区域
-  static Widget _buildRatingSection(int rating, double ratingAverage, int best35Sum, double best35Average, int best15Sum, double best15Average, double best50AchievementAverage, double best35AchievementAverage, double best15AchievementAverage, double best50ScoreRateAverage, double best35ScoreRateAverage, double best15ScoreRateAverage) {
+  static Widget _buildRatingSection(BuildContext context, int rating, double ratingAverage, int best35Sum, double best35Average, int best15Sum, double best15Average, double best50AchievementAverage, double best35AchievementAverage, double best15AchievementAverage, double best50ScoreRateAverage, double best35ScoreRateAverage, double best15ScoreRateAverage) {
+    // 获取屏幕尺寸
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // 根据屏幕宽度计算字体大小
+    double titleFontSize = screenWidth * 0.044; // 22.0 / 500
+    double mainFontSize = screenWidth * 0.04; // 20.0 / 500
+    double subFontSize = screenWidth * 0.032; // 16.0 / 500
+    double sectionTitleFontSize = screenWidth * 0.036; // 18.0 / 500
+    
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: Colors.black, width: 2.0),
@@ -189,7 +198,7 @@ class B50ConvertToImg {
                 Text(
                   'Rating',
                   style: TextStyle(
-                    fontSize: 22.0,
+                    fontSize: titleFontSize,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -201,7 +210,7 @@ class B50ConvertToImg {
                       TextSpan(
                         text: rating.toString(),
                         style: TextStyle(
-                          fontSize: 20.0,
+                          fontSize: mainFontSize,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
                         ),
@@ -209,7 +218,7 @@ class B50ConvertToImg {
                       TextSpan(
                         text: '(平均${ratingAverage.toStringAsFixed(1)})',
                         style: TextStyle(
-                          fontSize: 16.0,
+                          fontSize: subFontSize,
                           color: Colors.black,
                         ),
                       ),
@@ -220,7 +229,7 @@ class B50ConvertToImg {
                 Text(
                   'Best 35',
                   style: TextStyle(
-                    fontSize: 20.0,
+                    fontSize: mainFontSize,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -231,7 +240,7 @@ class B50ConvertToImg {
                       TextSpan(
                         text: best35Sum.toString(),
                         style: TextStyle(
-                          fontSize: 20.0,
+                          fontSize: mainFontSize,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
                         ),
@@ -239,7 +248,7 @@ class B50ConvertToImg {
                       TextSpan(
                         text: '(平均${best35Average.toStringAsFixed(1)})',
                         style: TextStyle(
-                          fontSize: 16.0,
+                          fontSize: subFontSize,
                           color: Colors.black,
                         ),
                       ),
@@ -250,7 +259,7 @@ class B50ConvertToImg {
                 Text(
                   'Best 15',
                   style: TextStyle(
-                    fontSize: 20.0,
+                    fontSize: mainFontSize,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -261,7 +270,7 @@ class B50ConvertToImg {
                       TextSpan(
                         text: best15Sum.toString(),
                         style: TextStyle(
-                          fontSize: 20.0,
+                          fontSize: mainFontSize,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
                         ),
@@ -269,7 +278,7 @@ class B50ConvertToImg {
                       TextSpan(
                         text: '(平均${best15Average.toStringAsFixed(1)})',
                         style: TextStyle(
-                          fontSize: 16.0,
+                          fontSize: subFontSize,
                           color: Colors.black,
                         ),
                       ),
@@ -288,32 +297,32 @@ class B50ConvertToImg {
                 Text(
                   'Best 50 平均达成率/DX分达成率',
                   style: TextStyle(
-                    fontSize: 18.0,
+                    fontSize: sectionTitleFontSize,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
                 ),
-                _buildDualDecimalText(best50AchievementAverage, best50ScoreRateAverage * 100),
+                _buildDualDecimalText(context, best50AchievementAverage, best50ScoreRateAverage * 100),
                 SizedBox(height: 12.0),
                 Text(
                   'Best 35 平均达成率/DX分达成率',
                   style: TextStyle(
-                    fontSize: 18.0,
+                    fontSize: sectionTitleFontSize,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
                 ),
-                _buildDualDecimalText(best35AchievementAverage, best35ScoreRateAverage * 100),
+                _buildDualDecimalText(context, best35AchievementAverage, best35ScoreRateAverage * 100),
                 SizedBox(height: 12.0),
                 Text(
                   'Best 15平均达成率/DX分达成率',
                   style: TextStyle(
-                    fontSize: 18.0,
+                    fontSize: sectionTitleFontSize,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
                 ),
-                _buildDualDecimalText(best15AchievementAverage, best15ScoreRateAverage * 100),
+                _buildDualDecimalText(context, best15AchievementAverage, best15ScoreRateAverage * 100),
               ],
             ),
           ),
@@ -323,7 +332,13 @@ class B50ConvertToImg {
   }
 
   // 构建区域标题
-  static Widget _buildSectionTitle(String title) {
+  static Widget _buildSectionTitle(BuildContext context, String title) {
+    // 获取屏幕尺寸
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // 根据屏幕宽度计算字体大小
+    double fontSize = screenWidth * 0.04; // 20.0 / 500
+    
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: Colors.black, width: 2.0),
@@ -335,7 +350,7 @@ class B50ConvertToImg {
         child: Text(
           title,
           style: TextStyle(
-            fontSize: 20.0,
+            fontSize: fontSize,
             fontWeight: FontWeight.bold,
             color: Colors.black,
           ),
@@ -346,6 +361,7 @@ class B50ConvertToImg {
 
   // 构建游戏卡片
   static Widget _buildGameCard({
+    required BuildContext context,
     required Color cardColor,
     String songName = '未知歌曲',
     double achievementRate = 0.0,
@@ -358,6 +374,9 @@ class B50ConvertToImg {
     int? songId,
     Color starsColor = Colors.white,
   }) {
+    // 获取屏幕尺寸
+    final screenWidth = MediaQuery.of(context).size.width;
+    
     return Container(
       decoration: BoxDecoration(
         color: cardColor,
@@ -370,36 +389,37 @@ class B50ConvertToImg {
           double maxWidth = constraints.maxWidth;
 
           // 根据宽度动态调整字体大小（增大字体）
+          double baseFontSize = screenWidth * 0.032; // 基础字体大小
           double songNameFontSize = maxWidth > 160
-              ? 16.0
+              ? baseFontSize * 1.25
               : maxWidth > 140
-                  ? 15.0
-                  : 14.0;
+                  ? baseFontSize * 1.17
+                  : baseFontSize * 1.1;
           double decimalMainFontSize = maxWidth > 160
-              ? 18.0
+              ? baseFontSize * 1.4
               : maxWidth > 140
-                  ? 17.0
-                  : 16.0;
+                  ? baseFontSize * 1.33
+                  : baseFontSize * 1.25;
           double decimalSmallFontSize = maxWidth > 160
-              ? 14.0
+              ? baseFontSize * 1.1
               : maxWidth > 140
-                  ? 13.0
-                  : 12.0;
+                  ? baseFontSize * 1.03
+                  : baseFontSize * 0.94;
           double otherFontSize = maxWidth > 160
-              ? 12.0
+              ? baseFontSize * 0.94
               : maxWidth > 140
-                  ? 11.0
-                  : 10.0;
+                  ? baseFontSize * 0.86
+                  : baseFontSize * 0.78;
           double gradeFontSize = maxWidth > 160
-              ? 11.0
+              ? baseFontSize * 0.86
               : maxWidth > 140
-                  ? 10.5
-                  : 10.0;
+                  ? baseFontSize * 0.82
+                  : baseFontSize * 0.78;
           double dxFontSize = maxWidth > 160
-              ? 12.0
+              ? baseFontSize * 0.94
               : maxWidth > 140
-                  ? 11.0
-                  : 10.0;
+                  ? baseFontSize * 0.86
+                  : baseFontSize * 0.78;
 
           double coverSize = maxWidth > 160
               ? 60.0
@@ -579,11 +599,18 @@ class B50ConvertToImg {
   }
 
   // 构建小数文本
-  static Widget _buildDecimalText(double value, {
+  static Widget _buildDecimalText(BuildContext context, double value, {
     bool isPercentage = false,
     int decimalPlaces = 4,
     Color color = Colors.white,
   }) {
+    // 获取屏幕尺寸
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // 根据屏幕宽度计算字体大小
+    double mainFontSize = screenWidth * 0.032; // 16.0 / 500
+    double subFontSize = screenWidth * 0.024; // 12.0 / 500
+    
     String text = value.toStringAsFixed(decimalPlaces);
 
     // 分割整数部分和小数部分
@@ -601,7 +628,7 @@ class B50ConvertToImg {
         Text(
           integerPart,
           style: TextStyle(
-            fontSize: 16.0,
+            fontSize: mainFontSize,
             fontWeight: FontWeight.bold,
             color: color,
           ),
@@ -610,7 +637,7 @@ class B50ConvertToImg {
         Text(
           '$decimalPart$percentageSymbol',
           style: TextStyle(
-            fontSize: 12.0,
+            fontSize: subFontSize,
             fontWeight: FontWeight.bold,
             color: color,
           ),
@@ -620,25 +647,31 @@ class B50ConvertToImg {
   }
 
   // 构建双小数文本
-  static Widget _buildDualDecimalText(double value1, double value2, {
+  static Widget _buildDualDecimalText(BuildContext context, double value1, double value2, {
     int decimalPlaces1 = 4, 
     int decimalPlaces2 = 2, 
     Color color = Colors.black,
   }) {
+    // 获取屏幕尺寸
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // 根据屏幕宽度计算字体大小
+    double fontSize = screenWidth * 0.032; // 16.0 / 500
+    
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _buildDecimalText(value1,
+        _buildDecimalText(context, value1,
             decimalPlaces: decimalPlaces1, color: color),
         Text(
           '/',
           style: TextStyle(
-            fontSize: 16.0,
+            fontSize: fontSize,
             fontWeight: FontWeight.bold,
             color: color,
           ),
         ),
-        _buildDecimalText(value2,
+        _buildDecimalText(context, value2,
             decimalPlaces: decimalPlaces2, color: color),
       ],
     );
@@ -646,7 +679,7 @@ class B50ConvertToImg {
 
   // 构建数据驱动的卡片网格
   static Widget _buildDataCardGrid(
-      List<Map<String, dynamic>> songs, double childAspectRatio, int crossAxisCount, Map<String, dynamic>? b50Data, List<dynamic>? maimaiMusicData) {
+      BuildContext context, List<Map<String, dynamic>> songs, double childAspectRatio, int crossAxisCount, Map<String, dynamic>? b50Data, List<dynamic>? maimaiMusicData) {
     return GridView.builder(
       shrinkWrap: true,
       physics: NeverScrollableScrollPhysics(),
@@ -659,13 +692,13 @@ class B50ConvertToImg {
       ),
       itemCount: songs.length,
       itemBuilder: (context, index) {
-        return _buildDataGameCard(songs[index], b50Data, maimaiMusicData);
+        return _buildDataGameCard(context, songs[index], b50Data, maimaiMusicData);
       },
     );
   }
 
   // 根据数据构建游戏卡片
-  static Widget _buildDataGameCard(Map<String, dynamic> songData, Map<String, dynamic>? b50Data, List<dynamic>? maimaiMusicData) {
+  static Widget _buildDataGameCard(BuildContext context, Map<String, dynamic> songData, Map<String, dynamic>? b50Data, List<dynamic>? maimaiMusicData) {
     // 解析数据
     double achievementRate = double.parse(songData['achievements'].toString());
     int score = songData['dxScore'];
@@ -754,6 +787,7 @@ class B50ConvertToImg {
     bool dxMode = type == 'DX';
 
     return _buildGameCard(
+      context: context,
       cardColor: cardColor,
       songName: title,
       achievementRate: achievementRate,

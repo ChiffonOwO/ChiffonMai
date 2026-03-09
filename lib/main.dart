@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/page/B50Page.dart';
-import 'package:my_first_flutter_app/page/RecommendByTags.dart';
-import 'package:my_first_flutter_app/page/SingleRatingCalculator.dart';
+import 'package:my_first_flutter_app/page/DiffBest50Page.dart';
+import 'package:my_first_flutter_app/page/RecommendByTagsPage.dart';
+import 'package:my_first_flutter_app/page/SingleRatingCalculatorPage.dart';
 import 'package:my_first_flutter_app/page/SongSearchPage.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/manager/UserBest50Manager.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
-import 'package:my_first_flutter_app/entity/RecordItem.dart';
+import 'package:my_first_flutter_app/page/UserScoreSearchPage.dart';
 import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
-import 'page/AchievementFullReverseCalculator.dart';
-import 'page/versionView.dart';
-import 'page/AchievementRateCalculator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'page/AchievementFullReverseCalculatorPage.dart';
+import 'page/VersionViewPage.dart';
+import 'page/AchievementRateCalculatorPage.dart';
 
 // 应用常量类：集中管理所有硬编码的配置值
 class AppConstants {
@@ -108,6 +110,33 @@ class _HomePageState extends State<HomePage> {
   int _best35TotalRA = 10670;
   int _best15TotalRA = 4379;
   
+  // 初始化方法，用于从本地存储加载数据
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+  
+  // 从本地存储加载用户数据
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _userNickname = prefs.getString('userNickname') ?? "U+5E78";
+      _best50TotalRA = prefs.getInt('best50TotalRA') ?? 15049;
+      _best35TotalRA = prefs.getInt('best35TotalRA') ?? 10670;
+      _best15TotalRA = prefs.getInt('best15TotalRA') ?? 4379;
+    });
+  }
+  
+  // 保存用户数据到本地存储
+  Future<void> _saveUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('userNickname', _userNickname);
+    await prefs.setInt('best50TotalRA', _best50TotalRA);
+    await prefs.setInt('best35TotalRA', _best35TotalRA);
+    await prefs.setInt('best15TotalRA', _best15TotalRA);
+  }
+  
   // 按钮数据源：使用类型安全的ButtonItem模型
   final List<ButtonItem> buttonItems = const [
     ButtonItem(icon: Icons.music_note, title: '乐曲查询', subtitle: '查询舞萌曲库的乐曲'),
@@ -136,6 +165,7 @@ class _HomePageState extends State<HomePage> {
     // Stack子组件按书写顺序从上到下叠加，越靠后层级越高
     return Scaffold(
       backgroundColor: Colors.transparent, // 透明背景，显示底层图片
+      resizeToAvoidBottomInset: false, // 防止输入法弹出时重新布局导致卡顿
       body: Stack(
         children: [
           // 层级1：基础背景图 - 占满整个屏幕，作为页面最底层背景
@@ -369,12 +399,14 @@ class _HomePageState extends State<HomePage> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text('刷新数据'),
-          content: TextField(
-            controller: qqController,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: '请输入QQ号',
-              hintText: '例如:1919810',
+          content: SingleChildScrollView(
+            child: TextField(
+              controller: qqController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: '请输入QQ号',
+                hintText: '例如:1919810',
+              ),
             ),
           ),
           actions: [
@@ -451,6 +483,9 @@ class _HomePageState extends State<HomePage> {
         _best35TotalRA = best35RA;
         _best15TotalRA = best15RA;
       });
+      
+      // 保存数据到本地存储
+      await _saveUserData();
       
       // 转换数据格式为B50Page需要的格式
       final b50DataMap = {
@@ -558,6 +593,18 @@ class _HomePageState extends State<HomePage> {
           }
           if (item.title == '刷新数据') {
             _showRefreshDataDialog(context);
+          }
+          if (item.title == '成绩查询') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => UserScoreSearchPage()),
+            );
+          }
+          if (item.title == '拟合Best50查询'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => DiffBest50Page()),
+            );
           }
         },
         child: Column(

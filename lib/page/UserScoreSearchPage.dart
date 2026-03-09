@@ -1,0 +1,692 @@
+import 'package:flutter/material.dart';
+import '../service/UserScoreSearchService.dart';
+import '../manager/UserPlayDataManager.dart';
+import '../main.dart';
+
+class UserScoreSearchPage extends StatefulWidget {
+  const UserScoreSearchPage({Key? key}) : super(key: key);
+
+  @override
+  _UserScoreSearchPageState createState() => _UserScoreSearchPageState();
+}
+
+class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
+  final UserScoreSearchService _service = UserScoreSearchService();
+  final UserPlayDataManager _playDataManager = UserPlayDataManager();
+  
+  Map<String, dynamic>? _userPlayData;
+  List<dynamic> _sortedSongs = [];
+  List<dynamic> _pagedSongs = [];
+  bool _isLoading = true;
+  
+  int _currentPage = 1;
+  int _pageSize = 50;
+  final TextEditingController _pageSizeController = TextEditingController(text: '50');
+  
+  // 筛选按钮相关尺寸变量
+  late double _buttonHorizontalSpacing;
+  late double _buttonVerticalSpacing;
+  late double _buttonBorderRadius;
+  late double _buttonWidth;
+  late double _buttonHeight;
+  late double _buttonFontSize;
+  
+  // 新增小按钮相关尺寸变量
+  late double _smallButtonWidth;
+  late double _smallButtonHeight;
+  late double _smallButtonFontSize;
+  
+  // 当前选中的按钮索引
+  int _selectedButtonIndex = 0;
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+  
+  // 初始化按钮尺寸变量
+  void _initButtonSizes(double screenWidth) {
+    _buttonHorizontalSpacing = screenWidth * 0.015;
+    _buttonVerticalSpacing = screenWidth * 0.008;
+    _buttonBorderRadius = screenWidth * 0.01;
+    _buttonWidth = screenWidth * 0.28; // 增加按钮宽度，从0.2增加到0.28
+    _buttonHeight = screenWidth * 0.15;
+    _buttonFontSize = screenWidth * 0.035; // 增大字体大小，从0.03增加到0.035
+    
+    // 初始化新增小按钮尺寸
+    _smallButtonWidth = screenWidth * 0.12;
+    _smallButtonHeight = screenWidth * 0.08;
+    _smallButtonFontSize = screenWidth * 0.035;
+  }
+  
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      _userPlayData = await _service.getUserPlayData();
+      if (_userPlayData != null) {
+        _sortedSongs = _service.getSortedSongs(_userPlayData!);
+        _updatePagedSongs();
+      }
+    } catch (e) {
+      print('加载数据出错: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+  
+  void _updatePagedSongs() {
+    _pagedSongs = _service.getPagedSongs(_sortedSongs, _currentPage, _pageSize);
+  }
+  
+  void _changePage(int page) {
+    setState(() {
+      _currentPage = page;
+      _updatePagedSongs();
+    });
+  }
+  
+  void _changePageSize() {
+    int newPageSize = int.tryParse(_pageSizeController.text) ?? 50;
+    if (newPageSize > 0) {
+      setState(() {
+        _pageSize = newPageSize;
+        _currentPage = 1;
+        _updatePagedSongs();
+      });
+    }
+  }
+  
+  int _getTotalPages() {
+    return (_sortedSongs.length / _pageSize).ceil();
+  }
+
+  // 计算统计数据
+  Map<String, int> _calculateStats() {
+    if (_userPlayData == null || !_userPlayData!.containsKey('records')) {
+      return {
+        'total': 0,
+        'sssp': 0,
+        'sss': 0,
+        'fc': 0,
+        'ap': 0,
+        'fs': 0,
+        'fdx': 0,
+      };
+    }
+    
+    List<dynamic> records = _userPlayData!['records'];
+    int total = records.length;
+    int sssp = 0; // ≥SSS+
+    int sss = 0;  // ≥SSS
+    int fc = 0;   // FC/FC+
+    int ap = 0;   // AP/AP+
+    int fs = 0;   // FS/FS+
+    int fdx = 0;  // FDX/FDX+
+    
+    for (var record in records) {
+      // 统计成绩等级
+      if (record.containsKey('achievements')) {
+        double achievements = double.tryParse(record['achievements'].toString()) ?? 0;
+        if (achievements >= 100.5) {
+          sssp++;
+        } else if (achievements >= 100.0) {
+          sss++;
+        }
+      }
+      
+      // 统计FC/AP
+      if (record.containsKey('fc')) {
+        String fcValue = record['fc'].toString().toLowerCase();
+        if (fcValue == 'fc' || fcValue == 'fcp') {
+          fc++;
+        }
+        if (fcValue == 'ap' || fcValue == 'app') {
+          ap++;
+        }
+      }
+      
+      // 统计FS/FDX
+      if (record.containsKey('fs')) {
+        String fsValue = record['fs'].toString().toLowerCase();
+        if (fsValue == 'fs' || fsValue == 'fsp') {
+          fs++;
+        }
+        if (fsValue == 'fsd' || fsValue == 'fsdp') {
+          fdx++;
+        }
+      }
+    }
+    
+    return {
+      'total': total,
+      'sssp': sssp,
+      'sss': sss,
+      'fc': fc,
+      'ap': ap,
+      'fs': fs,
+      'fdx': fdx,
+    };
+  }
+  
+  // 构建统计项
+  Widget _buildStatItem(String label, int value) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(6),
+        color: Colors.grey[50],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 10),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 2),
+          Text(
+            value.toString(),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.blue,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final stats = _calculateStats();
+    
+    // 初始化按钮尺寸
+    _initButtonSizes(screenWidth);
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      resizeToAvoidBottomInset: false, // 防止键盘弹出时调整布局
+      body: Stack(
+        children: [
+          // 固定背景，不受键盘影响
+          Container(
+            width: screenWidth,
+            height: screenHeight,
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/background.png'),
+                fit: BoxFit.cover,
+                opacity: 1.0,
+              ),
+            ),
+          ),
+          
+          Center(
+            child: Transform.translate(
+              offset: Offset(0, -screenHeight * 0.03),
+              child: Transform.scale(
+                scale: 1,
+                child: Image.asset(
+                  'assets/chiffon2.png',
+                  fit: BoxFit.cover,
+                  opacity: const AlwaysStoppedAnimation(1),
+                ),
+              ),
+            ),
+          ),
+          
+          
+          // 页面内容
+          Column(
+            children: [
+              // 标题栏
+              Container(
+                padding: EdgeInsets.fromLTRB(16, 48, 16, 16),
+                child: Row(
+                  children: [
+                    // 返回按钮
+                    IconButton(
+                      icon: Icon(Icons.arrow_back, color: AppConstants.textPrimaryColor),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                    // 标题
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          '成绩查询',
+                          style: TextStyle(
+                            color: AppConstants.textPrimaryColor,
+                            fontSize: screenWidth * 0.06,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // 占位，保持标题居中
+                    SizedBox(width: 48),
+                  ],
+                ),
+              ),
+              
+              // 主内容区域
+              Expanded(
+                child: Container(
+                  margin: EdgeInsets.fromLTRB(8, 4, 8, 16), // 进一步减小上边距，从8减小到4
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9), // 增加白色不透明度，使背景更深
+                    borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+                    boxShadow: const [AppConstants.defaultShadow],
+                  ),
+                  child: _isLoading
+                      ? Center(child: CircularProgressIndicator())
+                      : _userPlayData == null
+                          ? Center(child: Text('没有找到缓存数据'))
+                          : Column(
+                              children: [
+                                // 可滚动内容区域
+                                Expanded(
+                                  child: SingleChildScrollView(
+                                    child: Column(
+                                      children: [
+                                        // 统计显示区域
+                                        Container(
+                                          padding: EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              // 第一行统计数据
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                                children: [
+                                                  Expanded(child: _buildStatItem('总谱面数', stats['total']!)),
+                                                  SizedBox(width: 8),
+                                                  Expanded(child: _buildStatItem('SSS+', stats['sssp']!)),
+                                                  SizedBox(width: 8),
+                                                  Expanded(child: _buildStatItem('SSS', stats['sss']!)),
+                                                  SizedBox(width: 8),
+                                                ],
+                                              ),
+                                              SizedBox(height: 8),
+                                              // 第二行统计数据
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                                children: [
+                                                  Expanded(child: _buildStatItem('FC/FC+', stats['fc']!)),
+                                                  SizedBox(width: 8),
+                                                  Expanded(child: _buildStatItem('AP/AP+', stats['ap']!)),
+                                                  SizedBox(width: 8),
+                                                  Expanded(child: _buildStatItem('FS/FS+', stats['fs']!)),
+                                                  SizedBox(width: 8),
+                                                  Expanded(child: _buildStatItem('FDX/FDX+', stats['fdx']!)),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        
+                                        // 筛选按钮区域
+                                        Container(
+                                          padding: EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+                                          ),
+                                          child: Wrap(
+                                            spacing: _buttonHorizontalSpacing, // 水平间距
+                                            runSpacing: _buttonVerticalSpacing, // 垂直间距
+                                            children: [
+                                              ElevatedButton(
+                                                onPressed: () {},
+                                                style: ElevatedButton.styleFrom(
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(_buttonBorderRadius), // 圆角
+                                                  ),
+                                                  fixedSize: Size(_buttonWidth, _buttonHeight), // 按钮尺寸
+                                                  padding: EdgeInsets.symmetric(horizontal: 4), // 减少水平内边距
+                                                ),
+                                                child: FittedBox(
+                                                  fit: BoxFit.contain,
+                                                  child: Text('排序方式', 
+                                                    style: TextStyle(fontSize: _buttonFontSize),
+                                                    maxLines: 1,
+                                                  ),
+                                                ), // 文字尺寸
+                                              ),
+                                              ElevatedButton(
+                                                onPressed: () {},
+                                                style: ElevatedButton.styleFrom(
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(_buttonBorderRadius),
+                                                  ),
+                                                  fixedSize: Size(_buttonWidth, _buttonHeight),
+                                                  padding: EdgeInsets.symmetric(horizontal: 4), // 减少水平内边距
+                                                ),
+                                                child: FittedBox(
+                                                  fit: BoxFit.contain,
+                                                  child: Text('版本筛选', 
+                                                    style: TextStyle(fontSize: _buttonFontSize),
+                                                    maxLines: 1,
+                                                  ),
+                                                ),
+                                              ),
+                                              ElevatedButton(
+                                                onPressed: () {},
+                                                style: ElevatedButton.styleFrom(
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(_buttonBorderRadius),
+                                                  ),
+                                                  fixedSize: Size(_buttonWidth, _buttonHeight),
+                                                  padding: EdgeInsets.symmetric(horizontal: 4), // 减少水平内边距
+                                                ),
+                                                child: FittedBox(
+                                                  fit: BoxFit.contain,
+                                                  child: Text('定数筛选', 
+                                                    style: TextStyle(fontSize: _buttonFontSize),
+                                                    maxLines: 1,
+                                                  ),
+                                                ),
+                                              ),
+                                              ElevatedButton(
+                                                onPressed: () {},
+                                                style: ElevatedButton.styleFrom(
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(_buttonBorderRadius),
+                                                  ),
+                                                  fixedSize: Size(_buttonWidth, _buttonHeight),
+                                                  padding: EdgeInsets.symmetric(horizontal: 4), // 减少水平内边距
+                                                ),
+                                                child: FittedBox(
+                                                  fit: BoxFit.contain,
+                                                  child: Text('难度筛选', 
+                                                    style: TextStyle(fontSize: _buttonFontSize),
+                                                    maxLines: 1,
+                                                  ),
+                                                ),
+                                              ),
+                                              ElevatedButton(
+                                                onPressed: () {},
+                                                style: ElevatedButton.styleFrom(
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(_buttonBorderRadius),
+                                                  ),
+                                                  fixedSize: Size(_buttonWidth, _buttonHeight),
+                                                  padding: EdgeInsets.symmetric(horizontal: 4), // 减少水平内边距
+                                                ),
+                                                child: FittedBox(
+                                                  fit: BoxFit.contain,
+                                                  child: Text('达成率筛选', 
+                                                    style: TextStyle(fontSize: _buttonFontSize),
+                                                    maxLines: 1,
+                                                  ),
+                                                ),
+                                              ),
+                                              ElevatedButton(
+                                                onPressed: () {},
+                                                style: ElevatedButton.styleFrom(
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(_buttonBorderRadius),
+                                                  ),
+                                                  fixedSize: Size(_buttonWidth, _buttonHeight),
+                                                  padding: EdgeInsets.symmetric(horizontal: 4), // 减少水平内边距
+                                                ),
+                                                child: FittedBox(
+                                                  fit: BoxFit.contain,
+                                                  child: Text('连击/同步筛选', 
+                                                    style: TextStyle(fontSize: _buttonFontSize),
+                                                    maxLines: 1,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        
+                                        // 每页显示数量设置
+                                        Container(
+                                          padding: EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              // 四个小按钮组合
+                                              Row(
+                                                children: [
+                                                  ElevatedButton(
+                                                    onPressed: () {
+                                                      setState(() {
+                                                        _selectedButtonIndex = 0;
+                                                      });
+                                                    },
+                                                    style: ElevatedButton.styleFrom(
+                                                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                                      minimumSize: Size(_smallButtonWidth, _smallButtonHeight),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(2), // 方形按钮
+                                                      ),
+                                                      backgroundColor: _selectedButtonIndex == 0 ? Colors.blue : null,
+                                                    ),
+                                                    child: Text('评级', 
+                                                      style: TextStyle(
+                                                        fontSize: _smallButtonFontSize, 
+                                                        color: _selectedButtonIndex == 0 ? Colors.white : null,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  SizedBox(width: 4),
+                                                  ElevatedButton(
+                                                    onPressed: () {
+                                                      setState(() {
+                                                        _selectedButtonIndex = 1;
+                                                      });
+                                                    },
+                                                    style: ElevatedButton.styleFrom(
+                                                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                                      minimumSize: Size(_smallButtonWidth, _smallButtonHeight),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(2), // 方形按钮
+                                                      ),
+                                                      backgroundColor: _selectedButtonIndex == 1 ? Colors.blue : null,
+                                                    ),
+                                                    child: Text('连击', 
+                                                      style: TextStyle(
+                                                        fontSize: _smallButtonFontSize, 
+                                                        color: _selectedButtonIndex == 1 ? Colors.white : null,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  SizedBox(width: 4),
+                                                  ElevatedButton(
+                                                    onPressed: () {
+                                                      setState(() {
+                                                        _selectedButtonIndex = 2;
+                                                      });
+                                                    },
+                                                    style: ElevatedButton.styleFrom(
+                                                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                                      minimumSize: Size(_smallButtonWidth, _smallButtonHeight),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(2), // 方形按钮
+                                                      ),
+                                                      backgroundColor: _selectedButtonIndex == 2 ? Colors.blue : null,
+                                                    ),
+                                                    child: Text('同步', 
+                                                      style: TextStyle(
+                                                        fontSize: _smallButtonFontSize, 
+                                                        color: _selectedButtonIndex == 2 ? Colors.white : null,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  SizedBox(width: 4),
+                                                  ElevatedButton(
+                                                    onPressed: () {
+                                                      setState(() {
+                                                        _selectedButtonIndex = 3;
+                                                      });
+                                                    },
+                                                    style: ElevatedButton.styleFrom(
+                                                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                                      minimumSize: Size(_smallButtonWidth, _smallButtonHeight),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(2), // 方形按钮
+                                                      ),
+                                                      backgroundColor: _selectedButtonIndex == 3 ? Colors.blue : null,
+                                                    ),
+                                                    child: Text('得分', 
+                                                      style: TextStyle(
+                                                        fontSize: _smallButtonFontSize, 
+                                                        color: _selectedButtonIndex == 3 ? Colors.white : null,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              Spacer(), // 中间占位，将右侧内容推到右边
+                                              // 每页显示输入框
+                                              Row(
+                                                children: [
+                                                  Text('每页显示 ', style: TextStyle(fontSize: 12)), // 减小字体大小
+                                                  Container(
+                                                    width: screenWidth * 0.12, // 略微增加输入框宽度，从0.1增加到0.12
+                                                    height: 24, // 固定高度，减小输入框高度
+                                                    child: TextField(
+                                                      controller: _pageSizeController,
+                                                      keyboardType: TextInputType.number,
+                                                      onSubmitted: (_) => _changePageSize(),
+                                                      decoration: InputDecoration(
+                                                        border: OutlineInputBorder(),
+                                                        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 0), // 进一步减小内边距
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        
+                                        // 歌曲列表
+                                        Container(
+                                          padding: EdgeInsets.all(8),
+                                          constraints: BoxConstraints(
+                                            minHeight: 300, // 设置最小高度确保内容显示
+                                          ),
+                                          child: GridView.builder(
+                                            shrinkWrap: true, // 允许GridView根据内容大小调整
+                                            physics: NeverScrollableScrollPhysics(), // 禁用内部滚动，由外部SingleChildScrollView控制
+                                            padding: EdgeInsets.all(8),
+                                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                              crossAxisCount: 5,
+                                              crossAxisSpacing: screenWidth * 0.005, // 减小水平间距
+                                              mainAxisSpacing: screenWidth * 0.005, // 减小垂直间距
+                                              childAspectRatio: 1.0, // 确保图片显示为正方形
+                                            ),
+                                            itemCount: _pagedSongs.length,
+                                            itemBuilder: (context, index) {
+                                              final song = _pagedSongs[index];
+                                              final levelIndex = song['level_index'] ?? 0;
+                                              final borderColor = _service.getBorderColor(levelIndex);
+                                              
+                                              // 计算每个网格项的大小，确保正方形显示
+                                              final itemSize = (screenWidth - 32 - (4 * screenWidth * 0.01)) / 5; // 32是左右边距，4是间隔数
+                                              
+                                              return Container(
+                                                width: itemSize,
+                                                height: itemSize,
+                                                decoration: BoxDecoration(
+                                                  border: Border.all(
+                                                    color: Color(borderColor.value),
+                                                    width: 2,
+                                                  ),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  color: Color(borderColor.value).withOpacity(0.3), // 给四个角添加与边框相同颜色的背景
+                                                ),
+                                                child: ClipRRect(
+                                                  borderRadius: BorderRadius.circular(6), // 与容器边框保持一致的圆角
+                                                  child: Image.asset(
+                                                    'assets/cover/${song['song_id']}.webp',
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (context, error, stackTrace) {
+                                                      // 生成网络曲绘URL
+                                                      String coverId = song['song_id']?.toString() ?? '';
+                                                      if (coverId.isNotEmpty && coverId.length < 5) {
+                                                        // 万位补1，其余位补0
+                                                        coverId = '1' + '0' * (4 - coverId.length) + coverId;
+                                                      }
+                                                      String networkCoverUrl = 'https://www.diving-fish.com/covers/$coverId.png';
+                                                      
+                                                      return Image.network(
+                                                        networkCoverUrl,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (context, error, stackTrace) {
+                                                          return Container(
+                                                            color: Colors.grey[200],
+                                                            child: Center(child: Text('暂无图片')),
+                                                          );
+                                                        },
+                                                      );
+                                                    },
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                
+                                // 固定的分页控件
+                                Container(
+                                  padding: EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    border: Border(top: BorderSide(color: Colors.grey[300]!)),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      ElevatedButton(
+                                        onPressed: _currentPage > 1
+                                            ? () => _changePage(_currentPage - 1)
+                                            : null,
+                                        child: Text('上一页'),
+                                      ),
+                                      SizedBox(width: 16),
+                                      Text('$_currentPage / ${_getTotalPages()}'),
+                                      SizedBox(width: 16),
+                                      ElevatedButton(
+                                        onPressed: _currentPage < _getTotalPages()
+                                            ? () => _changePage(_currentPage + 1)
+                                            : null,
+                                        child: Text('下一页'),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -137,6 +137,10 @@ class _AchievementFullReverseCalculatorState
 
   @override
   Widget build(BuildContext context) {
+    // 获取屏幕尺寸
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
     // 计算总计
     int totalCp = _tapCp + _holdCp + _slideCp + _touchCp + _breakCp;
     int totalP = _tapP + _holdP + _slideP + _touchP + _breakP;
@@ -165,7 +169,7 @@ class _AchievementFullReverseCalculatorState
           // 层级2：第一张虚化装饰图 - 居中显示，轻微向上偏移
           Center(
             child: Transform.translate(
-              offset: const Offset(0, -20), // 垂直向上偏移20px
+              offset: Offset(0, -screenHeight * 0.02), // 垂直向上偏移屏幕高度的2%
               child: Transform.scale(
                 scale: 1, // 不缩放
                 child: Image.asset(
@@ -178,8 +182,8 @@ class _AchievementFullReverseCalculatorState
           ),
 
           // 页面标题
-          const Positioned(
-            top: 60,
+          Positioned(
+            top: screenHeight * 0.08, // 距离顶部为屏幕高度的8%
             left: 0,
             right: 0,
             child: Center(
@@ -187,7 +191,7 @@ class _AchievementFullReverseCalculatorState
                 "达成率反推",
                 style: TextStyle(
                   color: Color.fromARGB(255, 84, 97, 97),
-                  fontSize: 24,
+                  fontSize: screenWidth * 0.06, // 字体大小为屏幕宽度的6%
                   fontWeight: FontWeight.bold,
                   letterSpacing: 2,
                 ),
@@ -197,11 +201,12 @@ class _AchievementFullReverseCalculatorState
 
           // 返回按钮
           Positioned(
-            top: 40,
-            left: 10,
+            top: screenHeight * 0.05, // 距离顶部为屏幕高度的5%
+            left: screenWidth * 0.03, // 距离左侧为屏幕宽度的3%
             child: IconButton(
-              icon: const Icon(Icons.arrow_back,
-                  color: Color.fromARGB(255, 84, 97, 97), size: 24),
+              icon: Icon(Icons.arrow_back,
+                  color: Color.fromARGB(255, 84, 97, 97), 
+                  size: screenWidth * 0.06), // 图标大小为屏幕宽度的6%
               onPressed: () {
                 Navigator.pop(context);
               },
@@ -210,10 +215,10 @@ class _AchievementFullReverseCalculatorState
 
           // 主要内容区域
           Positioned(
-            top: 120,
-            left: 20,
-            right: 20,
-            bottom: 80,
+            top: screenHeight * 0.15, // 距离顶部为屏幕高度的15%
+            left: screenWidth * 0.03, // 距离左侧为屏幕宽度的3%
+            right: screenWidth * 0.03, // 距离右侧为屏幕宽度的3%
+            bottom: screenHeight * 0.03, // 距离底部为屏幕高度的3%
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.9),
@@ -227,7 +232,7 @@ class _AchievementFullReverseCalculatorState
                 ],
               ),
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
+                padding: EdgeInsets.all(screenWidth * 0.04), // padding 为屏幕宽度的4%
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -235,11 +240,11 @@ class _AchievementFullReverseCalculatorState
                     _buildSectionTitle('判定详情'),
                     _buildNormalNoteTable(
                         totalCp, totalP, totalG, totalGo, totalM),
-                    const SizedBox(height: 24),
+                    SizedBox(height: screenHeight * 0.03), // 间距为屏幕高度的3%
 
                     // 达成率输入框
                     _buildAchievementRateInput(),
-                    const SizedBox(height: 20),
+                    SizedBox(height: screenHeight * 0.025), // 间距为屏幕高度的2.5%
 
                     // 计算和重置按钮区域
                     Row(
@@ -252,15 +257,15 @@ class _AchievementFullReverseCalculatorState
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.grey,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding: EdgeInsets.symmetric(vertical: screenHeight * 0.015), // 垂直 padding 为屏幕高度的1.5%
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
                             ),
-                            child: const Text("重置", style: TextStyle(fontSize: 14)),
+                            child: Text("重置", style: TextStyle(fontSize: screenWidth * 0.035)), // 字体大小为屏幕宽度的3.5%
                           ),
                         ),
-                        const SizedBox(width: 8), // 按钮间距
+                        SizedBox(width: screenWidth * 0.02), // 按钮间距为屏幕宽度的2%
                         // 计算按钮 - 占据4/5宽度
                         Expanded(
                           flex: 4,
@@ -268,12 +273,12 @@ class _AchievementFullReverseCalculatorState
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
 
                     // 计算结果显示区域
                     if (_resultText != null)
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: EdgeInsets.all(screenWidth * 0.03), // padding 为屏幕宽度的3%
                         decoration: BoxDecoration(
                           color: Colors.grey[100],
                           borderRadius: BorderRadius.circular(8),
@@ -281,7 +286,7 @@ class _AchievementFullReverseCalculatorState
                         ),
                         child: Text(
                           _resultText!,
-                          style: const TextStyle(fontSize: 14, height: 1.5),
+                          style: TextStyle(fontSize: screenWidth * 0.035, height: 1.5), // 字体大小为屏幕宽度的3.5%
                         ),
                       ),
                   ],
@@ -296,30 +301,33 @@ class _AchievementFullReverseCalculatorState
 
   // 构建计算按钮
   Widget _buildCalculateButton() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
     return ElevatedButton(
       onPressed: _calculating ? null : _calculateFullReverse,
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: EdgeInsets.symmetric(vertical: screenHeight * 0.015), // 垂直 padding 为屏幕高度的1.5%
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
         ),
       ),
       child: _calculating
-          ? const Row(
+          ? Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 SizedBox(
-                    width: 20,
-                    height: 20,
+                    width: screenWidth * 0.04, // 宽度为屏幕宽度的4%
+                    height: screenWidth * 0.04, // 高度为屏幕宽度的4%
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Colors.white)),
-                SizedBox(width: 10),
+                SizedBox(width: screenWidth * 0.025), // 间距为屏幕宽度的2.5%
                 Text("计算中..."),
               ],
             )
-          : const Text("计算绝赞详情", style: TextStyle(fontSize: 16)),
+          : Text("计算绝赞详情", style: TextStyle(fontSize: screenWidth * 0.04)), // 字体大小为屏幕宽度的4%
     );
   }
 
@@ -558,10 +566,12 @@ class _AchievementFullReverseCalculatorState
 
   // 构建区域标题
   Widget _buildSectionTitle(String title) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    
     return Text(
       title,
-      style: const TextStyle(
-        fontSize: 20,
+      style: TextStyle(
+        fontSize: screenWidth * 0.05, // 字体大小为屏幕宽度的5%
         fontWeight: FontWeight.bold,
         color: Colors.blue,
       ),
@@ -729,17 +739,19 @@ class _AchievementFullReverseCalculatorState
 
   // 构建达成率输入框
   Widget _buildAchievementRateInput() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         const Text('达成率: '),
         SizedBox(
-          width: 120,
+          width: screenWidth * 0.3, // 宽度为屏幕宽度的30%
           child: TextField(
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
               hintText: '四位小数',
-              contentPadding: EdgeInsets.symmetric(horizontal: 8),
+              contentPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02), // 水平 padding 为屏幕宽度的2%
             ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
@@ -753,7 +765,7 @@ class _AchievementFullReverseCalculatorState
             },
           ),
         ),
-        const SizedBox(width: 4),
+        SizedBox(width: screenWidth * 0.01), // 间距为屏幕宽度的1%
         const Text('%'),
       ],
     );
@@ -761,15 +773,18 @@ class _AchievementFullReverseCalculatorState
 
   // 构建表格单元格
   Widget _buildTableCell(String text, {Color? color, double fontSize = 12.0}) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
     return Container(
       color: color,
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01), // 垂直 padding 为屏幕高度的1%
       child: Text(
         text,
         textAlign: TextAlign.center,
         style: TextStyle(
           fontWeight: FontWeight.bold,
-          fontSize: fontSize,
+          fontSize: screenWidth * 0.025, // 字体大小为屏幕宽度的2.5%
         ),
       ),
     );
@@ -779,6 +794,9 @@ class _AchievementFullReverseCalculatorState
   Widget _buildNumberInputCell(
       int value, Function(int) onChanged, TextEditingController controller,
       {Color? color}) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
     return Container(
       color: color, // 添加颜色参数
       padding: EdgeInsets.zero, // 移除所有内边距，确保颜色完全填充
@@ -788,15 +806,16 @@ class _AchievementFullReverseCalculatorState
         decoration: InputDecoration(
           border: InputBorder.none,
           hintText: value == 0 ? '' : value.toString(),
-          contentPadding: const EdgeInsets.symmetric(
-              horizontal: 4, vertical: 8), // 设置输入框内边距
+          contentPadding: EdgeInsets.symmetric(
+              horizontal: screenWidth * 0.01, 
+              vertical: screenHeight * 0.01), // 设置输入框内边距
           isDense: true, // 紧凑模式，减少默认高度
         ),
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         textAlign: TextAlign.center,
-        style: const TextStyle(
-          fontSize: 12,
+        style: TextStyle(
+          fontSize: screenWidth * 0.025, // 字体大小为屏幕宽度的2.5%
         ),
         onTap: () {
           if (value == 0) {
