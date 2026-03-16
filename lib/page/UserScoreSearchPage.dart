@@ -39,6 +39,18 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   // 当前选中的按钮索引
   int _selectedButtonIndex = 0;
   
+  // 当前排序方式
+  String _currentSortBy = 'Rating'; // 默认选择Rating
+  
+  // 筛选条件
+  Map<String, String> _filterConditions = {
+    '版本筛选': '',
+    '定数筛选': '',
+    '难度筛选': '',
+    '达成率筛选': '',
+    '连击/同步筛选': '',
+  };
+  
   @override
   void initState() {
     super.initState();
@@ -68,7 +80,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
     try {
       _userPlayData = await _service.getUserPlayData();
       if (_userPlayData != null) {
-        _sortedSongs = _service.getSortedSongs(_userPlayData!);
+        _sortedSongs = _service.getSortedSongs(_userPlayData!, _currentSortBy);
         _updatePagedSongs();
       }
     } catch (e) {
@@ -78,6 +90,82 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
         _isLoading = false;
       });
     }
+  }
+  
+  // 显示排序方式对话框
+  void _showSortDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('选择排序方式'),
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  RadioListTile<String>(
+                    title: Text('Rating'),
+                    value: 'Rating',
+                    groupValue: _currentSortBy,
+                    onChanged: (value) {
+                      setState(() {
+                        _currentSortBy = value!;
+                      });
+                    },
+                  ),
+                  RadioListTile<String>(
+                    title: Text('达成率'),
+                    value: '达成率',
+                    groupValue: _currentSortBy,
+                    onChanged: (value) {
+                      setState(() {
+                        _currentSortBy = value!;
+                      });
+                    },
+                  ),
+                  RadioListTile<String>(
+                    title: Text('定数'),
+                    value: '定数',
+                    groupValue: _currentSortBy,
+                    onChanged: (value) {
+                      setState(() {
+                        _currentSortBy = value!;
+                      });
+                    },
+                  ),
+                  RadioListTile<String>(
+                    title: Text('DX分达成率'),
+                    value: 'DX分达成率',
+                    groupValue: _currentSortBy,
+                    onChanged: (value) {
+                      setState(() {
+                        _currentSortBy = value!;
+                      });
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              child: Text('取消'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('确认'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _loadData(); // 重新加载数据
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
   
   void _updatePagedSongs() {
@@ -117,6 +205,11 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
         'ap': 0,
         'fs': 0,
         'fdx': 0,
+        'star5': 0,
+        'star4': 0,
+        'star3': 0,
+        'star2': 0,
+        'star1': 0,
       };
     }
     
@@ -128,6 +221,11 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
     int ap = 0;   // AP/AP+
     int fs = 0;   // FS/FS+
     int fdx = 0;  // FDX/FDX+
+    int star5 = 0; // 5星
+    int star4 = 0; // 4星
+    int star3 = 0; // 3星
+    int star2 = 0; // 2星
+    int star1 = 0; // 1星
     
     for (var record in records) {
       // 统计成绩等级
@@ -161,6 +259,24 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
           fdx++;
         }
       }
+      
+      // 统计星数
+      if (record.containsKey('dxScore')) {
+        int dxScore = int.tryParse(record['dxScore'].toString()) ?? 0;
+        // 计算DX分达成率
+        double rate = _calculateDXScoreRate(record);
+        if (rate >= 0.97) {
+          star5++;
+        } else if (rate >= 0.95) {
+          star4++;
+        } else if (rate >= 0.93) {
+          star3++;
+        } else if (rate >= 0.90) {
+          star2++;
+        } else if (rate >= 0.85) {
+          star1++;
+        }
+      }
     }
     
     return {
@@ -171,7 +287,67 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
       'ap': ap,
       'fs': fs,
       'fdx': fdx,
+      'star5': star5,
+      'star4': star4,
+      'star3': star3,
+      'star2': star2,
+      'star1': star1,
     };
+  }
+  
+  // 使用UserScoreSearchService中的方法计算DX分达成率
+  double _calculateDXScoreRate(dynamic record) {
+    return _service.calculateDXScoreRate(record);
+  }
+  
+  // 构建星数统计项
+  Widget _buildStarStatItem(String label, int value, String stars) {
+    Color textColor = _getStarsColor(stars);
+    
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(6),
+        color: Colors.grey[50],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 10),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 2),
+          Text(
+            value.toString(),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // 获取星星颜色
+  Color _getStarsColor(String stars) {
+    switch (stars) {
+      case '✦ 5':
+        return Colors.yellow;
+      case '✦ 4':
+      case '✦ 3':
+        return Colors.orange;
+      case '✦ 2':
+      case '✦ 1':
+        return Colors.green.shade300;
+      default:
+        return Colors.white;
+    }
   }
   
   // 构建统计项
@@ -336,6 +512,22 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                   Expanded(child: _buildStatItem('FDX/FDX+', stats['fdx']!)),
                                                 ],
                                               ),
+                                              SizedBox(height: 8),
+                                              // 第三行统计数据（星数）
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                                children: [
+                                                  Expanded(child: _buildStarStatItem('✦ 5', stats['star5']!, '✦ 5')),
+                                                  SizedBox(width: 8),
+                                                  Expanded(child: _buildStarStatItem('✦ 4', stats['star4']!, '✦ 4')),
+                                                  SizedBox(width: 8),
+                                                  Expanded(child: _buildStarStatItem('✦ 3', stats['star3']!, '✦ 3')), 
+                                                  SizedBox(width: 8),
+                                                  Expanded(child: _buildStarStatItem('✦ 2', stats['star2']!, '✦ 2')),
+                                                  SizedBox(width: 8),
+                                                  Expanded(child: _buildStarStatItem('✦ 1', stats['star1']!, '✦ 1')),
+                                                ],
+                                              ),
                                             ],
                                           ),
                                         ),
@@ -351,105 +543,183 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                             runSpacing: _buttonVerticalSpacing, // 垂直间距
                                             children: [
                                               ElevatedButton(
-                                                onPressed: () {},
+                                                onPressed: _showSortDialog,
                                                 style: ElevatedButton.styleFrom(
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(_buttonBorderRadius), // 圆角
                                                   ),
                                                   fixedSize: Size(_buttonWidth, _buttonHeight), // 按钮尺寸
-                                                  padding: EdgeInsets.symmetric(horizontal: 4), // 减少水平内边距
+                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8), // 调整内边距
                                                 ),
-                                                child: FittedBox(
-                                                  fit: BoxFit.contain,
-                                                  child: Text('排序方式', 
-                                                    style: TextStyle(fontSize: _buttonFontSize),
-                                                    maxLines: 1,
-                                                  ),
+                                                child: Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Text('排序方式', 
+                                                      style: TextStyle(fontSize: _buttonFontSize),
+                                                      maxLines: 1,
+                                                    ),
+                                                    SizedBox(height: 2),
+                                                    Text(_currentSortBy, 
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.white),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
                                                 ), // 文字尺寸
                                               ),
                                               ElevatedButton(
-                                                onPressed: () {},
+                                                onPressed: () {
+                                                  // 这里应该打开版本筛选对话框
+                                                  // 示例：设置一个筛选条件
+                                                  setState(() {
+                                                    _filterConditions['版本筛选'] = 'DX';
+                                                  });
+                                                },
                                                 style: ElevatedButton.styleFrom(
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(_buttonBorderRadius),
                                                   ),
                                                   fixedSize: Size(_buttonWidth, _buttonHeight),
-                                                  padding: EdgeInsets.symmetric(horizontal: 4), // 减少水平内边距
+                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8), // 调整内边距
                                                 ),
-                                                child: FittedBox(
-                                                  fit: BoxFit.contain,
-                                                  child: Text('版本筛选', 
-                                                    style: TextStyle(fontSize: _buttonFontSize),
-                                                    maxLines: 1,
-                                                  ),
+                                                child: Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Text('版本筛选', 
+                                                      style: TextStyle(fontSize: _buttonFontSize),
+                                                      maxLines: 1,
+                                                    ),
+                                                    SizedBox(height: 2),
+                                                    Text(_filterConditions['版本筛选'] ?? '', 
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.white),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
                                               ElevatedButton(
-                                                onPressed: () {},
+                                                onPressed: () {
+                                                  // 这里应该打开定数筛选对话框
+                                                  // 示例：设置一个筛选条件
+                                                  setState(() {
+                                                    _filterConditions['定数筛选'] = '12-14';
+                                                  });
+                                                },
                                                 style: ElevatedButton.styleFrom(
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(_buttonBorderRadius),
                                                   ),
                                                   fixedSize: Size(_buttonWidth, _buttonHeight),
-                                                  padding: EdgeInsets.symmetric(horizontal: 4), // 减少水平内边距
+                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8), // 调整内边距
                                                 ),
-                                                child: FittedBox(
-                                                  fit: BoxFit.contain,
-                                                  child: Text('定数筛选', 
-                                                    style: TextStyle(fontSize: _buttonFontSize),
-                                                    maxLines: 1,
-                                                  ),
+                                                child: Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Text('定数筛选', 
+                                                      style: TextStyle(fontSize: _buttonFontSize),
+                                                      maxLines: 1,
+                                                    ),
+                                                    SizedBox(height: 2),
+                                                    Text(_filterConditions['定数筛选'] ?? '', 
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.white),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
                                               ElevatedButton(
-                                                onPressed: () {},
+                                                onPressed: () {
+                                                  // 这里应该打开难度筛选对话框
+                                                  // 示例：设置一个筛选条件
+                                                  setState(() {
+                                                    _filterConditions['难度筛选'] = 'Master';
+                                                  });
+                                                },
                                                 style: ElevatedButton.styleFrom(
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(_buttonBorderRadius),
                                                   ),
                                                   fixedSize: Size(_buttonWidth, _buttonHeight),
-                                                  padding: EdgeInsets.symmetric(horizontal: 4), // 减少水平内边距
+                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8), // 调整内边距
                                                 ),
-                                                child: FittedBox(
-                                                  fit: BoxFit.contain,
-                                                  child: Text('难度筛选', 
-                                                    style: TextStyle(fontSize: _buttonFontSize),
-                                                    maxLines: 1,
-                                                  ),
+                                                child: Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Text('难度筛选', 
+                                                      style: TextStyle(fontSize: _buttonFontSize),
+                                                      maxLines: 1,
+                                                    ),
+                                                    SizedBox(height: 2),
+                                                    Text(_filterConditions['难度筛选'] ?? '', 
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.white),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
                                               ElevatedButton(
-                                                onPressed: () {},
+                                                onPressed: () {
+                                                  // 这里应该打开达成率筛选对话框
+                                                  // 示例：设置一个筛选条件
+                                                  setState(() {
+                                                    _filterConditions['达成率筛选'] = '95%+';
+                                                  });
+                                                },
                                                 style: ElevatedButton.styleFrom(
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(_buttonBorderRadius),
                                                   ),
                                                   fixedSize: Size(_buttonWidth, _buttonHeight),
-                                                  padding: EdgeInsets.symmetric(horizontal: 4), // 减少水平内边距
+                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8), // 调整内边距
                                                 ),
-                                                child: FittedBox(
-                                                  fit: BoxFit.contain,
-                                                  child: Text('达成率筛选', 
-                                                    style: TextStyle(fontSize: _buttonFontSize),
-                                                    maxLines: 1,
-                                                  ),
+                                                child: Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Text('达成率筛选', 
+                                                      style: TextStyle(fontSize: _buttonFontSize),
+                                                      maxLines: 1,
+                                                    ),
+                                                    SizedBox(height: 2),
+                                                    Text(_filterConditions['达成率筛选'] ?? '', 
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.white),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
                                               ElevatedButton(
-                                                onPressed: () {},
+                                                onPressed: () {
+                                                  // 这里应该打开连击/同步筛选对话框
+                                                  // 示例：设置一个筛选条件
+                                                  setState(() {
+                                                    _filterConditions['连击/同步筛选'] = 'FC+';
+                                                  });
+                                                },
                                                 style: ElevatedButton.styleFrom(
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(_buttonBorderRadius),
                                                   ),
                                                   fixedSize: Size(_buttonWidth, _buttonHeight),
-                                                  padding: EdgeInsets.symmetric(horizontal: 4), // 减少水平内边距
+                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8), // 调整内边距
                                                 ),
-                                                child: FittedBox(
-                                                  fit: BoxFit.contain,
-                                                  child: Text('连击/同步筛选', 
-                                                    style: TextStyle(fontSize: _buttonFontSize),
-                                                    maxLines: 1,
-                                                  ),
+                                                child: Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Text('连击/同步筛选', 
+                                                      style: TextStyle(fontSize: _buttonFontSize),
+                                                      maxLines: 1,
+                                                    ),
+                                                    SizedBox(height: 2),
+                                                    Text(_filterConditions['连击/同步筛选'] ?? '', 
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.white),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
                                             ],
@@ -589,11 +859,11 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                           child: GridView.builder(
                                             shrinkWrap: true, // 允许GridView根据内容大小调整
                                             physics: NeverScrollableScrollPhysics(), // 禁用内部滚动，由外部SingleChildScrollView控制
-                                            padding: EdgeInsets.all(8),
+                                            padding: EdgeInsets.all(2), // 进一步减小内边距，从4减少到2
                                             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                              crossAxisCount: 5,
-                                              crossAxisSpacing: screenWidth * 0.005, // 减小水平间距
-                                              mainAxisSpacing: screenWidth * 0.005, // 减小垂直间距
+                                              crossAxisCount: 5, // 保持每行5个曲绘
+                                              crossAxisSpacing: 2, // 使用固定值2作为水平间距
+                                              mainAxisSpacing: 2, // 使用固定值2作为垂直间距
                                               childAspectRatio: 1.0, // 确保图片显示为正方形
                                             ),
                                             itemCount: _pagedSongs.length,
@@ -603,7 +873,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                               final borderColor = _service.getBorderColor(levelIndex);
                                               
                                               // 计算每个网格项的大小，确保正方形显示
-                                              final itemSize = (screenWidth - 32 - (4 * screenWidth * 0.01)) / 5; // 32是左右边距，4是间隔数
+                                              final itemSize = (screenWidth - 4 - (4 * 2)) / 5; // 4是左右边距（各2），4是间隔数（因为是5列），每个间隔2像素
                                               
                                               return Container(
                                                 width: itemSize,

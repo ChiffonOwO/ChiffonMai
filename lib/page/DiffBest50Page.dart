@@ -649,7 +649,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                     Row(
                       children: [
                         Text(
-                          '$rating | $score | ',
+                          '$rating | $score |',
                           style: TextStyle(
                             fontSize: otherFontSize,
                             color: Colors.white,
