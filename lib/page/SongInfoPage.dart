@@ -5,6 +5,8 @@ import 'package:marquee/marquee.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
+import 'package:my_first_flutter_app/manager/DiffMusicDataManager.dart';
+import 'package:my_first_flutter_app/entity/DiffSong.dart';
 
 class SongInfoPage extends StatefulWidget {
   final String songId;
@@ -19,13 +21,13 @@ class _SongInfoPageState extends State<SongInfoPage> {
   // 数据加载状态
   bool _isLoading = true;
   Map<String, dynamic>? _songData;
-  List<dynamic>? _diffData;
+  List<dynamic>? _diffData; // 保持为dynamic类型，兼容Map和DiffData
   Map<String, dynamic>? _userData;
   List<dynamic>? _tagData;
   List<dynamic>? _tagSongsData;
 
   // 当前选中的难度索引
-  int _currentDiffIndex = 3; // 默认选中Master难度
+  int _currentDiffIndex = 0; // 默认选中第一个难度
 
   @override
   void initState() {
@@ -37,8 +39,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
   Future<void> _loadData() async {
     try {
       // 加载歌曲基础数据
-      if (MaimaiMusicDataManager().hasCachedData()) {
-        final songs = MaimaiMusicDataManager().getCachedSongs();
+      if (await MaimaiMusicDataManager().hasCachedData()) {
+        final songs = await MaimaiMusicDataManager().getCachedSongs();
         if (songs != null) {
           // 更优的解决方案
           final songIndex = songs.indexWhere((s) => s.id == widget.songId);
@@ -80,9 +82,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
       }
 
       // 加载难度数据
-      final diffData = await rootBundle.loadString('assets/songDiffData.json');
-      final Map<String, dynamic> diffMap = json.decode(diffData);
-      _diffData = diffMap['charts'][widget.songId];
+      final diffManager = DiffMusicDataManager();
+      final diffSong = await diffManager.getCachedDiffData();
+      if (diffSong != null) {
+        _diffData = diffSong.charts[widget.songId];
+      }
 
       // 加载用户数据
       final userPlayDataManager = UserPlayDataManager();
@@ -104,6 +108,28 @@ class _SongInfoPageState extends State<SongInfoPage> {
     } catch (e) {
       print('加载数据失败: $e');
     } finally {
+      // 调整_currentDiffIndex，确保不超过实际难度数量
+      if (_songData != null) {
+        final levels = _songData!['level'];
+        if (levels != null && levels is List) {
+          if (_currentDiffIndex >= levels.length) {
+            _currentDiffIndex = levels.length - 1;
+          }
+          // 确保索引不为负数
+          if (_currentDiffIndex < 0) {
+            _currentDiffIndex = 0;
+          }
+          
+          // 对于只有2个难度的歌曲，拟合难度的数据跟第一个难度保持相同
+          if (levels.length == 2 && _diffData != null && _diffData!.isNotEmpty) {
+            _diffData = [_diffData![0], _diffData![0]];
+          }
+        } else {
+          // 如果没有难度数据，设置为0
+          _currentDiffIndex = 0;
+        }
+      }
+      
       setState(() {
         _isLoading = false;
       });
@@ -207,6 +233,17 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
   // 根据难度索引获取主题颜色
   Color _getThemeColor(int diffIndex) {
+    // 检查难度数量
+    int difficultyCount = 0;
+    if (_songData != null && _songData!['level'] != null) {
+      difficultyCount = _songData!['level'].length;
+    }
+    
+    // 对于只有1或2个难度的歌曲，所有难度的背景全部采用粉色
+    if (difficultyCount <= 2) {
+      return Color(0xFFE9D8FF); // Master难度的颜色
+    }
+    
     switch (diffIndex) {
       case 0: // Basic
         return Color(0xFFE8F5E8); // 浅绿色
@@ -225,6 +262,17 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
   // 根据难度索引获取次要主题颜色
   Color _getSecondaryThemeColor(int diffIndex) {
+    // 检查难度数量
+    int difficultyCount = 0;
+    if (_songData != null && _songData!['level'] != null) {
+      difficultyCount = _songData!['level'].length;
+    }
+    
+    // 对于只有1或2个难度的歌曲，所有难度的背景全部采用粉色
+    if (difficultyCount <= 2) {
+      return Color(0xFFD4BFFF); // Master难度的颜色
+    }
+    
     switch (diffIndex) {
       case 0: // Basic
         return Color(0xFFC8E6C9); // 浅绿色
@@ -243,6 +291,17 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
   // 根据难度索引获取强调颜色
   Color _getAccentColor(int diffIndex) {
+    // 检查难度数量
+    int difficultyCount = 0;
+    if (_songData != null && _songData!['level'] != null) {
+      difficultyCount = _songData!['level'].length;
+    }
+    
+    // 对于只有1或2个难度的歌曲，所有难度的背景全部采用粉色
+    if (difficultyCount <= 2) {
+      return Color(0xFF9966CC); // Master难度的颜色
+    }
+    
     switch (diffIndex) {
       case 0: // Basic
         return Color(0xFF4CAF50); // 绿色
@@ -290,7 +349,10 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
     // 生成fallback的cover_id
     String generateCoverId(String songId) {
-      if (songId.length >= 5) {
+      if (songId.length == 6) {
+        // 对于6位数的曲绘，只去除第一位，保留后续的0
+        return songId.substring(1);
+      } else if (songId.length >= 5) {
         // 如果长度大于等于5，万位补1
         int songIdInt = int.parse(songId);
         int tenThousandPlace = (songIdInt ~/ 10000) + 1;
@@ -588,14 +650,19 @@ class _SongInfoPageState extends State<SongInfoPage> {
                               _buildStatItem(
                                   '拟合难度',
                                   currentDiffData != null
-                                      ? currentDiffData['fit_diff']
+                                      ? (currentDiffData is DiffData
+                                          ? currentDiffData.fitDiff
+                                          : currentDiffData['fit_diff'])
                                           .toStringAsFixed(2)
                                       : '-'),
                               _buildStatItem('谱面谱师', currentChart['charter']),
                               _buildStatItem(
                                   '平均达成',
                                   currentDiffData != null
-                                      ? '${currentDiffData['avg'].toStringAsFixed(2)}%'
+                                      ? '${(currentDiffData is DiffData
+                                          ? currentDiffData.avg
+                                          : currentDiffData['avg'])
+                                          .toStringAsFixed(2)}%'
                                       : '-'),
                             ],
                           ),

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mai什么 - 命运石之门的选择</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <script>
+    // Tailwind 配置
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#7C5AFF',
+            secondary: '#5A40C8',
+            accent: '#E0D5FF',
+            surface: '#1A1138',
+            surfaceLight: '#2D1F5E',
+            textPrimary: '#FFFFFF',
+            textSecondary: '#B3A3FF',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      }
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .gradient-bg {
+        background: linear-gradient(135deg, #1A1138 0%, #2D1F5E 100%);
+      }
+      .card-hover {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+      }
+      .card-hover:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px -5px rgba(124, 90, 255, 0.4);
+      }
+      .tab-active {
+        border-bottom: 3px solid #7C5AFF;
+        color: #7C5AFF;
+      }
+    }
+  </style>
+</head>
+<body class="bg-[#0F0824] text-textPrimary min-h-screen font-sans">
+  <div class="container mx-auto px-4 py-6 max-w-3xl">
+    <!-- 头部区域 -->
+    <header class="text-center mb-8">
+      <h1 class="text-[clamp(2rem,5vw,2.5rem)] font-bold text-primary mb-2">Mai什么</h1>
+      <p class="text-textSecondary text-lg italic">一切都是命运石之门的选择~</p>
+    </header>
+
+    <!-- 筛选条件区域 -->
+    <section class="bg-surface rounded-2xl p-6 mb-8 shadow-lg">
+      <h2 class="text-xl font-bold mb-6 flex items-center">
+        <i class="fa fa-filter mr-2 text-primary"></i>筛选条件
+      </h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- 定数范围 -->
+        <div class="space-y-2">
+          <label class="text-textSecondary block">定数范围</label>
+          <div class="flex items-center gap-3">
+            <input type="text" placeholder="最小值" class="w-full bg-surfaceLight border border-primary/30 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary transition-all">
+            <span class="text-textSecondary">-</span>
+            <input type="text" placeholder="最大值" class="w-full bg-surfaceLight border border-primary/30 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary transition-all">
+          </div>
+        </div>
+        
+        <!-- 版本筛选 -->
+        <div class="space-y-2">
+          <label class="text-textSecondary block">版本筛选</label>
+          <select class="w-full bg-surfaceLight border border-primary/30 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary transition-all appearance-none">
+            <option>全部版本</option>
+            <option>maimai DX</option>
+            <option>maimai DX PLUS</option>
+            <option>maimai DX Splash</option>
+          </select>
+        </div>
+        
+        <!-- 类型筛选 -->
+        <div class="space-y-2">
+          <label class="text-textSecondary block">类型筛选</label>
+          <select class="w-full bg-surfaceLight border border-primary/30 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary transition-all appearance-none">
+            <option>全部类型</option>
+            <option>POPS & ANIME</option>
+            <option>niconico</option>
+            <option>游戏音乐</option>
+            <option>maimai 原创</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- 歌曲抽取区域 -->
+    <section class="bg-surface rounded-2xl p-6 mb-8 shadow-lg">
+      <!-- 切换标签 -->
+      <div class="flex border-b border-primary/20 mb-6">
+        <button class="tab-active px-4 py-2 font-medium">一次抽取</button>
+        <button class="px-4 py-2 font-medium text-textSecondary hover:text-primary transition-colors">抽歌单</button>
+      </div>
+      
+      <!-- 抽取数量选择 -->
+      <div class="flex justify-center gap-4 mb-6">
+        <button class="w-12 h-12 rounded-full bg-surfaceLight flex items-center justify-center hover:bg-primary/20 transition-colors">1</button>
+        <button class="w-12 h-12 rounded-full bg-surfaceLight flex items-center justify-center hover:bg-primary/20 transition-colors">2</button>
+        <button class="w-12 h-12 rounded-full bg-surfaceLight flex items-center justify-center hover:bg-primary/20 transition-colors">3</button>
+        <button class="w-12 h-12 rounded-full bg-primary flex items-center justify-center font-bold">4</button>
+        <button class="w-12 h-12 rounded-full bg-surfaceLight flex items-center justify-center hover:bg-primary/20 transition-colors">首歌</button>
+      </div>
+      
+      <!-- 歌曲展示区 -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <!-- 歌曲卡片 1 -->
+        <div class="card-hover bg-surfaceLight rounded-xl overflow-hidden">
+          <div class="aspect-square overflow-hidden">
+            <img src="https://picsum.photos/seed/song1/400/400" alt="星詠みとデスぺ" class="w-full h-full object-cover">
+          </div>
+          <div class="p-3">
+            <p class="text-sm font-medium truncate">星詠みとデスぺ</p>
+            <p class="text-xs text-textSecondary">ID: 11303</p>
+          </div>
+        </div>
+        
+        <!-- 歌曲卡片 2 -->
+        <div class="card-hover bg-surfaceLight rounded-xl overflow-hidden">
+          <div class="aspect-square overflow-hidden">
+            <img src="https://picsum.photos/seed/song2/400/400" alt="デビルじゃない" class="w-full h-full object-cover">
+          </div>
+          <div class="p-3">
+            <p class="text-sm font-medium truncate">デビルじゃない</p>
+            <p class="text-xs text-textSecondary">ID: 11767</p>
+          </div>
+        </div>
+        
+        <!-- 歌曲卡片 3 -->
+        <div class="card-hover bg-surfaceLight rounded-xl overflow-hidden">
+          <div class="aspect-square overflow-hidden">
+            <img src="https://picsum.photos/seed/song3/400/400" alt="サヨナラフリー" class="w-full h-full object-cover">
+          </div>
+          <div class="p-3">
+            <p class="text-sm font-medium truncate">サヨナラフリー</p>
+            <p class="text-xs text-textSecondary">ID: 11240</p>
+          </div>
+        </div>
+        
+        <!-- 歌曲卡片 4 -->
+        <div class="card-hover bg-surfaceLight rounded-xl overflow-hidden">
+          <div class="aspect-square overflow-hidden">
+            <img src="https://picsum.photos/seed/song4/400/400" alt="Get Happy" class="w-full h-full object-cover">
+          </div>
+          <div class="p-3">
+            <p class="text-sm font-medium truncate">Get Happy</p>
+            <p class="text-xs text-textSecondary">ID: 238</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 重新抽奖按钮 -->
+      <button class="w-full py-4 bg-primary rounded-xl font-bold text-lg hover:bg-secondary transition-colors flex items-center justify-center gap-2 shadow-lg shadow-primary/20">
+        <i class="fa fa-refresh"></i>
+        重新抽奖
+      </button>
+    </section>
+
+    <!-- 历史记录区域 -->
+    <section class="bg-surface rounded-2xl p-6 shadow-lg">
+      <h2 class="text-xl font-bold mb-6 flex items-center">
+        <i class="fa fa-history mr-2 text-primary"></i>历史抽取记录
+      </h2>
+      
+      <!-- 历史记录 1 -->
+      <div class="mb-6">
+        <div class="flex justify-between items-center mb-3">
+          <p class="text-textSecondary">3月17日 18:55</p>
+          <button class="text-textSecondary hover:text-primary transition-colors">
+            <i class="fa fa-trash-o"></i>
+          </button>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="bg-surfaceLight rounded-lg overflow-hidden aspect-square">
+            <img src="https://picsum.photos/seed/history1/200/200" alt="历史记录1" class="w-full h-full object-cover">
+          </div>
+          <div class="bg-surfaceLight rounded-lg overflow-hidden aspect-square">
+            <img src="https://picsum.photos/seed/history2/200/200" alt="历史记录2" class="w-full h-full object-cover">
+          </div>
+          <div class="bg-surfaceLight rounded-lg overflow-hidden aspect-square">
+            <img src="https://picsum.photos/seed/history3/200/200" alt="历史记录3" class="w-full h-full object-cover">
+          </div>
+          <div class="bg-surfaceLight rounded-lg overflow-hidden aspect-square">
+            <img src="https://picsum.photos/seed/history4/200/200" alt="历史记录4" class="w-full h-full object-cover">
+          </div>
+        </div>
+      </div>
+      
+      <!-- 历史记录 2 -->
+      <div>
+        <div class="flex justify-between items-center mb-3">
+          <p class="text-textSecondary">3月17日 18:55</p>
+          <button class="text-textSecondary hover:text-primary transition-colors">
+            <i class="fa fa-trash-o"></i>
+          </button>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="bg-surfaceLight rounded-lg overflow-hidden aspect-square">
+            <img src="https://picsum.photos/seed/history5/200/200" alt="历史记录5" class="w-full h-full object-cover">
+          </div>
+          <div class="bg-surfaceLight rounded-lg overflow-hidden aspect-square">
+            <img src="https://picsum.photos/seed/history6/200/200" alt="历史记录6" class="w-full h-full object-cover">
+          </div>
+          <div class="bg-surfaceLight rounded-lg overflow-hidden aspect-square">
+            <img src="https://picsum.photos/seed/history7/200/200" alt="历史记录7" class="w-full h-full object-cover">
+          </div>
+          <div class="bg-surfaceLight rounded-lg overflow-hidden aspect-square">
+            <img src="https://picsum.photos/seed/history8/200/200" alt="历史记录8" class="w-full h-full object-cover">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 底部信息 -->
+    <footer class="mt-10 text-center text-textSecondary/60 text-sm">
+      <p>© 2025 Mai助手 | 一切内容均为游戏内数据展示</p>
+    </footer>
+  </div>
+
+  <!-- 交互脚本 -->
+  <script>
+    // 页面加载完成后执行
+    document.addEventListener('DOMContentLoaded', function() {
+      // 模拟历史记录删除功能
+      const deleteButtons = document.querySelectorAll('.fa-trash-o').forEach(button => {
+        button.addEventListener('click', function() {
+          if (confirm('确定要删除这条历史记录吗？')) {
+            // 这里可以添加实际的删除逻辑
+            this.closest('div').parentElement.style.opacity = '0.5';
+            setTimeout(() => {
+              this.closest('div').parentElement.style.display = 'none';
+            }, 300);
+          }
+        });
+      });
+
+      // 模拟重新抽奖功能
+      const drawButton = document.querySelector('button:contains("重新抽奖")');
+      if (drawButton) {
+        drawButton.addEventListener('click', function() {
+          // 添加加载效果
+          this.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 抽奖中...';
+          this.disabled = true;
+          
+          // 模拟抽奖延迟
+          setTimeout(() => {
+            this.innerHTML = '<i class="fa fa-refresh"></i> 重新抽奖';
+            this.disabled = false;
+            alert('抽奖完成！');
+          }, 1500);
+        });
+      }
+    });
+  </script>
+</body>
+</html>

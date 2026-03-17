@@ -37,8 +37,8 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
     try {
       // 加载maimai音乐数据
       // 优先使用缓存的API数据
-      if (MaimaiMusicDataManager().hasCachedData()) {
-        final songs = MaimaiMusicDataManager().getCachedSongs();
+      if (await MaimaiMusicDataManager().hasCachedData()) {
+        final songs = await MaimaiMusicDataManager().getCachedSongs();
         if (songs != null) {
           setState(() {
             _maimaiMusicData = songs.map((song) => {

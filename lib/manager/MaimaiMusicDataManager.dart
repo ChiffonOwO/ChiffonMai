@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/entity/Song.dart';
-import 'package:my_first_flutter_app/service/SongSearchService.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MaimaiMusicDataManager {
   // 单例模式
@@ -25,8 +25,10 @@ class MaimaiMusicDataManager {
         // 转换为 Song 对象列表
         final List<Song> songs = jsonList.map((json) => Song.fromJson(json)).toList();
         
-        // 更新缓存
-        SongSearchService.cachedSongs = songs;
+        // 写入本地缓存
+        final prefs = await SharedPreferences.getInstance();
+        final songsJson = json.encode(songs.map((song) => song.toJson()).toList());
+        await prefs.setString('cached_songs', songsJson);
         
         print('成功从 API 获取并更新音乐数据，共 ${songs.length} 首歌曲');
         return true;
@@ -41,12 +43,29 @@ class MaimaiMusicDataManager {
   }
 
   // 检查是否有缓存数据
-  bool hasCachedData() {
-    return SongSearchService.cachedSongs != null && SongSearchService.cachedSongs!.isNotEmpty;
+  Future<bool> hasCachedData() async {
+    // 检查本地缓存
+    final prefs = await SharedPreferences.getInstance();
+    final songsJson = prefs.getString('cached_songs');
+    return songsJson != null && songsJson.isNotEmpty;
   }
 
   // 获取缓存的歌曲数据
-  List<Song>? getCachedSongs() {
-    return SongSearchService.cachedSongs;
+  Future<List<Song>?> getCachedSongs() async {
+    // 从本地缓存读取
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final songsJson = prefs.getString('cached_songs');
+      
+      if (songsJson != null && songsJson.isNotEmpty) {
+        final List<dynamic> jsonList = json.decode(songsJson);
+        final List<Song> songs = jsonList.map((json) => Song.fromJson(json)).toList();
+        return songs;
+      }
+    } catch (e) {
+      print('读取本地缓存时出错: $e');
+    }
+    
+    return null;
   }
 }

@@ -18,6 +18,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   List<dynamic> _sortedSongs = [];
   List<dynamic> _pagedSongs = [];
   bool _isLoading = true;
+  Map<String, int>? _stats; // 存储统计数据
   
   int _currentPage = 1;
   int _pageSize = 50;
@@ -80,8 +81,10 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
     try {
       _userPlayData = await _service.getUserPlayData();
       if (_userPlayData != null) {
-        _sortedSongs = _service.getSortedSongs(_userPlayData!, _currentSortBy);
+        _sortedSongs = await _service.getSortedSongs(_userPlayData!, _currentSortBy);
         _updatePagedSongs();
+        // 计算统计数据
+        _stats = await _calculateStats();
       }
     } catch (e) {
       print('加载数据出错: $e');
@@ -195,7 +198,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   }
 
   // 计算统计数据
-  Map<String, int> _calculateStats() {
+  Future<Map<String, int>> _calculateStats() async {
     if (_userPlayData == null || !_userPlayData!.containsKey('records')) {
       return {
         'total': 0,
@@ -226,6 +229,9 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
     int star3 = 0; // 3星
     int star2 = 0; // 2星
     int star1 = 0; // 1星
+    
+    // 计算星数时，先缓存DX分达成率，避免重复计算
+    Map<dynamic, double> dxRateMap = {};
     
     for (var record in records) {
       // 统计成绩等级
@@ -259,12 +265,21 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
           fdx++;
         }
       }
-      
+    }
+    
+    // 单独计算星数，避免在主循环中阻塞
+    for (var record in records) {
       // 统计星数
       if (record.containsKey('dxScore')) {
         int dxScore = int.tryParse(record['dxScore'].toString()) ?? 0;
         // 计算DX分达成率
-        double rate = _calculateDXScoreRate(record);
+        double rate;
+        if (dxRateMap.containsKey(record)) {
+          rate = dxRateMap[record]!;
+        } else {
+          rate = await _calculateDXScoreRate(record);
+          dxRateMap[record] = rate;
+        }
         if (rate >= 0.97) {
           star5++;
         } else if (rate >= 0.95) {
@@ -296,7 +311,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   }
   
   // 使用UserScoreSearchService中的方法计算DX分达成率
-  double _calculateDXScoreRate(dynamic record) {
+  Future<double> _calculateDXScoreRate(dynamic record) {
     return _service.calculateDXScoreRate(record);
   }
   
@@ -386,7 +401,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    final stats = _calculateStats();
+    final stats =  _calculateStats();
     
     // 初始化按钮尺寸
     _initButtonSizes(screenWidth);
@@ -490,11 +505,11 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                               Row(
                                                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                                 children: [
-                                                  Expanded(child: _buildStatItem('总谱面数', stats['total']!)),
+                                                  Expanded(child: _buildStatItem('总谱面数', _stats!['total']!)),
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStatItem('SSS+', stats['sssp']!)),
+                                                  Expanded(child: _buildStatItem('SSS+', _stats!['sssp']!)),
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStatItem('SSS', stats['sss']!)),
+                                                  Expanded(child: _buildStatItem('SSS', _stats!['sss']!)),
                                                   SizedBox(width: 8),
                                                 ],
                                               ),
@@ -503,13 +518,13 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                               Row(
                                                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                                 children: [
-                                                  Expanded(child: _buildStatItem('FC/FC+', stats['fc']!)),
+                                                  Expanded(child: _buildStatItem('FC/FC+', _stats!['fc']!)),
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStatItem('AP/AP+', stats['ap']!)),
+                                                  Expanded(child: _buildStatItem('AP/AP+', _stats!['ap']!)),
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStatItem('FS/FS+', stats['fs']!)),
+                                                  Expanded(child: _buildStatItem('FS/FS+', _stats!['fs']!)),
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStatItem('FDX/FDX+', stats['fdx']!)),
+                                                  Expanded(child: _buildStatItem('FDX/FDX+', _stats!['fdx']!)),
                                                 ],
                                               ),
                                               SizedBox(height: 8),
@@ -517,15 +532,15 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                               Row(
                                                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                                 children: [
-                                                  Expanded(child: _buildStarStatItem('✦ 5', stats['star5']!, '✦ 5')),
+                                                  Expanded(child: _buildStarStatItem('✦ 5', _stats!['star5']!, '✦ 5')),
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStarStatItem('✦ 4', stats['star4']!, '✦ 4')),
+                                                  Expanded(child: _buildStarStatItem('✦ 4', _stats!['star4']!, '✦ 4')),
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStarStatItem('✦ 3', stats['star3']!, '✦ 3')), 
+                                                  Expanded(child: _buildStarStatItem('✦ 3', _stats!['star3']!, '✦ 3')), 
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStarStatItem('✦ 2', stats['star2']!, '✦ 2')),
+                                                  Expanded(child: _buildStarStatItem('✦ 2', _stats!['star2']!, '✦ 2')),
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStarStatItem('✦ 1', stats['star1']!, '✦ 1')),
+                                                  Expanded(child: _buildStarStatItem('✦ 1', _stats!['star1']!, '✦ 1')),
                                                 ],
                                               ),
                                             ],

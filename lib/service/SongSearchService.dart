@@ -6,28 +6,20 @@ import 'package:my_first_flutter_app/entity/Song.dart';
 
 // 搜索服务
 class SongSearchService {
-  // 缓存所有歌曲数据
-  static List<Song>? cachedSongs;
-
   // 加载所有歌曲数据（带缓存）
-  static Future<List<Song>> loadAllSongs() async {
-    // 如果已经缓存，直接返回
-    if (cachedSongs != null) {
-      return cachedSongs!;
-    }
-
+  static Future<List<Song>?> loadAllSongs() async {
     try {
-      // 检查是否已经通过API获取了数据
-      if (MaimaiMusicDataManager().hasCachedData()) {
-        cachedSongs = MaimaiMusicDataManager().getCachedSongs();
-        return cachedSongs!;
+      // 检查是否已经通过API获取了数据（包括本地缓存）
+      if (await MaimaiMusicDataManager().hasCachedData()) {
+        final songs = await MaimaiMusicDataManager().getCachedSongs();
+        return songs;
       }
       
       // 如果API数据不存在，尝试从资产文件加载JSON数据作为 fallback
       final jsonString = await rootBundle.loadString('assets/maimai_music_data.json');
       final List<dynamic> jsonList = json.decode(jsonString);
-      cachedSongs = jsonList.map((json) => Song.fromJson(json)).toList();
-      return cachedSongs!;
+      final List<Song> songs = jsonList.map((json) => Song.fromJson(json)).toList();
+      return songs;
     } catch (e) {
       print('加载歌曲数据失败: $e');
       return [];
@@ -43,7 +35,7 @@ class SongSearchService {
     final allSongs = await loadAllSongs();
     final lowerQuery = query.toLowerCase();
 
-    return allSongs.where((song) {
+    return allSongs!.where((song) {
       // 检查标题
       if (song.basicInfo.title.toLowerCase().contains(lowerQuery)) {
         return true;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/page/B50Page.dart';
 import 'package:my_first_flutter_app/page/DiffBest50Page.dart';
+import 'package:my_first_flutter_app/page/RandomChartPage.dart';
 import 'package:my_first_flutter_app/page/RecommendByTagsPage.dart';
 import 'package:my_first_flutter_app/page/SingleRatingCalculatorPage.dart';
 import 'package:my_first_flutter_app/page/SongSearchPage.dart';
@@ -8,6 +9,7 @@ import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/manager/UserBest50Manager.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
+import 'package:my_first_flutter_app/manager/DiffMusicDataManager.dart';
 import 'package:my_first_flutter_app/page/UserScoreSearchPage.dart';
 import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -74,6 +76,8 @@ Future<void> main() async {
   await SongAliasManager.instance.init();
   // 从API获取并更新音乐数据
   await MaimaiMusicDataManager().fetchAndUpdateMusicData();
+  // 从API获取并更新难度数据
+  await DiffMusicDataManager().fetchAndUpdateDiffData();
   // 初始化标签数据
   await RecommendByTagsService.initializeTags();
 }
@@ -150,7 +154,7 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.percent, title: '达成率计算', subtitle: '根据判定详情算出达成率'),
     ButtonItem(icon: Icons.compare_arrows, title: '版本对照', subtitle: '舞神要打哪些代的歌？'),
     ButtonItem(icon: Icons.replay, title: '达成率反推', subtitle: '根据判定详情推出绝赞详情'),
-    ButtonItem(icon: Icons.qr_code, title: '绑定二维码', subtitle: '关联你的舞萌账号'),
+    ButtonItem(icon: Icons.gamepad, title: '猜歌', subtitle: '舞萌笑传之猜猜呗'),
     ButtonItem(icon: Icons.file_upload_sharp, title: '刷新数据', subtitle: '刷新你的舞萌数据'),
     ButtonItem(icon: Icons.update, title: '检查更新', subtitle: '检查应用是否有新版本'),
   ];
@@ -441,6 +445,9 @@ class _HomePageState extends State<HomePage> {
       // 从API获取并更新音乐数据
       await MaimaiMusicDataManager().fetchAndUpdateMusicData();
       
+      // 从API获取并更新难度数据
+      await DiffMusicDataManager().fetchAndUpdateDiffData();
+      
       // 刷新标签数据
       await RecommendByTagsService.initializeTags();
       
@@ -604,6 +611,12 @@ class _HomePageState extends State<HomePage> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => DiffBest50Page()),
+            );
+          }
+          if (item.title == '随机乐曲'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => RandomChartPage()),
             );
           }
         },

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>maimai 猜歌页面</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft Yahei", sans-serif;
+        }
+        body {
+            padding: 20px;
+            background-color: #fff;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            font-size: 18px;
+            color: #666;
+        }
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .header-btn {
+            padding: 8px 16px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            background: #fff;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .search-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .search-input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .search-btn {
+            padding: 10px 16px;
+            background: #666;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .song-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+            display: grid;
+            grid-template-columns: auto 1fr auto auto auto;
+            grid-template-rows: auto auto auto;
+            gap: 12px;
+            align-items: stretch;
+        }
+        .cover {
+            grid-row: 1 / 2;
+            grid-column: 1 / 2;
+            width: 60px;
+            height: 60px;
+            border-radius: 4px;
+        }
+        .title {
+            grid-row: 1 / 2;
+            grid-column: 2 / 3;
+            font-size: 20px;
+            color: #333;
+            padding: 8px 12px;
+            background: #f0f2f5;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            text-align: left;
+            display: flex;
+            align-items: center;
+        }
+        .cell {
+            padding: 8px 12px;
+            border-radius: 4px;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .cell-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 2px;
+        }
+        .cell-value {
+            font-size: 18px;
+            color: #222;
+        }
+        .cell-green {
+            background: #d4f8e8;
+            border: 1px solid #9ae6b4;
+        }
+        .cell-yellow {
+            background: #fff9cc;
+            border: 1px solid #f6e05e;
+        }
+        .cell-gray {
+            background: #f0f2f5;
+            border: 1px solid #e0e0e0;
+        }
+        .cell-white {
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+        }
+        .tag {
+            display: inline-block;
+            padding: 2px 6px;
+            margin: 2px 4px 2px 0;
+            font-size: 12px;
+            border-radius: 4px;
+            background: #e0e0e0;
+            color: #333;
+        }
+        .tag.water {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        /* 第一首歌布局 */
+        .song1 .type { grid-row: 1 / 2; grid-column: 3 / 4; }
+        .song1 .bpm { grid-row: 1 / 2; grid-column: 4 / 5; }
+        .song1 .composer { grid-row: 1 / 2; grid-column: 5 / 6; }
+        .song1 .level-master { grid-row: 2 / 3; grid-column: 1 / 2; }
+        .song1 .master-charter { grid-row: 2 / 3; grid-column: 2 / 4; }
+        .song1 .level-remaster { grid-row: 2 / 3; grid-column: 4 / 5; }
+        .song1 .remaster-charter { grid-row: 2 / 3; grid-column: 5 / 6; }
+        .song1 .genre { grid-row: 3 / 4; grid-column: 1 / 2; }
+        .song1 .version { grid-row: 3 / 4; grid-column: 2 / 3; }
+        .song1 .master-tag { grid-row: 3 / 4; grid-column: 3 / 6; }
+        /* 第二首歌布局 */
+        .song2 .type { grid-row: 1 / 2; grid-column: 3 / 4; }
+        .song2 .bpm { grid-row: 1 / 2; grid-column: 4 / 5; }
+        .song2 .composer { grid-row: 1 / 2; grid-column: 5 / 6; }
+        .song2 .level-master { grid-row: 2 / 3; grid-column: 1 / 2; }
+        .song2 .master-charter { grid-row: 2 / 3; grid-column: 2 / 4; }
+        .song2 .level-remaster { grid-row: 2 / 3; grid-column: 4 / 5; }
+        .song2 .remaster-charter { grid-row: 2 / 3; grid-column: 5 / 6; }
+        .song2 .genre { grid-row: 3 / 4; grid-column: 1 / 2; }
+        .song2 .version { grid-row: 3 / 4; grid-column: 2 / 3; }
+        .song2 .master-tag { grid-row: 3 / 4; grid-column: 3 / 6; }
+        /* 第三首歌布局 */
+        .song3 .type { grid-row: 1 / 2; grid-column: 3 / 4; }
+        .song3 .bpm { grid-row: 1 / 2; grid-column: 4 / 5; }
+        .song3 .composer { grid-row: 1 / 2; grid-column: 5 / 6; }
+        .song3 .level-master { grid-row: 2 / 3; grid-column: 1 / 2; }
+        .song3 .master-charter { grid-row: 2 / 3; grid-column: 2 / 4; }
+        .song3 .level-remaster { grid-row: 2 / 3; grid-column: 4 / 5; }
+        .song3 .remaster-charter { grid-row: 2 / 3; grid-column: 5 / 6; }
+        .song3 .genre { grid-row: 3 / 4; grid-column: 1 / 2; }
+        .song3 .version { grid-row: 3 / 4; grid-column: 2 / 3; }
+        .song3 .master-tag { grid-row: 3 / 4; grid-column: 3 / 6; }
+        .arrow-up { color: #3182ce; }
+        .arrow-down { color: #e53e3e; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>已猜测: 3/10</div>
+        <div class="header-buttons">
+            <button class="header-btn">🔄 新游戏</button>
+            <button class="header-btn">↓</button>
+            <button class="header-btn">🚪 投降</button>
+        </div>
+        <div>无限时间</div>
+    </div>
+
+    <div class="search-bar">
+        <input type="text" class="search-input" placeholder="输入歌曲以开始...">
+        <button class="search-btn">猜测</button>
+    </div>
+
+    <!-- 第一首歌 -->
+    <div class="song-card song1">
+        <img class="cover" src="https://p.qqan.com/up/2023-10/16970122067223888.jpg" alt="东方乙女囃子">
+        <div class="title">魔理沙は大変なものを盗んでいきました</div>
+        
+        <div class="cell cell-green type">
+            <span class="cell-label">类型</span>
+            <span class="cell-value">SD</span>
+        </div>
+        <div class="cell cell-yellow bpm">
+            <span class="cell-label">BPM</span>
+            <span class="cell-value">170<span class="arrow-down">↓</span></span>
+        </div>
+        <div class="cell cell-white composer">
+            <span class="cell-label">曲师</span>
+            <span class="cell-value">ARM+夕野ヨシミ(IOSYS)feat. ...</span>
+        </div>
+
+        <div class="cell cell-yellow level-master">
+            <span class="cell-label">Lv</span>
+            <span class="cell-value">13<span class="arrow-up">↑</span></span>
+        </div>
+        <div class="cell cell-green master-charter">
+            <span class="cell-label">Master 谱师</span>
+            <span class="cell-value">はっぴー</span>
+        </div>
+        <div class="cell cell-green level-remaster">
+            <span class="cell-label">Lv</span>
+            <span class="cell-value">无</span>
+        </div>
+        <div class="cell cell-green remaster-charter">
+            <span class="cell-label">Re:Master 谱师</span>
+            <span class="cell-value">无</span>
+        </div>
+
+        <div class="cell cell-gray genre">
+            <span class="cell-label">流派</span>
+            <span class="cell-value">东方Project</span>
+        </div>
+        <div class="cell cell-gray version">
+            <span class="cell-label">版本</span>
+            <span class="cell-value">GreeN 超<span class="arrow-up">↑</span></span>
+        </div>
+        <div class="cell cell-gray master-tag">
+            <span class="cell-label">Master 标签</span>
+            <span class="cell-value">无标签数据</span>
+        </div>
+    </div>
+
+    <!-- 第二首歌 -->
+    <div class="song-card song2">
+        <img class="cover" src="https://p.qqan.com/up/2024-1/17040672001234567.jpg" alt="系ぎて">
+        <div class="title">系ぎて</div>
+        
+        <div class="cell cell-white type">
+            <span class="cell-label">类型</span>
+            <span class="cell-value">DX</span>
+        </div>
+        <div class="cell cell-white bpm">
+            <span class="cell-label">BPM</span>
+            <span class="cell-value">88<span class="arrow-up">↑</span></span>
+        </div>
+        <div class="cell cell-white composer">
+            <span class="cell-label">曲师</span>
+            <span class="cell-value">rintaro soma</span>
+        </div>
+
+        <div class="cell cell-white level-master">
+            <span class="cell-label">Lv</span>
+            <span class="cell-value">14+<span class="arrow-down">↓</span></span>
+        </div>
+        <div class="cell cell-white master-charter">
+            <span class="cell-label">Master 谱师</span>
+            <span class="cell-value">maimai TEAM DX</span>
+        </div>
+        <div class="cell cell-white level-remaster">
+            <span class="cell-label">Lv</span>
+            <span class="cell-value">15</span>
+        </div>
+        <div class="cell cell-white remaster-charter">
+            <span class="cell-label">Re:Master 谱师</span>
+            <span class="cell-value">BEYOND THE MEMORIES</span>
+        </div>
+
+        <div class="cell cell-gray genre">
+            <span class="cell-label">流派</span>
+            <span class="cell-value">舞萌</span>
+        </div>
+        <div class="cell cell-gray version">
+            <span class="cell-label">版本</span>
+            <span class="cell-value">DX 2024 双/宴<span class="arrow-down">↓</span></span>
+        </div>
+        <div class="cell cell-gray master-tag">
+            <span class="cell-label">Master 标签</span>
+            <div class="cell-value">
+                <span class="tag">转圈</span>
+                <span class="tag">绝赞段</span>
+                <span class="tag">扫键</span>
+                <span class="tag">交互</span>
+                <span class="tag water">水</span>
+                <span class="tag">错位</span>
+                <span class="tag">爆发</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 第三首歌 -->
+    <div class="song-card song3">
+        <img class="cover" src="https://p.qqan.com/up/2024-2/17070888009876543.jpg" alt="天国と地獄">
+        <div class="title">天国と地獄</div>
+        
+        <div class="cell cell-green type">
+            <span class="cell-label">类型</span>
+            <span class="cell-value">SD</span>
+        </div>
+        <div class="cell cell-yellow bpm">
+            <span class="cell-label">BPM</span>
+            <span class="cell-value">175<span class="arrow-down">↓</span></span>
+        </div>
+        <div class="cell cell-white composer">
+            <span class="cell-label">曲师</span>
+            <span class="cell-value">スーパーラバーズ「赤ちゃんは…</span>
+        </div>
+
+        <div class="cell cell-yellow level-master">
+            <span class="cell-label">Lv</span>
+            <span class="cell-value">13<span class="arrow-up">↑</span></span>
+        </div>
+        <div class="cell cell-white master-charter">
+            <span class="cell-label">Master 谱师</span>
+            <span class="cell-value">ニャイン</span>
+        </div>
+        <div class="cell cell-green level-remaster">
+            <span class="cell-label">Lv</span>
+            <span class="cell-value">无</span>
+        </div>
+        <div class="cell cell-green remaster-charter">
+            <span class="cell-label">Re:Master 谱师</span>
+            <span class="cell-value">无</span>
+        </div>
+
+        <div class="cell cell-gray genre">
+            <span class="cell-label">流派</span>
+            <span class="cell-value">其他游戏</span>
+        </div>
+        <div class="cell cell-gray version">
+            <span class="cell-label">版本</span>
+            <span class="cell-value">maimai 真<span class="arrow-up">↑</span></span>
+        </div>
+        <div class="cell cell-gray master-tag">
+            <span class="cell-label">Master 标签</span>
+            <div class="cell-value">
+                <span class="tag">反手</span>
+                <span class="tag">爆发</span>
+                <span class="tag">诈称谱</span>
+                <span class="tag">星星谱</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

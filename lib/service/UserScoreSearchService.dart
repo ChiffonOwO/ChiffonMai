@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/service/SongSearchService.dart';
+import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 import '../manager/UserPlayDataManager.dart';
 
 class UserScoreSearchService {
@@ -16,7 +16,7 @@ class UserScoreSearchService {
   }
 
   // 获取排序后的歌曲列表
-  List<dynamic> getSortedSongs(Map<String, dynamic> userPlayData, String sortBy) {
+  Future<List<dynamic>> getSortedSongs(Map<String, dynamic> userPlayData, String sortBy) async  {
     if (userPlayData.containsKey('records') && userPlayData['records'] is List) {
       List<dynamic> songs = List.from(userPlayData['records']);
       
@@ -43,12 +43,21 @@ class UserScoreSearchService {
           });
           break;
         case 'DX分达成率':
-          // 按 DX分达成率 降序排序
+          // 初始化歌曲缓存
+          await _initSongCache();
+          
+          // 先批量计算所有歌曲的DX达成率（异步）
+          // 用Map存储 歌曲 -> 达成率，避免排序时重复计算
+          Map<dynamic, double> dxRateMap = {};
+          for (var song in songs) {
+            double rate = await _calculateDXScoreRate(song);
+            dxRateMap[song] = rate;
+          }
+          // 基于提前计算好的达成率同步排序
           songs.sort((a, b) {
-            // 计算DX分达成率
-            double aRate = _calculateDXScoreRate(a);
-            double bRate = _calculateDXScoreRate(b);
-            return bRate.compareTo(aRate);
+            double aRate = dxRateMap[a] ?? 0;
+            double bRate = dxRateMap[b] ?? 0;
+            return bRate.compareTo(aRate); // 降序排序
           });
           break;
         default:
@@ -61,8 +70,21 @@ class UserScoreSearchService {
     return [];
   }
   
+  // 缓存变量
+  List<dynamic>? _cachedSongs;
+
+  // 初始化歌曲缓存
+  Future<void> _initSongCache() async {
+    if (_cachedSongs == null) {
+      final manager = MaimaiMusicDataManager();
+      if (await manager.hasCachedData()) {
+        _cachedSongs = await manager.getCachedSongs();
+      }
+    }
+  }
+
   // 计算DX分达成率（私有方法）
-  double _calculateDXScoreRate(dynamic record) {
+  Future<double> _calculateDXScoreRate(dynamic record) async {
     if (record == null) return 0.0;
     
     // 获取DX分
@@ -75,15 +97,18 @@ class UserScoreSearchService {
     // 计算最大DX分 (根据notes总和 * 3)
     int maxScore = 0;
 
-    // 尝试从cachedSongs中获取notes信息
+    // 尝试从缓存获取notes信息
     try {
-      if (SongSearchService.cachedSongs != null && SongSearchService.cachedSongs!.isNotEmpty) {
+      // 初始化缓存
+      await _initSongCache();
+      
+      if (_cachedSongs != null && _cachedSongs!.isNotEmpty) {
         // 查找对应乐曲
-        var song = SongSearchService.cachedSongs!.firstWhere(
+        var song = _cachedSongs!.firstWhere(
           (s) => s.id == songId,
         );
         // 如果找到歌曲，且难度索引有效
-        if (levelIndex >= 0 && levelIndex < song.charts.length) {
+        if (song != null && levelIndex >= 0 && levelIndex < song.charts.length) {
           // 获取对应难度的charts
           var chart = song.charts[levelIndex];
           // 计算notes总和
@@ -92,15 +117,15 @@ class UserScoreSearchService {
         }
       }
     } catch (e) {
-      print('从cachedSongs获取notes信息时出错: $e');
+      print('从缓存获取notes信息时出错: $e');
     }
     // 计算DX分达成率
     return maxScore > 0 ? dxScore / maxScore : 0.0;
   }
   
   // 计算DX分达成率（公共方法）
-  double calculateDXScoreRate(dynamic record) {
-    return _calculateDXScoreRate(record);
+  Future<double> calculateDXScoreRate(dynamic record) async {
+    return await _calculateDXScoreRate(record);
   }
 
   // 分页获取歌曲数据

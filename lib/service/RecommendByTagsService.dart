@@ -269,8 +269,8 @@ Future<List<RecordItem>> getBestNRecords(
   // 检查缓存
   if (RecommendByTagsService._cachedSongIdToIsNewMap == null) {
     // 1. 优先使用 MaimaiMusicDataManager 中的数据
-    if (MaimaiMusicDataManager().hasCachedData()) {
-      final songs = MaimaiMusicDataManager().getCachedSongs();
+    if (await MaimaiMusicDataManager().hasCachedData()) {
+      final songs = await MaimaiMusicDataManager().getCachedSongs();
       if (songs != null) {
         // 2. 构建 songId 到 isNew 的映射
         RecommendByTagsService._cachedSongIdToIsNewMap = {
@@ -580,11 +580,11 @@ Future<List<RecommendationResult>> calculateRecommendations(
     bool isNewOnly) async {
   List<RecommendationResult> recommendations = [];
   // 初始化所有歌曲列表
-  List<Song> songs;
+  List<Song>? songs;
   if (RecommendByTagsService._cachedMaimaiMusicData == null) {
     // 优先使用 MaimaiMusicDataManager 中的数据
-    if (MaimaiMusicDataManager().hasCachedData()) {
-      songs = MaimaiMusicDataManager().getCachedSongs()!.cast<Song>();
+    if (await MaimaiMusicDataManager().hasCachedData()) {
+      songs = await MaimaiMusicDataManager().getCachedSongs();
     } else {
       // 如果 API 数据不存在，尝试从资产文件加载 JSON 数据作为 fallback
       String maimaiMusicDataString;
@@ -615,7 +615,7 @@ Future<List<RecommendationResult>> calculateRecommendations(
    * 剔除条件：
    * 1. 达成率已达到100.5%以上的谱面
    */
-  for (var song in songs) {
+  for (var song in songs!) {
     // 1. 歌曲必须是目标版本的谱面（根据isNewOnly判断）
     if (song.basicInfo.isNew != isNewOnly) {
       continue;

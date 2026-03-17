@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/entity/MaiTagsEntity.dart';
 
 class MaiTagsManager {
@@ -22,19 +23,152 @@ class MaiTagsManager {
     "Accept-Language": "zh-CN,zh;q=0.9,en-GB;q=0.8,en-US;q=0.7,en;q=0.6"
   };
 
-  // 缓存变量
-  MaiTagsEntity? _cachedMaiTagsEntity;
-  Map<String, List<int>>? _cachedSongIdToTagIdsMap;
-  Map<int, String>? _cachedGroupIdToNameMap;
-  Map<int, (String, int)>? _cachedTagIdToInfoMap;
-  bool _tagsLoaded = false;
+  // 缓存相关常量
+  static const String TAGS_CACHE_KEY = 'mai_tags_cache';
+  static const String TAGS_CACHE_TIMESTAMP_KEY = 'mai_tags_cache_timestamp';
+  static const int CACHE_EXPIRY_DAYS = 7;
 
   /**
    * 初始化标签数据
    */
   Future<void> initializeTags() async {
     try {
-      // 发送 API 请求
+      // 尝试从本地缓存加载
+      final prefs = await SharedPreferences.getInstance();
+      final cachedData = prefs.getString(TAGS_CACHE_KEY);
+      final cachedTimestamp = prefs.getInt(TAGS_CACHE_TIMESTAMP_KEY);
+      
+      // 检查缓存是否有效
+      bool isCacheValid = false;
+      if (cachedData != null && cachedTimestamp != null) {
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final cacheAge = now - cachedTimestamp;
+        final maxAge = CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+        isCacheValid = cacheAge < maxAge;
+      }
+      
+      if (!isCacheValid || cachedData == null) {
+        // 从网络加载
+        final response = await http.post(
+          Uri.parse(TAGS_API_URL),
+          headers: TAGS_API_HEADERS,
+          body: [],
+        );
+
+        if (response.statusCode == 200) {
+          final mainTagString = response.body;
+          
+          // 更新本地缓存
+          await prefs.setString(TAGS_CACHE_KEY, mainTagString);
+          await prefs.setInt(TAGS_CACHE_TIMESTAMP_KEY, DateTime.now().millisecondsSinceEpoch);
+          
+          print('从网络加载标签数据并更新缓存');
+        } else {
+          print('标签数据初始化失败，状态码: ${response.statusCode}');
+        }
+      } else {
+        print('本地缓存有效，无需更新');
+      }
+    } catch (e) {
+      print('标签数据初始化错误: $e');
+    }
+  }
+
+  /**
+   * 获取标签数据
+   */
+  Future<MaiTagsEntity?> getTags() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedData = prefs.getString(TAGS_CACHE_KEY);
+      
+      if (cachedData != null) {
+        Map<String, dynamic> mainTagJson = json.decode(cachedData);
+        return MaiTagsEntity.fromJson(mainTagJson);
+      }
+      
+      // 如果没有缓存，尝试初始化
+      await initializeTags();
+      
+      // 再次尝试获取
+      final updatedData = prefs.getString(TAGS_CACHE_KEY);
+      if (updatedData != null) {
+        Map<String, dynamic> mainTagJson = json.decode(updatedData);
+        return MaiTagsEntity.fromJson(mainTagJson);
+      }
+      
+      return null;
+    } catch (e) {
+      print('获取标签数据错误: $e');
+      return null;
+    }
+  }
+
+  /**
+   * 构建 谱面标识 = 谱面ID + 谱面类型 + 谱面难度 到 标签ID列表 的映射
+   */
+  Future<Map<String, List<int>>> getSongIdToTagIdsMap() async {
+    final maiTagsEntity = await getTags();
+    if (maiTagsEntity != null) {
+      return buildSongIdToTagIdsMap(maiTagsEntity);
+    } else {
+      return {};
+    }
+  }
+
+  /**
+   * 构建分组ID到分组名称的映射
+   */
+  Future<Map<int, String>> getGroupIdToNameMap() async {
+    final maiTagsEntity = await getTags();
+    if (maiTagsEntity != null) {
+      Map<int, String> groupIdToNameMap = {};
+      List<TagGroupItem> tagGroups = maiTagsEntity.tagGroups;
+      if (tagGroups.isNotEmpty) {
+        for (var group in tagGroups) {
+          groupIdToNameMap[group.id] = group.localizedName.zhHans;
+        }
+      }
+      return groupIdToNameMap;
+    } else {
+      return {};
+    }
+  }
+
+  /**
+   * 构建标签ID → (标签名称, 分组ID) 的映射
+   */
+  Future<Map<int, (String, int)>> getTagIdToInfoMap() async {
+    final maiTagsEntity = await getTags();
+    if (maiTagsEntity != null) {
+      Map<int, (String, int)> tagIdToInfoMap = {};
+      List<TagItem> tags = maiTagsEntity.tags;
+      if (tags.isNotEmpty) {
+        for (var tag in tags) {
+          tagIdToInfoMap[tag.id] = (tag.localizedName.zhHans, tag.groupId);
+        }
+      }
+      return tagIdToInfoMap;
+    } else {
+      return {};
+    }
+  }
+
+  /**
+   * 检查是否有缓存数据
+   */
+  Future<bool> hasCachedData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cachedData = prefs.getString(TAGS_CACHE_KEY);
+    return cachedData != null && cachedData.isNotEmpty;
+  }
+  
+  /**
+   * 手动刷新缓存
+   */
+  Future<void> refreshCache() async {
+    try {
+      // 从网络加载
       final response = await http.post(
         Uri.parse(TAGS_API_URL),
         headers: TAGS_API_HEADERS,
@@ -43,96 +177,19 @@ class MaiTagsManager {
 
       if (response.statusCode == 200) {
         final mainTagString = response.body;
-        // 解析为最外层Map
-        Map<String, dynamic> mainTagJson = json.decode(mainTagString);
-        // 解析最外层的实体：MaiTagEntity
-        _cachedMaiTagsEntity = MaiTagsEntity.fromJson(mainTagJson);
-        // 清除其他缓存，确保下次使用新数据
-        _cachedSongIdToTagIdsMap = null;
-        _cachedGroupIdToNameMap = null;
-        _cachedTagIdToInfoMap = null;
-        _tagsLoaded = true;
-        print('标签数据初始化成功');
+        
+        // 更新本地缓存
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(TAGS_CACHE_KEY, mainTagString);
+        await prefs.setInt(TAGS_CACHE_TIMESTAMP_KEY, DateTime.now().millisecondsSinceEpoch);
+        
+        print('手动刷新标签数据缓存成功');
       } else {
-        print('标签数据初始化失败，状态码: ${response.statusCode}');
+        print('手动刷新标签数据缓存失败，状态码: ${response.statusCode}');
       }
     } catch (e) {
-      print('标签数据初始化网络错误: $e');
+      print('手动刷新标签数据缓存错误: $e');
     }
-  }
-
-  /**
-   * 获取标签数据
-   */
-  Future<MaiTagsEntity?> getTags() async {
-    if (!_tagsLoaded) {
-      await initializeTags();
-    }
-    return _cachedMaiTagsEntity;
-  }
-
-  /**
-   * 构建 谱面标识 = 谱面ID + 谱面类型 + 谱面难度 到 标签ID列表 的映射
-   */
-  Future<Map<String, List<int>>> getSongIdToTagIdsMap() async {
-    if (_cachedSongIdToTagIdsMap == null) {
-      final maiTagsEntity = await getTags();
-      if (maiTagsEntity != null) {
-        _cachedSongIdToTagIdsMap = buildSongIdToTagIdsMap(maiTagsEntity);
-      } else {
-        _cachedSongIdToTagIdsMap = {};
-      }
-    }
-    return _cachedSongIdToTagIdsMap!;
-  }
-
-  /**
-   * 构建分组ID到分组名称的映射
-   */
-  Future<Map<int, String>> getGroupIdToNameMap() async {
-    if (_cachedGroupIdToNameMap == null) {
-      final maiTagsEntity = await getTags();
-      if (maiTagsEntity != null) {
-        _cachedGroupIdToNameMap = {};
-        List<TagGroupItem> tagGroups = maiTagsEntity.tagGroups;
-        if (tagGroups.isNotEmpty) {
-          for (var group in tagGroups) {
-            _cachedGroupIdToNameMap![group.id] = group.localizedName.zhHans;
-          }
-        }
-      } else {
-        _cachedGroupIdToNameMap = {};
-      }
-    }
-    return _cachedGroupIdToNameMap!;
-  }
-
-  /**
-   * 构建标签ID → (标签名称, 分组ID) 的映射
-   */
-  Future<Map<int, (String, int)>> getTagIdToInfoMap() async {
-    if (_cachedTagIdToInfoMap == null) {
-      final maiTagsEntity = await getTags();
-      if (maiTagsEntity != null) {
-        _cachedTagIdToInfoMap = {};
-        List<TagItem> tags = maiTagsEntity.tags;
-        if (tags.isNotEmpty) {
-          for (var tag in tags) {
-            _cachedTagIdToInfoMap![tag.id] = (tag.localizedName.zhHans, tag.groupId);
-          }
-        }
-      } else {
-        _cachedTagIdToInfoMap = {};
-      }
-    }
-    return _cachedTagIdToInfoMap!;
-  }
-
-  /**
-   * 检查是否有缓存数据
-   */
-  bool hasCachedData() {
-    return _tagsLoaded && _cachedMaiTagsEntity != null;
   }
 
   /**

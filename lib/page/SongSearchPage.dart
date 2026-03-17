@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/service/SongSearchService.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
@@ -110,7 +111,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
       List<dynamic> results;
       if (query.isEmpty) {
         // 当输入框为空时，获取所有歌曲
-        results = await SongSearchService.loadAllSongs();
+        results = await MaimaiMusicDataManager().getCachedSongs() ?? [];
       } else {
         // 当输入框不为空时，执行搜索
         results = await SongSearchService.searchSongs(query);
@@ -926,7 +927,12 @@ class _SongSearchPageState extends State<SongSearchPage> {
                 errorBuilder: (context, error, stackTrace) {
                   // 生成网络曲绘URL
                   String coverId = song.id.toString();
-                  if (coverId.length < 5) {
+                  
+                  // 对于6位数的曲绘，只需要去除第一位
+                  if (coverId.length == 6) {
+                    // 去掉第一位
+                    coverId = coverId.substring(1);
+                  } else if (coverId.length < 5) {
                     // 万位补1，其余位补0
                     coverId = '1' + '0' * (4 - coverId.length) + coverId;
                   }
