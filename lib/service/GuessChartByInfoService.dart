@@ -16,8 +16,8 @@ import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
      黄色 - 该属性与你猜的“接近”：
      灰色 - 该属性与你猜的“差距较大”：
      BPM 相差在 ±20 范围内；
-     Master 难度或 Re:Master 难度相差在 ±0.2范围内；
-     版本相差一个世代（例如 maimai → maimai PLUS）。
+     Master 难度或 Re:Master 难度相差在 ±0.4范围内；
+     版本相差一个世代（例如 maimai ← maimai PLUS → maimai GreeN）。
      箭头：
      ↑ - 目标值比你猜的更高
      ↓ - 目标值比你猜的更低
@@ -203,20 +203,20 @@ class GuessChartByInfoService {
       final songIdToTagIdsMap = await buildSongIdToTagIdsMap();
 
       // 构建谱面标识
-      String songKey = '${song.id}#${song.type == 'DX' ? 'dx' : 'std'}#master';
+      String songKey = '${song.title}#${song.type == 'DX' ? 'dx' : 'std'}#master';
       // 获取Master难度的标签
       final tagIds = songIdToTagIdsMap[songKey] ?? [];
       final masterTags = tagIds.map((tagId) => tagIdToNameMap[tagId] ?? '').where((tag) => tag.isNotEmpty).toList();
-
       // 构建GuessSong实体
       return GuessSong(
+        songId: int.parse(song.id),
         title: song.basicInfo.title,
         type: song.type,
         bpm: song.basicInfo.bpm,
         artist: song.basicInfo.artist,
-        masterLevel: song.level.length > 3 ? song.level[3] : '',
+        masterDs: song.ds.length > 3 ? song.ds[3].toString() : '',
         masterCharter: song.charts.length > 3 ? song.charts[3].charter : '',
-        remasterLevel: song.level.length > 4 ? song.level[4] : '',
+        remasterDs: song.ds.length > 4 ? song.ds[4].toString() : '',
         remasterCharter: song.charts.length > 4 ? song.charts[4].charter : '',
         genre: song.basicInfo.genre,
         version: song.basicInfo.from,
@@ -226,13 +226,14 @@ class GuessChartByInfoService {
       print('构建GuessSong实体失败: $e');
       // 返回默认值
       return GuessSong(
+        songId: int.parse(song.id),
         title: song.basicInfo.title,
         type: song.type,
         bpm: song.basicInfo.bpm,
         artist: song.basicInfo.artist,
-        masterLevel: song.level.length > 3 ? song.level[3] : '',
+        masterDs: song.ds.length > 3 ? song.ds[3].toString() : '',
         masterCharter: song.charts.length > 3 ? song.charts[3].charter : '',
-        remasterLevel: song.level.length > 4 ? song.level[4] : '',
+        remasterDs: song.ds.length > 4 ? song.ds[4].toString() : '',
         remasterCharter: song.charts.length > 4 ? song.charts[4].charter : '',
         genre: song.basicInfo.genre,
         version: song.basicInfo.from,
@@ -254,10 +255,19 @@ class GuessChartByInfoService {
       final songIdToTagIdsMap = await buildSongIdToTagIdsMap();
 
       // 构建目标歌曲的谱面标识
-      String targetSongKey = '${targetSong.id}#${targetSong.type == 'DX' ? 'dx' : 'std'}#master';
+      String targetSongKey = '${targetSong.title}#${targetSong.type == 'DX' ? 'dx' : 'std'}#master';
       // 获取目标歌曲Master难度的标签
       final targetTagIds = songIdToTagIdsMap[targetSongKey] ?? [];
       final targetTags = targetTagIds.map((tagId) => tagIdToNameMap[tagId] ?? '').where((tag) => tag.isNotEmpty).toList();
+      
+      // 构建猜测歌曲的谱面标识
+      String guessedSongKey = '${guessedSong.title}#${guessedSong.type == 'DX' ? 'dx' : 'std'}#master';
+      // 获取猜测歌曲Master难度的标签
+      final guessedTagIds = songIdToTagIdsMap[guessedSongKey] ?? [];
+      final guessedTags = guessedTagIds.map((tagId) => tagIdToNameMap[tagId] ?? '').where((tag) => tag.isNotEmpty).toList();
+      
+      // 设置猜测歌曲的标签
+      guessedSong.masterTags = guessedTags;
 
       // 计算各属性的颜色
       guessedSong.titleBgColor = guessedSong.title == targetSong.basicInfo.title ? Colors.green : Colors.grey;
@@ -266,55 +276,66 @@ class GuessChartByInfoService {
       // BPM比较
       if (guessedSong.bpm == targetSong.basicInfo.bpm) {
         guessedSong.bpmBgColor = Colors.green;
+        guessedSong.bpmArrow = null;
       } else if ((guessedSong.bpm - targetSong.basicInfo.bpm).abs() <= 20) {
         guessedSong.bpmBgColor = Colors.yellow;
+        guessedSong.bpmArrow = guessedSong.bpm < targetSong.basicInfo.bpm ? '↑' : '↓';
       } else {
         guessedSong.bpmBgColor = Colors.grey;
+        guessedSong.bpmArrow = guessedSong.bpm < targetSong.basicInfo.bpm ? '↑' : '↓';
       }
 
       guessedSong.artistBgColor = guessedSong.artist == targetSong.basicInfo.artist ? Colors.green : Colors.grey;
 
       // Master难度比较
-      if (guessedSong.masterLevel == (targetSong.level.length > 3 ? targetSong.level[3] : '')) {
+      if (guessedSong.masterDs == (targetSong.ds.length > 3 ? targetSong.ds[3].toString() : '')) {
         guessedSong.masterLevelBgColor = Colors.green;
+        guessedSong.masterLevelArrow = null;
       } else {
         try {
-          final guessedLevel = double.tryParse(guessedSong.masterLevel);
-          final targetLevel = double.tryParse(targetSong.level.length > 3 ? targetSong.level[3] : '');
+          final guessedLevel = double.tryParse(guessedSong.masterDs);
+          final targetLevel = double.tryParse(targetSong.ds.length > 3 ? targetSong.ds[3].toString() : '');
           if (guessedLevel != null && targetLevel != null) {
-            if ((guessedLevel - targetLevel).abs() <= 0.2) {
+            if ((guessedLevel - targetLevel).abs() <= 0.4) {
               guessedSong.masterLevelBgColor = Colors.yellow;
             } else {
               guessedSong.masterLevelBgColor = Colors.grey;
             }
+            guessedSong.masterLevelArrow = guessedLevel < targetLevel ? '↑' : '↓';
           } else {
             guessedSong.masterLevelBgColor = Colors.grey;
+            guessedSong.masterLevelArrow = null;
           }
         } catch (e) {
           guessedSong.masterLevelBgColor = Colors.grey;
+          guessedSong.masterLevelArrow = null;
         }
       }
 
       guessedSong.masterCharterBgColor = guessedSong.masterCharter == (targetSong.charts.length > 3 ? targetSong.charts[3].charter : '') ? Colors.green : Colors.grey;
 
       // Re:Master难度比较
-      if (guessedSong.remasterLevel == (targetSong.level.length > 4 ? targetSong.level[4] : '')) {
+      if (guessedSong.remasterDs == (targetSong.ds.length > 4 ? targetSong.ds[4].toString() : '')) {
         guessedSong.remasterLevelBgColor = Colors.green;
+        guessedSong.remasterLevelArrow = null;
       } else {
         try {
-          final guessedLevel = double.tryParse(guessedSong.remasterLevel);
-          final targetLevel = double.tryParse(targetSong.level.length > 4 ? targetSong.level[4] : '');
+          final guessedLevel = double.tryParse(guessedSong.remasterDs);
+          final targetLevel = double.tryParse(targetSong.ds.length > 4 ? targetSong.ds[4].toString() : '');
           if (guessedLevel != null && targetLevel != null) {
-            if ((guessedLevel - targetLevel).abs() <= 0.2) {
+            if ((guessedLevel - targetLevel).abs() <= 0.4) {
               guessedSong.remasterLevelBgColor = Colors.yellow;
             } else {
               guessedSong.remasterLevelBgColor = Colors.grey;
             }
+            guessedSong.remasterLevelArrow = guessedLevel < targetLevel ? '↑' : '↓';
           } else {
             guessedSong.remasterLevelBgColor = Colors.grey;
+            guessedSong.remasterLevelArrow = null;
           }
         } catch (e) {
           guessedSong.remasterLevelBgColor = Colors.grey;
+          guessedSong.remasterLevelArrow = null;
         }
       }
 
@@ -324,6 +345,7 @@ class GuessChartByInfoService {
       // 版本比较
       if (guessedSong.version == targetSong.basicInfo.from) {
         guessedSong.versionBgColor = Colors.green;
+        guessedSong.versionArrow = null;
       } else {
         // 版本相差一个世代（例如 maimai → maimai PLUS）
         final guessedVersionIndex = _versionList.indexOf(guessedSong.version);
@@ -334,13 +356,16 @@ class GuessChartByInfoService {
           } else {
             guessedSong.versionBgColor = Colors.grey;
           }
+          // 版本箭头：索引越小版本越早，所以如果猜的版本索引小于目标版本索引，说明猜晚了，需要↑表示目标版本更早
+          guessedSong.versionArrow = guessedVersionIndex > targetVersionIndex ? '↑' : '↓';
         } else {
           guessedSong.versionBgColor = Colors.grey;
+          guessedSong.versionArrow = null;
         }
       }
 
       // 标签比较
-      guessedSong.tagBgColors = guessedSong.masterTags.map((tag) {
+      guessedSong.tagBgColors = guessedSong.masterTags?.map((tag) {
         return targetTags.contains(tag) ? Colors.green : Colors.grey;
       }).toList();
 

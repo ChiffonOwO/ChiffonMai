@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/page/B50Page.dart';
 import 'package:my_first_flutter_app/page/DiffBest50Page.dart';
+import 'package:my_first_flutter_app/page/GuessChartByInfoPage.dart';
 import 'package:my_first_flutter_app/page/RandomChartPage.dart';
 import 'package:my_first_flutter_app/page/RecommendByTagsPage.dart';
 import 'package:my_first_flutter_app/page/SingleRatingCalculatorPage.dart';
@@ -617,6 +618,12 @@ class _HomePageState extends State<HomePage> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => RandomChartPage()),
+            );
+          }
+          if (item.title == '猜歌'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => GuessChartByInfoPage()),
             );
           }
         },
