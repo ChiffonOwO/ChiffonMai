@@ -136,6 +136,25 @@ class MaiTagsManager {
   }
 
   /**
+   * 构建 标签ID → 标签名称 的映射
+   */
+  Future<Map<int, String>> getTagIdToNameMap() async {
+    final maiTagsEntity = await getTags();
+    if (maiTagsEntity != null) {
+      Map<int, String> tagIdToNameMap = {};
+      List<TagItem> tags = maiTagsEntity.tags;
+      if (tags.isNotEmpty) {
+        for (var tag in tags) {
+          tagIdToNameMap[tag.id] = tag.localizedName.zhHans;
+        }
+      }
+      return tagIdToNameMap;
+    } else {
+      return {};
+    }
+  }
+
+  /**
    * 构建标签ID → (标签名称, 分组ID) 的映射
    */
   Future<Map<int, (String, int)>> getTagIdToInfoMap() async {
