@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/page/B50Page.dart';
 import 'package:my_first_flutter_app/page/DiffBest50Page.dart';
+import 'package:my_first_flutter_app/page/GuessChartByCoverPage.dart';
 import 'package:my_first_flutter_app/page/GuessChartByInfoPage.dart';
 import 'package:my_first_flutter_app/page/RandomChartPage.dart';
 import 'package:my_first_flutter_app/page/RecommendByTagsPage.dart';
@@ -155,7 +156,8 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.percent, title: '达成率计算', subtitle: '根据判定详情算出达成率'),
     ButtonItem(icon: Icons.compare_arrows, title: '版本对照', subtitle: '舞神要打哪些代的歌？'),
     ButtonItem(icon: Icons.replay, title: '达成率反推', subtitle: '根据判定详情推出绝赞详情'),
-    ButtonItem(icon: Icons.gamepad, title: '猜歌', subtitle: '舞萌笑传之猜猜呗'),
+    ButtonItem(icon: Icons.gamepad, title: '无提示猜歌', subtitle: '舞萌笑传之猜猜呗1'),
+    ButtonItem(icon: Icons.gamepad, title: '根据部分曲绘猜歌', subtitle: '舞萌笑传之猜猜呗2'),
     ButtonItem(icon: Icons.file_upload_sharp, title: '刷新数据', subtitle: '刷新你的舞萌数据'),
     ButtonItem(icon: Icons.update, title: '检查更新', subtitle: '检查应用是否有新版本'),
   ];
@@ -620,10 +622,16 @@ class _HomePageState extends State<HomePage> {
               MaterialPageRoute(builder: (context) => RandomChartPage()),
             );
           }
-          if (item.title == '猜歌'){
+          if (item.title == '无提示猜歌'){
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => GuessChartByInfoPage()),
+            );
+          }
+          if (item.title == '根据部分曲绘猜歌'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => GuessChartByCoverPage()),
             );
           }
         },

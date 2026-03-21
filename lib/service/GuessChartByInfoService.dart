@@ -357,7 +357,7 @@ class GuessChartByInfoService {
             guessedSong.versionBgColor = Colors.grey;
           }
           // 版本箭头：索引越小版本越早，所以如果猜的版本索引小于目标版本索引，说明猜晚了，需要↑表示目标版本更早
-          guessedSong.versionArrow = guessedVersionIndex > targetVersionIndex ? '↑' : '↓';
+          guessedSong.versionArrow = guessedVersionIndex > targetVersionIndex ? '猜晚了' : '猜早了';
         } else {
           guessedSong.versionBgColor = Colors.grey;
           guessedSong.versionArrow = null;

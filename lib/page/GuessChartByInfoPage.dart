@@ -35,6 +35,9 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
   static const Duration _searchDelay = Duration(milliseconds: 800);
   bool _showSearchResults = false;
 
+  // 排序状态
+  bool _isAscending = true; // true: 顺序, false: 逆序
+
   // 歌曲别名管理器
   late SongAliasManager _songAliasManager;
 
@@ -152,7 +155,8 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
     if (_isGameOver) return;
 
     // 检查是否已经猜过这首歌
-    bool hasGuessed = _guessHistory.any((guess) => guess.songId == int.parse(guessedSong.id));
+    bool hasGuessed =
+        _guessHistory.any((guess) => guess.songId == int.parse(guessedSong.id));
     if (hasGuessed) {
       // 显示提示
       ScaffoldMessenger.of(context).showSnackBar(
@@ -275,12 +279,29 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 标题
-                  Text(
-                    song.basicInfo.title,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Text(
+                        song.type == 'SD' ? 'ST' : 'DX',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: song.type == 'SD' ? Colors.blue : Colors.orange,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          song.basicInfo.title,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                   // 作者
                   Text(
@@ -934,24 +955,53 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
                                         ),
                                         const SizedBox(height: 20),
 
-                                        // 搜索输入框
+                                        // 搜索输入框和结果
                                         Container(
-                                          decoration: BoxDecoration(
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                            border: Border.all(
-                                                color: Colors.grey[300]!),
-                                          ),
-                                          child: TextField(
-                                            controller: _searchController,
-                                            onChanged: _handleSearchInput,
-                                            enabled: !_isGameOver,
-                                            decoration: const InputDecoration(
-                                              hintText: '输入歌曲名称或别名',
-                                              border: InputBorder.none,
-                                              contentPadding:
-                                                  EdgeInsets.all(12),
-                                            ),
+                                          child: Column(
+                                            children: [
+                                              Container(
+                                                decoration: BoxDecoration(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                  border: Border.all(
+                                                      color: Colors.grey[300]!),
+                                                ),
+                                                child: TextField(
+                                                  controller: _searchController,
+                                                  onChanged: _handleSearchInput,
+                                                  enabled: !_isGameOver,
+                                                  decoration: const InputDecoration(
+                                                    hintText: '输入歌曲名称或别名',
+                                                    border: InputBorder.none,
+                                                    contentPadding:
+                                                        EdgeInsets.all(12),
+                                                  ),
+                                                ),
+                                              ),
+                                              // 搜索结果
+                                              if (_showSearchResults && _searchResults.isNotEmpty)
+                                                Container(
+                                                  decoration: BoxDecoration(
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(color: Colors.grey[300]!),
+                                                    color: Colors.white,
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: Colors.black.withOpacity(0.2),
+                                                        blurRadius: 10,
+                                                        offset: Offset(0, 5),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  constraints: BoxConstraints(maxHeight: screenHeight * 0.3),
+                                                  child: ListView.builder(
+                                                    itemCount: _searchResults.length,
+                                                    itemBuilder: (context, index) {
+                                                      return _buildSearchResultItem(_searchResults[index]);
+                                                    },
+                                                  ),
+                                                ),
+                                            ],
                                           ),
                                         ),
 
@@ -994,6 +1044,25 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
                                                 onPressed: _startNewGame,
                                               ),
                                               const SizedBox(width: 16),
+                                              // 排序按钮
+                                              IconButton(
+                                                icon: Icon(
+                                                  _isAscending
+                                                      ? Icons.sort_by_alpha
+                                                      : Icons
+                                                          .sort_by_alpha_outlined,
+                                                  color: Color.fromARGB(
+                                                      255, 84, 97, 97),
+                                                  size: 24,
+                                                ),
+                                                onPressed: () {
+                                                  setState(() {
+                                                    _isAscending =
+                                                        !_isAscending;
+                                                  });
+                                                },
+                                              ),
+                                              const SizedBox(width: 16),
                                               // 投降按钮
                                               if (!_isGameOver)
                                                 TextButton(
@@ -1010,7 +1079,7 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
                                               if (_isGameOver)
                                                 ElevatedButton(
                                                   onPressed: _startNewGame,
-                                                  child: const Text('开始新游戏'),
+                                                  child: const Text('新游戏'),
                                                 ),
                                             ],
                                           ),
@@ -1139,34 +1208,47 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
                                                               CrossAxisAlignment
                                                                   .start,
                                                           children: [
-                                                            Text(
-                                                              _targetSong!
-                                                                  .basicInfo
-                                                                  .title,
-                                                              style: TextStyle(
-                                                                fontSize:
-                                                                    screenWidth *
-                                                                        0.035,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                              ),
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
+                                                            // 第一行：类型 曲名
+                                                            Row(
+                                                              children: [
+                                                                Text(
+                                                                  _targetSong!.type == 'SD' ? 'ST' : _targetSong!.type,
+                                                                  style: TextStyle(
+                                                                    fontSize: screenWidth * 0.035,
+                                                                    fontWeight: FontWeight.bold,
+                                                                    color: _targetSong!.type == 'SD' ? Colors.blue : Colors.orange,
+                                                                  ),
+                                                                ),
+                                                                SizedBox(width: 8),
+                                                                Expanded(
+                                                                  child: Text(
+                                                                    _targetSong!.basicInfo.title,
+                                                                    style: TextStyle(
+                                                                      fontSize: screenWidth * 0.035,
+                                                                      fontWeight: FontWeight.bold,
+                                                                    ),
+                                                                    overflow: TextOverflow.ellipsis,
+                                                                  ),
+                                                                ),
+                                                              ],
                                                             ),
+                                                            // 第二行：曲师 | 流派
                                                             Text(
-                                                              '曲师: ${_targetSong!.basicInfo.artist}',
+                                                              '${_targetSong!.basicInfo.artist} | ${_targetSong!.basicInfo.genre}',
                                                               style: TextStyle(
-                                                                fontSize:
-                                                                    screenWidth *
-                                                                        0.03,
-                                                                color:
-                                                                    Colors.grey,
+                                                                fontSize: screenWidth * 0.03,
+                                                                color: Colors.grey,
                                                               ),
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
+                                                              overflow: TextOverflow.ellipsis,
+                                                            ),
+                                                            // 第三行：masterDs | remasterDs | version
+                                                            Text(
+                                                              '${_targetSong!.ds[3]} | ${_targetSong!.ds.length > 4 ? _targetSong!.ds[4] : '-'} | ${_formatVersion(_targetSong!.basicInfo.from)}',
+                                                              style: TextStyle(
+                                                                fontSize: screenWidth * 0.03,
+                                                                color: Colors.grey,
+                                                              ),
+                                                              overflow: TextOverflow.ellipsis,
                                                             ),
                                                           ],
                                                         ),
@@ -1193,14 +1275,21 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
                                                 ),
                                               ),
                                               const SizedBox(height: 12),
-                                              ..._guessHistory
+                                              ...(_isAscending
+                                                      ? _guessHistory
+                                                      : _guessHistory.reversed.toList())
                                                   .asMap()
                                                   .entries
                                                   .map((entry) {
                                                 // 这里需要根据猜测历史的索引获取对应的歌曲，暂时使用null
+                                                int displayIndex = _isAscending
+                                                    ? entry.key
+                                                    : _guessHistory.length -
+                                                        1 -
+                                                        entry.key;
                                                 return _buildGuessHistoryItem(
                                                     entry.value,
-                                                    entry.key,
+                                                    displayIndex,
                                                     null);
                                               }),
                                             ],
@@ -1225,34 +1314,7 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
             ),
           ),
 
-          // 悬浮搜索结果
-          if (_showSearchResults && _searchResults.isNotEmpty)
-            Positioned(
-              top: 180, // 调整位置，使其悬浮在搜索框下方
-              left: 20,
-              right: 20,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!),
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 10,
-                      offset: Offset(0, 5),
-                    ),
-                  ],
-                ),
-                constraints: BoxConstraints(maxHeight: screenHeight * 0.3),
-                child: ListView.builder(
-                  itemCount: _searchResults.length,
-                  itemBuilder: (context, index) {
-                    return _buildSearchResultItem(_searchResults[index]);
-                  },
-                ),
-              ),
-            ),
+
         ],
       ),
     );
