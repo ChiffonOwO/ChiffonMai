@@ -36,6 +36,7 @@ class GuessChartByCoverService {
   ];
 
   // 处理版本字符串，使其在前端简化展示
+  // ignore: unused_element
   static String _formatVersion(String version) {
     if (version == 'maimai') {
       return 'maimai';

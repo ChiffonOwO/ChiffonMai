@@ -13,7 +13,6 @@ class _RandomChartPageState extends State<RandomChartPage> {
   final RandomChartService _service = RandomChartService();
   
   // 状态变量
-  bool _isLoading = false;
   bool _isDrawing = false;
   List<Song> _drawnSongs = [];
   List<List<Song>> _history = [];
@@ -117,7 +116,6 @@ class _RandomChartPageState extends State<RandomChartPage> {
     final whiteAreaPadding = screenWidth * 0.04; // 白色区域内边距
     final cardPadding = screenWidth * 0.04; // 卡片内边距
     final borderRadius = screenWidth * 0.02; // 边框圆角
-    final buttonHeight = screenHeight * 0.06; // 按钮高度
     final iconSize = screenWidth * 0.05; // 图标大小
     final textSizeLarge = screenWidth * 0.045; // 大字号
     final textSizeMedium = screenWidth * 0.035; // 中字号
@@ -126,10 +124,6 @@ class _RandomChartPageState extends State<RandomChartPage> {
     final spacingMedium = screenWidth * 0.04; // 中间距
     final spacingLarge = screenWidth * 0.06; // 大间距
     final gridItemSpacing = screenWidth * 0.03; // 网格项间距
-    final dropDownHeight = screenHeight * 0.05; // 下拉菜单高度
-    final textFieldHeight = screenHeight * 0.05; // 文本框高度
-    final historyItemHeight = screenWidth * 0.15; // 历史记录项高度
-    final songCardAspectRatio = 0.75; // 歌曲卡片宽高比
 
     return Scaffold(
       backgroundColor: Colors.transparent,

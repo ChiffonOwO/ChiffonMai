@@ -19,13 +19,11 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
   // 游戏状态
   bool _isGameStarted = false;
   Song? _targetSong;
-  GuessSong? _targetGuessSong;
   List<GuessSong> _guessHistory = [];
   int _guessCount = 0;
   static const int _maxGuesses = 10;
   bool _isGameOver = false;
   bool _isWon = false;
-  bool _hasSurrendered = false;
 
   // 搜索状态
   TextEditingController _searchController = TextEditingController();
@@ -77,8 +75,6 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
     // 随机选择目标歌曲
     _targetSong = await GuessChartByInfoService.randomSelectSong();
     if (_targetSong != null) {
-      _targetGuessSong =
-          await GuessChartByInfoService.buildGuessSongEntity(_targetSong!);
       setState(() {
         _isGameStarted = true;
       });
@@ -1070,7 +1066,6 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
                                                     setState(() {
                                                       _isGameOver = true;
                                                       _isWon = false;
-                                                      _hasSurrendered = true;
                                                     });
                                                   },
                                                   child: const Text('投降'),

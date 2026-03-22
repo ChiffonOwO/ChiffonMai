@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 
 class B50ConvertToImg {
   // 全局Key，用于获取widget的渲染对象
+  // ignore: unused_field
   static GlobalKey _globalKey = GlobalKey();
 
   // 导出为图片的方法

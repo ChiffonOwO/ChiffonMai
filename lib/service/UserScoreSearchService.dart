@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 import '../manager/UserPlayDataManager.dart';
@@ -139,6 +138,110 @@ class UserScoreSearchService {
       endIndex = songs.length;
     }
     return songs.sublist(startIndex, endIndex);
+  }
+  
+  // 筛选歌曲
+  Future<List<dynamic>> filterSongs(List<dynamic> songs, Map<String, String> filterConditions) async {
+    // 初始化缓存
+    await _initSongCache();
+    return songs.where((song) {
+      // 版本筛选
+      if (filterConditions['版本筛选'] != null && filterConditions['版本筛选']!.isNotEmpty) {
+        String version = filterConditions['版本筛选']!;
+        // 从缓存的音乐数据中获取版本信息
+        String songId = song['song_id'].toString();
+        bool versionMatch = false;
+        
+        if (_cachedSongs != null) {
+          var foundSong = _cachedSongs!.firstWhere(
+            (s) => s.id == songId,
+          );
+          if (foundSong != null && foundSong.basicInfo.from != '') {
+            versionMatch = foundSong.basicInfo.from == version;
+          }
+        }
+        
+        if (!versionMatch) {
+          return false;
+        }
+      }
+      
+      // 定数筛选
+      if (filterConditions['定数筛选'] != null && filterConditions['定数筛选']!.isNotEmpty) {
+        String dsRange = filterConditions['定数筛选']!;
+        if (dsRange.contains('-')) {
+          List<String> parts = dsRange.split('-');
+          if (parts.length == 2) {
+            double minDs = double.tryParse(parts[0]) ?? 1.0;
+            double maxDs = double.tryParse(parts[1]) ?? 15.0;
+            double songDs = double.tryParse(song['ds'].toString()) ?? 0;
+            if (songDs < minDs || songDs > maxDs) {
+              return false;
+            }
+          }
+        }
+      }
+      
+      // 难度筛选
+      if (filterConditions['难度筛选'] != null && filterConditions['难度筛选']!.isNotEmpty) {
+        String difficulty = filterConditions['难度筛选']!;
+        Map<String, int> difficultyMap = {
+          'BASIC': 0,
+          'ADVANCED': 1,
+          'EXPERT': 2,
+          'MASTER': 3,
+          'Re:MASTER': 4,
+        };
+        int? levelIndex = difficultyMap[difficulty];
+        if (levelIndex != null && song['level_index'] != levelIndex) {
+          return false;
+        }
+      }
+      
+      // 达成率筛选
+      if (filterConditions['达成率筛选'] != null && filterConditions['达成率筛选']!.isNotEmpty) {
+        String achievementFilter = filterConditions['达成率筛选']!;
+        if (achievementFilter.contains('-')) {
+          List<String> parts = achievementFilter.split('-');
+          if (parts.length == 2) {
+            double minAchievement = double.tryParse(parts[0]) ?? 0;
+            double maxAchievement = double.tryParse(parts[1]) ?? 101;
+            double songAchievement = double.tryParse(song['achievements'].toString()) ?? 0;
+            if (songAchievement < minAchievement || songAchievement > maxAchievement) {
+              return false;
+            }
+          }
+        }
+      }
+      
+      // 连击/同步筛选
+      if (filterConditions['连击/同步筛选'] != null && filterConditions['连击/同步筛选']!.isNotEmpty) {
+        String comboFilter = filterConditions['连击/同步筛选']!;
+        if (comboFilter == 'FC+') {
+          String fc = song['fc'].toString().toLowerCase();
+          if (fc != 'fc' && fc != 'fcp' && fc != 'ap' && fc != 'app') {
+            return false;
+          }
+        } else if (comboFilter == 'AP+') {
+          String fc = song['fc'].toString().toLowerCase();
+          if (fc != 'ap' && fc != 'app') {
+            return false;
+          }
+        } else if (comboFilter == 'FS+') {
+          String fs = song['fs'].toString().toLowerCase();
+          if (fs != 'fs' && fs != 'fsp' && fs != 'fsd' && fs != 'fsdp') {
+            return false;
+          }
+        } else if (comboFilter == 'FDX+') {
+          String fs = song['fs'].toString().toLowerCase();
+          if (fs != 'fsd' && fs != 'fsdp') {
+            return false;
+          }
+        }
+      }
+      
+      return true;
+    }).toList();
   }
 
   // 根据 level_index 获取对应的颜色

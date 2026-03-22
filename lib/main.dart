@@ -149,7 +149,6 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.score, title: '成绩查询', subtitle: '查看游玩数据'),
     ButtonItem(icon: Icons.leaderboard, title: 'Best50查询', subtitle: '我去,龙币!'),
     ButtonItem(icon: Icons.analytics, title: '拟合Best50查询', subtitle: '我w55怎么拟合才w52?!'),
-    ButtonItem(icon: Icons.grade, title: '基于Best50推荐', subtitle: '基于你的Best50推荐曲目'),
     ButtonItem(icon: Icons.label, title: '基于标签推荐', subtitle: '基于你游玩的谱面标签推荐曲目'),
     ButtonItem(icon: Icons.shuffle, title: '随机乐曲', subtitle: '随机选曲1-4首'),
     ButtonItem(icon: Icons.calculate, title: '单曲Rating计算', subtitle: '我鸟加这个有分吃吗？'),

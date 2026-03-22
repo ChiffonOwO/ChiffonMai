@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../service/UserScoreSearchService.dart';
-import '../manager/UserPlayDataManager.dart';
 import '../main.dart';
 
 class UserScoreSearchPage extends StatefulWidget {
@@ -12,7 +11,6 @@ class UserScoreSearchPage extends StatefulWidget {
 
 class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   final UserScoreSearchService _service = UserScoreSearchService();
-  final UserPlayDataManager _playDataManager = UserPlayDataManager();
   
   Map<String, dynamic>? _userPlayData;
   List<dynamic> _sortedSongs = [];
@@ -52,6 +50,67 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
     '连击/同步筛选': '',
   };
   
+  // 版本列表
+  static List<String> _versionList = [
+    'maimai',
+    'maimai PLUS',
+    'maimai GreeN',
+    'maimai GreeN PLUS',
+    'maimai ORANGE',
+    'maimai ORANGE PLUS',
+    'maimai PiNK',
+    'maimai PiNK PLUS',
+    'maimai MURASAKi',
+    'maimai MURASAKi PLUS',
+    'maimai MiLK',
+    'maimai MiLK PLUS',
+    'maimai FiNALE',
+    'maimai \u3067\u3089\u3063\u304f\u3059',
+    'maimai \u3067\u3089\u3063\u304f\u3059 Splash',
+    'maimai \u3067\u3089\u3063\u304f\u3059 UNiVERSE',
+    'maimai \u3067\u3089\u3063\u304f\u3059 FESTiVAL',
+    'maimai \u3067\u3089\u3063\u304f\u3059 BUDDiES',
+    'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM'
+  ];
+  
+  // 处理版本字符串，使其在前端简化展示
+  static String _formatVersion(String version) {
+    if (version == 'maimai') {
+      return 'maimai';
+    }
+    if (version == 'maimai PLUS') {
+      return 'maimai+';
+    }
+    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059') {
+      return 'DX 2020';
+    }
+    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 Splash') {
+      return 'DX 2021';
+    }
+    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 UNiVERSE') {
+      return 'DX 2022';
+    }
+    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 FESTiVAL') {
+      return 'DX 2023';
+    }
+    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 BUDDiES') {
+      return 'DX 2024';
+    }
+    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM') {
+      return 'DX 2025';
+    }
+    if (version.contains(' PLUS')) {
+      version = version.replaceFirst(' PLUS', '+');
+    }
+    if (version.contains('maimai') && version != 'maimai') {
+      version = version.replaceFirst('maimai ', '');
+    }
+    if (version.contains('\u3067\u3089\u3063\u304f\u3059')) {
+      version = version.replaceFirst('\u3067\u3089\u3063\u304f\u3059 ', '');
+    }
+    return version;
+  }
+  
   @override
   void initState() {
     super.initState();
@@ -82,6 +141,8 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
       _userPlayData = await _service.getUserPlayData();
       if (_userPlayData != null) {
         _sortedSongs = await _service.getSortedSongs(_userPlayData!, _currentSortBy);
+        // 应用筛选条件
+        _sortedSongs = await _service.filterSongs(_sortedSongs, _filterConditions);
         _updatePagedSongs();
         // 计算统计数据
         _stats = await _calculateStats();
@@ -161,6 +222,349 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
             TextButton(
               child: Text('确认'),
               onPressed: () {
+                Navigator.of(context).pop();
+                _loadData(); // 重新加载数据
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // 显示版本筛选对话框
+  void _showVersionFilterDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        String selectedVersion = _filterConditions['版本筛选'] ?? '';
+        return AlertDialog(
+          title: Text('版本筛选'),
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return Container(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      RadioListTile<String>(
+                        title: Text('全部'),
+                        value: '',
+                        groupValue: selectedVersion,
+                        onChanged: (value) {
+                          setState(() {
+                            selectedVersion = value!;
+                          });
+                        },
+                      ),
+                      ..._versionList.map((version) {
+                        return RadioListTile<String>(
+                          title: Text(_formatVersion(version)),
+                          value: version,
+                          groupValue: selectedVersion,
+                          onChanged: (value) {
+                            setState(() {
+                              selectedVersion = value!;
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              child: Text('取消'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('确认'),
+              onPressed: () {
+                setState(() {
+                  _filterConditions['版本筛选'] = selectedVersion;
+                });
+                Navigator.of(context).pop();
+                _loadData(); // 重新加载数据
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // 显示定数筛选对话框
+  void _showDsFilterDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        String currentRange = _filterConditions['定数筛选'] ?? '';
+        TextEditingController minController = TextEditingController();
+        TextEditingController maxController = TextEditingController();
+        
+        // 解析当前范围
+        if (currentRange.contains('-')) {
+          List<String> parts = currentRange.split('-');
+          if (parts.length == 2) {
+            minController.text = parts[0];
+            maxController.text = parts[1];
+          }
+        }
+        
+        return AlertDialog(
+          title: Text('定数筛选'),
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: minController,
+                          keyboardType: TextInputType.numberWithOptions(decimal: true),
+                          decoration: InputDecoration(
+                            labelText: '下界',
+                            hintText: '1.0',
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: TextField(
+                          controller: maxController,
+                          keyboardType: TextInputType.numberWithOptions(decimal: true),
+                          decoration: InputDecoration(
+                            labelText: '上界',
+                            hintText: '15.0',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Text('最多一位小数，留空表示默认值', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              child: Text('取消'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('确认'),
+              onPressed: () {
+                String minText = minController.text.trim();
+                String maxText = maxController.text.trim();
+                String range = '';
+                
+                if (minText.isNotEmpty || maxText.isNotEmpty) {
+                  range = '$minText-$maxText';
+                }
+                
+                setState(() {
+                  _filterConditions['定数筛选'] = range;
+                });
+                Navigator.of(context).pop();
+                _loadData(); // 重新加载数据
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // 显示难度筛选对话框
+  void _showDifficultyFilterDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        String selectedDifficulty = _filterConditions['难度筛选'] ?? '';
+        List<String> difficulties = ['', 'BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'Re:MASTER'];
+        return AlertDialog(
+          title: Text('难度筛选'),
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: difficulties.map((difficulty) {
+                  return RadioListTile<String>(
+                    title: Text(difficulty.isEmpty ? '全部' : difficulty),
+                    value: difficulty,
+                    groupValue: selectedDifficulty,
+                    onChanged: (value) {
+                      setState(() {
+                        selectedDifficulty = value!;
+                      });
+                    },
+                  );
+                }).toList(),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              child: Text('取消'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('确认'),
+              onPressed: () {
+                setState(() {
+                  _filterConditions['难度筛选'] = selectedDifficulty;
+                });
+                Navigator.of(context).pop();
+                _loadData(); // 重新加载数据
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // 显示达成率筛选对话框
+  void _showAchievementFilterDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        String currentRange = _filterConditions['达成率筛选'] ?? '';
+        TextEditingController minController = TextEditingController();
+        TextEditingController maxController = TextEditingController();
+        
+        // 解析当前范围
+        if (currentRange.contains('-')) {
+          List<String> parts = currentRange.split('-');
+          if (parts.length == 2) {
+            minController.text = parts[0];
+            maxController.text = parts[1];
+          }
+        }
+        
+        return AlertDialog(
+          title: Text('达成率筛选'),
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: minController,
+                          keyboardType: TextInputType.numberWithOptions(decimal: true),
+                          decoration: InputDecoration(
+                            labelText: '下界',
+                            hintText: '0',
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: TextField(
+                          controller: maxController,
+                          keyboardType: TextInputType.numberWithOptions(decimal: true),
+                          decoration: InputDecoration(
+                            labelText: '上界',
+                            hintText: '101',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Text('最多四位小数，留空表示默认值', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              child: Text('取消'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('确认'),
+              onPressed: () {
+                String minText = minController.text.trim();
+                String maxText = maxController.text.trim();
+                String range = '';
+                
+                if (minText.isNotEmpty || maxText.isNotEmpty) {
+                  range = '$minText-$maxText';
+                }
+                
+                setState(() {
+                  _filterConditions['达成率筛选'] = range;
+                });
+                Navigator.of(context).pop();
+                _loadData(); // 重新加载数据
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // 显示连击/同步筛选对话框
+  void _showComboFilterDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        String selectedFilter = _filterConditions['连击/同步筛选'] ?? '';
+        List<String> filters = ['', 'FC+', 'AP+', 'FS+', 'FDX+'];
+        return AlertDialog(
+          title: Text('连击/同步筛选'),
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: filters.map((filter) {
+                  return RadioListTile<String>(
+                    title: Text(filter.isEmpty ? '全部' : filter),
+                    value: filter,
+                    groupValue: selectedFilter,
+                    onChanged: (value) {
+                      setState(() {
+                        selectedFilter = value!;
+                      });
+                    },
+                  );
+                }).toList(),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              child: Text('取消'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('确认'),
+              onPressed: () {
+                setState(() {
+                  _filterConditions['连击/同步筛选'] = selectedFilter;
+                });
                 Navigator.of(context).pop();
                 _loadData(); // 重新加载数据
               },
@@ -271,6 +675,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
     for (var record in records) {
       // 统计星数
       if (record.containsKey('dxScore')) {
+        // ignore: unused_local_variable
         int dxScore = int.tryParse(record['dxScore'].toString()) ?? 0;
         // 计算DX分达成率
         double rate;
@@ -401,6 +806,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    // ignore: unused_local_variable
     final stats =  _calculateStats();
     
     // 初始化按钮尺寸
@@ -575,7 +981,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                     ),
                                                     SizedBox(height: 2),
                                                     Text(_currentSortBy, 
-                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.white),
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.black),
                                                       maxLines: 1,
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
@@ -583,13 +989,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                 ), // 文字尺寸
                                               ),
                                               ElevatedButton(
-                                                onPressed: () {
-                                                  // 这里应该打开版本筛选对话框
-                                                  // 示例：设置一个筛选条件
-                                                  setState(() {
-                                                    _filterConditions['版本筛选'] = 'DX';
-                                                  });
-                                                },
+                                                onPressed: _showVersionFilterDialog,
                                                 style: ElevatedButton.styleFrom(
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(_buttonBorderRadius),
@@ -605,8 +1005,10 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                       maxLines: 1,
                                                     ),
                                                     SizedBox(height: 2),
-                                                    Text(_filterConditions['版本筛选'] ?? '', 
-                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.white),
+                                                    Text(_filterConditions['版本筛选'] != null && _filterConditions['版本筛选']!.isNotEmpty
+                                                        ? _formatVersion(_filterConditions['版本筛选']!)
+                                                        : '', 
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.black),
                                                       maxLines: 1,
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
@@ -614,13 +1016,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                 ),
                                               ),
                                               ElevatedButton(
-                                                onPressed: () {
-                                                  // 这里应该打开定数筛选对话框
-                                                  // 示例：设置一个筛选条件
-                                                  setState(() {
-                                                    _filterConditions['定数筛选'] = '12-14';
-                                                  });
-                                                },
+                                                onPressed: _showDsFilterDialog,
                                                 style: ElevatedButton.styleFrom(
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(_buttonBorderRadius),
@@ -637,7 +1033,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                     ),
                                                     SizedBox(height: 2),
                                                     Text(_filterConditions['定数筛选'] ?? '', 
-                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.white),
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.black),
                                                       maxLines: 1,
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
@@ -645,13 +1041,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                 ),
                                               ),
                                               ElevatedButton(
-                                                onPressed: () {
-                                                  // 这里应该打开难度筛选对话框
-                                                  // 示例：设置一个筛选条件
-                                                  setState(() {
-                                                    _filterConditions['难度筛选'] = 'Master';
-                                                  });
-                                                },
+                                                onPressed: _showDifficultyFilterDialog,
                                                 style: ElevatedButton.styleFrom(
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(_buttonBorderRadius),
@@ -668,7 +1058,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                     ),
                                                     SizedBox(height: 2),
                                                     Text(_filterConditions['难度筛选'] ?? '', 
-                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.white),
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.black),
                                                       maxLines: 1,
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
@@ -676,13 +1066,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                 ),
                                               ),
                                               ElevatedButton(
-                                                onPressed: () {
-                                                  // 这里应该打开达成率筛选对话框
-                                                  // 示例：设置一个筛选条件
-                                                  setState(() {
-                                                    _filterConditions['达成率筛选'] = '95%+';
-                                                  });
-                                                },
+                                                onPressed: _showAchievementFilterDialog,
                                                 style: ElevatedButton.styleFrom(
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(_buttonBorderRadius),
@@ -699,7 +1083,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                     ),
                                                     SizedBox(height: 2),
                                                     Text(_filterConditions['达成率筛选'] ?? '', 
-                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.white),
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.black),
                                                       maxLines: 1,
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
@@ -707,13 +1091,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                 ),
                                               ),
                                               ElevatedButton(
-                                                onPressed: () {
-                                                  // 这里应该打开连击/同步筛选对话框
-                                                  // 示例：设置一个筛选条件
-                                                  setState(() {
-                                                    _filterConditions['连击/同步筛选'] = 'FC+';
-                                                  });
-                                                },
+                                                onPressed: _showComboFilterDialog,
                                                 style: ElevatedButton.styleFrom(
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(_buttonBorderRadius),
@@ -730,7 +1108,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                     ),
                                                     SizedBox(height: 2),
                                                     Text(_filterConditions['连击/同步筛选'] ?? '', 
-                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.white),
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.black),
                                                       maxLines: 1,
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
@@ -769,7 +1147,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                     child: Text('评级', 
                                                       style: TextStyle(
                                                         fontSize: _smallButtonFontSize, 
-                                                        color: _selectedButtonIndex == 0 ? Colors.white : null,
+                                                        color: _selectedButtonIndex == 0 ? Colors.white : Colors.black,
                                                       ),
                                                     ),
                                                   ),
@@ -791,7 +1169,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                     child: Text('连击', 
                                                       style: TextStyle(
                                                         fontSize: _smallButtonFontSize, 
-                                                        color: _selectedButtonIndex == 1 ? Colors.white : null,
+                                                        color: _selectedButtonIndex == 1 ? Colors.white : Colors.black,
                                                       ),
                                                     ),
                                                   ),
@@ -813,7 +1191,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                     child: Text('同步', 
                                                       style: TextStyle(
                                                         fontSize: _smallButtonFontSize, 
-                                                        color: _selectedButtonIndex == 2 ? Colors.white : null,
+                                                        color: _selectedButtonIndex == 2 ? Colors.white : Colors.black,
                                                       ),
                                                     ),
                                                   ),
@@ -835,7 +1213,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                     child: Text('得分', 
                                                       style: TextStyle(
                                                         fontSize: _smallButtonFontSize, 
-                                                        color: _selectedButtonIndex == 3 ? Colors.white : null,
+                                                        color: _selectedButtonIndex == 3 ? Colors.white : Colors.black,
                                                       ),
                                                     ),
                                                   ),
@@ -950,16 +1328,16 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                         onPressed: _currentPage > 1
                                             ? () => _changePage(_currentPage - 1)
                                             : null,
-                                        child: Text('上一页'),
+                                        child: Text('上一页', style: TextStyle(color: Colors.black)),
                                       ),
                                       SizedBox(width: 16),
-                                      Text('$_currentPage / ${_getTotalPages()}'),
+                                      Text('$_currentPage / ${_getTotalPages()}', style: TextStyle(color: Colors.black)),
                                       SizedBox(width: 16),
                                       ElevatedButton(
                                         onPressed: _currentPage < _getTotalPages()
                                             ? () => _changePage(_currentPage + 1)
                                             : null,
-                                        child: Text('下一页'),
+                                        child: Text('下一页', style: TextStyle(color: Colors.black)),
                                       ),
                                     ],
                                   ),

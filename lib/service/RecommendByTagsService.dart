@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/services.dart';
-import 'package:my_first_flutter_app/entity/MaiTagsEntity.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/entity/RecommendationResult.dart';
 import 'package:my_first_flutter_app/entity/RecordItem.dart';
@@ -70,6 +69,7 @@ class RecommendByTagsService {
   static List<Song>? _cachedMaimaiMusicData;
   static UserPlayDataEntity? _cachedUserPlayDataEntity;
   static Map<String, bool>? _cachedSongIdToIsNewMap;
+  static Map<String, Map<String, Map<String, double>>>? _cachedChartVectors; // 缓存谱面向量
 }
 
 
@@ -401,6 +401,18 @@ int calculateSingleRating(double ds, double achievement) {
  */
 Future<Map<String, Map<String, double>>> calculateChartVectors(
     RecordItem recordItem) async {
+  // 构建谱面唯一标识
+  String songTitle = recordItem.title;
+  String sheetType = RecommendByTagsService.TYPE_MAP[recordItem.type] ?? '';
+  String sheetDifficulty = RecommendByTagsService.LEVEL_INDEX_MAP[recordItem.levelIndex] ?? '';
+  String songKey = songTitle + "#" + sheetType + "#" + sheetDifficulty;
+  
+  // 检查缓存
+  if (RecommendByTagsService._cachedChartVectors != null && 
+      RecommendByTagsService._cachedChartVectors!.containsKey(songKey)) {
+    return RecommendByTagsService._cachedChartVectors![songKey]!;
+  }
+
   // 获取标签管理器实例
   final maiTagsManager = MaiTagsManager();
 
@@ -437,11 +449,6 @@ Future<Map<String, Map<String, double>>> calculateChartVectors(
   groupTotalTags[3] = 0;
 
   // 获取当前谱面的标签
-  String songTitle = recordItem.title;
-  String sheetType = RecommendByTagsService.TYPE_MAP[recordItem.type] ?? '';
-  String sheetDifficulty =
-      RecommendByTagsService.LEVEL_INDEX_MAP[recordItem.levelIndex] ?? '';
-  String songKey = songTitle + "#" + sheetType + "#" + sheetDifficulty;
   List<int> tagIds = songIdToTagIdsMap[songKey] ?? [];
   // 统计每个标签分组的出现次数
   for (int tagId in tagIds) {
@@ -453,8 +460,7 @@ Future<Map<String, Map<String, double>>> calculateChartVectors(
     if (tagName.isEmpty) {
       continue;
     }
-    groupTagCounts[groupId]![tagName] =
-        (groupTagCounts[groupId]![tagName] ?? 0) + 1;
+    groupTagCounts[groupId]![tagName] = (groupTagCounts[groupId]![tagName] ?? 0) + 1;
     groupTotalTags[groupId] = (groupTotalTags[groupId] ?? 0) + 1;
   }
 
@@ -486,6 +492,12 @@ Future<Map<String, Map<String, double>>> calculateChartVectors(
     modeVector[tagName] = weight;
   }
   chartVectors['evaluation'] = modeVector;
+
+  // 缓存结果
+  if (RecommendByTagsService._cachedChartVectors == null) {
+    RecommendByTagsService._cachedChartVectors = {};
+  }
+  RecommendByTagsService._cachedChartVectors![songKey] = chartVectors;
 
   return chartVectors;
 }
@@ -606,6 +618,13 @@ Future<List<RecommendationResult>> calculateRecommendations(
   } else {
     songs = RecommendByTagsService._cachedMaimaiMusicData!;
   }
+  
+  // 预构建玩家记录的映射，提高查找效率
+  Map<String, RecordItem> playerRecordMap = {};
+  for (var record in allRecords) {
+    String key = '${record.songId}_${record.levelIndex}';
+    playerRecordMap[key] = record;
+  }
   /**
    * 核心是从maimaiMusicData中进行筛选
    * 匹配条件： 
@@ -626,11 +645,9 @@ Future<List<RecommendationResult>> calculateRecommendations(
       double ds = song.ds[i];
       if (ds >= minDs && ds <= maxDs) {
         // 检查玩家是否在此谱面上获得了大于100.5%的达成率
-        bool hasHighAchievement = allRecords.any((record) =>
-            record.songId == int.parse(song.id) &&
-            record.levelIndex == i &&
-            record.achievements > 100.5);
-        if (hasHighAchievement) {
+        String recordKey = '${int.parse(song.id)}_$i';
+        RecordItem? existingRecord = playerRecordMap[recordKey];
+        if (existingRecord != null && existingRecord.achievements > 100.5) {
           continue;
         }
 
@@ -692,12 +709,7 @@ Future<List<RecommendationResult>> calculateRecommendations(
           }
 
           // 根据转换的对象中的已知条件找出玩家这个谱面的达成率
-          RecordItem? playerRecord = allRecords.firstWhere(
-            (record) =>
-                record.songId == recordItem.songId &&
-                record.levelIndex == recordItem.levelIndex,
-            orElse: () => recordItem,
-          );
+          RecordItem? playerRecord = playerRecordMap[recordKey] ?? recordItem;
           recommendations.add(RecommendationResult(
             songTitle: song.basicInfo.title,
             level: song.level[i],

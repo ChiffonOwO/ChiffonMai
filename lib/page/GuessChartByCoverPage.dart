@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,13 +19,11 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
   // 游戏状态
   bool _isGameStarted = false;
   Song? _targetSong;
-  GuessSong? _targetGuessSong;
   List<GuessSong> _guessHistory = [];
   int _guessCount = 0;
   static const int _maxGuesses = 10;
   bool _isGameOver = false;
   bool _isWon = false;
-  bool _hasSurrendered = false;
   
   // 曲绘截取参数
   double? _cropX1;
@@ -87,7 +84,6 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
     // 随机选择目标歌曲
     _targetSong = await GuessChartByCoverService.randomSelectSong();
     if (_targetSong != null) {
-      _targetGuessSong = await GuessChartByCoverService.buildGuessSongEntity(_targetSong!);
       
       setState(() {
         _isGameStarted = true;
@@ -236,6 +232,7 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
     String coverPath = GuessChartByCoverService.getCoverPath(song.id);
 
     // 生成fallback的cover_id
+    // ignore: unused_local_variable
     String coverId = GuessChartByCoverService.generateCoverId(song.id);
     String networkCoverUrl = GuessChartByCoverService.getNetworkCoverUrl(song.id);
 
@@ -346,6 +343,7 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
     String coverPath = GuessChartByCoverService.getCoverPath(guessSong.songId.toString());
 
     // 生成fallback的cover_id
+    // ignore: unused_local_variable
     String coverId = GuessChartByCoverService.generateCoverId(guessSong.songId.toString());
     String networkCoverUrl = GuessChartByCoverService.getNetworkCoverUrl(guessSong.songId.toString());
 
@@ -1187,7 +1185,6 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
                                                       setState(() {
                                                         _isGameOver = true;
                                                         _isWon = false;
-                                                        _hasSurrendered = true;
                                                       });
                                                     },
                                                     child: const Text('投降'),

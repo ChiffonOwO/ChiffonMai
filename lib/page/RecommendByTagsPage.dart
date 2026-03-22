@@ -38,8 +38,10 @@ class _RecommendByTagsState extends State<RecommendByTags> {
         _errorMessage = '无错误信息';
       });
       
-      // 调用推荐算法获取结果
-      final result = await recommendSongs();
+      // 在后台线程中执行推荐算法
+      final result = await Future.delayed(Duration.zero, () async {
+        return await recommendSongs();
+      });
       
       setState(() {
         _recommendations = result;

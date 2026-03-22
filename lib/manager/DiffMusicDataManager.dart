@@ -15,7 +15,6 @@ class DiffMusicDataManager {
   // 缓存键
   static const String _cacheKey = 'diff_music_data';
   static const String _lastUpdateKey = 'diff_music_data_last_update';
-  static const int _cacheExpiryDays = 7;
 
   // 从 API 获取音乐难度数据并更新缓存
   Future<bool> fetchAndUpdateDiffData() async {
