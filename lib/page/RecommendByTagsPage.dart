@@ -35,13 +35,11 @@ class _RecommendByTagsState extends State<RecommendByTags> {
     try {
       setState(() {
         _isLoading = true;
-        _errorMessage = '无错误信息';
+        _errorMessage = null;
       });
       
-      // 在后台线程中执行推荐算法
-      final result = await Future.delayed(Duration.zero, () async {
-        return await recommendSongs();
-      });
+      // 直接异步执行推荐算法，让UI先显示加载状态
+      final result = await recommendSongs();
       
       setState(() {
         _recommendations = result;

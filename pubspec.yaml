@@ -78,6 +78,7 @@ flutter:
 
    # 图片资源配置（注意缩进：assets 是 flutter 的子项，前面有2个空格）
   assets:
+    - assets/bg/
     - assets/cover/
     - assets/version/
     - assets/background.png

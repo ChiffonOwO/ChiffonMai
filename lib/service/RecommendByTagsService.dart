@@ -545,13 +545,24 @@ double calculateVectorSimilarity(
 double calculateSimilarity(
     Map<String, Map<String, double>> playerAbilityVectors,
     Map<String, Map<String, double>> chartVectors) {
-  // 计算每个向量的相似度
-  double configSimilarity = calculateVectorSimilarity(
-      playerAbilityVectors['配置']!, chartVectors['config']!);
-  double difficultySimilarity = calculateVectorSimilarity(
-      playerAbilityVectors['难度']!, chartVectors['difficulty']!);
-  double evaluationSimilarity = calculateVectorSimilarity(
-      playerAbilityVectors['评价']!, chartVectors['evaluation']!);
+  // 计算每个向量的相似度，添加空值检查
+  double configSimilarity = 0.0;
+  if (playerAbilityVectors.containsKey('配置') && chartVectors.containsKey('config')) {
+    configSimilarity = calculateVectorSimilarity(
+        playerAbilityVectors['配置']!, chartVectors['config']!);
+  }
+  
+  double difficultySimilarity = 0.0;
+  if (playerAbilityVectors.containsKey('难度') && chartVectors.containsKey('difficulty')) {
+    difficultySimilarity = calculateVectorSimilarity(
+        playerAbilityVectors['难度']!, chartVectors['difficulty']!);
+  }
+  
+  double evaluationSimilarity = 0.0;
+  if (playerAbilityVectors.containsKey('评价') && chartVectors.containsKey('evaluation')) {
+    evaluationSimilarity = calculateVectorSimilarity(
+        playerAbilityVectors['评价']!, chartVectors['evaluation']!);
+  }
 
   // 设定权重
   double weightConfig = 0.5;
@@ -816,9 +827,9 @@ Future<Map<String, List<RecommendationResult>>> recommendSongs() async {
     // 计算过往版本中的Best35用于判断Best55推荐结果是否能够增长总Rating
     List<RecordItem> best35 =
         await getBestNRecords(userPlayDataRecords, 35, false);
-    for (var record in best35) {
-      print(record.toString());
-    }
+    // for (var record in best35) {
+    //   print(record.toString());
+    // }
 
     // 获取Rating范围
     int best55minRating = 0;

@@ -10,18 +10,18 @@ class MaiTagsManager {
   MaiTagsManager._internal();
 
   // API 配置
-  static const String TAGS_API_URL = "https://derrakuma.dxrating.net/functions/v1/combined-tags";
-  static const Map<String, String> TAGS_API_HEADERS = {
-    "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidHBubWRmZnVpbWlra3Nydm5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDYwMzMxNzAsImV4cCI6MjAyMTYwOTE3MH0.rrzOisCZGz2gkp-yh61-_HDY7YqL3lTc4XsOPzuAVDU",
-    "authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidHBubWRmZnVpbWlra3Nydm5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDYwMzMxNzAsImV4cCI6MjAyMTYwOTE3MH0.rrzOisCZGz2gkp-yh61-_HDY7YqL3lTc4XsOPzuAVDU",
-    "origin": "https://dxrating.net",
-    "referer": "https://dxrating.net/",
-    "x-client-info": "supabase-js-web/2.49.1",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
-    "Accept": "*/*",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Accept-Language": "zh-CN,zh;q=0.9,en-GB;q=0.8,en-US;q=0.7,en;q=0.6"
-  };
+  static const String TAGS_API_URL = "https://miruku.dxrating.net/api/v1/tags";
+  // static const Map<String, String> TAGS_API_HEADERS = {
+  //   "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidHBubWRmZnVpbWlra3Nydm5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDYwMzMxNzAsImV4cCI6MjAyMTYwOTE3MH0.rrzOisCZGz2gkp-yh61-_HDY7YqL3lTc4XsOPzuAVDU",
+  //   "authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidHBubWRmZnVpbWlra3Nydm5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDYwMzMxNzAsImV4cCI6MjAyMTYwOTE3MH0.rrzOisCZGz2gkp-yh61-_HDY7YqL3lTc4XsOPzuAVDU",
+  //   "origin": "https://dxrating.net",
+  //   "referer": "https://dxrating.net/",
+  //   "x-client-info": "supabase-js-web/2.49.1",
+  //   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+  //   "Accept": "*/*",
+  //   "Accept-Encoding": "gzip, deflate, br",
+  //   "Accept-Language": "zh-CN,zh;q=0.9,en-GB;q=0.8,en-US;q=0.7,en;q=0.6"
+  // };
 
   // 缓存相关常量
   static const String TAGS_CACHE_KEY = 'mai_tags_cache';
@@ -49,10 +49,9 @@ class MaiTagsManager {
       
       if (!isCacheValid || cachedData == null) {
         // 从网络加载
-        final response = await http.post(
+        final response = await http.get(
           Uri.parse(TAGS_API_URL),
-          headers: TAGS_API_HEADERS,
-          body: [],
+          // headers: TAGS_API_HEADERS,
         );
 
         if (response.statusCode == 200) {
@@ -188,10 +187,9 @@ class MaiTagsManager {
   Future<void> refreshCache() async {
     try {
       // 从网络加载
-      final response = await http.post(
+      final response = await http.get(
         Uri.parse(TAGS_API_URL),
-        headers: TAGS_API_HEADERS,
-        body: [],
+        // headers: TAGS_API_HEADERS,
       );
 
       if (response.statusCode == 200) {

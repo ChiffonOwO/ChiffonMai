@@ -6,6 +6,7 @@ import 'package:my_first_flutter_app/entity/GuessSong.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/service/GuessChartByInfoService.dart';
+import 'package:my_first_flutter_app/utils/CoverPathUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class GuessChartByInfoPage extends StatefulWidget {
@@ -1124,76 +1125,7 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
                                                           borderRadius:
                                                               BorderRadius
                                                                   .circular(4),
-                                                          child: Image.asset(
-                                                            'assets/cover/${_targetSong!.id}.webp',
-                                                            fit: BoxFit.cover,
-                                                            errorBuilder:
-                                                                (context, error,
-                                                                    stackTrace) {
-                                                              // 生成fallback的cover_id
-                                                              String generateCoverId(
-                                                                  String
-                                                                      songId) {
-                                                                if (songId
-                                                                        .length ==
-                                                                    6) {
-                                                                  return songId
-                                                                      .substring(
-                                                                          1);
-                                                                } else if (songId
-                                                                        .length >=
-                                                                    5) {
-                                                                  int songIdInt =
-                                                                      int.parse(
-                                                                          songId);
-                                                                  int tenThousandPlace =
-                                                                      (songIdInt ~/
-                                                                              10000) +
-                                                                          1;
-                                                                  int remaining =
-                                                                      songIdInt %
-                                                                          10000;
-                                                                  return '${tenThousandPlace}${remaining.toString().padLeft(4, '0')}';
-                                                                } else {
-                                                                  return '1${songId.padLeft(4, '0')}';
-                                                                }
-                                                              }
-
-                                                              String coverId =
-                                                                  generateCoverId(
-                                                                      _targetSong!
-                                                                          .id);
-                                                              String
-                                                                  networkCoverUrl =
-                                                                  'https://www.diving-fish.com/covers/$coverId.png';
-                                                              return Image
-                                                                  .network(
-                                                                networkCoverUrl,
-                                                                fit: BoxFit
-                                                                    .cover,
-                                                                errorBuilder:
-                                                                    (context,
-                                                                        error,
-                                                                        stackTrace) {
-                                                                  return Container(
-                                                                    color: Colors
-                                                                            .grey[
-                                                                        200],
-                                                                    child:
-                                                                        const Center(
-                                                                      child: Icon(
-                                                                          Icons
-                                                                              .music_note,
-                                                                          color: Colors
-                                                                              .grey,
-                                                                          size:
-                                                                              20),
-                                                                    ),
-                                                                  );
-                                                                },
-                                                              );
-                                                            },
-                                                          ),
+                                                          child: CoverPathUtil.buildCoverWidgetWithContext(context, _targetSong!.id, 60),
                                                         ),
                                                       ),
                                                       const SizedBox(width: 12),

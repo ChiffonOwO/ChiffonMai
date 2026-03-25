@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>完成率→得分</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft Yahei", sans-serif;
+        }
+        body {
+            background-color: #fff;
+            padding: 20px;
+        }
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: normal;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 18px;
+            color: #666;
+        }
+        /* 核心修改：调整行布局为相对定位，用于放置中间的提升值 */
+        .rank-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 20px;
+            position: relative; /* 新增：作为提升值的定位父容器 */
+        }
+        .rank-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .rank-icon {
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .rank-percent {
+            color: #333;
+        }
+        .rank-right {
+            color: #333;
+            /* 移除flex，避免和提升值冲突 */
+        }
+        /* 核心修改：提升值的样式和定位 */
+        .delta-up {
+            color: #999;
+            font-size: 16px;
+            position: absolute; /* 绝对定位 */
+            right: 0; /* 靠右对齐 */
+            top: 50%; /* 垂直居中 */
+            transform: translate(-40px, -150%); /* 向上偏移到两行中间 */
+            /* 可选：加个背景让文字更清晰 */
+            /* background: rgba(255,255,255,0.8);
+            padding: 0 4px; */
+        }
+
+        /* 各等级颜色 */
+        .sssplus { color: #ffcc00; text-shadow: 0 0 2px #ff6600; }
+        .sss { color: #ffcc00; text-shadow: 0 0 2px #ff6600; }
+        .ssplus { color: #ffaa00; text-shadow: 0 0 2px #ff6600; }
+        .ss { color: #ffaa00; text-shadow: 0 0 2px #ff6600; }
+        .splus { color: #ff9900; text-shadow: 0 0 2px #ff6600; }
+        .s { color: #ff9900; text-shadow: 0 0 2px #ff6600; }
+        .aaa { color: #ff4444; text-shadow: 0 0 2px #cc0000; }
+        .aa { color: #ff4444; text-shadow: 0 0 2px #cc0000; }
+        .a { color: #ff4444; text-shadow: 0 0 2px #cc0000; }
+        .bbb { color: #44aaff; text-shadow: 0 0 2px #0066cc; }
+        .bb { color: #44aaff; text-shadow: 0 0 2px #0066cc; }
+        .b { color: #44aaff; text-shadow: 0 0 2px #0066cc; }
+        .c { color: #88ccaa; text-shadow: 0 0 2px #449966; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>完成率→得分</h1>
+        <div class="header-row">
+            <div class="header-left">完成率</div>
+            <div class="header-right">得分</div>
+        </div>
+
+        <div class="rank-row">
+            <div class="rank-left">
+                <span class="rank-icon sssplus">SSS+</span>
+                <span class="rank-percent">100.5000%</span>
+            </div>
+            <div class="rank-right">238</div>
+            <!-- SSS+ 是最高级，无提升值 -->
+        </div>
+
+        <div class="rank-row">
+            <div class="rank-left">
+                <span class="rank-icon sss">SSS</span>
+                <span class="rank-percent">100.0000%</span>
+            </div>
+            <div class="rank-right">228</div>
+            <!-- 提升值放在当前行，定位到上一行得分下方 -->
+            <span class="delta-up">↑10</span>
+        </div>
+
+        <div class="rank-row">
+            <div class="rank-left">
+                <span class="rank-icon ssplus">SS+</span>
+                <span class="rank-percent">99.5000%</span>
+            </div>
+            <div class="rank-right">222</div>
+            <span class="delta-up">↑6</span>
+        </div>
+
+        <div class="rank-row">
+            <div class="rank-left">
+                <span class="rank-icon ss">SS</span>
+                <span class="rank-percent">99.0000%</span>
+            </div>
+            <div class="rank-right">218</div>
+            <span class="delta-up">↑4</span>
+        </div>
+
+        <div class="rank-row">
+            <div class="rank-left">
+                <span class="rank-icon splus">S+</span>
+                <span class="rank-percent">98.0000%</span>
+            </div>
+            <div class="rank-right">210</div>
+            <span class="delta-up">↑8</span>
+        </div>
+
+        <div class="rank-row">
+            <div class="rank-left">
+                <span class="rank-icon s">S</span>
+                <span class="rank-percent">97.0000%</span>
+            </div>
+            <div class="rank-right">205</div>
+            <span class="delta-up">↑5</span>
+        </div>
+
+        <div class="rank-row">
+            <div class="rank-left">
+                <span class="rank-icon aaa">AAA</span>
+                <span class="rank-percent">94.0000%</span>
+            </div>
+            <div class="rank-right">167</div>
+            <span class="delta-up">↑38</span>
+        </div>
+
+        <div class="rank-row">
+            <div class="rank-left">
+                <span class="rank-icon aa">AA</span>
+                <span class="rank-percent">90.0000%</span>
+            </div>
+            <div class="rank-right">145</div>
+            <span class="delta-up">↑22</span>
+        </div>
+
+        <div class="rank-row">
+            <div class="rank-left">
+                <span class="rank-icon a">A</span>
+                <span class="rank-percent">80.0000%</span>
+            </div>
+            <div class="rank-right">115</div>
+            <span class="delta-up">↑30</span>
+        </div>
+
+        <div class="rank-row">
+            <div class="rank-left">
+                <span class="rank-icon bbb">BBB</span>
+                <span class="rank-percent">75.0000%</span>
+            </div>
+            <div class="rank-right">95</div>
+            <span class="delta-up">↑20</span>
+        </div>
+
+        <div class="rank-row">
+            <div class="rank-left">
+                <span class="rank-icon bb">BB</span>
+                <span class="rank-percent">70.0000%</span>
+            </div>
+            <div class="rank-right">83</div>
+            <span class="delta-up">↑12</span>
+        </div>
+
+        <div class="rank-row">
+            <div class="rank-left">
+                <span class="rank-icon b">B</span>
+                <span class="rank-percent">60.0000%</span>
+            </div>
+            <div class="rank-right">61</div>
+            <span class="delta-up">↑22</span>
+        </div>
+
+        <div class="rank-row">
+            <div class="rank-left">
+                <span class="rank-icon c">C</span>
+                <span class="rank-percent">50.0000%</span>
+            </div>
+            <div class="rank-right">42</div>
+            <span class="delta-up">↑19</span>
+        </div>
+    </div>
+</body>
+</html>

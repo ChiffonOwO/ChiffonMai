@@ -5,14 +5,17 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:media_scanner/media_scanner.dart';
+import 'package:my_first_flutter_app/utils/CoverPathUtil.dart';
 
-class B50ConvertToImg {
+class DiffBest50ConvertToImg {
   // 全局Key，用于获取widget的渲染对象
   // ignore: unused_field
   static GlobalKey _globalKey = GlobalKey();
 
   // 导出为图片的方法
-  static Future<File?> convertToImage(BuildContext context, Map<String, dynamic>? b50Data, List<Map<String, dynamic>> sdSongs, List<Map<String, dynamic>> dxSongs, List<dynamic>? maimaiMusicData) async {
+  static Future<File?> convertToImage(BuildContext context, Map<String, dynamic>? diffBest50Data, List<Map<String, dynamic>> diffSongs, List<dynamic>? maimaiMusicData) async {
     try {
       // 创建一个GlobalKey
       GlobalKey globalKey = GlobalKey();
@@ -20,7 +23,7 @@ class B50ConvertToImg {
       // 创建一个Widget，用于生成图片
       Widget imageWidget = RepaintBoundary(
         key: globalKey,
-        child: _buildExportImageWidget(context, b50Data, sdSongs, dxSongs, maimaiMusicData),
+        child: _buildExportImageWidget(context, diffBest50Data, diffSongs, maimaiMusicData),
       );
 
       // 创建一个OverlayEntry
@@ -33,9 +36,11 @@ class B50ConvertToImg {
               Positioned(
                 left: -10000,
                 top: -10000,
-                child: SizedBox(
-                  width: 1200,
-                  height: 2000,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minWidth: 1200,
+                    maxWidth: 1200,
+                  ),
                   child: imageWidget,
                 ),
               ),
@@ -48,7 +53,7 @@ class B50ConvertToImg {
       Overlay.of(context).insert(overlayEntry);
 
       // 等待下一帧，确保widget已经渲染完成
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(Duration(milliseconds: 300)); // 增加延迟时间
 
       // 创建一个RenderRepaintBoundary
       final RenderRepaintBoundary? boundary = globalKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
@@ -59,7 +64,7 @@ class B50ConvertToImg {
       }
 
       // 获取图片数据
-      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      ui.Image image = await boundary.toImage(pixelRatio: 2.0); // 降低像素比，减少内存使用
       ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) {
         print('Error: ByteData is null');
@@ -69,16 +74,97 @@ class B50ConvertToImg {
 
       // 将图片数据写入文件
       Uint8List pngBytes = byteData.buffer.asUint8List();
-      final directory = await getExternalStorageDirectory();
+      
+      // 尝试获取存储权限
+      PermissionStatus status;
+      
+      // 对于 Android 13+，使用 photos 权限
+      if (Platform.isAndroid) {
+        print('Android platform detected, using photos permission');
+        status = await Permission.photos.status;
+        print('Initial photos permission status: $status');
+        
+        if (!status.isGranted) {
+          print('Requesting photos permission...');
+          status = await Permission.photos.request();
+          print('Photos permission request result: $status');
+        }
+      } else {
+        // 对于其他平台，使用 storage 权限
+        print('Non-Android platform detected, using storage permission');
+        status = await Permission.storage.status;
+        print('Initial storage permission status: $status');
+        
+        if (!status.isGranted) {
+          print('Requesting storage permission...');
+          status = await Permission.storage.request();
+          print('Storage permission request result: $status');
+        }
+      }
+      
+      if (status.isGranted) {
+        print('Permission granted');
+      } else if (status.isDenied) {
+        print('Permission denied');
+      } else if (status.isPermanentlyDenied) {
+        print('Permission permanently denied');
+      } else if (status.isRestricted) {
+        print('Permission restricted');
+      } else if (status.isLimited) {
+        print('Permission limited');
+      }
+      
+      // 优先使用相册目录（需要存储权限）
+      Directory? directory;
+      if (status.isGranted) {
+        try {
+          // 直接使用标准的相册目录路径
+          String picturesPath = '/storage/emulated/0/Pictures';
+          directory = Directory(picturesPath);
+          print('Using pictures directory: $picturesPath');
+          
+          // 确保相册目录存在
+          if (!directory.existsSync()) {
+            directory.createSync(recursive: true);
+            print('Created pictures directory: $picturesPath');
+          }
+        } catch (e) {
+          print('Error getting pictures directory: $e');
+        }
+      }
+      
+      // 如果相册目录获取失败或没有权限，使用应用文档目录
       if (directory == null) {
-        print('Error: External storage directory not found');
+        print('Using app documents directory');
+        try {
+          directory = await getApplicationDocumentsDirectory();
+        } catch (e) {
+          print('Error getting application documents directory: $e');
+          // 备选方案：使用外部存储目录
+          directory = await getExternalStorageDirectory();
+        }
+      }
+      
+      if (directory == null) {
+        print('Error: No storage directory found');
         overlayEntry.remove();
         return null;
       }
 
-      final file = File('${directory.path}/b50_export_${DateTime.now().millisecondsSinceEpoch}.png');
+      // 确保目录存在
+      if (!directory.existsSync()) {
+        directory.createSync(recursive: true);
+      }
+
+      final file = File('${directory.path}/diff_b50_export_${DateTime.now().millisecondsSinceEpoch}.png');
       await file.writeAsBytes(pngBytes);
       print('Image saved to: ${file.path}');
+
+      // 调用媒体扫描器，通知系统有新文件
+      if (Platform.isAndroid) {
+        await MediaScanner.loadMedia(path: file.path);
+        print('Media scanner called for: ${file.path}');
+      }
 
       // 移除OverlayEntry
       overlayEntry.remove();
@@ -91,89 +177,70 @@ class B50ConvertToImg {
   }
 
   // 构建用于导出的Widget
-  static Widget _buildExportImageWidget(BuildContext context, Map<String, dynamic>? b50Data, List<Map<String, dynamic>> sdSongs, List<Map<String, dynamic>> dxSongs, List<dynamic>? maimaiMusicData) {
+  static Widget _buildExportImageWidget(BuildContext context, Map<String, dynamic>? diffBest50Data, List<Map<String, dynamic>> diffSongs, List<dynamic>? maimaiMusicData) {
     // 计算各项指标
-    int rating = b50Data?['rating'] ?? 0;
-    
-    // 计算Best35相关指标
-    int best35Sum = sdSongs.fold(0, (sum, song) => sum + ((song['ra'] ?? 0) as int));
-    double best35Average = sdSongs.isNotEmpty ? best35Sum / sdSongs.length : 0.0;
-    
-    // 计算Best15相关指标
-    int best15Sum = dxSongs.fold(0, (sum, song) => sum + ((song['ra'] ?? 0) as int));
-    double best15Average = dxSongs.isNotEmpty ? best15Sum / dxSongs.length : 0.0;
-    
-    // 计算rating平均值
-    double ratingAverage = (best35Sum + best15Sum) / 50;
-    
+    int diffRatingSum = diffBest50Data?['diffRatingSum'] ?? 0;
+    int best50Diff = diffBest50Data?['best50Diff'] ?? 0;
+    double diffRatingAverage = diffSongs.isNotEmpty ? diffRatingSum / diffSongs.length : 0.0;
+
     // 计算平均达成率
-    double sdAchievementsSum = sdSongs.fold(0.0, (sum, song) => sum + (double.parse(song['achievements'].toString())));
-    double dxAchievementsSum = dxSongs.fold(0.0, (sum, song) => sum + (double.parse(song['achievements'].toString())));
-    
-    double best50AchievementAverage = (sdAchievementsSum + dxAchievementsSum) / 50;
-    double best35AchievementAverage = sdSongs.isNotEmpty ? sdAchievementsSum / sdSongs.length : 0.0;
-    double best15AchievementAverage = dxSongs.isNotEmpty ? dxAchievementsSum / dxSongs.length : 0.0;
-    
-    // 计算DX分达成率
-    double sdScoreRateSum = sdSongs.fold(0.0, (sum, song) {
-      int songId = song['song_id'];
-      int levelIndex = song['level_index'];
-      int score = song['dxScore'];
+    double achievementsSum = diffSongs.fold(0.0,
+        (sum, song) => sum + (double.tryParse(song['achievements'].toString()) ?? 0.0));
+    double diffBest50AchievementAverage = 
+        diffSongs.isNotEmpty ? achievementsSum / diffSongs.length : 0.0;
+
+    // 计算平均scoreRate
+    double scoreRateSum = diffSongs.fold(0.0, (sum, song) {
+      int songId = song['song_id'] ?? 0;
+      int levelIndex = song['level_index'] ?? 0;
+      int score = song['dxScore'] ?? 0;
       return sum + _calculateScoreRate(songId, levelIndex, score, maimaiMusicData);
     });
-    
-    double dxScoreRateSum = dxSongs.fold(0.0, (sum, song) {
-      int songId = song['song_id'];
-      int levelIndex = song['level_index'];
-      int score = song['dxScore'];
-      return sum + _calculateScoreRate(songId, levelIndex, score, maimaiMusicData);
-    });
-    
-    double best50ScoreRateAverage = (sdSongs.length + dxSongs.length) > 0 
-        ? (sdScoreRateSum + dxScoreRateSum) / (sdSongs.length + dxSongs.length) 
+
+    double diffBest50ScoreRateAverage = diffSongs.isNotEmpty 
+        ? scoreRateSum / diffSongs.length 
         : 0.0;
-    
-    double best35ScoreRateAverage = sdSongs.isNotEmpty ? sdScoreRateSum / sdSongs.length : 0.0;
-    double best15ScoreRateAverage = dxSongs.isNotEmpty ? dxScoreRateSum / dxSongs.length : 0.0;
 
     // 创建一个容器，设置固定宽度以确保布局一致
     double containerWidth = 1200; // 适合5列布局的宽度
 
     return Container(
       width: containerWidth,
-      color: Colors.white,
-      child: SingleChildScrollView(
-        padding: EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 评分区域
-            _buildRatingSection(context, rating, ratingAverage, best35Sum, best35Average, best15Sum, best15Average, best50AchievementAverage, best35AchievementAverage, best15AchievementAverage, best50ScoreRateAverage, best35ScoreRateAverage, best15ScoreRateAverage),
-            SizedBox(height: 20.0),
-
-            // Best35 标题区域
-            _buildSectionTitle(context, 'Best35 | 非当前版本最好成绩'),
-            SizedBox(height: 16.0),
-
-            // Best35 卡片网格 (5列)
-            _buildDataCardGrid(context, sdSongs, 1.8, 5, b50Data, maimaiMusicData),
-            SizedBox(height: 24.0),
-
-            // Best15 标题区域
-            _buildSectionTitle(context, 'Best15 | 当前版本最好成绩'),
-            SizedBox(height: 16.0),
-
-            // Best15 卡片网格 (5列)
-            _buildDataCardGrid(context, dxSongs, 1.8, 5, b50Data, maimaiMusicData),
-            SizedBox(height: 20.0),
-          ],
+      decoration: BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage('assets/bg/b50_bg.png'),
+          fit: BoxFit.cover,
         ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 评分区域
+                _buildRatingSection(context, diffRatingSum, diffRatingAverage, best50Diff, diffBest50AchievementAverage, diffBest50ScoreRateAverage),
+                SizedBox(height: 20.0),
+
+                // 基于拟合难度的Best50 标题区域
+                _buildSectionTitle(context, '基于拟合难度的Best50'),
+                SizedBox(height: 16.0),
+
+                // 基于拟合难度的Best50 卡片网格 (5列)
+                _buildDataCardGrid(context, diffSongs, 1.8, 5, maimaiMusicData),
+                SizedBox(height: 20.0),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
   // 构建评分区域
-  static Widget _buildRatingSection(BuildContext context, int rating, double ratingAverage, int best35Sum, double best35Average, int best15Sum, double best15Average, double best50AchievementAverage, double best35AchievementAverage, double best15AchievementAverage, double best50ScoreRateAverage, double best35ScoreRateAverage, double best15ScoreRateAverage) {
+  static Widget _buildRatingSection(BuildContext context, int diffRatingSum, double diffRatingAverage, int best50Diff, double diffBest50AchievementAverage, double diffBest50ScoreRateAverage) {
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
     
@@ -197,7 +264,7 @@ class B50ConvertToImg {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Rating',
+                  '拟合总Rating',
                   style: TextStyle(
                     fontSize: titleFontSize,
                     fontWeight: FontWeight.bold,
@@ -209,7 +276,7 @@ class B50ConvertToImg {
                   text: TextSpan(
                     children: [
                       TextSpan(
-                        text: rating.toString(),
+                        text: diffRatingSum.toString(),
                         style: TextStyle(
                           fontSize: mainFontSize,
                           color: Colors.black,
@@ -217,7 +284,7 @@ class B50ConvertToImg {
                         ),
                       ),
                       TextSpan(
-                        text: '(平均${ratingAverage.toStringAsFixed(1)})',
+                        text: '(平均${diffRatingAverage.toStringAsFixed(1)})',
                         style: TextStyle(
                           fontSize: subFontSize,
                           color: Colors.black,
@@ -228,62 +295,19 @@ class B50ConvertToImg {
                 ),
                 SizedBox(height: 12.0),
                 Text(
-                  'Best 35',
+                  '与Best50差值',
                   style: TextStyle(
                     fontSize: mainFontSize,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
                 ),
-                RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: best35Sum.toString(),
-                        style: TextStyle(
-                          fontSize: mainFontSize,
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      TextSpan(
-                        text: '(平均${best35Average.toStringAsFixed(1)})',
-                        style: TextStyle(
-                          fontSize: subFontSize,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 12.0),
                 Text(
-                  'Best 15',
+                  '${best50Diff > 0 ? '+' : ''}$best50Diff',
                   style: TextStyle(
                     fontSize: mainFontSize,
+                    color: best50Diff >= 0 ? Colors.green : Colors.red,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-                RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: best15Sum.toString(),
-                        style: TextStyle(
-                          fontSize: mainFontSize,
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      TextSpan(
-                        text: '(平均${best15Average.toStringAsFixed(1)})',
-                        style: TextStyle(
-                          fontSize: subFontSize,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ],
@@ -296,34 +320,14 @@ class B50ConvertToImg {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Best 50 平均达成率/DX分达成率',
+                  '拟合Best50 平均达成率/DX分达成率',
                   style: TextStyle(
                     fontSize: sectionTitleFontSize,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
                 ),
-                _buildDualDecimalText(context, best50AchievementAverage, best50ScoreRateAverage * 100),
-                SizedBox(height: 12.0),
-                Text(
-                  'Best 35 平均达成率/DX分达成率',
-                  style: TextStyle(
-                    fontSize: sectionTitleFontSize,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-                _buildDualDecimalText(context, best35AchievementAverage, best35ScoreRateAverage * 100),
-                SizedBox(height: 12.0),
-                Text(
-                  'Best 15平均达成率/DX分达成率',
-                  style: TextStyle(
-                    fontSize: sectionTitleFontSize,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-                _buildDualDecimalText(context, best15AchievementAverage, best15ScoreRateAverage * 100),
+                _buildDualDecimalText(context, diffBest50AchievementAverage, diffBest50ScoreRateAverage * 100),
               ],
             ),
           ),
@@ -443,16 +447,7 @@ class B50ConvertToImg {
                       border: Border.all(color: Colors.black, width: 1.0),
                     ),
                     child: songId != null
-                        ? Image.asset(
-                            'assets/cover/${songId.toString()}.webp',
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Center(
-                                child: Text('曲绘',
-                                    style: TextStyle(fontSize: coverSize * 0.24)),
-                              );
-                            },
-                          )
+                        ? CoverPathUtil.buildCoverWidgetWithContext(context, songId.toString(), coverSize)
                         : Center(
                             child: Text('曲绘',
                                 style: TextStyle(fontSize: coverSize * 0.24)),
@@ -478,7 +473,7 @@ class B50ConvertToImg {
                           style: TextStyle(
                             fontSize: dxFontSize,
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade600,
+                            color: Colors.blue.shade300,
                           ),
                         ),
                       SizedBox(width: 4.0),
@@ -489,22 +484,21 @@ class B50ConvertToImg {
                         textBaseline: TextBaseline.alphabetic,
                         children: [
                           Text(
-                            difficulty.toString().split('.')[0],
+                            difficulty.toStringAsFixed(2).split('.')[0],
                             style: TextStyle(
                               fontSize: decimalMainFontSize * 0.9,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
                           ),
-                          if (difficulty.toString().split('.').length > 1)
-                            Text(
-                              '.${difficulty.toString().split('.')[1]}',
-                              style: TextStyle(
-                                fontSize: decimalSmallFontSize * 0.9,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
+                          Text(
+                            '.${difficulty.toStringAsFixed(2).split('.')[1]}',
+                            style: TextStyle(
+                              fontSize: decimalSmallFontSize * 0.9,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
+                          ),
                         ],
                       ),
                     ],
@@ -680,38 +674,41 @@ class B50ConvertToImg {
 
   // 构建数据驱动的卡片网格
   static Widget _buildDataCardGrid(
-      BuildContext context, List<Map<String, dynamic>> songs, double childAspectRatio, int crossAxisCount, Map<String, dynamic>? b50Data, List<dynamic>? maimaiMusicData) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        crossAxisSpacing: 6.0,
-        mainAxisSpacing: 6.0,
-        childAspectRatio: childAspectRatio,
+      BuildContext context, List<Map<String, dynamic>> songs, double childAspectRatio, int crossAxisCount, List<dynamic>? maimaiMusicData) {
+    return Container(
+      width: 1200,
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          crossAxisSpacing: 6.0,
+          mainAxisSpacing: 6.0,
+          childAspectRatio: childAspectRatio,
+        ),
+        itemCount: songs.length,
+        itemBuilder: (context, index) {
+          return _buildDataGameCard(context, songs[index], maimaiMusicData);
+        },
       ),
-      itemCount: songs.length,
-      itemBuilder: (context, index) {
-        return _buildDataGameCard(context, songs[index], b50Data, maimaiMusicData);
-      },
     );
   }
 
   // 根据数据构建游戏卡片
-  static Widget _buildDataGameCard(BuildContext context, Map<String, dynamic> songData, Map<String, dynamic>? b50Data, List<dynamic>? maimaiMusicData) {
+  static Widget _buildDataGameCard(BuildContext context, Map<String, dynamic> songData, List<dynamic>? maimaiMusicData) {
     // 解析数据
-    double achievementRate = double.parse(songData['achievements'].toString());
-    int score = songData['dxScore'];
+    double achievementRate = double.tryParse(songData['achievements'].toString()) ?? 0.0;
+    int score = songData['dxScore'] ?? 0;
     String fc = songData['fc'] ?? '';
     String fs = songData['fs'] ?? '';
-    double difficulty = double.parse(songData['ds'].toString());
-    String rate = songData['rate'];
-    int levelIndex = songData['level_index'];
-    int rating = songData['ra'];
-    String type = songData['type'];
-    String title = songData['title'];
-    int songId = songData['song_id'];
+    double difficulty = double.tryParse(songData['fit_diff'].toString()) ?? 0.0;
+    String rate = songData['rate'] ?? '';
+    int levelIndex = songData['level_index'] ?? 0;
+    int rating = songData['diffRating'] ?? 0;
+    String type = songData['type'] ?? '';
+    String title = songData['title'] ?? '未知歌曲';
+    int songId = songData['song_id'] ?? 0;
     
     // 计算星星等级
     String stars = _calculateStars(songId, levelIndex, score, maimaiMusicData);
@@ -809,38 +806,48 @@ class B50ConvertToImg {
       Colors.green, // level_index 0
       Colors.yellow, // level_index 1
       Colors.red, // level_index 2
-      Colors.purple, // level_index 3
-      Colors.purple.shade300, // level_index 4
+      Colors.purple.shade400, // level_index 3
+      Colors.purple.shade200, // level_index 4
     ];
     return colors[levelIndex.clamp(0, 4)];
   }
   
   // 计算scoreRate
   static double _calculateScoreRate(int songId, int levelIndex, int score, List<dynamic>? maimaiMusicData) {
-    if (maimaiMusicData == null) return 0.0;
+    try {
+      if (maimaiMusicData == null) return 0.0;
 
-    // 查找对应的歌曲
-    dynamic songData = maimaiMusicData.firstWhere(
-      (item) => item['id'] == songId.toString(),
-      orElse: () => null,
-    );
+      // 查找对应的歌曲
+      dynamic songData;
+      try {
+        songData = maimaiMusicData.firstWhere(
+          (item) => item['id'] == songId.toString(),
+        );
+      } catch (e) {
+        // 如果找不到歌曲，返回0.0
+        return 0.0;
+      }
 
-    if (songData == null || songData['charts'] == null) return 0.0;
+      if (songData == null || songData['charts'] == null) return 0.0;
 
-    // 查找对应的charts
-    List<dynamic> charts = songData['charts'];
-    if (levelIndex < 0 || levelIndex >= charts.length) return 0.0;
+      // 查找对应的charts
+      List<dynamic> charts = songData['charts'];
+      if (levelIndex < 0 || levelIndex >= charts.length) return 0.0;
 
-    dynamic chart = charts[levelIndex];
-    if (chart['notes'] == null) return 0.0;
+      dynamic chart = charts[levelIndex];
+      if (chart['notes'] == null) return 0.0;
 
-    // 计算maxScore
-    List<dynamic> notes = chart['notes'];
-    int notesSum = notes.fold(0, (sum, note) => sum + (note as int));
-    int maxScore = notesSum * 3;
+      // 计算maxScore
+      List<dynamic> notes = chart['notes'];
+      int notesSum = notes.fold(0, (sum, note) => sum + (note as int));
+      int maxScore = notesSum * 3;
 
-    // 计算scoreRate
-    return maxScore > 0 ? score / maxScore : 0.0;
+      // 计算scoreRate
+      return maxScore > 0 ? score / maxScore : 0.0;
+    } catch (e) {
+      print('Error calculating score rate: $e');
+      return 0.0;
+    }
   }
 
   // 计算星星等级
@@ -849,30 +856,30 @@ class B50ConvertToImg {
 
     // 确定星星等级
     if (scoreRate >= 0.97) {
-      return '※5';
+      return '\u27265';
     } else if (scoreRate >= 0.95) {
-      return '※4';
+      return '\u27264';
     } else if (scoreRate >= 0.93) {
-      return '※3';
+      return '\u27263';
     } else if (scoreRate >= 0.90) {
-      return '※2';
+      return '\u27262';
     } else if (scoreRate >= 0.85) {
-      return '※1';
+      return '\u27261';
     } else {
-      return '※0';
+      return '\u27260';
     }
   }
   
   // 获取星星颜色
   static Color _getStarsColor(String stars) {
     switch (stars) {
-      case '※5':
+      case '\u27265':
         return Colors.yellow;
-      case '※4':
-      case '※3':
+      case '\u27264':
+      case '\u27263':
         return Colors.orange;
-      case '※2':
-      case '※1':
+      case '\u27262':
+      case '\u27261':
         return Colors.green.shade300;
       default:
         return Colors.white;

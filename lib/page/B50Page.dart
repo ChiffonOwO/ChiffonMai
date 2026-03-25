@@ -1,13 +1,13 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:async';
 
 import 'package:flutter/services.dart';
-import '../service/B50ConvertToImg.dart';
+import '../service/Best50ConvertToImgService.dart';
 import '../manager/UserBest50Manager.dart';
 import '../manager/MaimaiMusicDataManager.dart';
+import 'SongInfoPage.dart';
+import '../utils/CoverPathUtil.dart';
 
 class B50Page extends StatefulWidget {
   // 接收外部传入的B50数据
@@ -665,27 +665,7 @@ class _B50PageState extends State<B50Page> {
                       border: Border.all(color: Colors.black, width: 1.0),
                     ),
                     child: songId != null
-                        ? Image.asset(
-                            'assets/cover/${songId.toString()}.webp',
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              // 本地资产加载失败，尝试从网络加载
-                              String paddedId = songId.toString().padLeft(5, '0');
-                              String coverId = '1' + paddedId.substring(1);
-                              String networkUrl = 'https://www.diving-fish.com/covers/$coverId.png';
-                              return Image.network(
-                                networkUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  // 网络图片加载失败，显示默认文本
-                                  return Center(
-                                    child: Text('曲绘',
-                                        style: TextStyle(fontSize: coverSize * 0.24)),
-                                  );
-                                },
-                              );
-                            },
-                          )
+                        ? CoverPathUtil.buildCoverWidgetWithContext(context, songId.toString(), coverSize)
                         : Center(
                             child: Text('曲绘',
                                 style: TextStyle(fontSize: coverSize * 0.24)),
@@ -1011,18 +991,31 @@ class _B50PageState extends State<B50Page> {
     // 判断是否为DX模式
     bool dxMode = type == 'DX';
 
-    return _buildGameCard(
-      cardColor: cardColor,
-      songName: title,
-      achievementRate: achievementRate,
-      difficulty: difficulty,
-      dxMode: dxMode,
-      score: score,
-      rating: rating,
-      stars: stars,
-      grade: grade,
-      songId: songId,
-      starsColor: starsColor,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SongInfoPage(
+              songId: songId.toString(),
+              initialLevelIndex: levelIndex,
+            ),
+          ),
+        );
+      },
+      child: _buildGameCard(
+        cardColor: cardColor,
+        songName: title,
+        achievementRate: achievementRate,
+        difficulty: difficulty,
+        dxMode: dxMode,
+        score: score,
+        rating: rating,
+        stars: stars,
+        grade: grade,
+        songId: songId,
+        starsColor: starsColor,
+      ),
     );
   }
 
@@ -1105,54 +1098,113 @@ class _B50PageState extends State<B50Page> {
   }
 
   // 构建导出按钮
-  // 修改 _buildExportButton 方法
   Widget _buildExportButton() {
-    return Container(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: () async {
-          // 显示加载提示
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('正在导出图片...')),
-          );
-
-          // 导出为图片
-          File? file = await B50ConvertToImg.convertToImage(
-            context,
-            _b50Data,
-            _sdSongs,
-            _dxSongs,
-            _maimaiMusicData,
-          );
-
-          // 显示导出结果
-          if (file != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('图片导出成功：${file.path}')),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('图片导出失败')),
-            );
-          }
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue,
-          padding: EdgeInsets.symmetric(
-              vertical: MediaQuery.of(context).size.height * 0.015),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8.0),
-          ),
-        ),
-        child: Text(
-          '导出为图片',
-          style: TextStyle(
-            fontSize: MediaQuery.of(context).size.width * 0.04,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+    return ElevatedButton(
+      onPressed: _exportToImage,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.blue,
+        padding: EdgeInsets.symmetric(vertical: 12.0),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8.0),
         ),
       ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.image, color: Colors.white),
+          SizedBox(width: 8.0),
+          Text(
+            '导出为图片',
+            style: TextStyle(
+              fontSize: MediaQuery.of(context).size.width * 0.04,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  // 导出为图片
+  Future<void> _exportToImage() async {
+    try {
+      // 显示加载指示器
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: Text('导出中'),
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16.0),
+              Text('正在生成图片...'),
+            ],
+          ),
+        ),
+      );
+
+      // 调用导出方法
+      final file = await B50ConvertToImg.convertToImage(
+        context,
+        _b50Data,
+        _sdSongs,
+        _dxSongs,
+        _maimaiMusicData,
+      );
+
+      // 关闭加载指示器
+      Navigator.pop(context);
+
+      // 显示导出结果
+      if (file != null) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('导出成功'),
+            content: Text('图片已保存到：\n${file.path}'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('确定'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('导出失败'),
+            content: Text('图片导出失败，请重试'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('确定'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      // 关闭加载指示器
+      Navigator.pop(context);
+      
+      // 显示错误信息
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('导出失败'),
+          content: Text('导出过程中出现错误：\n$e'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('确定'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }

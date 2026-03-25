@@ -5,6 +5,8 @@ import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'dart:async';
 
+import 'package:my_first_flutter_app/utils/CoverPathUtil.dart';
+
 class SongSearchPage extends StatefulWidget {
   const SongSearchPage({super.key});
 
@@ -887,8 +889,6 @@ class _SongSearchPageState extends State<SongSearchPage> {
 
   // 构建歌曲项
   Widget _buildSongItem(dynamic song) {
-    // 生成曲绘路径
-    String coverUrl = 'assets/cover/${song.id.toString()}.webp';
 
     // 生成匹配信息
     List<Map<String, String>> matchInfo = _getMatchInfo(song);
@@ -921,40 +921,41 @@ class _SongSearchPageState extends State<SongSearchPage> {
                 border: Border.all(color: Colors.grey.shade200),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Image.asset(
-                coverUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  // 生成网络曲绘URL
-                  String coverId = song.id.toString();
+              child: CoverPathUtil.buildCoverWidget(song.id, 80),
+              // child: Image.asset(
+              //   coverUrl,
+              //   fit: BoxFit.cover,
+              //   errorBuilder: (context, error, stackTrace) {
+              //     // 生成网络曲绘URL
+              //     String coverId = song.id.toString();
                   
-                  // 对于6位数的曲绘，只需要去除第一位
-                  if (coverId.length == 6) {
-                    // 去掉第一位
-                    coverId = coverId.substring(1);
-                  } else if (coverId.length < 5) {
-                    // 万位补1，其余位补0
-                    coverId = '1' + '0' * (4 - coverId.length) + coverId;
-                  }
-                  String networkCoverUrl = 'https://www.diving-fish.com/covers/$coverId.png';
+              //     // 对于6位数的曲绘，只需要去除第一位
+              //     if (coverId.length == 6) {
+              //       // 去掉第一位
+              //       coverId = coverId.substring(1);
+              //     } else if (coverId.length < 5) {
+              //       // 万位补1，其余位补0
+              //       coverId = '1' + '0' * (4 - coverId.length) + coverId;
+              //     }
+              //     String networkCoverUrl = 'https://www.diving-fish.com/covers/$coverId.png';
                   
-                  return Image.network(
-                    networkCoverUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Center(
-                        child: Text(
-                          '曲绘',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
+              //     return Image.network(
+              //       networkCoverUrl,
+              //       fit: BoxFit.cover,
+              //       errorBuilder: (context, error, stackTrace) {
+              //         return Center(
+              //           child: Text(
+              //             '曲绘',
+              //             style: TextStyle(
+              //               fontSize: 14,
+              //               color: Colors.grey,
+              //             ),
+              //           ),
+              //         );
+              //       },
+              //     );
+              //   },
+              // ),
             ),
             const SizedBox(width: 12),
 

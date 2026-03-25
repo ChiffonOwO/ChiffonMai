@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/service/RandomChartService.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
+import 'package:my_first_flutter_app/utils/CoverPathUtil.dart';
 
 class RandomChartPage extends StatefulWidget {
   const RandomChartPage({super.key});
@@ -92,20 +93,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
     });
   }
   
-  // 生成曲绘路径
-  String _getCoverPath(String songId) {
-    return 'assets/cover/${songId}.webp';
-  }
-  
-  // 生成网络曲绘URL
-  String _getNetworkCoverUrl(String songId) {
-    String coverId = songId;
-    if (coverId.length < 5) {
-      // 万位补1，其余位补0
-      coverId = '1' + '0' * (4 - coverId.length) + coverId;
-    }
-    return 'https://www.diving-fish.com/covers/$coverId.png';
-  }
+  // 曲绘加载使用CoverPathUtil工具类
 
   @override
   Widget build(BuildContext context) {
@@ -528,24 +516,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                                     decoration: BoxDecoration(
                                                       borderRadius: BorderRadius.vertical(top: Radius.circular(borderRadius)),
                                                     ),
-                                                    child: Image.asset(
-                                                      _getCoverPath(_drawnSongs[i].id),
-                                                      fit: BoxFit.cover,
-                                                      errorBuilder: (context, error, stackTrace) {
-                                                        return Image.network(
-                                                          _getNetworkCoverUrl(_drawnSongs[i].id),
-                                                          fit: BoxFit.cover,
-                                                          errorBuilder: (context, error, stackTrace) {
-                                                            return Container(
-                                                              color: Colors.grey[300],
-                                                              child: const Center(
-                                                                child: Text('暂无封面'),
-                                                              ),
-                                                            );
-                                                          },
-                                                        );
-                                                      },
-                                                    ),
+                                                    child: CoverPathUtil.buildCoverWidgetWithContext(context, _drawnSongs[i].id, 100),
                                                   ),
                                                 ),
                                                 // 文本部分
@@ -662,21 +633,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                             color: Colors.grey[200],
                                             borderRadius: BorderRadius.circular(borderRadius),
                                           ),
-                                            child: Image.asset(
-                                              _getCoverPath(song.id),
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (context, error, stackTrace) {
-                                                return Image.network(
-                                                  _getNetworkCoverUrl(song.id),
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (context, error, stackTrace) {
-                                                    return Container(
-                                                      color: Colors.grey[300],
-                                                    );
-                                                  },
-                                                );
-                                              },
-                                            ),
+                                            child: CoverPathUtil.buildCoverWidgetWithContext(context, song.id, 50),
                                           );
                                         }).toList(),
                                       ),

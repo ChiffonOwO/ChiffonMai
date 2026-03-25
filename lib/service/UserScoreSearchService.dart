@@ -217,24 +217,70 @@ class UserScoreSearchService {
       // 连击/同步筛选
       if (filterConditions['连击/同步筛选'] != null && filterConditions['连击/同步筛选']!.isNotEmpty) {
         String comboFilter = filterConditions['连击/同步筛选']!;
-        if (comboFilter == 'FC+') {
+        if (comboFilter == '无连击评价') {
+          // 无连击评价 (fc为"")
           String fc = song['fc'].toString().toLowerCase();
-          if (fc != 'fc' && fc != 'fcp' && fc != 'ap' && fc != 'app') {
+          if (fc != "") {
+            return false;
+          }
+        } else if (comboFilter == 'FC') {
+          // FC(fc为"fc")
+          String fc = song['fc'].toString().toLowerCase();
+          if (fc != 'fc') {
+            return false;
+          }
+        } else if (comboFilter == 'FC+') {
+          // FC+(fc为"fcp")
+          String fc = song['fc'].toString().toLowerCase();
+          if (fc != 'fcp') {
+            return false;
+          }
+        } else if (comboFilter == 'AP') {
+          // AP(fc为"ap")
+          String fc = song['fc'].toString().toLowerCase();
+          if (fc != 'ap') {
             return false;
           }
         } else if (comboFilter == 'AP+') {
+          // AP+(fc为"app")
           String fc = song['fc'].toString().toLowerCase();
-          if (fc != 'ap' && fc != 'app') {
+          if (fc != 'app') {
+            return false;
+          }
+        } else if (comboFilter == '无同步评价') {
+          // 无同步评价(fs为"")
+          String fs = song['fs'].toString().toLowerCase();
+          if (fs != "") {
+            return false;
+          }
+        } else if (comboFilter == 'SYNC') {
+          // SYNC(fs为"sync")
+          String fs = song['fs'].toString().toLowerCase();
+          if (fs != 'sync') {
+            return false;
+          }
+        } else if (comboFilter == 'FS') {
+          // FS(fs为"fs")
+          String fs = song['fs'].toString().toLowerCase();
+          if (fs != 'fs') {
             return false;
           }
         } else if (comboFilter == 'FS+') {
+          // FS+(fs为"fsp")
           String fs = song['fs'].toString().toLowerCase();
-          if (fs != 'fs' && fs != 'fsp' && fs != 'fsd' && fs != 'fsdp') {
+          if (fs != 'fsp') {
+            return false;
+          }
+        } else if (comboFilter == 'FDX') {
+          // FDX(fs为"fsd")
+          String fs = song['fs'].toString().toLowerCase();
+          if (fs != 'fsd') {
             return false;
           }
         } else if (comboFilter == 'FDX+') {
+          // FDX+(fs为"fsdp")
           String fs = song['fs'].toString().toLowerCase();
-          if (fs != 'fsd' && fs != 'fsdp') {
+          if (fs != 'fsdp') {
             return false;
           }
         }

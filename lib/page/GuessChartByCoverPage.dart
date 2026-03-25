@@ -6,6 +6,7 @@ import 'package:my_first_flutter_app/entity/GuessSong.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/service/GuessChartByCoverService.dart';
+import 'package:my_first_flutter_app/utils/CoverPathUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class GuessChartByCoverPage extends StatefulWidget {
@@ -228,13 +229,7 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
 
   // 构建搜索结果项
   Widget _buildSearchResultItem(Song song) {
-    // 生成曲绘路径
-    String coverPath = GuessChartByCoverService.getCoverPath(song.id);
-
-    // 生成fallback的cover_id
-    // ignore: unused_local_variable
-    String coverId = GuessChartByCoverService.generateCoverId(song.id);
-    String networkCoverUrl = GuessChartByCoverService.getNetworkCoverUrl(song.id);
+    // 曲绘将使用CoverPathUtil工具类加载
 
     // 获取别名
     final aliases = _songAliasManager.aliases[song.id] ?? [];
@@ -261,24 +256,7 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.asset(
-                  coverPath,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Image.network(
-                      networkCoverUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey[200],
-                          child: const Center(
-                            child: Icon(Icons.music_note, color: Colors.grey),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
+                child: CoverPathUtil.buildCoverWidgetWithContext(context, song.id, 60),
               ),
             ),
             const SizedBox(width: 12),
@@ -339,13 +317,7 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
   // 构建猜测历史项
   Widget _buildGuessHistoryItem(
       GuessSong guessSong, int index, Song? guessedSong) {
-    // 生成曲绘路径
-    String coverPath = GuessChartByCoverService.getCoverPath(guessSong.songId.toString());
-
-    // 生成fallback的cover_id
-    // ignore: unused_local_variable
-    String coverId = GuessChartByCoverService.generateCoverId(guessSong.songId.toString());
-    String networkCoverUrl = GuessChartByCoverService.getNetworkCoverUrl(guessSong.songId.toString());
+    // 曲绘将使用CoverPathUtil工具类加载
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -381,27 +353,9 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: Image.asset(
-                    coverPath,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Image.network(
-                        networkCoverUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[200],
-                            child: const Center(
-                              child: Icon(Icons.music_note,
-                                  color: Colors.grey, size: 20),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
+                borderRadius: BorderRadius.circular(4),
+                child: CoverPathUtil.buildCoverWidgetWithContext(context, guessSong.songId.toString(), 60),
+              ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -757,8 +711,6 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
 
   // 裁剪曲绘，随机显示曲绘的一部分
   Widget _buildCroppedCover(String songId) {
-    String coverPath = GuessChartByCoverService.getCoverPath(songId);
-    String networkCoverUrl = GuessChartByCoverService.getNetworkCoverUrl(songId);
 
     // 确保截取参数已生成
     if (_cropX1 == null || _cropY1 == null || _cropX2 == null || _cropY2 == null) {
@@ -789,24 +741,7 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
           fit: StackFit.expand,
           children: [
             // 完整显示曲绘
-            Image.asset(
-              coverPath,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Image.network(
-                  networkCoverUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.grey[200],
-                      child: const Center(
-                        child: Icon(Icons.music_note, color: Colors.grey, size: 30),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+            CoverPathUtil.buildCoverWidgetWithContext(context, songId, 200),
             // 顶部遮盖
             Positioned(
               top: 0,
@@ -1029,24 +964,7 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
                                                   child: Stack(
                                                     fit: StackFit.expand,
                                                     children: [
-                                                      Image.asset(
-                                                        GuessChartByCoverService.getCoverPath(_targetSong!.id),
-                                                        fit: BoxFit.cover,
-                                                        errorBuilder: (context, error, stackTrace) {
-                                                          return Image.network(
-                                                            GuessChartByCoverService.getNetworkCoverUrl(_targetSong!.id),
-                                                            fit: BoxFit.cover,
-                                                            errorBuilder: (context, error, stackTrace) {
-                                                              return Container(
-                                                                color: Colors.grey[200],
-                                                                child: const Center(
-                                                                  child: Icon(Icons.music_note, color: Colors.grey, size: 30),
-                                                                ),
-                                                              );
-                                                            },
-                                                          );
-                                                        },
-                                                      ),
+                                                      CoverPathUtil.buildCoverWidgetWithContext(context, _targetSong!.id, 200),
                                                       // 红框框选出本轮截取的区域
                                                       if (_cropX1 != null && _cropY1 != null && _cropX2 != null && _cropY2 != null)
                                                         Positioned(

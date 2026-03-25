@@ -197,7 +197,7 @@ class VersionView extends StatelessWidget {
     VersionData(name: "BUDDiES PLUS", imagePath: "assets/version/maimai_DX_BUDDiES_PLUS.png", code: "宴"),
     VersionData(name: "PRiSM", imagePath: "assets/version/maimai_DX_PRiSM.png", code: "镜"),
     VersionData(name: "PRiSM PLUS", imagePath: "assets/version/maimai_DX_PRiSM_PLUS.png", code: "彩"),
-    VersionData(name: "CiRCLE", imagePath: "assets/version/maimai_DX_CiRCLE.png", code: "未知"),
+    VersionData(name: "CiRCLE", imagePath: "assets/version/maimai_DX_CiRCLE.png", code: "丸"),
   ];
   VersionView({super.key});
 

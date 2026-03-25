@@ -5,7 +5,10 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import '../service/DiffBest50Service.dart';
+import '../service/DiffBest50ConvertToImgService.dart';
 import '../manager/MaimaiMusicDataManager.dart';
+import 'SongInfoPage.dart';
+import '../utils/CoverPathUtil.dart';
 
 class DiffBest50Page extends StatefulWidget {
   const DiffBest50Page({super.key});
@@ -202,7 +205,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                       ),
                       SizedBox(height: 16),
                       Text(
-                        '暂无DiffBest50数据',
+                        '暂无拟合Best50数据',
                         style: TextStyle(
                           fontSize: 18,
                           color: Colors.grey,
@@ -252,7 +255,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
             right: 0,
             child: Center(
               child: Text(
-                "DiffBest50查询",
+                "拟合Best50查询",
                 style: TextStyle(
                   color: Color.fromARGB(255, 84, 97, 97),
                   fontSize: 24,
@@ -318,13 +321,17 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                     _buildRatingSection(),
                     SizedBox(height: 12.0),
 
-                    // DiffBest50 标题区域
-                    _buildSectionTitle('DiffBest50 | 基于拟合难度的Best50', context),
+                    // 导出按钮
+                    _buildExportButton(),
+                    SizedBox(height: 12.0),
+
+                    // 基于拟合难度的Best50 标题区域
+                    _buildSectionTitle( '基于拟合难度的Best50', context),
 
                     SizedBox(
                         height: MediaQuery.of(context).size.height * 0.015),
 
-                    // DiffBest50 卡片网格
+                    // 基于拟合难度的Best50 卡片网格
                     _buildDataCardGrid(_diffSongs,
                         MediaQuery.of(context).size.width > 600 ? 1.7 : 1.5),
                   ],
@@ -519,27 +526,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                       border: Border.all(color: Colors.black, width: 1.0),
                     ),
                     child: songId != null
-                        ? Image.asset(
-                            'assets/cover/${songId.toString()}.webp',
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              // 本地资产加载失败，尝试从网络加载
-                              String paddedId = songId.toString().padLeft(5, '0');
-                              String coverId = '1' + paddedId.substring(1);
-                              String networkUrl = 'https://www.diving-fish.com/covers/$coverId.png';
-                              return Image.network(
-                                networkUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  // 网络图片加载失败，显示默认文本
-                                  return Center(
-                                    child: Text('曲绘',
-                                        style: TextStyle(fontSize: coverSize * 0.24)),
-                                  );
-                                },
-                              );
-                            },
-                          )
+                        ? CoverPathUtil.buildCoverWidgetWithContext(context, songId.toString(), coverSize)
                         : Center(
                             child: Text('曲绘',
                                 style: TextStyle(fontSize: coverSize * 0.24)),
@@ -864,18 +851,31 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
     // 判断是否为DX模式
     bool dxMode = type == 'DX';
 
-    return _buildGameCard(
-      cardColor: cardColor,
-      songName: title,
-      achievementRate: achievementRate,
-      difficulty: difficulty,
-      dxMode: dxMode,
-      score: score,
-      rating: rating,
-      stars: stars,
-      grade: grade,
-      songId: songId,
-      starsColor: starsColor,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SongInfoPage(
+              songId: songId.toString(),
+              initialLevelIndex: levelIndex,
+            ),
+          ),
+        );
+      },
+      child: _buildGameCard(
+        cardColor: cardColor,
+        songName: title,
+        achievementRate: achievementRate,
+        difficulty: difficulty,
+        dxMode: dxMode,
+        score: score,
+        rating: rating,
+        stars: stars,
+        grade: grade,
+        songId: songId,
+        starsColor: starsColor,
+      ),
     );
   }
 
@@ -954,6 +954,116 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
         return Colors.green.shade300;
       default:
         return Colors.white;
+    }
+  }
+
+  // 构建导出按钮
+  Widget _buildExportButton() {
+    return ElevatedButton(
+      onPressed: _exportToImage,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.blue,
+        padding: EdgeInsets.symmetric(vertical: 12.0),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8.0),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.image, color: Colors.white),
+          SizedBox(width: 8.0),
+          Text(
+            '导出为图片',
+            style: TextStyle(
+              fontSize: MediaQuery.of(context).size.width * 0.04,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 导出为图片
+  Future<void> _exportToImage() async {
+    try {
+      // 显示加载指示器
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: Text('导出中'),
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16.0),
+              Text('正在生成图片...'),
+            ],
+          ),
+        ),
+      );
+
+      // 调用导出方法
+      final file = await DiffBest50ConvertToImg.convertToImage(
+        context,
+        _diffBest50Data,
+        _diffSongs,
+        _maimaiMusicData,
+      );
+
+      // 关闭加载指示器
+      Navigator.pop(context);
+
+      // 显示导出结果
+      if (file != null) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('导出成功'),
+            content: Text('图片已保存到：\n${file.path}'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('确定'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('导出失败'),
+            content: Text('图片导出失败，请重试'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('确定'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      // 关闭加载指示器
+      Navigator.pop(context);
+      
+      // 显示错误信息
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('导出失败'),
+          content: Text('导出过程中出现错误：\n$e'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('确定'),
+            ),
+          ],
+        ),
+      );
     }
   }
 }
