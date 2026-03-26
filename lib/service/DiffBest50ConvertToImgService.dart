@@ -7,7 +7,7 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:media_scanner/media_scanner.dart';
-import 'package:my_first_flutter_app/utils/CoverPathUtil.dart';
+import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 
 class DiffBest50ConvertToImg {
   // 全局Key，用于获取widget的渲染对象
@@ -447,7 +447,7 @@ class DiffBest50ConvertToImg {
                       border: Border.all(color: Colors.black, width: 1.0),
                     ),
                     child: songId != null
-                        ? CoverPathUtil.buildCoverWidgetWithContext(context, songId.toString(), coverSize)
+                        ? CoverUtil.buildCoverWidgetWithContext(context, songId.toString(), coverSize)
                         : Center(
                             child: Text('曲绘',
                                 style: TextStyle(fontSize: coverSize * 0.24)),

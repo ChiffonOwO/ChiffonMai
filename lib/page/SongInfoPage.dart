@@ -7,7 +7,7 @@ import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/manager/DiffMusicDataManager.dart';
 import 'package:my_first_flutter_app/entity/DiffSong.dart';
-import 'package:my_first_flutter_app/utils/CoverPathUtil.dart';
+import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 
 class SongInfoPage extends StatefulWidget {
   final String songId;
@@ -393,7 +393,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
   Widget _buildStarScoreTable() {
     if (_songData == null) return Container();
     
-    int maxScore = _calculateMaxScore(int.parse(widget.songId), _currentDiffIndex);
+    int maxScore = _calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex);
     
     // 星星等级对应的最低达成率（降序排列）
     List<Map<String, dynamic>> starLevels = [
@@ -919,7 +919,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                 ),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
-                                  child: CoverPathUtil.buildCoverWidgetWithContext(context, widget.songId.toString(), 120),
+                                  child: CoverUtil.buildCoverWidgetWithContext(context, widget.songId.toString(), 120),
                                 ),
                               ),
 
@@ -1189,7 +1189,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                             children: [
                                               TextSpan(
                                                 text:
-                                                    'DXScore: ${userRecord['dxScore']} / ${_calculateMaxScore(int.parse(widget.songId), _currentDiffIndex)}  ',
+                                                    'DXScore: ${userRecord['dxScore']} / ${_calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex)}  ',
                                                 style: TextStyle(
                                                   fontSize:
                                                       MediaQuery.of(context)
@@ -1234,7 +1234,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                 ),
                                               ),
                                               TextSpan(
-                                                text: '${(userRecord['dxScore'] / _calculateMaxScore(int.parse(widget.songId), _currentDiffIndex) * 100).toStringAsFixed(2)}%  ',
+                                                text: '${(userRecord['dxScore'] / _calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex) * 100).toStringAsFixed(2)}%  ',
                                                 style: TextStyle(
                                                   fontSize: MediaQuery.of(context).size.width * 0.042,
                                                   color: _getStarsColor(
@@ -1426,8 +1426,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
     int totalTap = notes.length > 0 ? notes[0] : 0;
     int totalHold = notes.length > 1 ? notes[1] : 0;
     int totalSlide = notes.length > 2 ? notes[2] : 0;
-    int totalTouch = notes.length > 3 ? notes[3] : 0;
-    int totalBreak = notes.length > 4 ? notes[4] : 0;
+    int totalTouch = notes.length == 5 ? notes[3] : 0;
+    int totalBreak = notes.length == 5 ? notes[4] : notes[3];
     
     int totalWeight = totalTap * _tapWeight +
                       totalHold * _holdWeight +
@@ -1528,7 +1528,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _noteTypes.map((noteType) => ElevatedButton(
+            children: _noteTypes
+                .where((noteType) => !(noteType == 'TOUCH' && totalTouch == 0))
+                .map((noteType) => ElevatedButton(
               onPressed: () {
                 setState(() {
                   _selectedNoteType = noteType;
@@ -1994,9 +1996,28 @@ class _SongInfoPageState extends State<SongInfoPage> {
     return notesSum * 3;
   }
 
+  // 计算最大DX分
+  // 当ds数组长度为2时，返回两个难度谱面DX分之和
+  // 否则返回当前难度的最大分数
+  int _calculateMaxDxScore(int songId, int levelIndex) {
+    if (_songData == null) return 0;
+
+    // 检查ds数组长度
+    List<dynamic> ds = _songData!['ds'];
+    if (ds.length == 2) {
+      // 计算两个难度谱面的最大分数之和
+      int maxScore1 = _calculateMaxScore(songId, 0);
+      int maxScore2 = _calculateMaxScore(songId, 1);
+      return maxScore1 + maxScore2;
+    } else {
+      // 返回当前难度的最大分数
+      return _calculateMaxScore(songId, levelIndex);
+    }
+  }
+
   // 计算scoreRate
   double _calculateScoreRate(int songId, int levelIndex, int score) {
-    int maxScore = _calculateMaxScore(songId, levelIndex);
+    int maxScore = _calculateMaxDxScore(songId, levelIndex);
     return maxScore > 0 ? score / maxScore : 0.0;
   }
 
@@ -2022,7 +2043,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
   // 计算星星等级的最低DX分和超出部分
   String _calculateStarsBonus(int songId, int levelIndex, int score) {
-    int maxScore = _calculateMaxScore(songId, levelIndex);
+    int maxScore = _calculateMaxDxScore(songId, levelIndex);
     double scoreRate = score / maxScore;
     int starLevel = 0;
     double minRate = 0.0;

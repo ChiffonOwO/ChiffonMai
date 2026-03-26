@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../service/UserScoreSearchService.dart';
 import '../main.dart';
 import 'SongInfoPage.dart';
-import '../utils/CoverPathUtil.dart';
+import '../utils/CoverUtil.dart';
 
 class UserScoreSearchPage extends StatefulWidget {
   const UserScoreSearchPage({Key? key}) : super(key: key);
@@ -611,7 +611,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
 
   // 计算统计数据
   Future<Map<String, int>> _calculateStats() async {
-    if (_userPlayData == null || !_userPlayData!.containsKey('records')) {
+    if (_sortedSongs.isEmpty) {
       return {
         'total': 0,
         'sssp': 0,
@@ -628,7 +628,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
       };
     }
     
-    List<dynamic> records = _userPlayData!['records'];
+    List<dynamic> records = _sortedSongs;
     int total = records.length;
     int sssp = 0; // ≥SSS+
     int sss = 0;  // ≥SSS
@@ -890,7 +890,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 4, 8, 16), // 进一步减小上边距，从8减小到4
+                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16), // 进一步减小上边距，从4减小到0
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.9), // 增加白色不透明度，使背景更深
                     borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
@@ -1399,7 +1399,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                   child: Stack(
                                                     fit: StackFit.expand,
                                                     children: [
-                                                      CoverPathUtil.buildCoverWidgetWithContextRRect(
+                                                      CoverUtil.buildCoverWidgetWithContextRRect(
                                                         context, 
                                                         song['song_id']?.toString() ?? '', 
                                                         double.infinity
@@ -1408,7 +1408,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                       if (displayText.isNotEmpty) 
                                                         Container(
                                                           decoration: BoxDecoration(
-                                                            color: Colors.black.withOpacity(0.6),
+                                                            color: Colors.black.withOpacity(0.4),
                                                             borderRadius: BorderRadius.circular(6),
                                                           ),
                                                           child: Center(

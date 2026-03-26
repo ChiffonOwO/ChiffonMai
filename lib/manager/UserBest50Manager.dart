@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/entity/UserBest50Entity.dart';
 import 'package:my_first_flutter_app/entity/RecordItem.dart';
 
 class UserBest50Manager {
   // API端点
-  static const String _apiUrl = 'https://www.diving-fish.com/api/maimaidxprober/query/player';
+  static const String _apiUrl = ApiUrls.UserBest50Api;
   
   // 单例实例
   static final UserBest50Manager _instance = UserBest50Manager._internal();

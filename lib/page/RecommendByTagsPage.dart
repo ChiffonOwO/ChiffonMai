@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
 import 'package:my_first_flutter_app/entity/RecommendationResult.dart';
+import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 
 class RecommendByTags extends StatefulWidget {
   const RecommendByTags({super.key});
@@ -26,8 +27,10 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   @override
   void initState() {
     super.initState();
-    // 初始化时获取推荐结果
-    _fetchRecommendations();
+    // 页面加载后延迟一点时间再获取推荐结果，确保页面先显示
+    Future.delayed(Duration(milliseconds: 800), () {
+      _fetchRecommendations();
+    });
   }
 
   // 获取推荐结果
@@ -394,78 +397,92 @@ class _RecommendByTagsState extends State<RecommendByTags> {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
     
-    return Container(
-      margin: EdgeInsets.only(bottom: screenHeight * 0.015), // 底部 margin 为屏幕高度的1.5%
-      padding: EdgeInsets.all(screenWidth * 0.03), // padding 为屏幕宽度的3%
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade200),
-        borderRadius: BorderRadius.circular(8),
-        color: Colors.white,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // 歌曲标题和难度
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  result.songTitle,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: screenWidth * 0.04, // 字体大小为屏幕宽度的4%
+    return GestureDetector(
+      onTap: () {
+        // 导航到SongInfoPage
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SongInfoPage(
+              songId: result.songId,
+              initialLevelIndex: result.levelIndex,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        margin: EdgeInsets.only(bottom: screenHeight * 0.015), // 底部 margin 为屏幕高度的1.5%
+        padding: EdgeInsets.all(screenWidth * 0.03), // padding 为屏幕宽度的3%
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade200),
+          borderRadius: BorderRadius.circular(8),
+          color: Colors.white,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 歌曲标题和难度
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    result.songTitle,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: screenWidth * 0.04, // 字体大小为屏幕宽度的4%
+                    ),
                   ),
                 ),
-              ),
-              Text(
-                result.level,
+                Text(
+                  result.level,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color.fromARGB(255, 84, 97, 97),
+                    fontSize: screenWidth * 0.035, // 字体大小为屏幕宽度的3.5%
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: screenHeight * 0.01), // 间距为屏幕高度的1%
+            
+            // 定数、相似度
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('定数: ${result.ds}'),
+                Text('相似度: ${(result.similarity * 100).toStringAsFixed(1)}%'),
+              ],
+            ),
+            SizedBox(height: screenHeight * 0.01), // 间距为屏幕高度的1%
+            // 最低达成率
+            Text('当前:${result.nowAchievement.toStringAsFixed(4)}%→目标:${result.minAchievement.toStringAsFixed(4)}%'),
+            
+            // 提升Rating信息
+            if (result.ableRiseTotalRating == true)
+            Padding(
+              padding: EdgeInsets.only(top: screenHeight * 0.01), // 顶部 padding 为屏幕高度的1%
+              child: Text(
+                'Rating提升: ' + result.riseTotalRating,
                 style: TextStyle(
+                  color: Colors.green,
                   fontWeight: FontWeight.bold,
-                  color: Color.fromARGB(255, 84, 97, 97),
-                  fontSize: screenWidth * 0.035, // 字体大小为屏幕宽度的3.5%
                 ),
               ),
-            ],
-          ),
-          SizedBox(height: screenHeight * 0.01), // 间距为屏幕高度的1%
-          
-          // 定数、相似度
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('定数: ${result.ds}'),
-              Text('相似度: ${(result.similarity * 100).toStringAsFixed(1)}%'),
-            ],
-          ),
-          SizedBox(height: screenHeight * 0.01), // 间距为屏幕高度的1%
-          // 最低达成率
-          Text('当前:${result.nowAchievement.toStringAsFixed(4)}%→目标:${result.minAchievement.toStringAsFixed(4)}%'),
-          
-          // 提升Rating信息
-          if (result.ableRiseTotalRating == true)
-          Padding(
-            padding: EdgeInsets.only(top: screenHeight * 0.01), // 顶部 padding 为屏幕高度的1%
-            child: Text(
-              'Rating提升: ' + result.riseTotalRating,
-              style: TextStyle(
-                color: Colors.green,
-                fontWeight: FontWeight.bold,
+            ),
+            if (result.ableRiseTotalRating == false)
+            Padding(
+              padding: EdgeInsets.only(top: screenHeight * 0.01), // 顶部 padding 为屏幕高度的1%
+              child: Text(
+                result.riseTotalRating,
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.normal,
+                ),
               ),
             ),
-          ),
-          if (result.ableRiseTotalRating == false)
-          Padding(
-            padding: EdgeInsets.only(top: screenHeight * 0.01), // 顶部 padding 为屏幕高度的1%
-            child: Text(
-              result.riseTotalRating,
-              style: TextStyle(
-                color: Colors.grey,
-                fontWeight: FontWeight.normal,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

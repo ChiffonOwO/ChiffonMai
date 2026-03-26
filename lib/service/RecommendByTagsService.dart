@@ -1,9 +1,7 @@
 // ignore_for_file: slash_for_doc_comments
 
-import 'dart:convert';
 import 'dart:math';
 
-import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/entity/RecommendationResult.dart';
 import 'package:my_first_flutter_app/entity/RecordItem.dart';
@@ -17,7 +15,8 @@ class RecommendByTagsService {
   static const int RA_RANGE_LIMIT = 20; // Rating极差上限
   static const String USER_PLAY_DATA_FILE_PATH =
       'assets/userPlayData.json'; // 玩家游玩记录文件路径
-  static const String MAIN_TAG_FILE_PATH = 'assets/maiTags.json'; // 标签文件路径（作为 fallback）
+  static const String MAIN_TAG_FILE_PATH =
+      'assets/maiTags.json'; // 标签文件路径（作为 fallback）
   static const String MAIMAI_MUSIC_DATA_FILE_PATH =
       'assets/maimai_music_data.json'; // 谱面数据文件路径
 
@@ -27,6 +26,7 @@ class RecommendByTagsService {
   static Future<void> initializeTags() async {
     await MaiTagsManager().initializeTags();
   }
+
   static const Map<String, String> TYPE_MAP = {
     "SD": "std",
     "DX": "dx",
@@ -64,15 +64,15 @@ class RecommendByTagsService {
   ];
 
   // 缓存变量
-  static String? _maimaiMusicDataFileContent;
-  static String? _userPlayDataFileContent;
-  static List<Song>? _cachedMaimaiMusicData;
-  static UserPlayDataEntity? _cachedUserPlayDataEntity;
-  static Map<String, bool>? _cachedSongIdToIsNewMap;
-  static Map<String, Map<String, Map<String, double>>>? _cachedChartVectors; // 缓存谱面向量
+  // 仅保留谱面向量缓存，其他缓存由对应的Manager管理
+  static Map<String, Map<String, Map<String, double>>>?
+      _cachedChartVectors; // 缓存谱面向量
+
+  // Group names constants
+  static const String GROUP_CONFIG = 'config';
+  static const String GROUP_DIFFICULTY = 'difficulty';
+  static const String GROUP_EVALUATION = 'evaluation';
 }
-
-
 
 /**
  * 获取玩家游玩记录中的Records数组
@@ -80,51 +80,24 @@ class RecommendByTagsService {
  */
 Future<List<RecordItem>> getUserPlayDataRecords() async {
   try {
-    // 检查缓存
-  if (RecommendByTagsService._cachedUserPlayDataEntity != null) {
-    return RecommendByTagsService._cachedUserPlayDataEntity!.records;
-  }
+    // 直接从 UserPlayDataManager 获取数据
+    final userPlayDataManager = UserPlayDataManager();
+    final cachedUserData = await userPlayDataManager.getCachedUserPlayData();
 
-  // 优先从 UserPlayDataManager 获取数据
-  final userPlayDataManager = UserPlayDataManager();
-  final cachedUserData = await userPlayDataManager.getCachedUserPlayData();
-  
-  if (cachedUserData != null) {
-    // 解析最外层的实体：UserPlayDataEntity
-    UserPlayDataEntity userPlayData = UserPlayDataEntity.fromJson(cachedUserData);
-    // 缓存结果
-    RecommendByTagsService._cachedUserPlayDataEntity = userPlayData;
-    // 提取Records数组
-    List<RecordItem> records = userPlayData.records;
-    return records;
-  } else {
-    // 如果缓存中没有数据，尝试从资产文件加载 JSON 数据作为 fallback
-    String playDataPath = RecommendByTagsService.USER_PLAY_DATA_FILE_PATH;
-    String playDataString;
-
-    // 检查文件内容缓存
-    if (RecommendByTagsService._userPlayDataFileContent == null) {
-      playDataString = await rootBundle.loadString(playDataPath);
-      RecommendByTagsService._userPlayDataFileContent = playDataString;
+    if (cachedUserData != null) {
+      // 解析最外层的实体：UserPlayDataEntity
+      UserPlayDataEntity userPlayData =
+          UserPlayDataEntity.fromJson(cachedUserData);
+      // 提取Records数组
+      List<RecordItem> records = userPlayData.records;
+      return records;
     } else {
-      playDataString = RecommendByTagsService._userPlayDataFileContent!;
+      // 如果缓存中没有数据，返回空列表
+      print('UserPlayDataManager 中没有缓存数据');
+      return [];
     }
-
-    // 解析为最外层Map
-    Map<String, dynamic> playDataJson = json.decode(playDataString);
-
-    // 解析最外层的实体：UserPlayDataEntity
-    UserPlayDataEntity userPlayData = UserPlayDataEntity.fromJson(playDataJson);
-    // 缓存结果
-    RecommendByTagsService._cachedUserPlayDataEntity = userPlayData;
-
-    // 提取Records数组
-    List<RecordItem> records = userPlayData.records;
-
-    return records;
-  }
   } catch (e) {
-    print('json解析失败: $e');
+    print('获取玩家游玩记录失败: $e');
     return [];
   }
 }
@@ -165,22 +138,24 @@ Future<Map<String, Map<String, int>>> countTagsByGroup(
   // 获取标签管理器实例
   final maiTagsManager = MaiTagsManager();
 
-  // 第一步：构建分组ID到分组名称的映射，如 1 -> 配置
-  Map<int, String> groupIdToNameMap = await maiTagsManager.getGroupIdToNameMap();
-  if (groupIdToNameMap.isEmpty) {
-    print('分组ID到分组名称的映射为空');
-    return {};
-  }
+  // 构建分组ID到分组名称的映射，使用英文常量
+  Map<int, String> groupIdToNameMap = {
+    1: RecommendByTagsService.GROUP_CONFIG,
+    2: RecommendByTagsService.GROUP_DIFFICULTY,
+    3: RecommendByTagsService.GROUP_EVALUATION,
+  };
 
   // 第二步：构建标签ID → (标签名称, 分组ID) 的映射, 如 22 -> (高物量, 3)
-  Map<int, (String, int)> tagIdToInfoMap = await maiTagsManager.getTagIdToInfoMap();
+  Map<int, (String, int)> tagIdToInfoMap =
+      await maiTagsManager.getTagIdToInfoMap();
   if (tagIdToInfoMap.isEmpty) {
     print('标签ID到信息的映射为空');
     return {};
   }
 
   // 第三步：构建 谱面标识 → 标签ID列表 的映射
-  Map<String, List<int>> songIdToTagIdsMap = await maiTagsManager.getSongIdToTagIdsMap();
+  Map<String, List<int>> songIdToTagIdsMap =
+      await maiTagsManager.getSongIdToTagIdsMap();
 
   // 第四步：遍历筛选后的RA谱面，按分组统计标签出现次数
   // 分组名 → (标签名 → 出现次数)
@@ -189,9 +164,19 @@ Future<Map<String, Map<String, int>>> countTagsByGroup(
   Set<String> processedSongKeys = {};
   for (var record in filteredRecords) {
     // 构建谱面标识，注意type和难度需要相关映射，两个数据源的属性值不同
+    String sheetType = '';
+    if (RecommendByTagsService.TYPE_MAP.containsKey(record.type)) {
+      sheetType = RecommendByTagsService.TYPE_MAP[record.type]!;
+    } else {
+      // 尝试反向映射
+      sheetType = RecommendByTagsService.TYPE_MAP.entries
+          .firstWhere((entry) => entry.value == record.type.toLowerCase(),
+              orElse: () => MapEntry('', ''))
+          .value;
+    }
     String songKey = record.title +
         "#" +
-        RecommendByTagsService.TYPE_MAP[record.type]! +
+        sheetType +
         "#" +
         RecommendByTagsService.LEVEL_INDEX_MAP[record.levelIndex]!;
     // 如果该谱面已被处理过，则跳过
@@ -202,29 +187,30 @@ Future<Map<String, Map<String, int>>> countTagsByGroup(
 
     //获取该谱面的所有标签ID
     List<int>? tagIds = songIdToTagIdsMap[songKey] ?? [];
-    String tagName = "";
-    int groupId = 0;
     for (var tagId in tagIds) {
       final tagInfo = tagIdToInfoMap[tagId];
       if (tagInfo != null) {
         // 解构提取 tagName 和 groupId
-        (tagName, groupId) = tagInfo;
-      }
-      // 获取分组名称
-      String groupName = groupIdToNameMap[groupId]!;
+        String tagName = tagInfo.$1;
+        int groupId = tagInfo.$2;
 
-      // 如果目标分组不存在，则初始化分组的标签统计Map
-      if (!groupTagCountMap.containsKey(groupName)) {
-        groupTagCountMap[groupName] = {};
-      }
+        // 获取分组名称
+        String? groupName = groupIdToNameMap[groupId];
+        if (groupName != null) {
+          // 如果目标分组不存在，则初始化分组的标签统计Map
+          if (!groupTagCountMap.containsKey(groupName)) {
+            groupTagCountMap[groupName] = {};
+          }
 
-      Map<String, int> tagCountMap = groupTagCountMap[groupName]!;
-      // 如果标签不存在，则初始化
-      if (!tagCountMap.containsKey(tagName)) {
-        tagCountMap[tagName] = 0;
+          Map<String, int> tagCountMap = groupTagCountMap[groupName]!;
+          // 如果标签不存在，则初始化
+          if (!tagCountMap.containsKey(tagName)) {
+            tagCountMap[tagName] = 0;
+          }
+          // 增加标签出现次数
+          tagCountMap[tagName] = tagCountMap[tagName]! + 1;
+        }
       }
-      // 增加标签出现次数
-      tagCountMap[tagName] = tagCountMap[tagName]! + 1;
     }
   }
   return groupTagCountMap;
@@ -239,9 +225,17 @@ Future<Map<String, Map<String, int>>> countTagsByGroup(
 Future<Map<String, Map<String, double>>> calculatePlayerAbilityVectors(
     List<RecordItem> filteredRecords) async {
   Map<String, Map<String, double>> playerAbilityVectors = {};
-  // 先求出玩家筛选后的数据中的变迁出现次数(按分组统计)
+  // 先求出玩家筛选后的数据中的各标签出现次数(按分组统计)
   Map<String, Map<String, int>> groupTagCountMap =
       await countTagsByGroup(filteredRecords);
+  // 打印分组统计标签出现次数
+  print('按分组统计标签出现次数:');
+  groupTagCountMap.forEach((groupName, tagCounts) {
+    print('  $groupName:');
+    tagCounts.forEach((tagName, count) {
+      print('    $tagName: $count');
+    });
+  });
   // 遍历每个分组，计算其下各标签的能力向量
   for (var groupName in groupTagCountMap.keys) {
     // 对于每个分组，计算其下各标签的能力向量
@@ -254,6 +248,14 @@ Future<Map<String, Map<String, double>>> calculatePlayerAbilityVectors(
       playerAbilityVectors[groupName]![tagName] = frequency;
     }
   }
+  // 打印玩家能力向量
+  print('玩家能力向量:');
+  playerAbilityVectors.forEach((groupName, tagWeights) {
+    print('  $groupName:');
+    tagWeights.forEach((tagName, weight) {
+      print('    $tagName: ${weight.toStringAsFixed(4)}');
+    });
+  });
   return playerAbilityVectors;
 }
 
@@ -266,66 +268,22 @@ Future<Map<String, Map<String, double>>> calculatePlayerAbilityVectors(
  */
 Future<List<RecordItem>> getBestNRecords(
     List<RecordItem> allRecords, int n, bool isNewOnly) async {
-  // 检查缓存
-  if (RecommendByTagsService._cachedSongIdToIsNewMap == null) {
-    // 1. 优先使用 MaimaiMusicDataManager 中的数据
-    if (await MaimaiMusicDataManager().hasCachedData()) {
-      final songs = await MaimaiMusicDataManager().getCachedSongs();
-      if (songs != null) {
-        // 2. 构建 songId 到 isNew 的映射
-        RecommendByTagsService._cachedSongIdToIsNewMap = {
-          for (var song in songs) song.id: song.basicInfo.isNew,
-        };
-      } else {
-        // 3. 如果 API 数据不存在，尝试从资产文件加载 JSON 数据作为 fallback
-        String maimaiMusicDataString;
-        if (RecommendByTagsService._maimaiMusicDataFileContent == null) {
-          maimaiMusicDataString = await rootBundle
-              .loadString(RecommendByTagsService.MAIMAI_MUSIC_DATA_FILE_PATH);
-          RecommendByTagsService._maimaiMusicDataFileContent =
-              maimaiMusicDataString;
-        } else {
-          maimaiMusicDataString =
-              RecommendByTagsService._maimaiMusicDataFileContent!;
-        }
+  // 直接使用 MaimaiMusicDataManager 中的数据构建 songId 到 isNew 的映射
+  final maimaiMusicDataManager = MaimaiMusicDataManager();
+  Map<String, bool> songIdToIsNewMap = {};
 
-        final List<dynamic> rawSongList = json.decode(maimaiMusicDataString);
-        final List<Song> maimaiMusicData = rawSongList
-            .map((json) => Song.fromJson(json as Map<String, dynamic>))
-            .toList();
-
-        // 构建 songId 到 isNew 的映射
-        RecommendByTagsService._cachedSongIdToIsNewMap = {
-          for (var song in maimaiMusicData) song.id: song.basicInfo.isNew,
-        };
-      }
-    } else {
-      // 4. 如果 MaimaiMusicDataManager 中没有数据，尝试从资产文件加载
-      String maimaiMusicDataString;
-      if (RecommendByTagsService._maimaiMusicDataFileContent == null) {
-        maimaiMusicDataString = await rootBundle
-            .loadString(RecommendByTagsService.MAIMAI_MUSIC_DATA_FILE_PATH);
-        RecommendByTagsService._maimaiMusicDataFileContent =
-            maimaiMusicDataString;
-      } else {
-        maimaiMusicDataString =
-            RecommendByTagsService._maimaiMusicDataFileContent!;
-      }
-
-      final List<dynamic> rawSongList = json.decode(maimaiMusicDataString);
-      final List<Song> maimaiMusicData = rawSongList
-          .map((json) => Song.fromJson(json as Map<String, dynamic>))
-          .toList();
-
+  if (await maimaiMusicDataManager.hasCachedData()) {
+    final songs = await maimaiMusicDataManager.getCachedSongs();
+    if (songs != null) {
       // 构建 songId 到 isNew 的映射
-      RecommendByTagsService._cachedSongIdToIsNewMap = {
-        for (var song in maimaiMusicData) song.id: song.basicInfo.isNew,
+      songIdToIsNewMap = {
+        for (var song in songs) song.id: song.basicInfo.isNew,
       };
     }
+  } else {
+    print('MaimaiMusicDataManager 中没有缓存数据');
+    return [];
   }
-
-  Map<String, bool> songIdToIsNewMap =
-      RecommendByTagsService._cachedSongIdToIsNewMap!;
 
   // 3. 优化后的筛选+排序+取前 N 逻辑
   final List<RecordItem> bestRecords = allRecords
@@ -403,12 +361,20 @@ Future<Map<String, Map<String, double>>> calculateChartVectors(
     RecordItem recordItem) async {
   // 构建谱面唯一标识
   String songTitle = recordItem.title;
-  String sheetType = RecommendByTagsService.TYPE_MAP[recordItem.type] ?? '';
-  String sheetDifficulty = RecommendByTagsService.LEVEL_INDEX_MAP[recordItem.levelIndex] ?? '';
+  // 处理类型映射，确保统一使用 std/dx 格式
+  String sheetType = '';
+  if (RecommendByTagsService.TYPE_MAP.containsKey(recordItem.type)) {
+    sheetType = RecommendByTagsService.TYPE_MAP[recordItem.type]!;
+  } else if (recordItem.type.toLowerCase() == 'std' ||
+      recordItem.type.toLowerCase() == 'dx') {
+    sheetType = recordItem.type.toLowerCase();
+  }
+  String sheetDifficulty =
+      RecommendByTagsService.LEVEL_INDEX_MAP[recordItem.levelIndex] ?? '';
   String songKey = songTitle + "#" + sheetType + "#" + sheetDifficulty;
-  
+
   // 检查缓存
-  if (RecommendByTagsService._cachedChartVectors != null && 
+  if (RecommendByTagsService._cachedChartVectors != null &&
       RecommendByTagsService._cachedChartVectors!.containsKey(songKey)) {
     return RecommendByTagsService._cachedChartVectors![songKey]!;
   }
@@ -417,7 +383,8 @@ Future<Map<String, Map<String, double>>> calculateChartVectors(
   final maiTagsManager = MaiTagsManager();
 
   // 构建 谱面标识 = 谱面ID + 谱面类型 + 谱面难度 到 标签ID列表 的映射
-  Map<String, List<int>> songIdToTagIdsMap = await maiTagsManager.getSongIdToTagIdsMap();
+  Map<String, List<int>> songIdToTagIdsMap =
+      await maiTagsManager.getSongIdToTagIdsMap();
 
   // 构建 标签ID 到 标签名称 的映射
   Map<int, String> tagIdToNameMap = {};
@@ -460,38 +427,46 @@ Future<Map<String, Map<String, double>>> calculateChartVectors(
     if (tagName.isEmpty) {
       continue;
     }
-    groupTagCounts[groupId]![tagName] = (groupTagCounts[groupId]![tagName] ?? 0) + 1;
+    groupTagCounts[groupId]![tagName] =
+        (groupTagCounts[groupId]![tagName] ?? 0) + 1;
     groupTotalTags[groupId] = (groupTotalTags[groupId] ?? 0) + 1;
   }
 
   // 计算三个向量
   Map<String, Map<String, double>> chartVectors = {};
+
   // 配置向量(groupId == 1)
   Map<String, double> configVector = {};
-  for (String tagName in groupTagCounts[1]!.keys) {
-    int count = groupTagCounts[1]![tagName] ?? 0;
-    double weight = count / groupTotalTags[1]!;
-    configVector[tagName] = weight;
+  if (groupTotalTags[1]! > 0) {
+    for (String tagName in groupTagCounts[1]!.keys) {
+      int count = groupTagCounts[1]![tagName] ?? 0;
+      double weight = count / groupTotalTags[1]!;
+      configVector[tagName] = weight;
+    }
   }
-  chartVectors['config'] = configVector;
+  chartVectors[RecommendByTagsService.GROUP_CONFIG] = configVector;
 
   // 难度向量(groupId == 2)
   Map<String, double> difficultyVector = {};
-  for (String tagName in groupTagCounts[2]!.keys) {
-    int count = groupTagCounts[2]![tagName] ?? 0;
-    double weight = count / groupTotalTags[2]!;
-    difficultyVector[tagName] = weight;
+  if (groupTotalTags[2]! > 0) {
+    for (String tagName in groupTagCounts[2]!.keys) {
+      int count = groupTagCounts[2]![tagName] ?? 0;
+      double weight = count / groupTotalTags[2]!;
+      difficultyVector[tagName] = weight;
+    }
   }
-  chartVectors['difficulty'] = difficultyVector;
+  chartVectors[RecommendByTagsService.GROUP_DIFFICULTY] = difficultyVector;
 
   // 评价向量(groupId == 3)
   Map<String, double> modeVector = {};
-  for (String tagName in groupTagCounts[3]!.keys) {
-    int count = groupTagCounts[3]![tagName] ?? 0;
-    double weight = count / groupTotalTags[3]!;
-    modeVector[tagName] = weight;
+  if (groupTotalTags[3]! > 0) {
+    for (String tagName in groupTagCounts[3]!.keys) {
+      int count = groupTagCounts[3]![tagName] ?? 0;
+      double weight = count / groupTotalTags[3]!;
+      modeVector[tagName] = weight;
+    }
   }
-  chartVectors['evaluation'] = modeVector;
+  chartVectors[RecommendByTagsService.GROUP_EVALUATION] = modeVector;
 
   // 缓存结果
   if (RecommendByTagsService._cachedChartVectors == null) {
@@ -547,21 +522,24 @@ double calculateSimilarity(
     Map<String, Map<String, double>> chartVectors) {
   // 计算每个向量的相似度，添加空值检查
   double configSimilarity = 0.0;
-  if (playerAbilityVectors.containsKey('配置') && chartVectors.containsKey('config')) {
+  if (playerAbilityVectors.containsKey(RecommendByTagsService.GROUP_CONFIG)) {
     configSimilarity = calculateVectorSimilarity(
-        playerAbilityVectors['配置']!, chartVectors['config']!);
+        playerAbilityVectors[RecommendByTagsService.GROUP_CONFIG]!,
+        chartVectors[RecommendByTagsService.GROUP_CONFIG] ?? {});
   }
-  
+
   double difficultySimilarity = 0.0;
-  if (playerAbilityVectors.containsKey('难度') && chartVectors.containsKey('difficulty')) {
+  if (playerAbilityVectors.containsKey(RecommendByTagsService.GROUP_DIFFICULTY)) {
     difficultySimilarity = calculateVectorSimilarity(
-        playerAbilityVectors['难度']!, chartVectors['difficulty']!);
+        playerAbilityVectors[RecommendByTagsService.GROUP_DIFFICULTY]!,
+        chartVectors[RecommendByTagsService.GROUP_DIFFICULTY] ?? {});
   }
-  
+
   double evaluationSimilarity = 0.0;
-  if (playerAbilityVectors.containsKey('评价') && chartVectors.containsKey('evaluation')) {
+  if (playerAbilityVectors.containsKey(RecommendByTagsService.GROUP_EVALUATION)) {
     evaluationSimilarity = calculateVectorSimilarity(
-        playerAbilityVectors['评价']!, chartVectors['evaluation']!);
+        playerAbilityVectors[RecommendByTagsService.GROUP_EVALUATION]!,
+        chartVectors[RecommendByTagsService.GROUP_EVALUATION] ?? {});
   }
 
   // 设定权重
@@ -578,7 +556,6 @@ double calculateSimilarity(
 /**
  * 计算推荐结果
  * 基于玩家的能力向量和谱面记录，计算推荐结果
- *  @param maimaiMusicData 所有歌曲列表
  *  @param allRecords 所有谱面记录列表
  *  @param playerAbilityVectors 玩家的能力向量Map（键：分组名称，值：该分组下各标签的能力向量Map）
  *  @param minDs 目标定数下限
@@ -591,7 +568,6 @@ double calculateSimilarity(
  *  @return 推荐结果列表
  */
 Future<List<RecommendationResult>> calculateRecommendations(
-    List<Song> maimaiMusicData,
     List<RecordItem> allRecords,
     Map<String, Map<String, double>> playerAbilityVectors,
     double minDs,
@@ -604,32 +580,15 @@ Future<List<RecommendationResult>> calculateRecommendations(
   List<RecommendationResult> recommendations = [];
   // 初始化所有歌曲列表
   List<Song>? songs;
-  if (RecommendByTagsService._cachedMaimaiMusicData == null) {
-    // 优先使用 MaimaiMusicDataManager 中的数据
-    if (await MaimaiMusicDataManager().hasCachedData()) {
-      songs = await MaimaiMusicDataManager().getCachedSongs();
-    } else {
-      // 如果 API 数据不存在，尝试从资产文件加载 JSON 数据作为 fallback
-      String maimaiMusicDataString;
-      if (RecommendByTagsService._maimaiMusicDataFileContent == null) {
-        maimaiMusicDataString = await rootBundle
-            .loadString(RecommendByTagsService.MAIMAI_MUSIC_DATA_FILE_PATH);
-        RecommendByTagsService._maimaiMusicDataFileContent =
-            maimaiMusicDataString;
-      } else {
-        maimaiMusicDataString =
-            RecommendByTagsService._maimaiMusicDataFileContent!;
-      }
-      final List<dynamic> rawSongList = json.decode(maimaiMusicDataString);
-      songs = rawSongList
-          .map((json) => Song.fromJson(json as Map<String, dynamic>))
-          .toList();
-    }
-    RecommendByTagsService._cachedMaimaiMusicData = songs;
+  // 直接使用 MaimaiMusicDataManager 中的数据
+  final maimaiMusicDataManager = MaimaiMusicDataManager();
+  if (await maimaiMusicDataManager.hasCachedData()) {
+    songs = await maimaiMusicDataManager.getCachedSongs();
   } else {
-    songs = RecommendByTagsService._cachedMaimaiMusicData!;
+    print('MaimaiMusicDataManager 中没有缓存数据');
+    return [];
   }
-  
+
   // 预构建玩家记录的映射，提高查找效率
   Map<String, RecordItem> playerRecordMap = {};
   for (var record in allRecords) {
@@ -662,15 +621,17 @@ Future<List<RecommendationResult>> calculateRecommendations(
           continue;
         }
 
-        // 计算能落入rating区间的最低达成率
+        // 检查玩家是否在此谱面上有记录
+        double currentAchievement = double.parse(existingRecord?.achievements.toString() ?? '0.0');
+        // 计算能落入rating区间的最低达成率（用于后续计算）
         double minAchievements = 0.0;
         if (isNewOnly == false)
-          minAchievements = calculateMinAchievements(ds, best35minRating);
+          minAchievements = calculateMinAchievements(ds, best35minRating, currentAchievement);
         if (isNewOnly == true)
-          minAchievements = calculateMinAchievements(ds, minRating);
+          minAchievements = calculateMinAchievements(ds, minRating, currentAchievement);
 
-        // 提前过滤，避免不必要的计算
-        if (minAchievements < 100.0) {
+        // 提前过滤，避免不必要的计算 - 只过滤掉无法达到目标Rating的歌曲
+        if (minAchievements > 100.5) {
           continue;
         }
 
@@ -704,7 +665,7 @@ Future<List<RecommendationResult>> calculateRecommendations(
         // 将综合相似度 >= 0.5 的谱面加入推荐结果列表
         if (similarity >= 0.5) {
           // 计算此推荐结果能否带来Rating的提升
-          int minAchievementsRating =
+          int minAchievementsRating = 
               calculateSingleRating(ds, minAchievements);
           // 对于Best35的提升情况
           if (isNewOnly == false && minAchievementsRating > best35minRating) {
@@ -721,17 +682,25 @@ Future<List<RecommendationResult>> calculateRecommendations(
 
           // 根据转换的对象中的已知条件找出玩家这个谱面的达成率
           RecordItem? playerRecord = playerRecordMap[recordKey] ?? recordItem;
+          // 确保目标达成率始终大于玩家目前达成率
+          double targetAchievement = minAchievements;
+          if (playerRecord.achievements >= minAchievements) {
+            // 如果当前达成率大于等于最低达成率，则目标达成率为当前达成率加上一个小的增量
+            targetAchievement = playerRecord.achievements + 0.001;
+          }
           recommendations.add(RecommendationResult(
             songTitle: song.basicInfo.title,
             level: song.level[i],
             ds: ds,
             similarity: similarity,
-            nowAchievement: playerRecord.achievements,
-            minAchievement: minAchievements,
+            nowAchievement: double.parse(playerRecord.achievements.toString()),
+            minAchievement: targetAchievement,
             ableRiseTotalRating: ableRiseTotalRating,
             riseTotalRating: ableRiseTotalRating
                 ? "+" + riseToatalRating.toString()
                 : '无Rating提升,推荐练习',
+            songId: song.id,
+            levelIndex: i,
           ));
         }
       }
@@ -772,27 +741,86 @@ Future<List<RecommendationResult>> calculateRecommendations(
 /**
  * 计算能落入rating区间的最低达成率
  * @param ds 谱面定数
- * @param targetRating 目标Rating
- * @return 能落入rating区间的最低达成率
+ * @param targetRa 目标Rating
+ * @param currentAchievement 当前达成率
+ * @return 能落入rating区间的最低达成率，且始终大于当前达成率
  */
-double calculateMinAchievements(double ds, int targetRa) {
-  // 避免除以零
-  if (ds <= 0 || RecommendByTagsService.RATING_WEIGHT[2] <= 0) {
-    return 100.5;
+double calculateMinAchievements(double ds, int targetRa, double currentAchievement) {
+  // 生成所有可能的分数点
+  List<double> achievementPoints = generateAchievementPoints(ds, currentAchievement);
+  
+  // 从分数点中找到能达到目标Rating的最低达成率
+  double minAchievement = 100.5; // 默认值
+  
+  for (double achievement in achievementPoints) {
+    int ra = calculateSingleRating(ds, achievement);
+    if (ra >= targetRa) {
+      minAchievement = achievement;
+      break; // 找到第一个能达到目标Rating的分数点
+    }
   }
-
-  // 计算能落入rating区间的最低达成率
-  double achievement =
-      targetRa / (ds * RecommendByTagsService.RATING_WEIGHT[2]);
-  // 注意到回代验证有.9999的存在，所以需要二次验证
-  double roundedRa =
-      achievement * (ds * RecommendByTagsService.RATING_WEIGHT[2]);
-  if (roundedRa.truncate() < targetRa) {
-    achievement = 100.5;
-  }
-
-  return min(achievement, 100.5);
+  
+  return minAchievement;
 }
+
+/**
+ * 生成推荐结果所需的分数点
+ * @param ds 谱面定数
+ * @param currentAchievement 当前达成率
+ * @return 分数点列表，包含100-100.5%之间的最多2个值，以及100.5%
+ */
+List<double> generateAchievementPoints(double ds, double currentAchievement) {
+  List<double> points = [];
+  
+  // 计算100%对应的Rating
+  int raAt100 = calculateSingleRating(ds, 100.0);
+  
+  // 计算100-100.5%之间的点
+  int additionalPoints = 0;
+  double currentPoint = currentAchievement + 0.001; // 确保大于当前达成率
+  
+  // 确保起点不低于100.0
+  if (currentPoint < 100.0) {
+    currentPoint = 100.0;
+  }
+  
+  // 尝试找到第一个点（Rating比100%高1）
+  while (currentPoint < 100.5 && additionalPoints < 2) {
+    currentPoint += 0.001;
+    int currentRa = calculateSingleRating(ds, currentPoint);
+    if (currentRa == raAt100 + 1) {
+      points.add(currentPoint);
+      additionalPoints++;
+    } else if (currentRa > raAt100 + 1) {
+      break;
+    }
+  }
+  
+  // 尝试找到第二个点（Rating比100%高2）
+  if (additionalPoints < 2) {
+    while (currentPoint < 100.5) {
+      currentPoint += 0.001;
+      int currentRa = calculateSingleRating(ds, currentPoint);
+      if (currentRa == raAt100 + 2) {
+        points.add(currentPoint);
+        additionalPoints++;
+        break;
+      } else if (currentRa > raAt100 + 2) {
+        break;
+      }
+    }
+  }
+  
+  // 100.5% 达成率
+  double hundredPointFive = 100.5;
+  if (hundredPointFive > currentAchievement) {
+    points.add(hundredPointFive);
+  }
+  
+  return points;
+}
+
+
 
 /**
  * 推荐算法实现 
@@ -809,52 +837,69 @@ Future<Map<String, List<RecommendationResult>>> recommendSongs() async {
   };
 
   try {
+    // 初始化标签数据
+    await MaiTagsManager().initializeTags();
+    print('标签数据初始化完成');
+
     // 使用已经筛选的单曲Rating最高的70个谱面
     List<RecordItem> userPlayDataRecords = await getUserPlayDataRecords();
-    List<RecordItem> filteredRecords =
+    print('获取到 ${userPlayDataRecords.length} 条玩家游玩记录');
+
+    List<RecordItem> filteredRecords = 
         filterRecordsByRating(userPlayDataRecords);
+    print('筛选后得到 ${filteredRecords.length} 条记录');
 
     // 根据Best70标签的出现频率计算玩家的能力向量(3个向量)
-    Map<String, Map<String, double>> playerAbilityVectors =
+    Map<String, Map<String, double>> playerAbilityVectors = 
         await calculatePlayerAbilityVectors(filteredRecords);
+    print('计算得到玩家能力向量: ${playerAbilityVectors.keys.toList()}');
 
     // 获取玩家的过往版本中的Best55和当前版本中的Best15
-    List<RecordItem> best55 =
+    List<RecordItem> best55 = 
         await getBestNRecords(userPlayDataRecords, 55, false);
-    List<RecordItem> best15 =
+    print('获取到 ${best55.length} 条Best55记录');
+
+    List<RecordItem> best15 = 
         await getBestNRecords(userPlayDataRecords, 15, true);
+    print('获取到 ${best15.length} 条Best15记录');
 
     // 计算过往版本中的Best35用于判断Best55推荐结果是否能够增长总Rating
-    List<RecordItem> best35 =
+    List<RecordItem> best35 = 
         await getBestNRecords(userPlayDataRecords, 35, false);
-    // for (var record in best35) {
-    //   print(record.toString());
-    // }
+    print('获取到 ${best35.length} 条Best35记录');
 
     // 获取Rating范围
     int best55minRating = 0;
     int best55maxRating = 0;
     (best55minRating, best55maxRating) = getRaRange(best55);
+    print('Best55 Rating范围: $best55minRating - $best55maxRating');
+
     int best15minRating = 0;
     int best15maxRating = 0;
     (best15minRating, best15maxRating) = getRaRange(best15);
+    print('Best15 Rating范围: $best15minRating - $best15maxRating');
+
     int best35minRating = 0;
     int best35maxRating = 0;
     (best35minRating, best35maxRating) = getRaRange(best35);
+    print('Best35 Rating范围: $best35minRating - $best35maxRating');
 
     // 获取定数范围
     double best55minDs = 0.0;
     double best55maxDs = 0.0;
-    (best55minDs, best55maxDs) =
+    (best55minDs, best55maxDs) = 
         getDifficultyRange(best55minRating, best55maxRating);
+    print('Best55 定数范围: $best55minDs - $best55maxDs');
+
     double best15minDs = 0.0;
     double best15maxDs = 0.0;
-    (best15minDs, best15maxDs) =
+    (best15minDs, best15maxDs) = 
         getDifficultyRange(best15minRating, best15maxRating);
+    print('Best15 定数范围: $best15minDs - $best15maxDs');
 
-    // 计算b55推荐结果
-    List<RecommendationResult> best55Recommendations =
-        await calculateRecommendations([],
+    // 并行计算推荐结果，提高性能
+    final Future<List<RecommendationResult>> best55Future = 
+        calculateRecommendations(
             userPlayDataRecords,
             playerAbilityVectors,
             best55minDs,
@@ -864,11 +909,9 @@ Future<Map<String, List<RecommendationResult>>> recommendSongs() async {
             best35minRating,
             best35maxRating,
             false);
-    best55Recommendations.sort((a, b) => b.similarity.compareTo(a.similarity));
 
-    // 计算b15推荐结果
-    List<RecommendationResult> best15Recommendations =
-        await calculateRecommendations([],
+    final Future<List<RecommendationResult>> best15Future = 
+        calculateRecommendations(
             userPlayDataRecords,
             playerAbilityVectors,
             best15minDs,
@@ -878,6 +921,14 @@ Future<Map<String, List<RecommendationResult>>> recommendSongs() async {
             best35minRating,
             best35maxRating,
             true);
+
+    // 等待两个计算完成
+    final best55Recommendations = await best55Future;
+    print('计算得到 ${best55Recommendations.length} 条Best55推荐结果');
+    best55Recommendations.sort((a, b) => b.similarity.compareTo(a.similarity));
+
+    final best15Recommendations = await best15Future;
+    print('计算得到 ${best15Recommendations.length} 条Best15推荐结果');
     best15Recommendations.sort((a, b) => b.similarity.compareTo(a.similarity));
 
     // 返回推荐结果

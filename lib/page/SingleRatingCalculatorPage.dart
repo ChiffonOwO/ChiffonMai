@@ -131,6 +131,32 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
 
   @override
   Widget build(BuildContext context) {
+    // 获取屏幕尺寸
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
+    // 计算尺寸参数
+    final titleTop = screenHeight * 0.08; // 标题距离顶部为屏幕高度的8%
+    final backButtonTop = screenHeight * 0.05; // 返回按钮距离顶部为屏幕高度的5%
+    final backButtonLeft = screenWidth * 0.03; // 返回按钮距离左侧为屏幕宽度的3%
+    final contentTop = screenHeight * 0.15; // 内容区域距离顶部为屏幕高度的15%
+    final contentBottom = screenHeight * 0.03; // 内容区域距离底部为屏幕高度的3%
+    final contentHorizontalPadding = screenWidth * 0.015; // 内容区域水平内边距为屏幕宽度的1.5%
+    final innerPadding = screenWidth * 0.04; // 内部padding为屏幕宽度的4%
+    final smallSpacing = screenHeight * 0.01; // 小间距为屏幕高度的1%
+    final mediumSpacing = screenHeight * 0.02; // 中间距为屏幕高度的2%
+    final borderRadius = screenWidth * 0.02; // 边框圆角为屏幕宽度的2%
+    
+    // 字体大小
+    final titleFontSize = screenWidth * 0.06; // 标题字体大小为屏幕宽度的6%
+    final subtitleFontSize = screenWidth * 0.045; // 副标题字体大小为屏幕宽度的4.5%
+    final bodyFontSize = screenWidth * 0.04; // 正文字体大小为屏幕宽度的4%
+    final smallFontSize = screenWidth * 0.035; // 小字体大小为屏幕宽度的3.5%
+    final buttonFontSize = screenWidth * 0.045; // 按钮字体大小为屏幕宽度的4.5%
+    
+    // 图标大小
+    final backButtonSize = screenWidth * 0.06; // 返回按钮图标大小为屏幕宽度的6%
+    
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: false,
@@ -156,7 +182,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
             // 层级2：第一张虚化装饰图 - 居中显示，轻微向上偏移
             Center(
               child: Transform.translate(
-                offset: const Offset(0, -20),
+                offset: Offset(0, -screenHeight * 0.02),
                 child: Transform.scale(
                   scale: 1,
                   child: Image.asset(
@@ -169,8 +195,8 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
             ),
 
             // 页面标题
-            const Positioned(
-              top: 60,
+            Positioned(
+              top: titleTop,
               left: 0,
               right: 0,
               child: Center(
@@ -178,7 +204,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                   "单曲Rating计算",
                   style: TextStyle(
                     color: Color.fromARGB(255, 84, 97, 97),
-                    fontSize: 24,
+                    fontSize: titleFontSize,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 2,
                   ),
@@ -188,10 +214,10 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
 
             // 返回按钮
             Positioned(
-              top: 40,
-              left: 10,
+              top: backButtonTop,
+              left: backButtonLeft,
               child: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Color.fromARGB(255, 84, 97, 97), size: 24),
+                icon: Icon(Icons.arrow_back, color: Color.fromARGB(255, 84, 97, 97), size: backButtonSize),
                 onPressed: () {
                   Navigator.pop(context);
                 },
@@ -200,19 +226,19 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
 
             // 主要内容区域 - 使用SingleChildScrollView实现滚动
             Positioned(
-              top: 120,
-              left: 0,
-              right: 0,
-              bottom: 20,
+              top: contentTop,
+              left: contentHorizontalPadding,
+              right: contentHorizontalPadding,
+              bottom: contentBottom,
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.01),
                 child: Column(
                   children: [
                     // 第一个白色区域：输入和结果
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(8.0),
+                        borderRadius: BorderRadius.circular(borderRadius),
                         boxShadow: const [
                           BoxShadow(
                             color: Colors.black12,
@@ -222,114 +248,114 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                         ],
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.all(16.0),
+                        padding: EdgeInsets.all(innerPadding),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             // 歌曲定数输入
-                            const Text(
+                            Text(
                               '歌曲定数（1.0-15.0）',
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: subtitleFontSize,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.blue,
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            SizedBox(height: smallSpacing),
                             TextField(
                               controller: _difficultyController,
                               keyboardType: TextInputType.numberWithOptions(decimal: true),
                               inputFormatters: [
                                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,1}')),
                               ],
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 border: OutlineInputBorder(),
                                 hintText: '请输入歌曲定数',
-                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                contentPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.03, vertical: screenHeight * 0.01),
                               ),
                             ),
-                            const SizedBox(height: 20),
+                            SizedBox(height: mediumSpacing),
 
                             // 达成率输入
-                            const Text(
+                            Text(
                               '达成率（%）',
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: subtitleFontSize,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.blue,
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            SizedBox(height: smallSpacing),
                             TextField(
                               controller: _completionController,
                               keyboardType: TextInputType.numberWithOptions(decimal: true),
                               inputFormatters: [
                                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,4}')),
                               ],
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 border: OutlineInputBorder(),
                                 hintText: '请输入达成率',
-                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                contentPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.03, vertical: screenHeight * 0.01),
                               ),
                             ),
-                            const SizedBox(height: 20),
+                            SizedBox(height: mediumSpacing),
 
                             // 预留的深色结果区域
                             Container(
                               decoration: BoxDecoration(
                                 color: Colors.grey[800],
-                                borderRadius: BorderRadius.circular(8.0),
+                                borderRadius: BorderRadius.circular(borderRadius),
                               ),
-                              padding: const EdgeInsets.all(16.0),
+                              padding: EdgeInsets.all(innerPadding),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  const Text('计算结果',
+                                  Text('计算结果',
                                     style: TextStyle(
-                                      fontSize: 16,
+                                      fontSize: subtitleFontSize,
                                       fontWeight: FontWeight.bold,
                                       color: Colors.white,
                                     ),
                                   ),
-                                  const SizedBox(height: 16),
+                                  SizedBox(height: mediumSpacing),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      const Text('评级:', style: TextStyle(color: Colors.white)),
+                                      Text('评级:', style: TextStyle(color: Colors.white, fontSize: bodyFontSize)),
                                       Text(
                                         _showResults ? _rating : '-',
-                                        style: const TextStyle(
-                                          fontSize: 18,
+                                        style: TextStyle(
+                                          fontSize: subtitleFontSize,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.white,
                                         ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 8),
+                                  SizedBox(height: smallSpacing),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      const Text('乘数:', style: TextStyle(color: Colors.white)),
+                                      Text('乘数:', style: TextStyle(color: Colors.white, fontSize: bodyFontSize)),
                                       Text(
                                         _showResults ? _multiplier.toString() : '-',
-                                        style: const TextStyle(
-                                          fontSize: 18,
+                                        style: TextStyle(
+                                          fontSize: subtitleFontSize,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.white,
                                         ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 8),
+                                  SizedBox(height: smallSpacing),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      const Text('单曲Rating:', style: TextStyle(color: Colors.white)),
+                                      Text('单曲Rating:', style: TextStyle(color: Colors.white, fontSize: bodyFontSize)),
                                       Text(
                                         _showResults ? _singleRating.toString() : '-',
-                                        style: const TextStyle(
-                                          fontSize: 18,
+                                        style: TextStyle(
+                                          fontSize: subtitleFontSize,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.white,
                                         ),
@@ -339,7 +365,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 20),
+                            SizedBox(height: mediumSpacing),
 
                             // 计算按钮 - 放到第一个白色区域的最下方
                             ElevatedButton(
@@ -347,13 +373,13 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.blue,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                textStyle: const TextStyle(
-                                  fontSize: 20,
+                                padding: EdgeInsets.symmetric(vertical: screenHeight * 0.02),
+                                textStyle: TextStyle(
+                                  fontSize: buttonFontSize,
                                   fontWeight: FontWeight.bold,
                                 ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8.0),
+                                  borderRadius: BorderRadius.circular(borderRadius),
                                 ),
                                 elevation: 5,
                               ),
@@ -363,13 +389,13 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: mediumSpacing),
 
                     // 第二个白色区域：评级对照表
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(8.0),
+                        borderRadius: BorderRadius.circular(borderRadius),
                         boxShadow: const [
                           BoxShadow(
                             color: Colors.black12,
@@ -379,46 +405,46 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                         ],
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.all(16.0),
+                        padding: EdgeInsets.all(innerPadding),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             // 计算公式
-                            const Text(
+                            Text(
                               '单曲Rating = 定数 * 乘数 * 达成率',
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: subtitleFontSize,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.blue,
                               ),
                               textAlign: TextAlign.center,
                             ),
-                            const Text(
+                            Text(
                               '（保留整数部分）',
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: subtitleFontSize,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.blue,
                               ),
                               textAlign: TextAlign.center,
                             ),
-                            const SizedBox(height: 16),
+                            SizedBox(height: mediumSpacing),
 
                             // 表格
                             Table(
                               border: TableBorder.all(color: Colors.grey),
                               children: [
                                 // 表头
-                                const TableRow(
+                                TableRow(
                                   children: [
                                     TableCell(
                                       child: Padding(
-                                        padding: EdgeInsets.all(8.0),
+                                        padding: EdgeInsets.all(smallSpacing * 2),
                                         child: Text(
                                           '完成度',
                                           style: TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 14,
+                                            fontSize: smallFontSize,
                                           ),
                                           textAlign: TextAlign.center,
                                         ),
@@ -426,12 +452,12 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                                     ),
                                     TableCell(
                                       child: Padding(
-                                        padding: EdgeInsets.all(8.0),
+                                        padding: EdgeInsets.all(smallSpacing * 2),
                                         child: Text(
                                           '评级',
                                           style: TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 14,
+                                            fontSize: smallFontSize,
                                           ),
                                           textAlign: TextAlign.center,
                                         ),
@@ -439,12 +465,12 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                                     ),
                                     TableCell(
                                       child: Padding(
-                                        padding: EdgeInsets.all(8.0),
+                                        padding: EdgeInsets.all(smallSpacing * 2),
                                         child: Text(
                                           '乘数',
                                           style: TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 14,
+                                            fontSize: smallFontSize,
                                           ),
                                           textAlign: TextAlign.center,
                                         ),
@@ -458,28 +484,31 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                                     children: [
                                       TableCell(
                                         child: Padding(
-                                          padding: const EdgeInsets.all(8.0),
+                                          padding: EdgeInsets.all(smallSpacing * 2),
                                           child: Text(
                                             item['completion'].toString(),
                                             textAlign: TextAlign.center,
+                                            style: TextStyle(fontSize: smallFontSize),
                                           ),
                                         ),
                                       ),
                                       TableCell(
                                         child: Padding(
-                                          padding: const EdgeInsets.all(8.0),
+                                          padding: EdgeInsets.all(smallSpacing * 2),
                                           child: Text(
                                             item['rating'],
                                             textAlign: TextAlign.center,
+                                            style: TextStyle(fontSize: smallFontSize),
                                           ),
                                         ),
                                       ),
                                       TableCell(
                                         child: Padding(
-                                          padding: const EdgeInsets.all(8.0),
+                                          padding: EdgeInsets.all(smallSpacing * 2),
                                           child: Text(
                                             item['multiplier'].toString(),
                                             textAlign: TextAlign.center,
+                                            style: TextStyle(fontSize: smallFontSize),
                                           ),
                                         ),
                                       ),
@@ -492,7 +521,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: mediumSpacing),
                   ],
                 ),
               ),

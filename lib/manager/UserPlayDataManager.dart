@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:my_first_flutter_app/api/ApiUrls.dart';
+import 'package:my_first_flutter_app/api/DeveloperToken.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UserPlayDataManager {
@@ -13,7 +15,7 @@ class UserPlayDataManager {
   static const String _lastUpdateKey = 'user_play_data_last_update';
 
   // API 地址
-  static const String _apiUrl = 'https://www.diving-fish.com/api/maimaidxprober/dev/player/records';
+  static const String _apiUrl = ApiUrls.UserPlayDataApi;
 
   // 从 API 获取用户游玩数据
   Future<Map<String, dynamic>?> fetchUserPlayData(String qq) async {
@@ -23,7 +25,7 @@ class UserPlayDataManager {
       
       // 设置请求头
       final headers = {
-        'Developer-Token': '4bVsq1wNM37SECueo8GTikyXzhYngUZB',
+        'Developer-Token': DeveloperToken.DivingFishDeveloperToken,
       };
       
       // 发送 GET 请求

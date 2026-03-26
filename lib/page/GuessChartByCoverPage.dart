@@ -6,7 +6,7 @@ import 'package:my_first_flutter_app/entity/GuessSong.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/service/GuessChartByCoverService.dart';
-import 'package:my_first_flutter_app/utils/CoverPathUtil.dart';
+import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class GuessChartByCoverPage extends StatefulWidget {
@@ -256,7 +256,7 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: CoverPathUtil.buildCoverWidgetWithContext(context, song.id, 60),
+                child: CoverUtil.buildCoverWidgetWithContext(context, song.id, 60),
               ),
             ),
             const SizedBox(width: 12),
@@ -354,7 +354,7 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
                 ),
                 child: ClipRRect(
                 borderRadius: BorderRadius.circular(4),
-                child: CoverPathUtil.buildCoverWidgetWithContext(context, guessSong.songId.toString(), 60),
+                child: CoverUtil.buildCoverWidgetWithContext(context, guessSong.songId.toString(), 60),
               ),
               ),
               const SizedBox(width: 12),
@@ -741,7 +741,7 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
           fit: StackFit.expand,
           children: [
             // 完整显示曲绘
-            CoverPathUtil.buildCoverWidgetWithContext(context, songId, 200),
+            CoverUtil.buildCoverWidgetWithContext(context, songId, 200),
             // 顶部遮盖
             Positioned(
               top: 0,
@@ -964,7 +964,7 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
                                                   child: Stack(
                                                     fit: StackFit.expand,
                                                     children: [
-                                                      CoverPathUtil.buildCoverWidgetWithContext(context, _targetSong!.id, 200),
+                                                      CoverUtil.buildCoverWidgetWithContext(context, _targetSong!.id, 200),
                                                       // 红框框选出本轮截取的区域
                                                       if (_cropX1 != null && _cropY1 != null && _cropX2 != null && _cropY2 != null)
                                                         Positioned(
@@ -1161,33 +1161,7 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
                                                             borderRadius:
                                                                 BorderRadius
                                                                     .circular(4),
-                                                            child: Image.asset(
-                                                              GuessChartByCoverService.getCoverPath(_targetSong!.id),
-                                                              fit: BoxFit.cover,
-                                                              errorBuilder: (context, error, stackTrace) {
-                                                                return Image.network(
-                                                                  GuessChartByCoverService.getNetworkCoverUrl(_targetSong!.id),
-                                                                  fit: BoxFit.cover,
-                                                                  errorBuilder: (context, error, stackTrace) {
-                                                                    return Container(
-                                                                      color: Colors
-                                                                              .grey[
-                                                                          200],
-                                                                      child:
-                                                                          const Center(
-                                                                        child: Icon(
-                                                                            Icons
-                                                                                .music_note,
-                                                                            color: Colors
-                                                                                .grey,
-                                                                            size:
-                                                                                20),
-                                                                      ),
-                                                                    );
-                                                                  },
-                                                                );
-                                                              },
-                                                            ),
+                                                            child: CoverUtil.buildCoverWidgetWithContext(context, _targetSong!.id, 60),
                                                           ),
                                                         ),
                                                         const SizedBox(width: 12),

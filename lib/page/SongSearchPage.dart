@@ -5,7 +5,7 @@ import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'dart:async';
 
-import 'package:my_first_flutter_app/utils/CoverPathUtil.dart';
+import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 
 class SongSearchPage extends StatefulWidget {
   const SongSearchPage({super.key});
@@ -921,7 +921,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                 border: Border.all(color: Colors.grey.shade200),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: CoverPathUtil.buildCoverWidget(song.id, 80),
+              child: CoverUtil.buildCoverWidget(song.id, 80),
               // child: Image.asset(
               //   coverUrl,
               //   fit: BoxFit.cover,

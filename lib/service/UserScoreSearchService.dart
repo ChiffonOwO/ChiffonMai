@@ -106,13 +106,33 @@ class UserScoreSearchService {
         var song = _cachedSongs!.firstWhere(
           (s) => s.id == songId,
         );
-        // 如果找到歌曲，且难度索引有效
-        if (song != null && levelIndex >= 0 && levelIndex < song.charts.length) {
-          // 获取对应难度的charts
-          var chart = song.charts[levelIndex];
-          // 计算notes总和
-          int notesSum = chart.notes.fold(0, (sum, note) => sum + note);
-          maxScore = notesSum * 3;
+        // 如果找到歌曲
+        if (song != null) {
+          // 检查ds数组长度
+          if (song.ds != null && song.ds.length == 2) {
+            // 对于ds数组长度为2的特殊歌曲，计算两个难度谱面的最大分数之和
+            if (song.charts.length >= 2) {
+              // 计算第一个难度谱面的最大分数
+              var chart1 = song.charts[0];
+              int notesSum1 = chart1.notes.fold(0, (sum, note) => sum + note);
+              int maxScore1 = notesSum1 * 3;
+              
+              // 计算第二个难度谱面的最大分数
+              var chart2 = song.charts[1];
+              int notesSum2 = chart2.notes.fold(0, (sum, note) => sum + note);
+              int maxScore2 = notesSum2 * 3;
+              
+              // 总最大分数为两个难度谱面的最大分数之和
+              maxScore = maxScore1 + maxScore2;
+            }
+          } else if (levelIndex >= 0 && levelIndex < song.charts.length) {
+            // 对于普通歌曲，使用当前难度的最大分数
+            // 获取对应难度的charts
+            var chart = song.charts[levelIndex];
+            // 计算notes总和
+            int notesSum = chart.notes.fold(0, (sum, note) => sum + note);
+            maxScore = notesSum * 3;
+          }
         }
       }
     } catch (e) {

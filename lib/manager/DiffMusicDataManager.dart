@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/entity/DiffSong.dart';
 
@@ -10,7 +11,7 @@ class DiffMusicDataManager {
   DiffMusicDataManager._internal();
 
   // API 地址
-  static const String _apiUrl = 'https://www.diving-fish.com/api/maimaidxprober/chart_stats';
+  static const String _apiUrl = ApiUrls.DiffMusicDataApi;
   
   // 缓存键
   static const String _cacheKey = 'diff_music_data';

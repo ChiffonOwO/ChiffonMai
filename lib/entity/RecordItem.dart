@@ -1,5 +1,5 @@
 class RecordItem {
-    final double achievements;
+    final num achievements;
     final double ds;
     final int dxScore;
     final String fc;
@@ -49,7 +49,7 @@ class RecordItem {
 
   factory RecordItem.fromJson(Map<String, dynamic> json) {
     return RecordItem(
-      achievements: json['achievements'] ?? 0.0,
+      achievements: json['achievements'] ?? 0,
       ds: json['ds'] ?? 0.0,
       dxScore: json['dxScore'] ?? 0,
       fc: json['fc'] ?? '',

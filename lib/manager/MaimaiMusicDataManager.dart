@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,7 +11,7 @@ class MaimaiMusicDataManager {
   MaimaiMusicDataManager._internal();
 
   // API 地址
-  static const String _apiUrl = 'https://www.diving-fish.com/api/maimaidxprober/music_data';
+  static const String _apiUrl = ApiUrls.MusicDataApi;
 
   // 从 API 获取音乐数据并更新缓存
   Future<bool> fetchAndUpdateMusicData() async {

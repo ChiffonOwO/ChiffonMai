@@ -98,28 +98,46 @@ class TagSongItem {
 
 // 二级嵌套实体
 class LocalizedName {
+  final String en;
+  final String ja;
+  final String ko;
   final String zhHans;
 
   LocalizedName({
+    required this.en,
+    required this.ja,
+    required this.ko,
     required this.zhHans,
   });
 
   factory LocalizedName.fromJson(Map<String, dynamic> json) {
     return LocalizedName(
+      en: json['en'],
+      ja: json['ja'],
+      ko: json['ko'],
       zhHans: json['zh-Hans'],
     );
   }
 }
 
 class LocalizedDescription {
+  final String en;
+  final String ja;
+  final String ko;
   final String zhHans;
 
   LocalizedDescription({
+    required this.en,
+    required this.ja,
+    required this.ko,
     required this.zhHans,
   });
 
   factory LocalizedDescription.fromJson(Map<String, dynamic> json) {
     return LocalizedDescription(
+      en: json['en'],
+      ja: json['ja'],
+      ko: json['ko'],
       zhHans: json['zh-Hans'],
     );
   }

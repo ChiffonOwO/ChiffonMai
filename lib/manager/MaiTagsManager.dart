@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/entity/MaiTagsEntity.dart';
 
@@ -10,7 +11,7 @@ class MaiTagsManager {
   MaiTagsManager._internal();
 
   // API 配置
-  static const String TAGS_API_URL = "https://miruku.dxrating.net/api/v1/tags";
+  static const String TAGS_API_URL = ApiUrls.TagDataApi;
   // static const Map<String, String> TAGS_API_HEADERS = {
   //   "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidHBubWRmZnVpbWlra3Nydm5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDYwMzMxNzAsImV4cCI6MjAyMTYwOTE3MH0.rrzOisCZGz2gkp-yh61-_HDY7YqL3lTc4XsOPzuAVDU",
   //   "authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidHBubWRmZnVpbWlra3Nydm5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDYwMzMxNzAsImV4cCI6MjAyMTYwOTE3MH0.rrzOisCZGz2gkp-yh61-_HDY7YqL3lTc4XsOPzuAVDU",
@@ -26,7 +27,8 @@ class MaiTagsManager {
   // 缓存相关常量
   static const String TAGS_CACHE_KEY = 'mai_tags_cache';
   static const String TAGS_CACHE_TIMESTAMP_KEY = 'mai_tags_cache_timestamp';
-  static const int CACHE_EXPIRY_DAYS = 7;
+  // 移除定时策略，缓存永不过期
+  // static const int CACHE_EXPIRY_DAYS = 1;
 
   /**
    * 初始化标签数据
@@ -36,18 +38,11 @@ class MaiTagsManager {
       // 尝试从本地缓存加载
       final prefs = await SharedPreferences.getInstance();
       final cachedData = prefs.getString(TAGS_CACHE_KEY);
-      final cachedTimestamp = prefs.getInt(TAGS_CACHE_TIMESTAMP_KEY);
       
-      // 检查缓存是否有效
-      bool isCacheValid = false;
-      if (cachedData != null && cachedTimestamp != null) {
-        final now = DateTime.now().millisecondsSinceEpoch;
-        final cacheAge = now - cachedTimestamp;
-        final maxAge = CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
-        isCacheValid = cacheAge < maxAge;
-      }
+      // 移除定时策略，缓存永不过期
+      bool isCacheValid = cachedData != null;
       
-      if (!isCacheValid || cachedData == null) {
+      if (!isCacheValid) {
         // 从网络加载
         final response = await http.get(
           Uri.parse(TAGS_API_URL),
@@ -55,7 +50,8 @@ class MaiTagsManager {
         );
 
         if (response.statusCode == 200) {
-          final mainTagString = response.body;
+          // 强制使用UTF-8编码解码响应内容，避免乱码
+          final mainTagString = utf8.decode(response.bodyBytes);
           
           // 更新本地缓存
           await prefs.setString(TAGS_CACHE_KEY, mainTagString);
@@ -193,7 +189,8 @@ class MaiTagsManager {
       );
 
       if (response.statusCode == 200) {
-        final mainTagString = response.body;
+        // 强制使用UTF-8编码解码响应内容，避免乱码
+        final mainTagString = utf8.decode(response.bodyBytes);
         
         // 更新本地缓存
         final prefs = await SharedPreferences.getInstance();

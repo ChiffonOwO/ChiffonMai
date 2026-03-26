@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:convert' show utf8;
+import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/entity/SongAliasModel.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -57,8 +58,8 @@ class SongAliasManager {
   /// 调用第三方API获取最新别名（已适配指定API）
   Future<void> fetchFromApi() async {
     try {
-      // 你的指定API地址
-      final url = 'https://www.yuzuchan.moe/api/maimaidx/maimaidxalias';
+      // 指定API地址
+      final url = ApiUrls.SongAliasApi;
       final response = await http.get(Uri.parse(url));
 
       // 接口返回成功

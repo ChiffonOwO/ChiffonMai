@@ -7,6 +7,8 @@ class RecommendationResult {
   final double minAchievement;
   final bool ableRiseTotalRating;
   final String riseTotalRating;
+  final String songId;
+  final int levelIndex;
 
   RecommendationResult({
     required this.songTitle,
@@ -17,5 +19,7 @@ class RecommendationResult {
     required this.minAchievement,
     required this.ableRiseTotalRating,
     required this.riseTotalRating,
+    required this.songId,
+    required this.levelIndex,
   });
 }

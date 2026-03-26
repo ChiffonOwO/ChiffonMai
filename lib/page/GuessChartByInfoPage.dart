@@ -6,7 +6,7 @@ import 'package:my_first_flutter_app/entity/GuessSong.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/service/GuessChartByInfoService.dart';
-import 'package:my_first_flutter_app/utils/CoverPathUtil.dart';
+import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class GuessChartByInfoPage extends StatefulWidget {
@@ -1125,7 +1125,7 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
                                                           borderRadius:
                                                               BorderRadius
                                                                   .circular(4),
-                                                          child: CoverPathUtil.buildCoverWidgetWithContext(context, _targetSong!.id, 60),
+                                                          child: CoverUtil.buildCoverWidgetWithContext(context, _targetSong!.id, 60),
                                                         ),
                                                       ),
                                                       const SizedBox(width: 12),

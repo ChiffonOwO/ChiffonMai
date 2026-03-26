@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/service/RandomChartService.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
-import 'package:my_first_flutter_app/utils/CoverPathUtil.dart';
+import 'package:my_first_flutter_app/utils/CoverUtil.dart';
+import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 
 class RandomChartPage extends StatefulWidget {
   const RandomChartPage({super.key});
@@ -512,11 +513,24 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                                 // 正方形曲绘
                                                 AspectRatio(
                                                   aspectRatio: 1, // 保持正方形
-                                                  child: Container(
-                                                    decoration: BoxDecoration(
-                                                      borderRadius: BorderRadius.vertical(top: Radius.circular(borderRadius)),
+                                                  child: GestureDetector(
+                                                    onTap: () {
+                                                      Navigator.push(
+                                                        context,
+                                                        MaterialPageRoute(
+                                                          builder: (context) => SongInfoPage(
+                                                            songId: _drawnSongs[i].id.toString(),
+                                                            initialLevelIndex: 0,
+                                                          ),
+                                                        ),
+                                                      );
+                                                    },
+                                                    child: Container(
+                                                      decoration: BoxDecoration(
+                                                        borderRadius: BorderRadius.vertical(top: Radius.circular(borderRadius)),
+                                                      ),
+                                                      child: CoverUtil.buildCoverWidgetWithContext(context, _drawnSongs[i].id, 100),
                                                     ),
-                                                    child: CoverPathUtil.buildCoverWidgetWithContext(context, _drawnSongs[i].id, 100),
                                                   ),
                                                 ),
                                                 // 文本部分
@@ -628,12 +642,25 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                         crossAxisSpacing: gridItemSpacing * 0.8,
                                     mainAxisSpacing: gridItemSpacing * 0.8,
                                         children: songs.map((song) {
-                                          return Container(
-                                            decoration: BoxDecoration(
-                                            color: Colors.grey[200],
-                                            borderRadius: BorderRadius.circular(borderRadius),
-                                          ),
-                                            child: CoverPathUtil.buildCoverWidgetWithContext(context, song.id, 50),
+                                          return GestureDetector(
+                                            onTap: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) => SongInfoPage(
+                                                    songId: song.id.toString(),
+                                                    initialLevelIndex: 0,
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey[200],
+                                                borderRadius: BorderRadius.circular(borderRadius),
+                                              ),
+                                              child: CoverUtil.buildCoverWidgetWithContext(context, song.id, 50),
+                                            ),
                                           );
                                         }).toList(),
                                       ),

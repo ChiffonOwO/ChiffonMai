@@ -8,7 +8,7 @@ import '../service/DiffBest50Service.dart';
 import '../service/DiffBest50ConvertToImgService.dart';
 import '../manager/MaimaiMusicDataManager.dart';
 import 'SongInfoPage.dart';
-import '../utils/CoverPathUtil.dart';
+import '../utils/CoverUtil.dart';
 
 class DiffBest50Page extends StatefulWidget {
   const DiffBest50Page({super.key});
@@ -130,37 +130,6 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
               ),
             ),
 
-            // 页面标题
-            const Positioned(
-              top: 60,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  "拟合Best50查询",
-                  style: TextStyle(
-                    color: Color.fromARGB(255, 84, 97, 97),
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                  ),
-                ),
-              ),
-            ),
-
-            // 返回按钮
-            Positioned(
-              top: 40,
-              left: 10,
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back,
-                    color: Color.fromARGB(255, 84, 97, 97), size: 24),
-                onPressed: () {
-                  Navigator.pop(context); // 返回到主页
-                },
-              ),
-            ),
-
             // 层级2：第一张虚化装饰图 - 居中显示，轻微向上偏移
             Center(
               child: Transform.translate(
@@ -225,6 +194,42 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                 ),
               ),
             ),
+
+            // 页面标题
+            const Positioned(
+              top: 60,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Text(
+                  "拟合Best50查询",
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 84, 97, 97),
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ),
+            ),
+
+            // 返回按钮 - 放在最后，确保在最上层
+            Positioned(
+              top: 40,
+              left: 10,
+              child: GestureDetector(
+                onTap: () {
+                  print('返回按钮被点击');
+                  Navigator.pop(context); // 返回到主页
+                },
+                child: Container(
+                  padding: EdgeInsets.all(16), // 增加点击区域
+                  color: Colors.transparent, // 透明背景，不影响视觉
+                  child: Icon(Icons.arrow_back,
+                      color: Color.fromARGB(255, 84, 97, 97), size: 28), // 增大图标
+                ),
+              ),
+            ),
           ],
         ),
       );
@@ -245,37 +250,6 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                 fit: BoxFit.cover, // 覆盖整个容器，拉伸/裁剪适配
                 opacity: 1.0, // 不透明
               ),
-            ),
-          ),
-
-          // 页面标题
-          const Positioned(
-            top: 60,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Text(
-                "拟合Best50查询",
-                style: TextStyle(
-                  color: Color.fromARGB(255, 84, 97, 97),
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                ),
-              ),
-            ),
-          ),
-
-          // 返回按钮
-          Positioned(
-            top: 40,
-            left: 10,
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back,
-                  color: Color.fromARGB(255, 84, 97, 97), size: 24),
-              onPressed: () {
-                Navigator.pop(context); // 返回到主页
-              },
             ),
           ),
 
@@ -336,6 +310,42 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                         MediaQuery.of(context).size.width > 600 ? 1.7 : 1.5),
                   ],
                 ),
+              ),
+            ),
+          ),
+
+          // 页面标题
+          const Positioned(
+            top: 60,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Text(
+                "拟合Best50查询",
+                style: TextStyle(
+                  color: Color.fromARGB(255, 84, 97, 97),
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                ),
+              ),
+            ),
+          ),
+
+          // 返回按钮 - 放在最后，确保在最上层
+          Positioned(
+            top: 40,
+            left: 10,
+            child: GestureDetector(
+              onTap: () {
+                print('返回按钮被点击');
+                Navigator.pop(context); // 返回到主页
+              },
+              child: Container(
+                padding: EdgeInsets.all(16), // 增加点击区域
+                color: Colors.transparent, // 透明背景，不影响视觉
+                child: Icon(Icons.arrow_back,
+                    color: Color.fromARGB(255, 84, 97, 97), size: 28), // 增大图标
               ),
             ),
           ),
@@ -526,7 +536,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                       border: Border.all(color: Colors.black, width: 1.0),
                     ),
                     child: songId != null
-                        ? CoverPathUtil.buildCoverWidgetWithContext(context, songId.toString(), coverSize)
+                        ? CoverUtil.buildCoverWidgetWithContext(context, songId.toString(), coverSize)
                         : Center(
                             child: Text('曲绘',
                                 style: TextStyle(fontSize: coverSize * 0.24)),

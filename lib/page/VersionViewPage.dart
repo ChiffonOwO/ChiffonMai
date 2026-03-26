@@ -7,30 +7,6 @@ import 'package:permission_handler/permission_handler.dart';
 
 // 应用常量类：集中管理所有硬编码的配置值
 class AppConstants {
-  // 布局尺寸常量
-  static const double targetHeight = 380.0;
-  static const double blockSpacing = 160.0;
-  
-  static const double textLeft = 185.0;
-  static const double textTop = 180.0;
-  static const double buttonHeight = 70.0;
-  static const double gridHorizontalPadding = 15.0;
-  static const double buttonPaddingVertical = 6.0;
-  static const double buttonPaddingHorizontal = 4.0;
-
-  // 网格布局常量
-  static const int crossAxisCount = 2;
-  static const double crossAxisSpacing = 8.0;
-  static const double mainAxisSpacing = 4.0;
-  static const double childAspectRatio = 1.2;
-
-  // 圆角常量
-  static const double borderRadiusSmall = 8.0;
-  static const double borderRadiusLarge = 12.0;
-
-  // 边框常量
-  static const double borderWidth = 1.5;
-
   // 阴影常量
   static const BoxShadow defaultShadow = BoxShadow(
     color: Colors.black12,
@@ -203,6 +179,29 @@ class VersionView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 获取屏幕尺寸
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
+    // 计算尺寸参数
+    final backButtonTop = screenHeight * 0.05; // 返回按钮距离顶部为屏幕高度的5%
+    final backButtonLeft = screenWidth * 0.03; // 返回按钮距离左侧为屏幕宽度的3%
+    final titleTop = screenHeight * 0.08; // 标题距离顶部为屏幕高度的8%
+    final contentTop = screenHeight * 0.15; // 内容区域距离顶部为屏幕高度的15%
+    final contentBottom = screenHeight * 0.03; // 内容区域距离底部为屏幕高度的3%
+    final contentHorizontalPadding = screenWidth * 0.015; // 内容区域水平内边距为屏幕宽度的1.5%
+    final borderRadius = screenWidth * 0.02; // 边框圆角为屏幕宽度的2%
+    
+    // 字体大小
+    final titleFontSize = screenWidth * 0.06; // 标题字体大小为屏幕宽度的6%
+    final backButtonSize = screenWidth * 0.06; // 返回按钮图标大小为屏幕宽度的6%
+    final tableHeaderFontSize = screenWidth * 0.035; // 表头字体大小为屏幕宽度的3.5%
+    final tableContentFontSize = screenWidth * 0.03; // 表格内容字体大小为屏幕宽度的3%
+    
+    // 图片大小
+    final imageContainerSize = screenWidth * 0.15; // 图片容器大小为屏幕宽度的15%
+    final imageSize = screenWidth * 0.12; // 图片大小为屏幕宽度的12%
+    
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
@@ -223,7 +222,7 @@ class VersionView extends StatelessWidget {
           // 层级2：第一张虚化装饰图
           Center(
             child: Transform.translate(
-              offset: const Offset(0, -20),
+              offset: Offset(0, -screenHeight * 0.02),
               child: Transform.scale(
                 scale: 1,
                 child: Image.asset(
@@ -238,7 +237,7 @@ class VersionView extends StatelessWidget {
           // 层级3：第二张虚化装饰图
           Center(
             child: Transform.translate(
-              offset: const Offset(0, -20),
+              offset: Offset(0, -screenHeight * 0.02),
               child: Transform.scale(
                 scale: 1,
                 child: Image.asset(
@@ -252,10 +251,10 @@ class VersionView extends StatelessWidget {
 
           // 返回按钮
           Positioned(
-            top: 40,
-            left: 10,
+            top: backButtonTop,
+            left: backButtonLeft,
             child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: AppConstants.textPrimaryColor, size: 24),
+              icon: Icon(Icons.arrow_back, color: AppConstants.textPrimaryColor, size: backButtonSize),
               onPressed: () {
                 Navigator.pop(context);
               },
@@ -263,8 +262,8 @@ class VersionView extends StatelessWidget {
           ),
 
           // 页面标题
-          const Positioned(
-            top: 60,
+          Positioned(
+            top: titleTop,
             left: 0,
             right: 0,
             child: Center(
@@ -272,7 +271,7 @@ class VersionView extends StatelessWidget {
                 "maimai版本对照表",
                 style: TextStyle(
                   color: AppConstants.textPrimaryColor,
-                  fontSize: 24,
+                  fontSize: titleFontSize,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 2,
                 ),
@@ -282,14 +281,14 @@ class VersionView extends StatelessWidget {
 
           // 表格区域
           Positioned(
-            top: 120,
-            left: 20,
-            right: 20,
-            bottom: 20,
+            top: contentTop,
+            left: contentHorizontalPadding,
+            right: contentHorizontalPadding,
+            bottom: contentBottom,
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+                borderRadius: BorderRadius.circular(borderRadius),
                 boxShadow: const [AppConstants.defaultShadow],
               ),
               child: LayoutBuilder(
@@ -307,7 +306,7 @@ class VersionView extends StatelessWidget {
                         DataColumn(
                           label: SizedBox(
                             width: column1Width,
-                            child: const Center(
+                            child: Center(
                               child: Align(
                                 alignment: Alignment.centerLeft,
                                 child: Text(
@@ -315,7 +314,7 @@ class VersionView extends StatelessWidget {
                                   style: TextStyle(
                                     color: Colors.black,
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 14,
+                                    fontSize: tableHeaderFontSize,
                                   ),
                                 ),
                               )
@@ -325,13 +324,13 @@ class VersionView extends StatelessWidget {
                         DataColumn(
                           label: SizedBox(
                             width: column2Width,
-                            child: const Center(
+                            child: Center(
                               child: Text(
                                 '版本图',
                                 style: TextStyle(
                                   color: Colors.black,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 14,
+                                  fontSize: tableHeaderFontSize,
                                 ),
                               ),
                             ),
@@ -340,13 +339,13 @@ class VersionView extends StatelessWidget {
                         DataColumn(
                           label: SizedBox(
                             width: column3Width,
-                            child: const Center(
+                            child: Center(
                               child: Text(
                                 '版本代号',
                                 style: TextStyle(
                                   color: Colors.black,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 14,
+                                  fontSize: tableHeaderFontSize,
                                 ),
                               ),
                             ),
@@ -360,7 +359,7 @@ class VersionView extends StatelessWidget {
                           width: column1Width,
                           child: Align(
                             alignment: Alignment.centerLeft,
-                            child: Text(version.name),
+                            child: Text(version.name, style: TextStyle(fontSize: tableContentFontSize)),
                           )
                         ),
                       ),
@@ -369,8 +368,8 @@ class VersionView extends StatelessWidget {
                           width: column2Width,
                           child: Center(
                             child: Container(
-                              width: 60,
-                              height: 60,
+                              width: imageContainerSize,
+                              height: imageContainerSize,
                               alignment: Alignment.center,
                               child: GestureDetector(
                                 onTap: () {
@@ -386,15 +385,15 @@ class VersionView extends StatelessWidget {
                                 },
                                 child: Image.asset(
                                   version.imagePath,
-                                  width: 50,
-                                  height: 50,
+                                  width: imageSize,
+                                  height: imageSize,
                                   fit: BoxFit.contain,
                                   errorBuilder: (context, error, stackTrace) {
                                     return Container(
-                                      width: 50,
-                                      height: 50,
+                                      width: imageSize,
+                                      height: imageSize,
                                       color: Colors.grey[200],
-                                      child: const Center(child: Text('图片缺失')),
+                                      child: Center(child: Text('图片缺失', style: TextStyle(fontSize: tableContentFontSize))),
                                     );
                                   },
                                 ),
@@ -406,7 +405,7 @@ class VersionView extends StatelessWidget {
                       DataCell(
                         SizedBox(
                           width: column3Width,
-                          child: Center(child: Text(version.code)),
+                          child: Center(child: Text(version.code, style: TextStyle(fontSize: tableContentFontSize))),
                         ),
                       ),
                     ]);
@@ -416,9 +415,8 @@ class VersionView extends StatelessWidget {
             },
           ),
             ),
-          ),
-        ],
       ),
+    ]),
     );
   }
 }
