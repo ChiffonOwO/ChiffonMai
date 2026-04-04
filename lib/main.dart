@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/page/B50Page.dart';
+import 'package:my_first_flutter_app/page/CollectionSearchPage.dart';
 import 'package:my_first_flutter_app/page/DiffBest50Page.dart';
+import 'package:my_first_flutter_app/page/GuessChartByBlurredCoverPage.dart';
 import 'package:my_first_flutter_app/page/GuessChartByCoverPage.dart';
 import 'package:my_first_flutter_app/page/GuessChartByInfoPage.dart';
+import 'package:my_first_flutter_app/page/GuessChartBySongExcerptPage.dart';
 import 'package:my_first_flutter_app/page/RandomChartPage.dart';
 import 'package:my_first_flutter_app/page/RecommendByTagsPage.dart';
 import 'package:my_first_flutter_app/page/SingleRatingCalculatorPage.dart';
@@ -12,8 +15,11 @@ import 'package:my_first_flutter_app/manager/UserBest50Manager.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/manager/DiffMusicDataManager.dart';
+import 'package:my_first_flutter_app/manager/CollectionsManager.dart';
+import 'package:my_first_flutter_app/manager/LuoXueSongsManager.dart';
 import 'package:my_first_flutter_app/page/UserScoreSearchPage.dart';
 import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
+import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'page/AchievementFullReverseCalculatorPage.dart';
 import 'page/VersionViewPage.dart';
@@ -82,6 +88,22 @@ Future<void> main() async {
   await DiffMusicDataManager().fetchAndUpdateDiffData();
   // 初始化标签数据
   await RecommendByTagsService.initializeTags();
+  // 初始化收藏品数据
+  final collectionsManager = CollectionsManager();
+  await collectionsManager.fetchTrophiesCollections();
+  await collectionsManager.fetchIconsCollections();
+  await collectionsManager.fetchPlatesCollections();
+  await collectionsManager.fetchFramesCollections();
+  
+  // 初始化落雪歌曲数据
+  final luoXueSongsManager = LuoXueSongsManager();
+  await luoXueSongsManager.getLuoXueSongs();
+  // 建立落雪歌曲与缓存歌曲的映射
+  final maimaiMusicManager = MaimaiMusicDataManager();
+  if (await maimaiMusicManager.hasCachedData()) {
+    final cachedSongs = await maimaiMusicManager.getCachedSongs();
+    luoXueSongsManager.mapLuoXueSongsToCachedSongs(cachedSongs ?? []);
+  }
 }
 
 /// 应用根组件：无状态组件，配置MaterialApp基础属性
@@ -147,6 +169,7 @@ class _HomePageState extends State<HomePage> {
   final List<ButtonItem> buttonItems = const [
     ButtonItem(icon: Icons.music_note, title: '乐曲查询', subtitle: '查询舞萌曲库的乐曲'),
     ButtonItem(icon: Icons.score, title: '成绩查询', subtitle: '查看游玩数据'),
+    ButtonItem(icon: Icons.collections_bookmark, title: '收藏品查询', subtitle: '查看收藏品查询'),
     ButtonItem(icon: Icons.leaderboard, title: 'Best50查询', subtitle: '我去,龙币!'),
     ButtonItem(icon: Icons.analytics, title: '拟合Best50查询', subtitle: '我w55怎么拟合才w52?!'),
     ButtonItem(icon: Icons.label, title: '基于标签推荐', subtitle: '基于你游玩的谱面标签推荐曲目'),
@@ -157,6 +180,8 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.replay, title: '达成率反推', subtitle: '根据判定详情推出绝赞详情'),
     ButtonItem(icon: Icons.gamepad, title: '无提示猜歌', subtitle: '舞萌笑传之猜猜呗1'),
     ButtonItem(icon: Icons.gamepad, title: '根据部分曲绘猜歌', subtitle: '舞萌笑传之猜猜呗2'),
+    ButtonItem(icon: Icons.gamepad, title: '根据模糊曲绘猜歌', subtitle: '舞萌笑传之猜猜呗3'),
+    ButtonItem(icon: Icons.gamepad, title: '根据歌曲片段猜歌', subtitle: '舞萌笑传之猜猜呗4'),
     ButtonItem(icon: Icons.file_upload_sharp, title: '刷新数据', subtitle: '刷新你的舞萌数据'),
     ButtonItem(icon: Icons.update, title: '检查更新', subtitle: '检查应用是否有新版本'),
   ];
@@ -174,33 +199,11 @@ class _HomePageState extends State<HomePage> {
       resizeToAvoidBottomInset: false, // 防止输入法弹出时重新布局导致卡顿
       body: Stack(
         children: [
-          // 层级1：基础背景图 - 占满整个屏幕，作为页面最底层背景
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/background.png'), // 背景图资源
-                fit: BoxFit.cover, // 覆盖整个容器，拉伸/裁剪适配
-                opacity: 1.0, // 不透明
-              ),
-            ),
-          ),
+          // 层级1：基础背景图 - 使用通用背景Widget
+          CommonWidgetUtil.buildCommonBgWidget(),
 
-          // 层级2：第一张虚化装饰图 - 居中显示，轻微向上偏移
-          Center(
-            child: Transform.translate(
-              offset: Offset(0, -screenHeight * 0.03), // 垂直向上偏移
-              child: Transform.scale(
-                scale: 1, // 不缩放
-                child: Image.asset(
-                  'assets/chiffon2.png',
-                  fit: BoxFit.cover,
-                  opacity: const AlwaysStoppedAnimation(1), // 固定不透明
-                ),
-              ),
-            ),
-          ),
+          // 层级2：第一张虚化装饰图 - 使用通用装饰背景Widget
+          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
 
           // 层级3：第二张虚化装饰图 - 居中显示，与层级2重叠，增强视觉效果
           Center(
@@ -631,6 +634,24 @@ class _HomePageState extends State<HomePage> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => GuessChartByCoverPage()),
+            );
+          }
+          if (item.title == '收藏品查询'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => CollectionSearchPage()),
+            );
+          }
+          if (item.title == '根据模糊曲绘猜歌'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => GuessChartByBlurredCoverPage()),
+            );
+          }
+          if (item.title == '根据歌曲片段猜歌'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => GuessChartBySongExcerptPage()),
             );
           }
         },

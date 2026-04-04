@@ -51,5 +51,10 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- 允许查询B站应用 -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>bilibili</string>
+	</array>
 </dict>
 </plist>

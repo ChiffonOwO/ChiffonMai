@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
@@ -6,18 +7,18 @@ import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/entity/GuessSong.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
-import 'package:my_first_flutter_app/service/GuessChartByCoverService.dart';
+import 'package:my_first_flutter_app/service/GuessChartByBlurredCoverService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class GuessChartByCoverPage extends StatefulWidget {
-  const GuessChartByCoverPage({super.key});
+class GuessChartByBlurredCoverPage extends StatefulWidget {
+  const GuessChartByBlurredCoverPage({super.key});
 
   @override
-  State<GuessChartByCoverPage> createState() => _GuessChartByCoverPageState();
+  State<GuessChartByBlurredCoverPage> createState() => _GuessChartByBlurredCoverPageState();
 }
 
-class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
+class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverPage> {
   // 游戏状态
   bool _isGameStarted = false;
   Song? _targetSong;
@@ -27,11 +28,9 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
   bool _isGameOver = false;
   bool _isWon = false;
   
-  // 曲绘截取参数
-  double? _cropX1;
-  double? _cropY1;
-  double? _cropX2;
-  double? _cropY2;
+  // 模糊程度（0-100，默认50）
+  int _blurLevel = 50;
+  int _currentBlurLevel = 50;
 
   // 搜索状态
   TextEditingController _searchController = TextEditingController();
@@ -42,6 +41,8 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
   bool _showSearchResults = false;
 
   // 排序状态
+  // ignore: unused_field
+// 排序状态
   bool _isAscending = true; // true: 顺序, false: 逆序
 
   // 歌曲别名管理器
@@ -78,13 +79,12 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
       _searchController.clear();
       _searchResults = [];
       _showSearchResults = false;
-      
-      // 生成新的随机截取位置
-      _generateRandomCropPosition();
+      // 应用新的模糊程度设置
+      _currentBlurLevel = _blurLevel;
     });
 
     // 随机选择目标歌曲
-    _targetSong = await GuessChartByCoverService.randomSelectSong();
+    _targetSong = await GuessChartByBlurredCoverService.randomSelectSong();
     if (_targetSong != null) {
       
       setState(() {
@@ -93,25 +93,6 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
     }
   }
 
-  // 生成随机截取位置
-  void _generateRandomCropPosition() {
-    // 随机生成起始点和终点
-    // 确保截取区域在0-1范围内
-    double x1 = (DateTime.now().millisecondsSinceEpoch % 80) / 100.0;
-    double y1 = ((DateTime.now().millisecondsSinceEpoch + 100) % 80) / 100.0;
-    double x2 = x1 + (10 + (DateTime.now().millisecondsSinceEpoch % 30)) / 100.0; // 宽度随机
-    double y2 = y1 + (10 + ((DateTime.now().millisecondsSinceEpoch + 200) % 30)) / 100.0; // 高度随机
-
-    // 确保x2和y2不超过1
-    x2 = x2 > 1 ? 1 : x2;
-    y2 = y2 > 1 ? 1 : y2;
-
-    // 保存截取参数，用于游戏结束时显示红框
-    _cropX1 = x1;
-    _cropY1 = y1;
-    _cropX2 = x2;
-    _cropY2 = y2;
-  }
 
   // 处理搜索输入
   void _handleSearchInput(String value) {
@@ -135,7 +116,7 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
       });
 
       // 加载所有歌曲
-      final allSongs = await GuessChartByCoverService.loadAllSongs();
+      final allSongs = await GuessChartByBlurredCoverService.loadAllSongs();
       if (allSongs != null) {
         // 搜索歌曲（支持原曲名和别名）
         final results = await _searchSongs(allSongs, value);
@@ -200,9 +181,9 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
     }
 
     // 构建猜测实体
-    var guessSong = await GuessChartByCoverService.buildGuessSongEntity(guessedSong);
+    var guessSong = await GuessChartByBlurredCoverService.buildGuessSongEntity(guessedSong);
     // 计算猜测结果
-    guessSong = await GuessChartByCoverService.calculateGuessResult(
+    guessSong = await GuessChartByBlurredCoverService.calculateGuessResult(
         guessSong, _targetSong!);
 
     // 更新猜测历史
@@ -672,6 +653,63 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
     );
   }
 
+  // 显示模糊设置对话框
+  void _showBlurSettingsDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        int tempBlurLevel = _blurLevel;
+        return AlertDialog(
+          title: const Text('模糊程度设置'),
+          content: StatefulBuilder(
+            builder: (context, setState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '模糊程度: $tempBlurLevel% (下局游戏生效)',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Slider(
+                    value: tempBlurLevel.toDouble(),
+                    min: 0,
+                    max: 100,
+                    divisions: 100,
+                    onChanged: (value) {
+                      setState(() {
+                        tempBlurLevel = value.toInt();
+                      });
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _blurLevel = tempBlurLevel;
+                });
+                Navigator.of(context).pop();
+              },
+              child: const Text('确定'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // 格式化版本
   String _formatVersion(String version) {
     if (version == 'maimai') {
@@ -710,22 +748,20 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
     return version;
   }
 
-  // 裁剪曲绘，随机显示曲绘的一部分
-  Widget _buildCroppedCover(String songId) {
-
-    // 确保截取参数已生成
-    if (_cropX1 == null || _cropY1 == null || _cropX2 == null || _cropY2 == null) {
-      _generateRandomCropPosition();
+  // 获取排序后的猜测历史
+  List<GuessSong> _getSortedGuessHistory() {
+    List<GuessSong> sortedHistory = List.from(_guessHistory);
+    if (!_isAscending) {
+      sortedHistory = sortedHistory.reversed.toList();
     }
+    return sortedHistory;
+  }
 
-    double x1 = _cropX1!;
-    double y1 = _cropY1!;
-    double x2 = _cropX2!;
-    double y2 = _cropY2!;
-
+  // 显示模糊曲绘
+  Widget _buildBlurredCover(String songId) {
     return Container(
-      width: 200, // 增大为原来的2倍 (100 -> 200)
-      height: 200, // 增大为原来的2倍 (100 -> 200)
+      width: 200,
+      height: 200,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
@@ -738,45 +774,12 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // 完整显示曲绘
-            CoverUtil.buildCoverWidgetWithContext(context, songId, 200),
-            // 顶部遮盖
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: y1 * 200,
-              child: Container(color: Colors.black),
-            ),
-            // 底部遮盖
-            Positioned(
-              top: y2 * 200,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(color: Colors.black),
-            ),
-            // 左侧遮盖
-            Positioned(
-              top: y1 * 200,
-              left: 0,
-              width: x1 * 200,
-              height: (y2 - y1) * 200,
-              child: Container(color: Colors.black),
-            ),
-            // 右侧遮盖
-            Positioned(
-              top: y1 * 200,
-              left: x2 * 200,
-              right: 0,
-              height: (y2 - y1) * 200,
-              child: Container(color: Colors.black),
-            ),
-          ],
-        ),
+        child: !_isGameOver
+            ? ImageFiltered(
+                imageFilter: ImageFilter.blur(sigmaX: _currentBlurLevel / 3, sigmaY: _currentBlurLevel / 3),
+                child: CoverUtil.buildCoverWidgetWithContext(context, songId, 200),
+              )
+            : CoverUtil.buildCoverWidgetWithContext(context, songId, 200),
       ),
     );
   }
@@ -824,7 +827,7 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
                     Expanded(
                       child: Center(
                         child: Text(
-                          '猜歌（部分曲绘）',
+                          '猜歌（模糊曲绘）',
                           style: TextStyle(
                             color: textPrimaryColor,
                             fontSize: screenWidth * 0.06,
@@ -922,13 +925,18 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
                                           // 曲绘展示
                                           if (!_isGameOver && _targetSong != null)
                                             Center(
-                                              child: _buildCroppedCover(_targetSong!.id),
+                                              child: Column(
+                                                children: [
+                                                  _buildBlurredCover(_targetSong!.id),
+                                                  const SizedBox(height: 16),
+                                                ],
+                                              ),
                                             ),
                                           if (_isGameOver && _targetSong != null)
                                             Center(
                                               child: Container(
-                                                width: 200, // 减小为原来的2/3 (300 -> 200)
-                                                height: 200, // 减小为原来的2/3 (300 -> 200)
+                                                width: 200,
+                                                height: 200,
                                                 decoration: BoxDecoration(
                                                   borderRadius: BorderRadius.circular(12),
                                                   boxShadow: [
@@ -941,28 +949,7 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
                                                 ),
                                                 child: ClipRRect(
                                                   borderRadius: BorderRadius.circular(12),
-                                                  child: Stack(
-                                                    fit: StackFit.expand,
-                                                    children: [
-                                                      CoverUtil.buildCoverWidgetWithContext(context, _targetSong!.id, 200),
-                                                      // 红框框选出本轮截取的区域
-                                                      if (_cropX1 != null && _cropY1 != null && _cropX2 != null && _cropY2 != null)
-                                                        Positioned(
-                                                          left: _cropX1! * 200,
-                                                          top: _cropY1! * 200,
-                                                          width: (_cropX2! - _cropX1!) * 200,
-                                                          height: (_cropY2! - _cropY1!) * 200,
-                                                          child: Container(
-                                                            decoration: BoxDecoration(
-                                                              border: Border.all(
-                                                                color: Colors.red,
-                                                                width: 2,
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                    ],
-                                                  ),
+                                                  child: CoverUtil.buildCoverWidgetWithContext(context, _targetSong!.id, 200),
                                                 ),
                                               ),
                                             ),
@@ -1047,7 +1034,17 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
                                                       size: 24),
                                                   onPressed: _showRulesDialog,
                                                 ),
-                                                const SizedBox(width: 16),
+                                                const SizedBox(width: 6),
+                                                // 模糊设置按钮
+                                                IconButton(
+                                                  icon: const Icon(
+                                                      Icons.settings,
+                                                      color: Color.fromARGB(
+                                                          255, 84, 97, 97),
+                                                      size: 24),
+                                                  onPressed: _showBlurSettingsDialog,
+                                                ),
+                                                const SizedBox(width: 6),
                                                 // 刷新按钮
                                                 IconButton(
                                                   icon: const Icon(Icons.refresh,
@@ -1056,7 +1053,7 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
                                                       size: 24),
                                                   onPressed: _startNewGame,
                                                 ),
-                                                const SizedBox(width: 16),
+                                                const SizedBox(width: 6),
                                                 // 排序按钮
                                                 IconButton(
                                                   icon: Icon(
@@ -1070,12 +1067,11 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
                                                   ),
                                                   onPressed: () {
                                                     setState(() {
-                                                      _isAscending =
-                                                          !_isAscending;
+                                                      _isAscending = !_isAscending;
                                                     });
                                                   },
                                                 ),
-                                                const SizedBox(width: 16),
+                                                const SizedBox(width: 6),
                                                 // 投降按钮
                                                 if (!_isGameOver)
                                                   TextButton(
@@ -1206,61 +1202,54 @@ class _GuessChartByCoverPageState extends State<GuessChartByCoverPage> {
 
                                           // 猜测历史
                                           if (_guessHistory.isNotEmpty)
-                                            Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  '猜测历史',
-                                                  style: TextStyle(
-                                                    fontSize: screenWidth * 0.045,
-                                                    fontWeight: FontWeight.bold,
+                                            Container(
+                                              margin: const EdgeInsets.only(top: 20),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    '猜测历史',
+                                                    style: TextStyle(
+                                                      fontSize: 16,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
                                                   ),
-                                                ),
-                                                const SizedBox(height: 12),
-                                                ...(_isAscending
-                                                        ? _guessHistory
-                                                        : _guessHistory.reversed.toList())
-                                                    .asMap()
-                                                    .entries
-                                                    .map((entry) {
-                                                  // 这里需要根据猜测历史的索引获取对应的歌曲，暂时使用null
-                                                  int displayIndex = _isAscending
-                                                      ? entry.key
-                                                      : _guessHistory.length -
-                                                          1 -
-                                                          entry.key;
-                                                  return _buildGuessHistoryItem(
-                                                      entry.value,
-                                                      displayIndex,
-                                                      null);
-                                                }),
-                                              ],
+                                                  const SizedBox(height: 12),
+                                                  Column(
+                                                    children: _getSortedGuessHistory()
+                                                        .asMap()
+                                                        .entries
+                                                        .map((entry) =>
+                                                            _buildGuessHistoryItem(
+                                                                entry.value,
+                                                                entry.key,
+                                                                null))
+                                                        .toList(),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                         ],
                                       )
-                                    : Center(
-                                        child: Padding(
-                                          padding:
-                                              EdgeInsets.all(screenHeight * 0.1),
-                                          child: CircularProgressIndicator(),
-                                        ),
+                                    : const Center(
+                                        child: CircularProgressIndicator(),
                                       ),
-                              ],
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
+                          ],
+                        );
+                      },
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         ],
       ),
-        ]
-      )
     );
   }
 }

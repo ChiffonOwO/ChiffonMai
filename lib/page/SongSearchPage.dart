@@ -6,6 +6,7 @@ import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'dart:async';
 
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
+import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 
 class SongSearchPage extends StatefulWidget {
   const SongSearchPage({super.key});
@@ -69,7 +70,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
     'niconico & VOCALOID',
     '其他游戏',
     '东方Project',
-    '音击&中二节奏'
+    '音击&中二节奏',
+    '\u5bb4\u4f1a\u5834'
   ];
 
   @override
@@ -507,145 +509,127 @@ class _SongSearchPageState extends State<SongSearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    // 自定义常量
+    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
+    final double borderRadiusSmall = 8.0;
+    final BoxShadow defaultShadow = BoxShadow(
+      color: Colors.grey.withOpacity(0.5),
+      spreadRadius: 2,
+      blurRadius: 5,
+      offset: Offset(0, 3),
+    );
+
     return Scaffold(
       backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false, // 防止键盘弹出时挤压背景
+      resizeToAvoidBottomInset: false, // 防止键盘弹出时调整布局
       body: Stack(
         children: [
-          // 层级1：基础背景图 - 占满整个屏幕，作为页面最底层背景
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/background.png'), // 背景图资源
-                fit: BoxFit.cover, // 覆盖整个容器，拉伸/裁剪适配
-                opacity: 1.0, // 不透明
-              ),
-            ),
-          ),
+          // 背景
+          CommonWidgetUtil.buildCommonBgWidget(),
+          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
 
-          // 层级2：第一张虚化装饰图 - 居中显示，轻微向上偏移
-          Center(
-            child: Transform.translate(
-              offset: const Offset(0, -20), // 垂直向上偏移20px
-              child: Transform.scale(
-                scale: 1, // 不缩放
-                child: Image.asset(
-                  'assets/chiffon2.png',
-                  fit: BoxFit.cover,
-                  opacity: const AlwaysStoppedAnimation(1), // 固定不透明
-                ),
-              ),
-            ),
-          ),
-
-          // 页面标题
-          const Positioned(
-            top: 40,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Text(
-                "歌曲搜索",
-                style: TextStyle(
-                  color: Color.fromARGB(255, 84, 97, 97),
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                ),
-              ),
-            ),
-          ),
-
-          // 返回按钮
-          Positioned(
-            top: 20,
-            left: 10,
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back,
-                  color: Color.fromARGB(255, 84, 97, 97), size: 24),
-              onPressed: () {
-                Navigator.pop(context);
-              },
-            ),
-          ),
-
-          // 主要内容区域
-          Positioned(
-            top: 80,
-            left: 10,
-            right: 10,
-            bottom: 40,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(8.0),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 5.0,
-                    offset: Offset(2.0, 2.0),
-                  ),
-                ],
-              ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  // 根据设备尺寸计算字体大小
-                  double screenWidth = MediaQuery.of(context).size.width;
-                  double screenHeight = MediaQuery.of(context).size.height;
-
-                  // 基础字体大小
-                  double baseFontSize = screenWidth * 0.04;
-                  double smallFontSize = screenWidth * 0.035;
-                  double tinyFontSize = screenWidth * 0.03;
-
-                  // 边距
-                  double padding = screenWidth * 0.04;
-
-                  return Column(
-                    children: [
-                      // 搜索输入框
-                      Padding(
-                        padding: EdgeInsets.all(padding),
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: (value) {
-                            // 防抖搜索
-                            _debouncedSearch(value);
-                          },
-                          decoration: InputDecoration(
-                            hintText: '输入歌曲标题、艺术家、BPM、谱师、别名',
-                            hintStyle: TextStyle(fontSize: smallFontSize),
-                            prefixIcon: const Icon(Icons.search),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8.0),
-                            ),
+          // 页面内容
+          Column(
+            children: [
+              // 标题栏
+              Container(
+                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
+                child: Row(
+                  children: [
+                    // 返回按钮
+                    IconButton(
+                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                    // 标题
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          '歌曲搜索',
+                          style: TextStyle(
+                            color: textPrimaryColor,
+                            fontSize: screenWidth * 0.06,
+                            fontWeight: FontWeight.bold,
                           ),
-                          style: TextStyle(fontSize: baseFontSize),
                         ),
                       ),
+                    ),
+                    // 占位，保持标题居中
+                    SizedBox(width: 48),
+                  ],
+                ),
+              ),
 
-                      // 筛选条件、条目总数和搜索结果一起滚动
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.only(left: padding, right: padding, bottom: padding),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // 筛选按钮区域
-                              if (_showAllFilters)
-                                Column(
-                                  children: [
-                                    // 定数筛选
-                                    _buildLevelFilter(screenWidth, screenHeight),
-                                    SizedBox(height: screenHeight * 0.01),
+              // 主内容区域
+              Expanded(
+                child: Container(
+                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(borderRadiusSmall),
+                    boxShadow: [defaultShadow],
+                  ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // 根据设备尺寸计算字体大小
+                      double screenWidth = MediaQuery.of(context).size.width;
+                      double screenHeight = MediaQuery.of(context).size.height;
 
-                                    // 版本筛选
-                                    _buildVersionFilter(screenWidth, screenHeight),
-                                    SizedBox(height: screenHeight * 0.01),
+                      // 基础字体大小
+                      double baseFontSize = screenWidth * 0.04;
+                      double smallFontSize = screenWidth * 0.035;
+                      double tinyFontSize = screenWidth * 0.03;
 
-                                    // 流派筛选
+                      // 边距
+                      double padding = screenWidth * 0.04;
+
+                      return Column(
+                        children: [
+                          // 搜索输入框
+                          Padding(
+                            padding: EdgeInsets.all(padding),
+                            child: TextField(
+                              controller: _searchController,
+                              onChanged: (value) {
+                                // 防抖搜索
+                                _debouncedSearch(value);
+                              },
+                              decoration: InputDecoration(
+                                hintText: '输入歌曲标题、艺术家、BPM、谱师、别名',
+                                hintStyle: TextStyle(fontSize: smallFontSize),
+                                prefixIcon: const Icon(Icons.search),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8.0),
+                                ),
+                              ),
+                              style: TextStyle(fontSize: baseFontSize),
+                            ),
+                          ),
+
+                          // 筛选条件、条目总数和搜索结果一起滚动
+                          Expanded(
+                            child: SingleChildScrollView(
+                              padding: EdgeInsets.only(left: padding, right: padding, bottom: padding),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // 筛选按钮区域
+                                  if (_showAllFilters)
+                                    Column(
+                                      children: [
+                                        // 定数筛选
+                                        _buildLevelFilter(screenWidth, screenHeight),
+                                        SizedBox(height: screenHeight * 0.01),
+
+                                        // 版本筛选
+                                        _buildVersionFilter(screenWidth, screenHeight),
+                                        SizedBox(height: screenHeight * 0.01),
+
+                                        // 流派筛选
                                     _buildGenreFilter(screenWidth, screenHeight),
                                     SizedBox(height: screenHeight * 0.01),
                                   ],
@@ -884,6 +868,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
           ),
         ],
       ),
+        ],
+      )
     );
   }
 

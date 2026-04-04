@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import '../service/UserScoreSearchService.dart';
 import '../main.dart';
 import 'SongInfoPage.dart';
@@ -813,7 +814,6 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
     // ignore: unused_local_variable
     final stats =  _calculateStats();
     
@@ -825,34 +825,10 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
       resizeToAvoidBottomInset: false, // 防止键盘弹出时调整布局
       body: Stack(
         children: [
-          // 固定背景，不受键盘影响
-          Container(
-            width: screenWidth,
-            height: screenHeight,
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/background.png'),
-                fit: BoxFit.cover,
-                opacity: 1.0,
-              ),
-            ),
-          ),
-          
-          Center(
-            child: Transform.translate(
-              offset: Offset(0, -screenHeight * 0.03),
-              child: Transform.scale(
-                scale: 1,
-                child: Image.asset(
-                  'assets/chiffon2.png',
-                  fit: BoxFit.cover,
-                  opacity: const AlwaysStoppedAnimation(1),
-                ),
-              ),
-            ),
-          ),
-          
-          
+
+          CommonWidgetUtil.buildCommonBgWidget(),
+          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
+        
           // 页面内容
           Column(
             children: [

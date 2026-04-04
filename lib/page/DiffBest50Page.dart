@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import '../service/DiffBest50Service.dart';
 import '../service/DiffBest50ConvertToImgService.dart';
 import '../manager/MaimaiMusicDataManager.dart';
@@ -235,119 +236,96 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
       );
     }
 
+    // 自定义常量
+    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
+    final double borderRadiusSmall = 8.0;
+    final BoxShadow defaultShadow = BoxShadow(
+      color: Colors.grey.withOpacity(0.5),
+      spreadRadius: 2,
+      blurRadius: 5,
+      offset: Offset(0, 3),
+    );
+
     return Scaffold(
       backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false, // 防止键盘弹出时挤压背景
+      resizeToAvoidBottomInset: false, // 防止键盘弹出时调整布局
       body: Stack(
         children: [
-          // 层级1：基础背景图 - 占满整个屏幕，作为页面最底层背景
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/background.png'), // 背景图资源
-                fit: BoxFit.cover, // 覆盖整个容器，拉伸/裁剪适配
-                opacity: 1.0, // 不透明
-              ),
-            ),
-          ),
+          // 背景
+          CommonWidgetUtil.buildCommonBgWidget(),
+          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
 
-          // 层级2：第一张虚化装饰图 - 居中显示，轻微向上偏移
-          Center(
-            child: Transform.translate(
-              offset: const Offset(0, -20), // 垂直向上偏移20px
-              child: Transform.scale(
-                scale: 1, // 不缩放
-                child: Image.asset(
-                  'assets/chiffon2.png',
-                  fit: BoxFit.cover,
-                  opacity: const AlwaysStoppedAnimation(1), // 固定不透明
-                ),
-              ),
-            ),
-          ),
-
-          // 浅白色背景区域
-          Positioned(
-            top: MediaQuery.of(context).size.height * 0.12,
-            left: MediaQuery.of(context).size.width * 0.02,
-            right: MediaQuery.of(context).size.width * 0.02,
-            bottom: MediaQuery.of(context).size.height * 0.03,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(12.0),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 8.0,
-                    offset: Offset(2.0, 2.0),
-                  ),
-                ],
-              ),
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.03),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+          // 页面内容
+          Column(
+            children: [
+              // 标题栏
+              Container(
+                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
+                child: Row(
                   children: [
-                    // 评分区域
-                    _buildRatingSection(),
-                    SizedBox(height: 12.0),
-
-                    // 导出按钮
-                    _buildExportButton(),
-                    SizedBox(height: 12.0),
-
-                    // 基于拟合难度的Best50 标题区域
-                    _buildSectionTitle( '基于拟合难度的Best50', context),
-
-                    SizedBox(
-                        height: MediaQuery.of(context).size.height * 0.015),
-
-                    // 基于拟合难度的Best50 卡片网格
-                    _buildDataCardGrid(_diffSongs,
-                        MediaQuery.of(context).size.width > 600 ? 1.7 : 1.5),
+                    // 返回按钮
+                    IconButton(
+                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                    // 标题
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          '拟合Best50查询',
+                          style: TextStyle(
+                            color: textPrimaryColor,
+                            fontSize: screenWidth * 0.06,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // 占位，保持标题居中
+                    SizedBox(width: 48),
                   ],
                 ),
               ),
-            ),
-          ),
 
-          // 页面标题
-          const Positioned(
-            top: 60,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Text(
-                "拟合Best50查询",
-                style: TextStyle(
-                  color: Color.fromARGB(255, 84, 97, 97),
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
+              // 主内容区域
+              Expanded(
+                child: Container(
+                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(borderRadiusSmall),
+                    boxShadow: [defaultShadow],
+                  ),
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.03),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // 评分区域
+                        _buildRatingSection(),
+                        SizedBox(height: 12.0),
+
+                        // 导出按钮
+                        _buildExportButton(),
+                        SizedBox(height: 12.0),
+
+                        // 基于拟合难度的Best50 标题区域
+                        _buildSectionTitle('基于拟合难度的Best50', context),
+
+                        SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.015),
+
+                        // 基于拟合难度的Best50 卡片网格
+                        _buildDataCardGrid(_diffSongs,
+                            MediaQuery.of(context).size.width > 600 ? 1.7 : 1.5),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-
-          // 返回按钮 - 放在最后，确保在最上层
-          Positioned(
-            top: 40,
-            left: 10,
-            child: GestureDetector(
-              onTap: () {
-                print('返回按钮被点击');
-                Navigator.pop(context); // 返回到主页
-              },
-              child: Container(
-                padding: EdgeInsets.all(16), // 增加点击区域
-                color: Colors.transparent, // 透明背景，不影响视觉
-                child: Icon(Icons.arrow_back,
-                    color: Color.fromARGB(255, 84, 97, 97), size: 28), // 增大图标
-              ),
-            ),
+            ],
           ),
         ],
       ),

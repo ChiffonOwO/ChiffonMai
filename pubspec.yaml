@@ -53,7 +53,12 @@ dependencies:
   flutter_screenutil: ^5.2.0 # 屏幕适配
   shared_preferences: ^2.4.1 # 本地存储
   url_launcher: ^6.3.2
-
+  # 网络图片缓存
+  cached_network_image: ^3.3.1  
+  flutter_cache_manager: ^3.3.1  
+  # 音频播放
+  just_audio: ^0.9.34  
+  audioplayers: ^5.2.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

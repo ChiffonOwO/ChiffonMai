@@ -56,5 +56,6 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <package android:name="tv.danmaku.bili" />  <!-- B站应用包名 -->
     </queries>
 </manifest>

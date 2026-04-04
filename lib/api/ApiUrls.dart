@@ -7,4 +7,9 @@ class ApiUrls {
   static const String SongAliasApi = 'https://www.yuzuchan.moe/api/maimaidx/maimaidxalias';
   static const String UserBest50Api = 'https://www.diving-fish.com/api/maimaidxprober/query/player';
   static const String UserPlayDataApi = 'https://www.diving-fish.com/api/maimaidxprober/dev/player/records';
+  static const String TrophiesCollectionApi = 'https://maimai.lxns.net/api/v0/maimai/trophy/list';
+  static const String IconsCollectionApi = 'https://maimai.lxns.net/api/v0/maimai/icon/list';
+  static const String PlatesCollectionApi = 'https://maimai.lxns.net/api/v0/maimai/plate/list';
+  static const String FramesCollectionApi = 'https://maimai.lxns.net/api/v0/maimai/frame/list';
+  static const String LuoXueSongsApi = 'https://maimai.lxns.net/api/v0/maimai/song/list';
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
 import 'package:my_first_flutter_app/entity/RecommendationResult.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
+import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 
 class RecommendByTags extends StatefulWidget {
   const RecommendByTags({super.key});
@@ -28,7 +29,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   void initState() {
     super.initState();
     // 页面加载后延迟一点时间再获取推荐结果，确保页面先显示
-    Future.delayed(Duration(milliseconds: 800), () {
+    Future.delayed(Duration(milliseconds: 4000), () {
       _fetchRecommendations();
     });
   }
@@ -63,216 +64,197 @@ class _RecommendByTagsState extends State<RecommendByTags> {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
     
+    // 自定义常量
+    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
+    final double borderRadiusSmall = 8.0;
+    final BoxShadow defaultShadow = BoxShadow(
+      color: Colors.grey.withOpacity(0.5),
+      spreadRadius: 2,
+      blurRadius: 5,
+      offset: Offset(0, 3),
+    );
+
     return Scaffold(
       backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false, // 防止键盘弹出时挤压背景
+      resizeToAvoidBottomInset: false, // 防止键盘弹出时调整布局
       body: Stack(
         children: [
-          // 层级1：基础背景图 - 占满整个屏幕，作为页面最底层背景
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/background.png'), // 背景图资源
-                fit: BoxFit.cover, // 覆盖整个容器，拉伸/裁剪适配
-                opacity: 1.0, // 不透明
-              ),
-            ),
-          ),
+          // 背景
+          CommonWidgetUtil.buildCommonBgWidget(),
+          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
 
-          // 层级2：第一张虚化装饰图 - 居中显示，轻微向上偏移
-          Center(
-            child: Transform.translate(
-              offset: Offset(0, -screenHeight * 0.02), // 垂直向上偏移屏幕高度的2%
-              child: Transform.scale(
-                scale: 1, // 不缩放
-                child: Image.asset(
-                  'assets/chiffon2.png',
-                  fit: BoxFit.cover,
-                  opacity: const AlwaysStoppedAnimation(1), // 固定不透明
+          // 页面内容
+          Column(
+            children: [
+              // 标题栏
+              Container(
+                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
+                child: Row(
+                  children: [
+                    // 返回按钮
+                    IconButton(
+                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                    // 标题
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          '根据标签推荐',
+                          style: TextStyle(
+                            color: textPrimaryColor,
+                            fontSize: screenWidth * 0.06,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // 占位，保持标题居中
+                    SizedBox(width: 48),
+                  ],
                 ),
               ),
-            ),
-          ),
 
-          // 页面标题
-          Positioned(
-            top: screenHeight * 0.08, // 距离顶部为屏幕高度的8%
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Text(
-                "根据标签推荐",
-                style: TextStyle(
-                  color: Color.fromARGB(255, 84, 97, 97),
-                  fontSize: screenWidth * 0.06, // 字体大小为屏幕宽度的6%
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
+              // 主内容区域
+              Expanded(
+                child: Container(
+                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(borderRadiusSmall),
+                    boxShadow: [defaultShadow],
+                  ),
+                  child: Column(
+                    children: [
+                      // 切换按钮
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: screenWidth * 0.04, // 水平 padding 为屏幕宽度的4%
+                          vertical: screenHeight * 0.01, // 垂直 padding 为屏幕高度的1%
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () {
+                                setState(() {
+                                  _currentTab = 'Best55';
+                                  _currentPage = 1; // 切换标签时重置页码
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _currentTab == 'Best55' 
+                                    ? const Color.fromARGB(255, 84, 97, 97) 
+                                    : Colors.grey.shade200,
+                                foregroundColor: _currentTab == 'Best55' 
+                                    ? Colors.white 
+                                    : const Color.fromARGB(255, 84, 97, 97),
+                              ),
+                              child: const Text('Best55推荐'),
+                            ),
+                            SizedBox(width: screenWidth * 0.04), // 间距为屏幕宽度的4%
+                            ElevatedButton(
+                              onPressed: () {
+                                setState(() {
+                                  _currentTab = 'Best15';
+                                  _currentPage = 1; // 切换标签时重置页码
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _currentTab == 'Best15' 
+                                    ? const Color.fromARGB(255, 84, 97, 97) 
+                                    : Colors.grey.shade200,
+                                foregroundColor: _currentTab == 'Best15' 
+                                    ? Colors.white 
+                                    : const Color.fromARGB(255, 84, 97, 97),
+                              ),
+                              child: const Text('Best15推荐'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      // 内容区域
+                      Expanded(
+                        child: SingleChildScrollView(
+                          controller: _scrollController,
+                          padding: EdgeInsets.all(screenWidth * 0.04), // padding 为屏幕宽度的4%
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // 加载状态
+                              if (_isLoading)
+                                Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(screenHeight * 0.05), // padding 为屏幕高度的5%
+                                    child: Column(
+                                      children: [
+                                        CircularProgressIndicator(
+                                          color: Color.fromARGB(255, 84, 97, 97),
+                                        ),
+                                        SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
+                                        Text('正在计算推荐结果...'),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              // 错误状态
+                              else if (_errorMessage != null)
+                                Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(screenHeight * 0.05), // padding 为屏幕高度的5%
+                                    child: Column(
+                                      children: [
+                                        Icon(
+                                          Icons.error_outline,
+                                          color: Colors.red,
+                                          size: screenWidth * 0.12, // 图标大小为屏幕宽度的12%
+                                        ),
+                                        SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
+                                        Text(
+                                          _errorMessage!,
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(color: Colors.red),
+                                        ),
+                                        SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
+                                        ElevatedButton(
+                                          onPressed: _fetchRecommendations,
+                                          child: const Text('重试'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              // 展示推荐结果
+                              else
+                                _buildRecommendationContent(),
+                            ],
+                          ),
+                        ),
+                      ),
+                      
+                      // 分页组件 - 固定在滚动区域下方
+                      if (!_isLoading && _errorMessage == null)
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            vertical: screenHeight * 0.015, // 垂直 padding 为屏幕高度的1.5%
+                            horizontal: screenWidth * 0.04, // 水平 padding 为屏幕宽度的4%
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                          ),
+                          child: _buildPagination(),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ),
-
-          // 返回按钮
-          Positioned(
-            top: screenHeight * 0.05, // 距离顶部为屏幕高度的5%
-            left: screenWidth * 0.03, // 距离左侧为屏幕宽度的3%
-            child: IconButton(
-              icon: Icon(Icons.arrow_back,
-                  color: Color.fromARGB(255, 84, 97, 97), 
-                  size: screenWidth * 0.06), // 图标大小为屏幕宽度的6%
-              onPressed: () {
-                Navigator.pop(context);
-              },
-            ),
-          ),
-
-          // 主要内容区域
-          Positioned(
-            top: screenHeight * 0.15, // 距离顶部为屏幕高度的15%
-            left: screenWidth * 0.03, // 距离左侧为屏幕宽度的3%
-            right: screenWidth * 0.03, // 距离右侧为屏幕宽度的3%
-            bottom: screenHeight * 0.03, // 距离底部为屏幕高度的3%
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(8.0),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 5.0,
-                    offset: Offset(2.0, 2.0),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  // 切换按钮
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: screenWidth * 0.04, // 水平 padding 为屏幕宽度的4%
-                      vertical: screenHeight * 0.01, // 垂直 padding 为屏幕高度的1%
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              _currentTab = 'Best55';
-                              _currentPage = 1; // 切换标签时重置页码
-                            });
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _currentTab == 'Best55' 
-                                ? const Color.fromARGB(255, 84, 97, 97) 
-                                : Colors.grey.shade200,
-                            foregroundColor: _currentTab == 'Best55' 
-                                ? Colors.white 
-                                : const Color.fromARGB(255, 84, 97, 97),
-                          ),
-                          child: const Text('Best55推荐'),
-                        ),
-                        SizedBox(width: screenWidth * 0.04), // 间距为屏幕宽度的4%
-                        ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              _currentTab = 'Best15';
-                              _currentPage = 1; // 切换标签时重置页码
-                            });
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _currentTab == 'Best15' 
-                                ? const Color.fromARGB(255, 84, 97, 97) 
-                                : Colors.grey.shade200,
-                            foregroundColor: _currentTab == 'Best15' 
-                                ? Colors.white 
-                                : const Color.fromARGB(255, 84, 97, 97),
-                          ),
-                          child: const Text('Best15推荐'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  // 内容区域
-                  Expanded(
-                    child: SingleChildScrollView(
-                      controller: _scrollController,
-                      padding: EdgeInsets.all(screenWidth * 0.04), // padding 为屏幕宽度的4%
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // 加载状态
-                          if (_isLoading)
-                            Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(screenHeight * 0.05), // padding 为屏幕高度的5%
-                                child: Column(
-                                  children: [
-                                    CircularProgressIndicator(
-                                      color: Color.fromARGB(255, 84, 97, 97),
-                                    ),
-                                    SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
-                                    Text('正在计算推荐结果...'),
-                                  ],
-                                ),
-                              ),
-                            )
-                          // 错误状态
-                          else if (_errorMessage != null)
-                            Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(screenHeight * 0.05), // padding 为屏幕高度的5%
-                                child: Column(
-                                  children: [
-                                    Icon(
-                                      Icons.error_outline,
-                                      color: Colors.red,
-                                      size: screenWidth * 0.12, // 图标大小为屏幕宽度的12%
-                                    ),
-                                    SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
-                                    Text(
-                                      _errorMessage!,
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(color: Colors.red),
-                                    ),
-                                    SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
-                                    ElevatedButton(
-                                      onPressed: _fetchRecommendations,
-                                      child: const Text('重试'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                          // 展示推荐结果
-                          else
-                            _buildRecommendationContent(),
-                        ],
-                      ),
-                    ),
-                  ),
-                  
-                  // 分页组件 - 固定在滚动区域下方
-                  if (!_isLoading && _errorMessage == null)
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        vertical: screenHeight * 0.015, // 垂直 padding 为屏幕高度的1.5%
-                        horizontal: screenWidth * 0.04, // 水平 padding 为屏幕宽度的4%
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-                      ),
-                      child: _buildPagination(),
-                    ),
-                ],
-              ),
-            ),
+            ],
           ),
         ],
       ),

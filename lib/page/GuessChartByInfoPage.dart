@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/entity/GuessSong.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
@@ -421,7 +422,7 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
               Expanded(
                 flex: 1,
                 child: _buildInfoItem(
-                    '类型', guessSong.type, guessSong.typeBgColor ?? Colors.grey),
+                    '类型', guessSong.type == 'SD' ? 'ST' : guessSong.type, guessSong.typeBgColor ?? Colors.grey),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -805,111 +806,90 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
+    // 自定义常量
+    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
+    final double borderRadiusSmall = 8.0;
+    final BoxShadow defaultShadow = BoxShadow(
+      color: Colors.black12,
+      blurRadius: 5.0,
+      offset: Offset(2.0, 2.0),
+    );
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: false, // 防止键盘弹出时挤压背景
       body: Stack(
         children: [
-          // 层级1：基础背景图 - 占满整个屏幕，作为页面最底层背景
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/background.png'), // 背景图资源
-                fit: BoxFit.cover, // 覆盖整个容器，拉伸/裁剪适配
-                opacity: 1.0, // 不透明
-              ),
-            ),
-          ),
+          // 背景
+          CommonWidgetUtil.buildCommonBgWidget(),
+          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
 
-          // 层级2：第一张虚化装饰图 - 居中显示，轻微向上偏移
-          Center(
-            child: Transform.translate(
-              offset: const Offset(0, -20), // 垂直向上偏移20px
-              child: Transform.scale(
-                scale: 1, // 不缩放
-                child: Image.asset(
-                  'assets/chiffon2.png',
-                  fit: BoxFit.cover,
-                  opacity: const AlwaysStoppedAnimation(1), // 固定不透明
+          // 页面内容
+          Column(
+            children: [
+              // 标题栏
+              Container(
+                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
+                child: Row(
+                  children: [
+                    // 返回按钮
+                    IconButton(
+                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                    // 标题
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          '猜歌',
+                          style: TextStyle(
+                            color: textPrimaryColor,
+                            fontSize: screenWidth * 0.06,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // 占位，保持标题居中
+                    SizedBox(width: 48),
+                  ],
                 ),
               ),
-            ),
-          ),
 
-          // 页面标题
-          const Positioned(
-            top: 40,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Text(
-                "猜歌",
-                style: TextStyle(
-                  color: Color.fromARGB(255, 84, 97, 97),
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                ),
-              ),
-            ),
-          ),
-
-          // 返回按钮
-          Positioned(
-            top: 20,
-            left: 10,
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back,
-                  color: Color.fromARGB(255, 84, 97, 97), size: 24),
-              onPressed: () {
-                Navigator.pop(context);
-              },
-            ),
-          ),
-
-          // 主要内容区域
-          Positioned(
-            top: 80,
-            left: 10,
-            right: 10,
-            bottom: 40,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(8.0),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 5.0,
-                    offset: Offset(2.0, 2.0),
+              // 主内容区域
+              Expanded(
+                child: Container(
+                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(borderRadiusSmall),
+                    boxShadow: [defaultShadow],
                   ),
-                ],
-              ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  // 边距
-                  double padding = screenWidth * 0.04;
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // 边距
+                      double padding = screenWidth * 0.04;
 
-                  return Column(
-                    children: [
-                      // 主要内容
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.all(padding),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _isGameStarted
-                                  ? Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        // 游戏状态
-                                        Container(
-                                          padding: const EdgeInsets.all(16),
-                                          decoration: BoxDecoration(
+                      return Column(
+                        children: [
+                          // 主要内容
+                          Expanded(
+                            child: SingleChildScrollView(
+                              padding: EdgeInsets.all(padding),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _isGameStarted
+                                      ? Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            // 游戏状态
+                                            Container(
+                                              padding: const EdgeInsets.all(16),
+                                              decoration: BoxDecoration(
                                             color: Colors.blue[50],
                                             borderRadius:
                                                 BorderRadius.circular(8),
@@ -1244,6 +1224,7 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
 
         ],
       ),
+        ])
     );
   }
 }

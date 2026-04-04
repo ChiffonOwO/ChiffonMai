@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 
 class AchievementFullReverseCalculator extends StatefulWidget {
   const AchievementFullReverseCalculator({super.key});
@@ -148,151 +149,131 @@ class _AchievementFullReverseCalculatorState
     int totalGo = _tapGo + _holdGo + _slideGo + _touchGo + _breakGo;
     int totalM = _tapM + _holdM + _slideM + _touchM + _breakM;
 
+    // 自定义常量
+    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
+    final double borderRadiusSmall = 8.0;
+    final BoxShadow defaultShadow = BoxShadow(
+      color: Colors.black12,
+      blurRadius: 5.0,
+      offset: Offset(2.0, 2.0),
+    );
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: false, // 防止键盘弹出时挤压背景
       body: Stack(
         children: [
-          // 层级1：基础背景图 - 占满整个屏幕，作为页面最底层背景
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/background.png'), // 背景图资源
-                fit: BoxFit.cover, // 覆盖整个容器，拉伸/裁剪适配
-                opacity: 1.0, // 不透明
-              ),
-            ),
-          ),
+          // 背景
+          CommonWidgetUtil.buildCommonBgWidget(),
+          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
 
-          // 层级2：第一张虚化装饰图 - 居中显示，轻微向上偏移
-          Center(
-            child: Transform.translate(
-              offset: Offset(0, -screenHeight * 0.02), // 垂直向上偏移屏幕高度的2%
-              child: Transform.scale(
-                scale: 1, // 不缩放
-                child: Image.asset(
-                  'assets/chiffon2.png',
-                  fit: BoxFit.cover,
-                  opacity: const AlwaysStoppedAnimation(1), // 固定不透明
-                ),
-              ),
-            ),
-          ),
-
-          // 页面标题
-          Positioned(
-            top: screenHeight * 0.08, // 距离顶部为屏幕高度的8%
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Text(
-                "达成率反推",
-                style: TextStyle(
-                  color: Color.fromARGB(255, 84, 97, 97),
-                  fontSize: screenWidth * 0.06, // 字体大小为屏幕宽度的6%
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                ),
-              ),
-            ),
-          ),
-
-          // 返回按钮
-          Positioned(
-            top: screenHeight * 0.05, // 距离顶部为屏幕高度的5%
-            left: screenWidth * 0.03, // 距离左侧为屏幕宽度的3%
-            child: IconButton(
-              icon: Icon(Icons.arrow_back,
-                  color: Color.fromARGB(255, 84, 97, 97), 
-                  size: screenWidth * 0.06), // 图标大小为屏幕宽度的6%
-              onPressed: () {
-                Navigator.pop(context);
-              },
-            ),
-          ),
-
-          // 主要内容区域
-          Positioned(
-            top: screenHeight * 0.15, // 距离顶部为屏幕高度的15%
-            left: screenWidth * 0.03, // 距离左侧为屏幕宽度的3%
-            right: screenWidth * 0.03, // 距离右侧为屏幕宽度的3%
-            bottom: screenHeight * 0.03, // 距离底部为屏幕高度的3%
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(8.0),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 5.0,
-                    offset: Offset(2.0, 2.0),
-                  ),
-                ],
-              ),
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(screenWidth * 0.04), // padding 为屏幕宽度的4%
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+          // 页面内容
+          Column(
+            children: [
+              // 标题栏
+              Container(
+                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
+                child: Row(
                   children: [
-                    // 普通音符表格
-                    _buildSectionTitle('判定详情'),
-                    _buildNormalNoteTable(
-                        totalCp, totalP, totalG, totalGo, totalM),
-                    SizedBox(height: screenHeight * 0.03), // 间距为屏幕高度的3%
-
-                    // 达成率输入框
-                    _buildAchievementRateInput(),
-                    SizedBox(height: screenHeight * 0.025), // 间距为屏幕高度的2.5%
-
-                    // 计算和重置按钮区域
-                    Row(
-                      children: [
-                        // 重置按钮 - 占据1/5宽度
-                        Expanded(
-                          flex: 1,
-                          child: ElevatedButton(
-                            onPressed: _resetAll,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey,
-                              foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: screenHeight * 0.015), // 垂直 padding 为屏幕高度的1.5%
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: Text("重置", style: TextStyle(fontSize: screenWidth * 0.035)), // 字体大小为屏幕宽度的3.5%
+                    // 返回按钮
+                    IconButton(
+                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                    // 标题
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          '达成率反推',
+                          style: TextStyle(
+                            color: textPrimaryColor,
+                            fontSize: screenWidth * 0.06,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        SizedBox(width: screenWidth * 0.02), // 按钮间距为屏幕宽度的2%
-                        // 计算按钮 - 占据4/5宽度
-                        Expanded(
-                          flex: 4,
-                          child: _buildCalculateButton(),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
-
-                    // 计算结果显示区域
-                    if (_resultText != null)
-                      Container(
-                        padding: EdgeInsets.all(screenWidth * 0.03), // padding 为屏幕宽度的3%
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue.shade200),
-                        ),
-                        child: Text(
-                          _resultText!,
-                          style: TextStyle(fontSize: screenWidth * 0.035, height: 1.5), // 字体大小为屏幕宽度的3.5%
-                        ),
                       ),
+                    ),
+                    // 占位，保持标题居中
+                    SizedBox(width: 48),
                   ],
                 ),
               ),
-            ),
+
+              // 主内容区域
+              Expanded(
+                child: Container(
+                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(borderRadiusSmall),
+                    boxShadow: [defaultShadow],
+                  ),
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(screenWidth * 0.04), // padding 为屏幕宽度的4%
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // 普通音符表格
+                        _buildSectionTitle('判定详情'),
+                        _buildNormalNoteTable(
+                            totalCp, totalP, totalG, totalGo, totalM),
+                        SizedBox(height: screenHeight * 0.03), // 间距为屏幕高度的3%
+
+                        // 达成率输入框
+                        _buildAchievementRateInput(),
+                        SizedBox(height: screenHeight * 0.025), // 间距为屏幕高度的2.5%
+
+                        // 计算和重置按钮区域
+                        Row(
+                          children: [
+                            // 重置按钮 - 占据1/5宽度
+                            Expanded(
+                              flex: 1,
+                              child: ElevatedButton(
+                                onPressed: _resetAll,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.grey,
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.symmetric(vertical: screenHeight * 0.015), // 垂直 padding 为屏幕高度的1.5%
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: Text("重置", style: TextStyle(fontSize: screenWidth * 0.035)), // 字体大小为屏幕宽度的3.5%
+                              ),
+                            ),
+                            SizedBox(width: screenWidth * 0.02), // 按钮间距为屏幕宽度的2%
+                            // 计算按钮 - 占据4/5宽度
+                            Expanded(
+                              flex: 4,
+                              child: _buildCalculateButton(),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
+
+                        // 计算结果显示区域
+                        if (_resultText != null)
+                          Container(
+                            padding: EdgeInsets.all(screenWidth * 0.03), // padding 为屏幕宽度的3%
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.blue.shade200),
+                            ),
+                            child: Text(
+                              _resultText!,
+                              style: TextStyle(fontSize: screenWidth * 0.035, height: 1.5), // 字体大小为屏幕宽度的3.5%
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

@@ -8,6 +8,8 @@ import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/manager/DiffMusicDataManager.dart';
 import 'package:my_first_flutter_app/entity/DiffSong.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
+import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SongInfoPage extends StatefulWidget {
   final String songId;
@@ -154,7 +156,10 @@ class _SongInfoPageState extends State<SongInfoPage> {
       if (_songData != null) {
         final levels = _songData!['level'];
         if (levels != null && levels is List) {
-          if (_currentDiffIndex >= levels.length) {
+          // 对于难度数量大于等于4个的歌曲，默认选择第4个难度
+          if (levels.length >= 4 && widget.initialLevelIndex == 0) {
+            _currentDiffIndex = 3; // 第4个难度（索引为3）
+          } else if (_currentDiffIndex >= levels.length) {
             _currentDiffIndex = levels.length - 1;
           }
           // 确保索引不为负数
@@ -397,6 +402,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
     
     // 星星等级对应的最低达成率（降序排列）
     List<Map<String, dynamic>> starLevels = [
+      {"star": 6, "rate": 0.99, "color": Colors.yellow},
+      {"star": 5.5, "rate": 0.98, "color": Colors.yellow},
       {"star": 5, "rate": 0.97, "color": Colors.yellow},
       {"star": 4, "rate": 0.95, "color": Colors.orange},
       {"star": 3, "rate": 0.93, "color": Colors.orange},
@@ -407,7 +414,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
     // 计算每个星星等级的最低DX分
     List<Map<String, dynamic>> starScoreData = [];
     for (var item in starLevels) {
-      int star = item['star'];
+      num star = item['star'];
       double rate = item['rate'];
       Color color = item['color'];
       int minScore = (maxScore * rate).ceil();
@@ -472,7 +479,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
             Column(
               children: starScoreData.asMap().entries.map((entry) {
                 var item = entry.value;
-                int star = item['star'];
+                num star = item['star'];
                 double rate = item['rate'];
                 int minScore = item['minScore'];
                 int? delta = item['delta'];
@@ -489,7 +496,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                       Row(
                         children: [
                           Text(
-                            '\u2726 $star',
+                            '\u2726 ${star.toString()}',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -793,6 +800,15 @@ class _SongInfoPageState extends State<SongInfoPage> {
     final secondaryThemeColor = _getSecondaryThemeColor(_currentDiffIndex);
     final accentColor = _getAccentColor(_currentDiffIndex);
 
+    // 自定义常量
+    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
+    final double borderRadiusSmall = 8.0;
+    final BoxShadow defaultShadow = BoxShadow(
+      color: Colors.black12,
+      blurRadius: 5.0,
+      offset: Offset(2.0, 2.0),
+    );
+
     // 曲绘将使用CoverPathUtil工具类加载
 
     return Scaffold(
@@ -800,88 +816,58 @@ class _SongInfoPageState extends State<SongInfoPage> {
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          // 层级1：基础背景图 - 占满整个屏幕，作为页面最底层背景
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/background.png'), // 背景图资源
-                fit: BoxFit.cover, // 覆盖整个容器，拉伸/裁剪适配
-                opacity: 1.0, // 不透明
-              ),
-            ),
-          ),
+          // 背景
+          CommonWidgetUtil.buildCommonBgWidget(),
+          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
 
-          // 层级2：第一张虚化装饰图 - 居中显示，轻微向上偏移
-          Center(
-            child: Transform.translate(
-              offset: const Offset(0, -20), // 垂直向上偏移20px
-              child: Transform.scale(
-                scale: 1, // 不缩放
-                child: Image.asset(
-                  'assets/chiffon2.png',
-                  fit: BoxFit.cover,
-                  opacity: const AlwaysStoppedAnimation(1), // 固定不透明
-                ),
-              ),
-            ),
-          ),
-
-          // 页面标题
-          const Positioned(
-            top: 60,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Text(
-                "歌曲详情",
-                style: TextStyle(
-                  color: Color.fromARGB(255, 84, 97, 97),
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                ),
-              ),
-            ),
-          ),
-
-          // 返回按钮
-          Positioned(
-            top: 40,
-            left: 10,
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back,
-                  color: Color.fromARGB(255, 84, 97, 97), size: 24),
-              onPressed: () {
-                Navigator.pop(context);
-              },
-            ),
-          ),
-
-          // 主要内容区域
-          Positioned(
-            top: MediaQuery.of(context).size.height * 0.12,
-            left: MediaQuery.of(context).size.width * 0.02,
-            right: MediaQuery.of(context).size.width * 0.02,
-            bottom: MediaQuery.of(context).size.height * 0.02,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(8.0),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 5.0,
-                    offset: Offset(2.0, 2.0),
-                  ),
-                ],
-              ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+          // 页面内容
+          Column(
+            children: [
+              // 标题栏
+              Container(
+                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
+                child: Row(
                   children: [
+                    // 返回按钮
+                    IconButton(
+                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                    // 标题
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          '歌曲详情',
+                          style: TextStyle(
+                            color: textPrimaryColor,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // 占位，保持标题居中
+                    SizedBox(width: 48),
+                  ],
+                ),
+              ),
+
+              // 主内容区域
+              Expanded(
+                child: Container(
+                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(borderRadiusSmall),
+                    boxShadow: [defaultShadow],
+                  ),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                     // 卡片区域
                     Container(
                       decoration: BoxDecoration(
@@ -1280,6 +1266,22 @@ class _SongInfoPageState extends State<SongInfoPage> {
                             ),
                           ),
 
+                          // 跳转到B站按钮
+                          Container(
+                            margin: const EdgeInsets.only(top: 12),
+                            child: ElevatedButton(
+                              onPressed: _jumpToBilibili,
+                              child: const Text('跳转到B站'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.pink,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                          ),
+
                           const SizedBox(height: 20),
 
                           // 谱面标签
@@ -1405,10 +1407,12 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         ],
                       ),
                     ),
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         ],
       ),
@@ -1469,6 +1473,10 @@ class _SongInfoPageState extends State<SongInfoPage> {
     double missLoss = totalWeight > 0 ? (1.00 * 100.00 * noteWeight / totalWeight) : 0;
     
     // BREAK音符特殊判定损失
+   // 50落：基础部分权重相同，额外部分损失0.25 (1.0 - 0.75)
+    double break50Loss = noteCount > 0 ? 0.25 / noteCount : 0; // 50落 -> 损失25%
+    // 100落：基础部分权重相同，额外部分损失0.50 (1.0 - 0.50)
+    double break100Loss = noteCount > 0 ? 0.5 / noteCount : 0; // 100落 -> 损失50%
     double break80Loss = totalWeight > 0 ? (0.20 * 100.00 * noteWeight / totalWeight) : 0; // 80% -> 损失20%
     double break60Loss = totalWeight > 0 ? (0.40 * 100.00 * noteWeight / totalWeight) : 0; // 60% -> 损失40%
     double break50gLoss = totalWeight > 0 ? (0.50 * 100.00 * noteWeight / totalWeight) : 0; // 50% -> 损失50%
@@ -1654,6 +1662,22 @@ class _SongInfoPageState extends State<SongInfoPage> {
                 
                 // BREAK音符特殊判定损失（仅当选中BREAK时显示）
                 if (_selectedNoteType == 'BREAK') ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('50落损失:', style: TextStyle(color: Colors.grey)),
+                      Text('${break50Loss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('100落损失:', style: TextStyle(color: Colors.grey)),
+                      Text('${break100Loss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -1963,6 +1987,18 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
   // 获取难度标签
   String _getDiffLabel(int index) {
+    // 检查难度数量
+    int difficultyCount = 0;
+    if (_songData != null && _songData!['level'] != null) {
+      difficultyCount = _songData!['level'].length;
+    }
+    
+    // 如果难度数量≤2个，显示"U\u00b7TA\u00b7GE​"
+    if (difficultyCount <= 2) {
+      return 'U\u00b7TA\u00b7GE​';
+    }
+    
+    // 否则返回原来的标签
     switch (index) {
       case 0:
         return 'Basic';
@@ -2135,6 +2171,29 @@ class _SongInfoPageState extends State<SongInfoPage> {
       version = version.replaceFirst('\u3067\u3089\u3063\u304f\u3059 ', '');
     }
     return version;
+  }
+
+  // 跳转到B站
+  void _jumpToBilibili() async {
+    if (_songData == null) return;
+
+    final songTitle = _songData!['basic_info']['title'];
+    final diffLabel = _getDiffLabel(_currentDiffIndex);
+    final searchQuery = '$songTitle $diffLabel';
+
+    // B站搜索链接
+    final url = Uri.parse('bilibili://search?keyword=${Uri.encodeComponent(searchQuery)}');
+
+    // 尝试打开B站应用
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
+    } else {
+      // 如果无法打开B站应用，尝试在浏览器中打开
+      final webUrl = Uri.parse('https://search.bilibili.com/all?keyword=${Uri.encodeComponent(searchQuery)}');
+      if (await canLaunchUrl(webUrl)) {
+        await launchUrl(webUrl);
+      }
+    }
   }
 
   // 获取标签颜色
