@@ -6,10 +6,15 @@
 	<string>需要访问您的相册以保存导出的图片</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>需要访问您的相册以保存导出的图片</string>
-	<!-- 允许所有HTTPS请求 -->
-    <key>NSAllowsArbitraryLoads</key>
+
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+
 	<key>CFBundleDevelopmentRegion</key>
-	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<string>$(DEVELOPMANT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>My First Flutter App</string>
 	<key>CFBundleExecutable</key>
@@ -51,7 +56,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<!-- 允许查询B站应用 -->
+
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>bilibili</string>
