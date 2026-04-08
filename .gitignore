@@ -45,3 +45,6 @@ app.*.map.json
 /android/app/release
 /android/build/
 /android/app/build/
+
+# Ignore sensitive files
+lib/api/DeveloperToken.dart
