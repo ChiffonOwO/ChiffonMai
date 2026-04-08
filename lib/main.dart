@@ -17,6 +17,7 @@ import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/manager/DiffMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/CollectionsManager.dart';
 import 'package:my_first_flutter_app/manager/LuoXueSongsManager.dart';
+import 'package:my_first_flutter_app/manager/LZYCheckUpdateManager.dart';
 import 'package:my_first_flutter_app/page/UserScoreSearchPage.dart';
 import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
@@ -143,6 +144,24 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _loadUserData();
+    _autoCheckUpdate();
+  }
+  
+  // 自动检查更新
+  Future<void> _autoCheckUpdate() async {
+    print("首页加载时自动检查更新");
+    final updateManager = LZYCheckUpdateManager();
+    try {
+      // 检查是否应该显示更新提示
+      if (await updateManager.shouldShowUpdateDialog()) {
+        var updateInfo = await updateManager.checkUpdate();
+        if (updateInfo['hasUpdate'] && mounted) {
+          updateManager.showUpdateDialog(context);
+        }
+      }
+    } catch (e) {
+      print("自动检查更新失败：$e");
+    }
   }
   
   // 从本地存储加载用户数据
@@ -356,47 +375,92 @@ class _HomePageState extends State<HomePage> {
   // 构建用户信息文本
   Widget _buildUserInfo(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          _userNickname,
-          style: TextStyle(
-            color: AppConstants.textPrimaryColor,
-            fontSize: screenWidth * 0.07,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1,
-            height: 0.6,
+    
+    // 检查是否有缓存数据（通过检查用户昵称为默认值判断）
+    bool hasNoCachedData = _userNickname == "U+5E78";
+    
+    if (hasNoCachedData) {
+      // 没有缓存数据时显示提示信息
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            "请点击",
+            style: TextStyle(
+              color: AppConstants.textPrimaryColor,
+              fontSize: screenWidth * 0.05,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1,
+              height: 1.2,
+            ),
           ),
-        ),
-        Text(
-          "Rating",
-          style: TextStyle(
-            color: AppConstants.textSecondaryColor,
-            fontSize: screenWidth * 0.045,
-            fontWeight: FontWeight.normal,
+          Text(
+            "刷新数据",
+            style: TextStyle(
+              color: AppConstants.textPrimaryColor,
+              fontSize: screenWidth * 0.05,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1,
+              height: 1.2,
+            ),
           ),
-        ),
-        Text(
-          "$_best50TotalRA",
-          style: TextStyle(
-            color: AppConstants.textSecondaryColor,
-            fontSize: screenWidth * 0.07,
-            fontWeight: FontWeight.w600,
-            height: 0.8,
+          Text(
+            "刷新成绩",
+            style: TextStyle(
+              color: AppConstants.textPrimaryColor,
+              fontSize: screenWidth * 0.05,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1,
+              height: 1.2,
+            ),
           ),
-        ),
-        Text(
-          "$_best35TotalRA+$_best15TotalRA",
-          style: TextStyle(
-            color: AppConstants.textSecondaryColor,
-            fontSize: screenWidth * 0.04,
-            fontWeight: FontWeight.w300,
+        ],
+      );
+    } else {
+      // 有缓存数据时显示正常信息
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _userNickname,
+            style: TextStyle(
+              color: AppConstants.textPrimaryColor,
+              fontSize: screenWidth * 0.07,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1,
+              height: 0.6,
+            ),
           ),
-        ),
-      ],
-    );
+          Text(
+            "Rating",
+            style: TextStyle(
+              color: AppConstants.textSecondaryColor,
+              fontSize: screenWidth * 0.045,
+              fontWeight: FontWeight.normal,
+            ),
+          ),
+          Text(
+            "$_best50TotalRA",
+            style: TextStyle(
+              color: AppConstants.textSecondaryColor,
+              fontSize: screenWidth * 0.07,
+              fontWeight: FontWeight.w600,
+              height: 0.8,
+            ),
+          ),
+          Text(
+            "$_best35TotalRA+$_best15TotalRA",
+            style: TextStyle(
+              color: AppConstants.textSecondaryColor,
+              fontSize: screenWidth * 0.04,
+              fontWeight: FontWeight.w300,
+            ),
+          ),
+        ],
+      );
+    }
   }
 
   // 显示刷新数据对话框
@@ -653,6 +717,81 @@ class _HomePageState extends State<HomePage> {
               context,
               MaterialPageRoute(builder: (context) => GuessChartBySongExcerptPage()),
             );
+          }
+          if (item.title == '检查更新'){
+            // 显示加载对话框
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: Text('检查更新'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('正在检查更新...'),
+                    ],
+                  ),
+                );
+              },
+            );
+            
+            // 检查更新
+            final updateManager = LZYCheckUpdateManager();
+            updateManager.checkUpdate().then((updateInfo) {
+              Navigator.of(context).pop(); // 关闭加载对话框
+              if (updateInfo['hasUpdate']) {
+                // 显示更新提示
+                if (context.mounted) {
+                  updateManager.showUpdateDialog(context);
+                }
+              } else {
+                // 显示没有更新的提示
+                if (context.mounted) {
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return AlertDialog(
+                        title: Text('检查更新'),
+                        content: Text('当前已是最新版本'),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                            },
+                            child: Text('确定'),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                }
+              }
+            }).catchError((error) {
+              Navigator.of(context).pop(); // 关闭加载对话框
+              // 显示错误提示
+              if (context.mounted) {
+                showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: Text('检查更新失败'),
+                      content: Text('请检查网络连接后重试'),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                          child: Text('确定'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              }
+            });
           }
         },
         child: Column(

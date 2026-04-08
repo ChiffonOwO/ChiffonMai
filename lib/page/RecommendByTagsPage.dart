@@ -199,6 +199,12 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                                         ),
                                         SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
                                         Text('正在计算推荐结果...'),
+                                        SizedBox(height: screenHeight * 0.01), // 间距为屏幕高度的1%
+                                        Text(
+                                          '此功能计算量较大，可能会出现卡顿，请耐心等待',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(fontSize: screenWidth * 0.035),
+                                        ),
                                       ],
                                     ),
                                   ),

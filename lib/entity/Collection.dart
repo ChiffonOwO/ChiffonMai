@@ -107,11 +107,11 @@ class CollectionRequired {
 
   factory CollectionRequired.fromJson(Map<String, dynamic> json) {
     return CollectionRequired(
-      difficulties: (json['difficulties'] as List<dynamic>?)?.map((item) => item as int).toList(),
+      difficulties: (json['difficulties'] as List<dynamic>?)?.where((item) => item != null).map((item) => item as int).toList(),
       rate: json['rate'],
       fc: json['fc'],
       fs: json['fs'],
-      songs: (json['songs'] as List<dynamic>?)?.map((item) => CollectionRequiredSong.fromJson(item)).toList(),
+      songs: (json['songs'] as List<dynamic>?)?.where((item) => item != null).map((item) => CollectionRequiredSong.fromJson(item)).toList(),
       completed: json['completed'],
     );
   }
@@ -163,7 +163,7 @@ class CollectionRequiredSong {
       title: json['title'] ?? '',
       type: json['type'] ?? '',
       completed: json['completed'],
-      completedDifficulties: (json['completed_difficulties'] as List<dynamic>?)?.map((item) => item as int).toList(),
+      completedDifficulties: (json['completed_difficulties'] as List<dynamic>?)?.where((item) => item != null).map((item) => item as int).toList(),
     );
   }
 

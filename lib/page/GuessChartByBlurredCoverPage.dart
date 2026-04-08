@@ -1220,11 +1220,14 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
                                                     children: _getSortedGuessHistory()
                                                         .asMap()
                                                         .entries
-                                                        .map((entry) =>
-                                                            _buildGuessHistoryItem(
-                                                                entry.value,
-                                                                entry.key,
-                                                                null))
+                                                        .map((entry) {
+                                                          // 获取原始索引（保持序号不变）
+                                                          final originalIndex = _guessHistory.indexOf(entry.value);
+                                                          return _buildGuessHistoryItem(
+                                                              entry.value,
+                                                              originalIndex,
+                                                              null);
+                                                        })
                                                         .toList(),
                                                   ),
                                                 ],

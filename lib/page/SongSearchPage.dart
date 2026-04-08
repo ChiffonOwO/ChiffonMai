@@ -827,7 +827,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                           ),
                           margin: EdgeInsets.all(padding),
                           padding: EdgeInsets.symmetric(
-                            vertical: screenHeight * 0.015,
+                            vertical: screenHeight * 0.008,
                             horizontal: screenWidth * 0.05,
                           ),
                           child: Row(
@@ -977,14 +977,31 @@ class _SongSearchPageState extends State<SongSearchPage> {
                   ),
                   const SizedBox(height: 8),
 
-                  // 第二行：版本、流派
-                  Text(
-                    '${_formatVersion(song.basicInfo.from)} | ${song.basicInfo.genre}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                  // 第二行：类型、版本、流派
+                  Row(
+                    children: [
+                      // ST/DX/UTAGE 显示
+                      Text(
+                        song.id.toString().length == 6 ? 'UTAGE' : (song.type == 'SD' ? 'ST' : 'DX'),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: song.id.toString().length == 6 ? Color(0xFFFF6B8B) : (song.type == 'SD' ? Colors.blue : Colors.orange),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // 版本和流派
+                      Expanded(
+                        child: Text(
+                          '${_formatVersion(song.basicInfo.from)} | ${song.basicInfo.genre}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
 

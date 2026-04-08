@@ -1422,7 +1422,7 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
                                                         .map((entry) =>
                                                             _buildGuessHistoryItem(
                                                                 entry.value,
-                                                                entry.key,
+                                                                _guessHistory.indexOf(entry.value),
                                                                 null))
                                                         .toList(),
                                                   ),

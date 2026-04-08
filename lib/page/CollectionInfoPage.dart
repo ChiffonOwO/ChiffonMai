@@ -6,6 +6,7 @@ import '../utils/LuoXueToDivingFishUtil.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/CollectionsImageUtil.dart';
 import '../utils/CoverUtil.dart';
+import '../utils/TranslationUtil.dart';
 import 'SongInfoPage.dart';
 
 class CollectionInfoPage extends StatefulWidget {
@@ -28,6 +29,10 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
   bool _isLoading = true;
   Map<CollectionRequiredSong, dynamic>? _songMap;
   bool _isLoadingSongs = false;
+  String? _translatedName;
+  String? _translatedDescription;
+  bool _isTranslatingName = false;
+  bool _isTranslatingDescription = false;
 
   // 自定义常量
   final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
@@ -73,6 +78,82 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
     } finally {
       setState(() {
         _isLoading = false;
+      });
+    }
+  }
+
+  // 检测是否为英文或日文字符
+  bool _isEnglishOrJapanese(String text) {
+    // 检查是否包含拉丁字母或日文字符（平假名、片假名）
+    final englishRegex = RegExp(r'[a-zA-Z]');
+    final japaneseHiraganaKatakanaRegex = RegExp(r'[\u3040-\u309F\u30A0-\u30FF]');
+    
+    return englishRegex.hasMatch(text) || japaneseHiraganaKatakanaRegex.hasMatch(text);
+  }
+
+  // 检测是否为英文
+  bool _isEnglish(String text) {
+    // 检查是否包含拉丁字母
+    final englishRegex = RegExp(r'[a-zA-Z]');
+    return englishRegex.hasMatch(text);
+  }
+
+  // 检测是否为日语
+  bool _isJapanese(String text) {
+    // 检查是否包含日文字符（平假名、片假名）
+    final japaneseHiraganaKatakanaRegex = RegExp(r'[\u3040-\u309F\u30A0-\u30FF]');
+    return japaneseHiraganaKatakanaRegex.hasMatch(text);
+  }
+
+  // 检测是否同时包含英语和日语
+  bool _isEnglishAndJapanese(String text) {
+    return _isEnglish(text) && _isJapanese(text);
+  }
+
+  // 翻译收藏品名称
+  Future<void> _translateName() async {
+    if (_collection?.name == null) return;
+    
+    setState(() {
+      _isTranslatingName = true;
+    });
+    
+    try {
+      String? translated = await TranslateService.translate(_collection!.name, from: 'auto', to: 'zh');
+      if (translated != null) {
+        setState(() {
+          _translatedName = translated;
+        });
+      }
+    } catch (e) {
+      print('翻译名称失败: $e');
+    } finally {
+      setState(() {
+        _isTranslatingName = false;
+      });
+    }
+  }
+
+  // 翻译收藏品描述
+  Future<void> _translateDescription() async {
+    if (_collection?.description == null) return;
+    
+    setState(() {
+      _isTranslatingDescription = true;
+    });
+    
+    try {
+      String? translated = await TranslateService.translate(_collection!.description!, from: 'auto', to: 'zh');
+      if (translated != null) {
+        setState(() {
+          _translatedDescription = translated;
+        });
+      }
+    } catch (e) {
+      print('翻译描述失败: $e');
+    } finally {
+      setState(() {
+        _isTranslatingDescription = false;
       });
     }
   }
@@ -409,34 +490,65 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
       );
     }
 
-    // 处理所需连击
+    // 处理所需连击和同步
     for (final requiredItem in requiredList) {
+      // 处理fc字段
       if (requiredItem.fc != null) {
-        if (!seenFc.contains(requiredItem.fc!)) {
-          seenFc.add(requiredItem.fc!);
-          mergedConditions.add(
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '所需连击:',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
+        // 定义同步类型的fc值
+        final syncTypes = ['fs', 'fsp', 'fsd', 'fsdp', 'sync'];
+        
+        if (syncTypes.contains(requiredItem.fc!)) {
+          // fc字段是同步类型，显示到所需同步里
+          if (!seenFs.contains(requiredItem.fc!)) {
+            seenFs.add(requiredItem.fc!);
+            mergedConditions.add(
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '所需同步:',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 4),
-                  _getFcDisplay(requiredItem.fc!),
-                ],
+                    SizedBox(height: 4),
+                    _getFsDisplay(requiredItem.fc!),
+                  ],
+                ),
               ),
-            ),
-          );
+            );
+          }
+        } else {
+          // fc字段是连击类型，显示到所需连击里
+          if (!seenFc.contains(requiredItem.fc!)) {
+            seenFc.add(requiredItem.fc!);
+            mergedConditions.add(
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '所需连击:',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    _getFcDisplay(requiredItem.fc!),
+                  ],
+                ),
+              ),
+            );
+          }
         }
       }
 
-      // 处理所需同步
+      // 处理所需同步（fs字段）
       if (requiredItem.fs != null) {
         if (!seenFs.contains(requiredItem.fs!)) {
           seenFs.add(requiredItem.fs!);
@@ -569,6 +681,41 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                       color: textPrimaryColor,
                                     ),
                                   ),
+                                  // 如果名称包含英文或日文，显示翻译按钮和结果
+                                  if (_isEnglishOrJapanese(_collection!.name))
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        if (_translatedName != null)
+                                          Text(
+                                            _translatedName!,
+                                            style: const TextStyle(
+                                              fontSize: 18,
+                                              fontStyle: FontStyle.italic,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                        if (_isTranslatingName)
+                                          const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          )
+                                        else if (_translatedName != null)
+                                          Text(
+                                            '由腾讯云翻译自${_isEnglishAndJapanese(_collection!.name) ? '日语+英语' : _isEnglish(_collection!.name) ? '英语' : '日语'}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey,
+                                            ),
+                                          )
+                                        else
+                                          TextButton(
+                                            onPressed: _translateName,
+                                            child: const Text('翻译为中文'),
+                                          ),
+                                      ],
+                                    ),
                                   SizedBox(height: 16),
 
                                   // 颜色（仅称号）
@@ -645,6 +792,41 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                             fontSize: 16,
                                           ),
                                         ),
+                                        // 如果描述包含英文或日文，显示翻译按钮和结果
+                                        if (_isEnglishOrJapanese(_collection!.description!))
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              if (_translatedDescription != null)
+                                                Text(
+                                                  _translatedDescription!,
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    fontStyle: FontStyle.italic,
+                                                    color: Colors.grey,
+                                                  ),
+                                                ),
+                                              if (_isTranslatingDescription)
+                                                const SizedBox(
+                                                  width: 20,
+                                                  height: 20,
+                                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                                )
+                                              else if (_translatedDescription != null)
+                                                Text(
+                                                  '由腾讯云翻译自${_isEnglishAndJapanese(_collection!.description!) ? '日语+英语' : _isEnglish(_collection!.description!) ? '英语' : '日语'}',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey,
+                                                  ),
+                                                )
+                                              else
+                                                TextButton(
+                                                  onPressed: _translateDescription,
+                                                  child: const Text('翻译为中文'),
+                                                ),
+                                            ],
+                                          ),
                                         SizedBox(height: 16),
                                       ],
                                     ),
