@@ -4,6 +4,8 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:my_first_flutter_app/utils/StringUtil.dart';
+import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import '../service/Best50ConvertToImgService.dart';
 import '../manager/UserBest50Manager.dart';
 import '../manager/MaimaiMusicDataManager.dart';
@@ -906,75 +908,24 @@ class _B50PageState extends State<B50Page> {
     int songId = songData['song_id'];
 
     // 计算星星等级
-    String stars = _calculateStars(songId, levelIndex, score);
-    Color starsColor = _getStarsColor(stars);
+    double scoreRate = _calculateScoreRate(songId, levelIndex, score);
+    String stars = StringUtil.formatStars(scoreRate);
+    Color starsColor = ColorUtil.getStarsColor(stars);
 
     // 映射FC属性
-    String fcText = '-';
-    if (fc.isNotEmpty) {
-      if (fc == 'fcp') {
-        fcText = 'FC+';
-      } else if (fc == 'fc') {
-        fcText = 'FC';
-      } else if (fc == 'ap') {
-        fcText = 'AP';
-      } else if (fc == 'app') {
-        fcText = 'AP+';
-      }
-    }
+    String fcText = fc.isNotEmpty ? StringUtil.formatFC(fc) : '-';
 
     // 映射FS属性
-    String fsText = '-';
-    if (fs.isNotEmpty) {
-      if (fs == 'fsd') {
-        fsText = 'FDX';
-      } else if (fs == 'fsp') {
-        fsText = 'FS+';
-      } else if (fs == 'fs') {
-        fsText = 'FS';
-      } else if (fs == 'sync') {
-        fsText = 'SC';
-      } else if (fs == 'fsdp') {
-        fsText = 'FDX+';
-      }
-    }
+    String fsText = fs.isNotEmpty ? StringUtil.formatFS(fs) : '-';
+
     // 映射Rate属性
-    String rateText = rate;
-    if (rateText == 'sssp') {
-      rateText = 'SSS+';
-    } else if (rateText == 'sss') {
-      rateText = 'SSS';
-    } else if (rateText == 'ssp') {
-      rateText = 'SS+';
-    } else if (rateText == 'ss') {
-      rateText = 'SS';
-    } else if (rateText == 'sp') {
-      rateText = 'S+';
-    } else if (rateText == 's') {
-      rateText = 'S';
-    } else if (rateText == 'aaa') {
-      rateText = 'AAA';
-    } else if (rateText == 'aa') {
-      rateText = 'AA';
-    } else if (rateText == 'a') {
-      rateText = 'A';
-    } else if (rateText == 'bbb') {
-      rateText = 'BBB';
-    } else if (rateText == 'bb') {
-      rateText = 'BB';
-    } else if (rateText == 'b') {
-      rateText = 'B';
-    } else if (rateText == 'c') {
-      rateText = 'C';
-    } else if (rateText == 'd') {
-      rateText = 'D';
-    }
+    String rateText = StringUtil.formatRate(rate);
 
     // 构建完整grade
     String grade = '$rateText | $fcText | $fsText';
 
     // 获取卡片颜色
-    Color cardColor = _getCardColor(levelIndex);
+    Color cardColor = ColorUtil.getCardColor(levelIndex);
 
     // 判断是否为DX模式
     bool dxMode = type == 'DX';
@@ -1007,18 +958,6 @@ class _B50PageState extends State<B50Page> {
     );
   }
 
-  // 根据level_index获取卡片颜色
-  Color _getCardColor(int levelIndex) {
-    List<Color> colors = [
-      Colors.green, // level_index 0
-      Colors.yellow, // level_index 1
-      Colors.red, // level_index 2
-      Colors.purple.shade400, // level_index 3
-      Colors.purple.shade200, // level_index 4
-    ];
-    return colors[levelIndex.clamp(0, 4)];
-  }
-
   // 计算scoreRate
   double _calculateScoreRate(int songId, int levelIndex, int score) {
     if (_maimaiMusicData == null) return 0.0;
@@ -1047,42 +986,6 @@ class _B50PageState extends State<B50Page> {
 
     // 计算scoreRate
     return maxScore > 0 ? score / maxScore : 0.0;
-  }
-
-  // 计算星星等级
-  String _calculateStars(int songId, int levelIndex, int score) {
-    double scoreRate = _calculateScoreRate(songId, levelIndex, score);
-
-    // 确定星星等级
-    if (scoreRate >= 0.97) {
-      return '\u27265';
-    } else if (scoreRate >= 0.95) {
-      return '\u27264';
-    } else if (scoreRate >= 0.93) {
-      return '\u27263';
-    } else if (scoreRate >= 0.90) {
-      return '\u27262';
-    } else if (scoreRate >= 0.85) {
-      return '\u27261';
-    } else {
-      return '\u27260';
-    }
-  }
-
-  // 获取星星颜色
-  Color _getStarsColor(String stars) {
-    switch (stars) {
-      case '\u27265':
-        return Colors.yellow;
-      case '\u27264':
-      case '\u27263':
-        return Colors.orange;
-      case '\u27262':
-      case '\u27261':
-        return Colors.green.shade300;
-      default:
-        return Colors.white;
-    }
   }
 
   // 构建导出按钮

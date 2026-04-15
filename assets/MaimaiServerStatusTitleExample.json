@@ -1,0 +1,190 @@
+{
+    "config": {
+        "slug": "maimai",
+        "title": "maimaiDX Server Status Regen",
+        "description": "<a href=\"https://otogamer.cn/?refer=awmc\">  <img src=\"https://img.cdn1.vip/i/6990942645b3a_1771082790.webp\" alt=\"Banner\" style=\"width: 100%; max-width: 100%; height: auto; display: block;\"></a><br>\n<a href=\"https://www.lucdn.cn?utm_source=awmc\"> <img src=\"https://assets.awmc.cc/static/lucdn_banner.png\" alt=\"Banner\" style=\"width: 100%; max-width: 100%; height: auto; display: block;\"></a><br>\n\n本数据仅供参考。具体信息请以机台为准。\n\n\n更新频率 20s 一次Milk 创建的基于 **舞萌DX** 的服务状态！\n\n\n\n支持API接入，详情请查看 https://wiki.awmc.cc/dev/status-api\n\n\n\n*Tags:舞萌状态，舞萌DX状态，舞萌DX。*\n\n\n\n如果你想要补充其他服务欢迎联系我！ (QQ:3801477277 邮箱:milk@awmc.cc )\n\n\n\n## QQ交流群 --> [1072033605](https://qm.qq.com/q/n0ofGi82DC) <--\n\n\n\n`Ctrl + D` 收藏这个网页！https://status.awmc.cc/status/maimai",
+        "icon": "/upload/logo1.png?t=1770729265361",
+        "autoRefreshInterval": 300,
+        "theme": "auto",
+        "published": true,
+        "showTags": true,
+        "customCSS": "/* GLOBALS\n-------------------------------------------------- */\n\n:root {\n  /* Palette colors */\n  --color-gray: #7f8c8d;\n  --color-red: #e74c3c;\n  --color-orange: #f39c12;\n  --color-teal: #1abc9c;\n  --color-blue: #3498db;\n  --color-green: #27ae60;\n  --color-indigo: #5c6bc0;\n  --color-purple: #9b59b6;\n  --color-pink: #e84393;\n\n  /* Palette RGB colors */\n  --rgb-color-gray: 127, 140, 141;\n  --rgb-color-red: 231, 76, 60;\n  --rgb-color-orange: 243, 156, 18;\n  --rgb-color-teal: 26, 188, 156;\n  --rgb-color-blue: 52, 152, 219;\n  --rgb-color-green: 39, 174, 96;\n  --rgb-color-indigo: 92, 107, 192;\n  --rgb-color-purple: 155, 89, 182;\n  --rgb-color-pink: 232, 67, 147;\n\n  /* Light theme base colors */\n  --color-bg: #fbfbfc;\n  --color-text-primary: #566573;\n  --color-text-heading: #141414;\n  --color-text-secondary: #85929e;\n  --color-block-bg: #fff;\n  --color-border: rgba(0, 0, 0, .1);\n  --color-uptime-bar-empty-bg: #d7dbdd;\n  --color-tooltip-bg: #fff;\n\n  /* Button: Secondary */\n  --color-btn-secondary-bg: transparent;\n  --color-btn-secondary-hover-bg: #ebebeb;\n  --color-btn-secondary-active-bg: #d7d7d7;\n  --color-btn-secondary-border: rgba(0, 0, 0, .16);\n\n  /* Sizing */\n  --size-container-width: 864px;\n  --size-edit-container-width: 1164px;\n  --size-logo-width: 48px;\n  --size-logo-height: 48px;\n  --size-uptime-bar-height: 24px;\n\n  /* Spacing */\n  --spacing-4: .25rem;\n  --spacing-8: .5rem;\n  --spacing-12: .75rem;\n  --spacing-16: 1rem;\n  --spacing-20: 1.25rem;\n  --spacing-24: 1.5rem;\n  --spacing-32: 2rem;\n\n  /* Border radius */\n  --border-radius-200: .25rem;\n  --border-radius-400: .375rem;\n  --border-radius-500: .5rem;\n\n  /* Typography */\n  --font-size-50: 0.75rem;\n  --font-size-100: .875rem;\n  --font-size-300: 1.125rem;\n  --font-size-350: 1.25rem;\n  --font-weight-medium: 500;\n  --font-weight-semibold: 600;\n  --font-line-height-200: var(--spacing-24);\n\n  /* Shadow */\n  --shadow-filter: rgba(0, 0, 0, .05) 0px 1px 6px 0px;\n}\n\n/* DARK THEME OVERRIDES\n-------------------------------------------------- */\n\n.dark {\n  /* Base colors */\n  --color-bg: #141414;\n  --color-text-primary: #909497;\n  --color-text-heading: #f1f1f1;\n  --color-text-secondary: #626567;\n  --color-block-bg: #1e1e1e;\n  --color-border: rgba(255, 255, 255, .07);\n  --color-uptime-bar-empty-bg: #424949;\n  --color-tooltip-bg: #1e1e1e;\n\n  /* Button: Secondary */\n  --color-btn-secondary-bg: transparent;\n  --color-btn-secondary-hover-bg: #232323;\n  --color-btn-secondary-active-bg: #1e1e1e;\n  --color-btn-secondary-border: rgba(255, 255, 255, .13);\n}\n\n/* BASE STRUCTURE\n-------------------------------------------------- */\n\nbody:not(:has(.edit)) {\n  background-color: var(--color-bg) !important;\n  color: var(--color-text-primary) !important;\n}\n\n.container {\n  margin-top: 0 !important;\n  padding: var(--spacing-32) var(--spacing-20) 0;\n  max-width: var(--size-container-width);\n}\n\n/* Link (excluding button) */\na:not(.btn),\n.dark a:not(.btn) {\n  color: inherit;\n  text-underline-offset: .125em;\n}\na:not(.btn):hover,\n.dark a:not(.btn):hover,\na:not(.btn):focus-visible {\n  outline: none;\n  color: var(--color-blue);\n}\n\n/* HEADER\n-------------------------------------------------- */\n\n/* Wrapper for logo and title */\n.title-flex {\n  margin-bottom: var(--spacing-32) !important;\n}\n\n/* Center the logo */\n.logo-wrapper {\n  margin: 0 auto;\n}\n\n/* Resize the logo */\n.logo {\n  width: var(--size-logo-width) !important;\n  height: var(--size-logo-height) !important;\n}\n\n/* Remove the margin of the logo */\n[dir=\"ltr\"] .logo {\n  margin-right: 0 !important;\n}\n\n/* Remove the title adjacent to the logo */\nspan[data-v-7d4a7f28] {\n  display: none;\n}\n\n/* ADMIN BUTTONS\n-------------------------------------------------- */\n\n/* Fix vertical margin of admin buttons on mobile */\n.mb-4[data-v-a2098280]:has([data-testid=\"edit-button\"]) {\n  margin-bottom: var(--spacing-32) !important;\n}\n\n.mb-4[data-v-a2098280]:has([data-testid=\"edit-button\"]) div {\n  display: flex;\n  flex-wrap: wrap;\n  gap: var(--spacing-8);\n}\n\n.mb-4[data-v-a2098280]:has([data-testid=\"edit-button\"]) div button {\n  margin: 0 !important;\n}\n\n/* Admin button */\n.mb-4[data-v-a2098280]:has([data-testid=\"edit-button\"]) .btn-primary {\n  box-shadow: none;\n  border: 1px solid var(--color-btn-secondary-border);\n  border-radius: var(--border-radius-400);\n  background-color: var(--color-btn-secondary-bg);\n  padding: var(--spacing-4) var(--spacing-12);\n  color: var(--color-text-heading);\n  font-weight: var(--font-weight-medium);\n  font-size: var(--font-size-100);\n  line-height: var(--font-line-height-200);\n}\n.mb-4[data-v-a2098280]:has([data-testid=\"edit-button\"]) .btn-primary:hover,\n.mb-4[data-v-a2098280]:has([data-testid=\"edit-button\"]) .btn-primary:focus-visible {\n  background-color: var(--color-btn-secondary-hover-bg);\n}\n.mb-4[data-v-a2098280]:has([data-testid=\"edit-button\"]) .btn-primary:active {\n  box-shadow: none;\n  background-color: var(--color-btn-secondary-active-bg);\n}\n\n.mb-4[data-v-a2098280]:has([data-testid=\"edit-button\"]) .btn-primary svg {\n  display: none;\n}\n\n/* INCIDENT BLOCK\n-------------------------------------------------- */\n\n.incident[data-v-a2098280] {\n  margin-bottom: var(--spacing-16) !important;\n  box-shadow: none;\n  border-radius: var(--border-radius-500);\n  padding: var(--spacing-20) !important;\n  color: var(--color-text-heading) !important;\n}\n.incident[data-v-a2098280].bg-info {\n  border: 1px solid rgba(var(--rgb-color-teal), .23);\n  background-color: rgba(var(--rgb-color-teal), .08) !important;\n}\n.incident[data-v-a2098280].bg-warning {\n  border: 1px solid rgba(var(--rgb-color-orange), .23);\n  background-color: rgba(var(--rgb-color-orange), .08) !important;\n}\n.incident[data-v-a2098280].bg-danger {\n  border: 1px solid rgba(var(--rgb-color-red), .23);\n  background-color: rgba(var(--rgb-color-red), .08) !important;\n}\n.incident[data-v-a2098280].bg-primary {\n  border: 1px solid rgba(var(--rgb-color-green), .23);\n  background-color: rgba(var(--rgb-color-green), .08) !important;\n}\n.incident[data-v-a2098280].bg-light {\n  box-shadow: var(--shadow-filter);\n  border: 1px solid var(--color-border);\n  background-color: var(--color-block-bg) !important;\n}\n.incident[data-v-a2098280].bg-dark {\n  box-shadow: var(--shadow-filter);\n  border: 1px solid var(--color-border);\n  background-color: var(--color-bg) !important;\n}\n\n.incident[data-v-a2098280] h4 {\n  font-size: var(--font-size-300);\n}\n\n.incident[data-v-a2098280] div {\n  color: var(--color-text-primary);\n}\n\n.date.mt-3 {\n  border-top: 1px solid var(--color-border);\n  padding-top: var(--spacing-20);\n}\n\n/* MAIN STATUS BLOCK\n-------------------------------------------------- */\n\n.overall-status[data-v-a2098280] {\n  margin-bottom: var(--spacing-16) !important;\n  box-shadow: none;\n  border-radius: var(--border-radius-500);\n  padding: var(--spacing-20) !important;\n  color: var(--color-text-heading);\n  font-weight: var(--font-weight-semibold);\n  font-size: var(--font-size-350);\n  line-height: var(--font-line-height-200);\n}\n.overall-status[data-v-a2098280]:has(.ok) {\n  border: 1px solid rgba(var(--rgb-color-green), .23);\n  background-color: rgba(var(--rgb-color-green), .08);\n}\n.overall-status[data-v-a2098280]:has(.warning) {\n  border: 1px solid rgba(var(--rgb-color-orange), .23);\n  background-color: rgba(var(--rgb-color-orange), .08);\n}\n.overall-status[data-v-a2098280]:has(.danger) {\n  border: 1px solid rgba(var(--rgb-color-red), .23);\n  background-color: rgba(var(--rgb-color-red), .08);\n}\n.overall-status[data-v-a2098280]:has(.status-maintenance) {\n  border: 1px solid rgba(var(--rgb-color-blue), .23);\n  background-color: rgba(var(--rgb-color-blue), .08);\n}\n\n.overall-status[data-v-a2098280] div {\n  display: flex;\n  align-items: center;\n  gap: var(--spacing-20);\n}\n\n.overall-status[data-v-a2098280] svg {\n  margin-right: 0 !important;\n  width: 1.5em;\n  height: 1.5em;\n}\n.overall-status[data-v-a2098280]:has(.ok) svg {\n  color: var(--color-green);\n}\n.overall-status[data-v-a2098280]:has(.warning) svg {\n  color: var(--color-orange);\n}\n.overall-status[data-v-a2098280]:has(.danger) svg {\n  color: var(--color-red);\n}\n.overall-status[data-v-a2098280]:has(.status-maintenance) svg {\n  color: var(--color-blue);\n}\n\n/* MAINTENANCE BLOCK\n-------------------------------------------------- */\n\n.shadow-box.bg-maintenance {\n  margin: var(--spacing-16) 0 !important;\n  box-shadow: none;\n  border: 1px solid rgba(var(--rgb-color-blue), .23);\n  border-radius: var(--border-radius-500);\n  background-color: rgba(var(--rgb-color-blue), .08) !important;\n  padding: var(--spacing-20) !important;\n  color: var(--color-text-heading) !important;\n}\n\n.shadow-box.bg-maintenance .alert-heading {\n  color: var(--color-text-heading);\n  font-weight: var(--font-weight-semibold);\n  font-size: var(--font-size-300);\n}\n\n.shadow-box.bg-maintenance .content {\n  color: var(--color-text-primary);\n}\n\n.timeslot {\n  display: flex;\n  margin: 0 !important;\n  border-top: 1px solid var(--color-border);\n  border-radius: 0;\n  background-color: transparent !important;\n  padding: var(--spacing-20) 0 0;\n  color: var(--color-text-primary) !important;\n  font-size: var(--font-size-50);\n}\n\n/* USER MARKDOWN ELEMENTS\n-------------------------------------------------- */\n\n.alert-heading.p-2 {\n  margin-bottom: var(--spacing-32);\n  padding: 0 !important;\n}\n\n.alert-heading.p-2 p {\n  margin: 0;\n}\n\n/* PAGE DESCRIPTION\n-------------------------------------------------- */\n\ndiv > .alert-heading.p-2:has(*) {\n  margin-top: var(--spacing-32);\n  box-shadow: var(--shadow-filter);\n  border: 1px solid var(--color-border);\n  border-radius: var(--border-radius-500);\n  background-color: var(--color-block-bg);\n  padding: var(--spacing-20) !important;\n}\n\n/* MONITOR GROUP\n-------------------------------------------------- */\n\ndiv[data-v-026459e0]:has(> .group-title) {\n  margin-bottom: var(--spacing-32) !important;\n}\n\n/* Monitor group title */\n.group-title {\n  display: flex;\n  align-items: center;\n  margin-bottom: var(--spacing-16);\n  color: var(--color-text-heading);\n  font-weight: var(--font-weight-semibold);\n  font-size: var(--font-size-350);\n}\n\n/* Monitor elements in the group */\n.shadow-box.monitor-list {\n  margin-top: 0 !important;\n  box-shadow: none;\n  background-color: transparent !important;\n  padding: 0;\n}\n\n.shadow-box.monitor-list > .monitor-list {\n  display: grid;\n  grid-template-columns: minmax(0, 1fr);\n  gap: var(--spacing-16);\n}\n/* Enable 2 columns on wider screens; comment out to disable */\n@media (min-width: 532px) {\n  .shadow-box.monitor-list > .monitor-list {\n    grid-template-columns: repeat(2, minmax(0, 1fr));\n  }\n}\n\n/* MONITOR ITEM\n-------------------------------------------------- */\n\n.monitor-list .item {\n  box-shadow: var(--shadow-filter);\n  border: 1px solid var(--color-border);\n  border-radius: var(--border-radius-500);\n  background-color: var(--color-block-bg);\n  padding: var(--spacing-16) var(--spacing-20) !important;\n}\n.monitor-list .item:hover {\n  background-color: var(--color-block-bg) !important;\n}\n\n.monitor-list .item > .row > div {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n}\n\n/* Monitor name and uptime percentage container */\n.info {\n  display: flex;\n  align-items: center;\n  order: 2;\n  margin-bottom: var(--spacing-8);\n}\n\n/* Monitor name */\n.item-name[data-v-026459e0] {\n  padding-left: 0;\n  overflow: hidden;\n  color: var(--color-text-heading);\n  font-weight: var(--font-weight-semibold);\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n/* Uptime percentage */\n.badge {\n  all: unset;\n  order: 1;\n  margin-left: auto;\n  background-color: transparent !important;\n  color: var(--color-text-primary) !important;\n}\n\n/* Monitor tags wrapper */\n.extra-info[data-v-026459e0] {\n  flex-wrap: wrap;\n  order: 1;\n  gap: var(--spacing-8);\n  margin-top: var(--spacing-4);\n}\n.extra-info:not(:has(div[data-v-12c40cbd])) {\n  margin-top: 0;\n  margin-bottom: 0;\n}\n.extra-info[data-v-026459e0] div {\n  display: flex;\n  flex-wrap: wrap;\n  gap: var(--spacing-8);\n  min-width: 0;\n}\n\n/* Monitor tags */\n.tag-wrapper {\n  align-items: center;\n  padding-top: 2px !important;\n  padding-bottom: 2px !important;\n}\n.tag-wrapper[style*=\"rgb(75, 85, 99)\"] {\n  border: 1px solid rgba(var(--rgb-color-gray), .23);\n  background-color: rgba(var(--rgb-color-gray), .08) !important;\n  color: var(--color-gray) !important;\n}\n.tag-wrapper[style*=\"rgb(220, 38, 38)\"] {\n  border: 1px solid rgba(var(--rgb-color-red), .23);\n  background-color: rgba(var(--rgb-color-red), .08) !important;\n  color: var(--color-red) !important;\n}\n.tag-wrapper[style*=\"rgb(217, 119, 6)\"] {\n  border: 1px solid rgba(var(--rgb-color-orange), .23);\n  background-color: rgba(var(--rgb-color-orange), .08) !important;\n  color: var(--color-orange) !important;\n}\n.tag-wrapper[style*=\"rgb(5, 150, 105)\"] {\n  border: 1px solid rgba(var(--rgb-color-green), .23);\n  background-color: rgba(var(--rgb-color-green), .08) !important;\n  color: var(--color-green) !important;\n}\n.tag-wrapper[style*=\"rgb(37, 99, 235)\"] {\n  border: 1px solid rgba(var(--rgb-color-blue), .23);\n  background-color: rgba(var(--rgb-color-blue), .08) !important;\n  color: var(--color-blue) !important;\n}\n.tag-wrapper[style*=\"rgb(79, 70, 229)\"] {\n  border: 1px solid rgba(var(--rgb-color-indigo), .23);\n  background-color: rgba(var(--rgb-color-indigo), .08) !important;\n  color: var(--color-indigo) !important;\n}\n.tag-wrapper[style*=\"rgb(124, 58, 237)\"] {\n  border: 1px solid rgba(var(--rgb-color-purple), .23);\n  background-color: rgba(var(--rgb-color-purple), .08) !important;\n  color: var(--color-purple) !important;\n}\n.tag-wrapper[style*=\"rgb(219, 39, 119)\"] {\n  border: 1px solid rgba(var(--rgb-color-pink), .23);\n  background-color: rgba(var(--rgb-color-pink), .08) !important;\n  color: var(--color-pink) !important;\n}\n\n/* Wrapper for the uptime bars home and uptime time */\n.wrap {\n  padding: 0 !important;\n}\n\n/* Uptime bars home */\n.hp-bar-big {\n  display: flex;\n  margin-bottom: 6px;\n  padding: 0;\n}\n.mobile .hp-bar-big {\n  padding-bottom: 0;\n}\n\n/* Uptime bar in the uptime bars home */\n.hp-bar-big .beat-hover-area .beat[data-v-ce0d40a3] {\n  border-radius: 0;\n  background-color: var(--color-green);\n  width: 100% !important;\n  height: var(--size-uptime-bar-height) !important;\n}\n.hp-bar-big .beat-hover-area[data-v-ce0d40a3] {\n  flex: 1;\n  padding: 0 1px 0 0 !important;\n}\n.hp-bar-big .beat-hover-area[data-v-ce0d40a3]:not(.empty):hover,\n.hp-bar-big .beat-hover-area[data-v-ce0d40a3]:not(.empty):focus-visible {\n  transform: none;\n  opacity: .7;\n  outline: none;\n}\n.hp-bar-big .beat-hover-area:first-of-type .beat[data-v-ce0d40a3] {\n  border-top-left-radius: var(--border-radius-200);\n  border-bottom-left-radius: var(--border-radius-200);\n}\n.hp-bar-big .beat-hover-area:last-of-type .beat[data-v-ce0d40a3] {\n  margin: 0 !important;\n  border-top-right-radius: var(--border-radius-200);\n  border-bottom-right-radius: var(--border-radius-200);\n  padding: 0 !important;\n}\n.hp-bar-big .beat-hover-area .beat[data-v-ce0d40a3].empty {\n  background-color: var(--color-uptime-bar-empty-bg) !important;\n}\n.hp-bar-big .beat-hover-area .beat[data-v-ce0d40a3].down {\n  background-color: var(--color-red);\n}\n.hp-bar-big .beat-hover-area .beat[data-v-ce0d40a3].pending {\n  background-color: var(--color-orange);\n}\n.hp-bar-big .beat-hover-area .beat[data-v-ce0d40a3].maintenance {\n  background-color: var(--color-blue);\n}\n\n/* Uptime time (below uptime bars) */\n.word[data-v-ce0d40a3] {\n  color: var(--color-text-primary);\n}\n\n/* FOOTER\n-------------------------------------------------- */\n\n/* User markdown, Uptime Kuma branding, refresh timer */\nfooter[data-v-a2098280] {\n  margin: var(--spacing-32) 0 !important;\n  color: var(--color-text-secondary);\n}\n\n/* Extra spacing if the user footer has anything */\nfooter .alert-heading.p-2:has(*) {\n  margin-bottom: var(--spacing-16) !important;\n}\n\n/* Refresh timer */\n/* Remove or comment \"display: none\" to restore visibility */\n.refresh-info[data-v-a2098280] {\n  display: none;\n  opacity: 1;\n  margin-bottom: 0 !important;\n}\n\n/* EDIT WINDOW\n-------------------------------------------------- */\n\n.container:has(.edit) {\n  max-width: var(--size-edit-container-width);\n}\n\n/* Input field for the monitor group name */\n.edit span[data-v-7d4a7f28][data-v-026459e0] {\n  padding: var(--spacing-4) var(--spacing-8);\n}\n\n/* Input field for page description and footer */\n.edit h4[data-v-7d4a7f28][data-v-a2098280][contenteditable=\"true\"],\n.edit div[data-v-7d4a7f28][data-v-a2098280] {\n  padding: var(--spacing-8) var(--spacing-12) !important;\n  color: var(--color-text-heading);\n}\n\n/* OVERLAYS\n-------------------------------------------------- */\n\n/* Uptime bar hover tooltip */\n.tooltip-wrapper .tooltip-content[data-v-abd90d66] {\n  box-shadow: var(--shadow-filter);\n  border-color: var(--color-border);\n  background-color: var(--color-tooltip-bg) !important;\n  text-align: start;\n}\n.tooltip-wrapper .tooltip-content[data-v-abd90d66]::before {\n  display: none;\n}\n\n.tooltip-wrapper .tooltip-content .tooltip-status[data-v-abd90d66] {\n  font-size: var(--font-size-100);\n}\n.tooltip-wrapper .tooltip-content .tooltip-status.status-up[data-v-abd90d66] {\n  color: var(--color-green);\n}\n.tooltip-wrapper .tooltip-content .tooltip-status.status-pending[data-v-abd90d66] {\n  color: var(--color-orange);\n}\n.tooltip-wrapper .tooltip-content .tooltip-status.status-down[data-v-abd90d66] {\n  color: var(--color-red);\n}\n.tooltip-wrapper .tooltip-content .tooltip-status.status-maintenance[data-v-abd90d66] {\n  color: var(--color-blue);\n}\n\n.tooltip-wrapper .tooltip-content .tooltip-time[data-v-abd90d66] {\n  margin-bottom: 0;\n  color: var(--color-text-primary);\n  font-size: var(--font-size-50);\n}\n\n.tooltip-wrapper .tooltip-arrow[data-v-abd90d66] {\n  display: none;\n}",
+        "footerText": "Made By ❤️ with Milk",
+        "showPoweredBy": false,
+        "analyticsId": "c824cc7d-41e6-4bef-b3eb-c8610823bc5c",
+        "analyticsScriptUrl": "https://s.awmc.cc/script.js",
+        "analyticsType": "umami",
+        "showCertificateExpiry": true,
+        "showOnlyLastHeartbeat": false,
+        "rssTitle": null
+    },
+    "incidents": [],
+    "publicGroupList": [
+        {
+            "id": 1,
+            "name": "Overall / 总览",
+            "weight": 1,
+            "monitorList": [
+                {
+                    "id": 1,
+                    "name": "舞萌DX状态",
+                    "sendUrl": 0,
+                    "type": "group",
+                    "tags": []
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "name": "舞萌DX - 基础网页展示服务 [不影响游戏]",
+            "weight": 2,
+            "monitorList": [
+                {
+                    "id": 4,
+                    "name": "NET服务器 [上海联通代理]",
+                    "sendUrl": 0,
+                    "type": "keyword",
+                    "tags": [],
+                    "certExpiryDaysRemaining": 227,
+                    "validCert": true
+                },
+                {
+                    "id": 18,
+                    "name": "NET服务器 [上海移动代理]",
+                    "sendUrl": 0,
+                    "type": "keyword",
+                    "tags": [],
+                    "certExpiryDaysRemaining": 227,
+                    "validCert": true
+                },
+                {
+                    "id": 17,
+                    "name": "NET服务器 [上海电信代理]",
+                    "sendUrl": 0,
+                    "type": "keyword",
+                    "tags": [],
+                    "certExpiryDaysRemaining": 227,
+                    "validCert": true
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "name": "舞萌DX 核心游戏服务器 - CMCC 移动线路",
+            "weight": 3,
+            "monitorList": [
+                {
+                    "id": 15,
+                    "name": "会员服务器 [上海移动代理]",
+                    "sendUrl": 0,
+                    "type": "keyword",
+                    "tags": []
+                },
+                {
+                    "id": 7,
+                    "name": "游戏标题服务器 [上海移动代理]",
+                    "sendUrl": 0,
+                    "type": "http",
+                    "tags": [],
+                    "certExpiryDaysRemaining": 227,
+                    "validCert": true
+                },
+                {
+                    "id": 13,
+                    "name": "ALL.NET机台管理服务器 [上海移动代理]",
+                    "sendUrl": 0,
+                    "type": "http",
+                    "tags": []
+                },
+                {
+                    "id": 10,
+                    "name": "二维码服务器 [上海移动代理]",
+                    "sendUrl": 0,
+                    "type": "http",
+                    "tags": [],
+                    "certExpiryDaysRemaining": 135,
+                    "validCert": true
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "name": "舞萌DX 核心游戏服务器 - CT 电信线路",
+            "weight": 4,
+            "monitorList": [
+                {
+                    "id": 6,
+                    "name": "游戏标题服务器 [上海电信代理]",
+                    "sendUrl": 0,
+                    "type": "http",
+                    "tags": [],
+                    "certExpiryDaysRemaining": 227,
+                    "validCert": true
+                },
+                {
+                    "id": 14,
+                    "name": "会员服务器 [上海电信代理]",
+                    "sendUrl": 0,
+                    "type": "keyword",
+                    "tags": []
+                },
+                {
+                    "id": 12,
+                    "name": "ALL.NET机台管理服务器 [上海电信代理]",
+                    "sendUrl": 0,
+                    "type": "http",
+                    "tags": []
+                },
+                {
+                    "id": 9,
+                    "name": "二维码服务器 [上海电信代理]",
+                    "sendUrl": 0,
+                    "type": "http",
+                    "tags": [],
+                    "certExpiryDaysRemaining": 135,
+                    "validCert": true
+                }
+            ]
+        },
+        {
+            "id": 5,
+            "name": "舞萌DX 核心游戏服务器 - CU 联通线路",
+            "weight": 5,
+            "monitorList": [
+                {
+                    "id": 8,
+                    "name": "二维码服务器 [上海联通代理]",
+                    "sendUrl": 0,
+                    "type": "http",
+                    "tags": [],
+                    "certExpiryDaysRemaining": 135,
+                    "validCert": true
+                },
+                {
+                    "id": 11,
+                    "name": "ALL.NET机台管理服务器 [上海联通代理]",
+                    "sendUrl": 0,
+                    "type": "http",
+                    "tags": []
+                },
+                {
+                    "id": 16,
+                    "name": "会员服务器 [上海联通代理]",
+                    "sendUrl": 0,
+                    "type": "keyword",
+                    "tags": []
+                },
+                {
+                    "id": 5,
+                    "name": "游戏标题服务器 [上海联通代理]",
+                    "sendUrl": 0,
+                    "type": "http",
+                    "tags": [],
+                    "certExpiryDaysRemaining": 227,
+                    "validCert": true
+                }
+            ]
+        }
+    ],
+    "maintenanceList": []
+}

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart';
+import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,7 +12,7 @@ class LZYCheckUpdateManager {
   LZYCheckUpdateManager._internal();
 
   // ==================== 检查更新配置 =====================
-  final String pastebinRawUrl = "https://pastebin.com/raw/Ba1BW9ap";
+  final String pastebinRawUrl = ApiUrls.checkUpdateApi;
   final bool forceUpdate = false;
   // ======================================================
 

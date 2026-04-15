@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import '../service/UserScoreSearchService.dart';
-import '../main.dart';
+import 'HomePage.dart';
 import 'SongInfoPage.dart';
 import '../utils/CoverUtil.dart';
 

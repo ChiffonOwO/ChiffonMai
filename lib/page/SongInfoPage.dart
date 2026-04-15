@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:marquee/marquee.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
-import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
-import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
-import 'package:my_first_flutter_app/manager/DiffMusicDataManager.dart';
 import 'package:my_first_flutter_app/entity/DiffSong.dart';
+import 'package:my_first_flutter_app/entity/Collection.dart';
+import 'package:my_first_flutter_app/service/SongInfoService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'CollectionInfoPage.dart';
 
 class SongInfoPage extends StatefulWidget {
   final String songId;
@@ -84,73 +84,13 @@ class _SongInfoPageState extends State<SongInfoPage> {
   // 加载所有数据
   Future<void> _loadData() async {
     try {
-      // 加载歌曲基础数据
-      if (await MaimaiMusicDataManager().hasCachedData()) {
-        final songs = await MaimaiMusicDataManager().getCachedSongs();
-        if (songs != null) {
-          // 更优的解决方案
-          final songIndex = songs.indexWhere((s) => s.id == widget.songId);
-          if (songIndex != -1) {
-            final song = songs[songIndex];
-            _songData = {
-              'id': song.id,
-              'title': song.title,
-              'type': song.type,
-              'ds': song.ds,
-              'level': song.level,
-              'cids': song.cids,
-              'charts': song.charts
-                  .map((chart) =>
-                      {'notes': chart.notes, 'charter': chart.charter})
-                  .toList(),
-              'basic_info': {
-                'title': song.basicInfo.title,
-                'artist': song.basicInfo.artist,
-                'genre': song.basicInfo.genre,
-                'bpm': song.basicInfo.bpm,
-                'release_date': song.basicInfo.releaseDate,
-                'from': song.basicInfo.from,
-                'is_new': song.basicInfo.isNew
-              }
-            };
-          }
-        }
-      } else {
-        // 如果 API 数据不存在，尝试从资产文件加载 JSON 数据作为 fallback
-        final songData =
-            await rootBundle.loadString('assets/maimai_music_data.json');
-        final List<dynamic> songList = json.decode(songData);
-        int songIndex =
-            songList.indexWhere((song) => song['id'] == widget.songId);
-        if (songIndex != -1) {
-          _songData = songList[songIndex];
-        }
-      }
-
-      // 加载难度数据
-      final diffManager = DiffMusicDataManager();
-      final diffSong = await diffManager.getCachedDiffData();
-      if (diffSong != null) {
-        _diffData = diffSong.charts[widget.songId];
-      }
-
-      // 加载用户数据
-      final userPlayDataManager = UserPlayDataManager();
-      _userData = await userPlayDataManager.getCachedUserPlayData();
-
-      // 如果缓存中没有用户数据，尝试从资产文件加载 JSON 数据作为 fallback
-      if (_userData == null) {
-        final userData =
-            await rootBundle.loadString('assets/userPlayData.json');
-        final Map<String, dynamic> userMap = json.decode(userData);
-        _userData = userMap;
-      }
-
-      // 加载标签数据
-      final tagData = await rootBundle.loadString('assets/maiTags.json');
-      final Map<String, dynamic> tagMap = json.decode(tagData);
-      _tagData = tagMap['tags'];
-      _tagSongsData = tagMap['tagSongs'];
+      // 使用SongInfoService加载数据
+      final result = await SongInfoService().loadData(widget.songId);
+      _songData = result['songData'];
+      _diffData = result['diffData'];
+      _userData = result['userData'];
+      _tagData = result['tagData'];
+      _tagSongsData = result['tagSongsData'];
     } catch (e) {
       print('加载数据失败: $e');
     } finally {
@@ -1166,7 +1106,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                               _buildStatItem(
                                   'BPM', basicInfo['bpm'].toString()),
                               _buildStatItem(
-                                  '版本', _formatVersion(basicInfo['from'])),
+                                  '版本', StringUtil.formatVersionForSongInfoPage(basicInfo['from'])),
                               _buildStatItem(
                                   '曲师', basicInfo['artist'].split('/').last),
                             ],
@@ -1308,7 +1248,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                               fontSize: MediaQuery.of(context)
                                                       .size
                                                       .width *
-                                                  0.04,
+                                                  0.042,
                                               color: Colors.grey,
                                             ),
                                           ),
@@ -1397,19 +1337,39 @@ class _SongInfoPageState extends State<SongInfoPage> {
                             ),
                           ),
 
-                          // 跳转到B站按钮（放在玩家最佳成绩下方）
+                          // 按钮行（跳转到B站和查看收藏品）
                           Container(
                             margin: const EdgeInsets.only(top: 12),
-                            child: ElevatedButton(
-                              onPressed: _jumpToBilibili,
-                              child: const Text('跳转到B站'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.pink,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: _jumpToBilibili,
+                                    child: const Text('跳转到B站'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.pink,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: _viewRelatedCollectibles,
+                                    child: const Text('相关收藏品'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.purple,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
 
@@ -2389,43 +2349,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
     }
   }
 
-  // 格式化版本
-  String _formatVersion(String version) {
-    if (version == 'maimai') {
-      return 'maimai';
-    }
-    if (version == 'maimai PLUS') {
-      return 'maimai+';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059') {
-      return 'DX 2020';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 Splash') {
-      return 'DX 2021';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 UNiVERSE') {
-      return 'DX 2022';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 FESTiVAL') {
-      return 'DX 2023';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 BUDDiES') {
-      return 'DX 2024';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM') {
-      return 'DX 2025';
-    }
-    if (version.contains(' PLUS')) {
-      version = version.replaceFirst(' PLUS', '+');
-    }
-    if (version.contains('maimai') && version != 'maimai') {
-      version = version.replaceFirst('maimai ', '');
-    }
-    if (version.contains('\u3067\u3089\u3063\u304f\u3059')) {
-      version = version.replaceFirst('\u3067\u3089\u3063\u304f\u3059 ', '');
-    }
-    return version;
-  }
+
 
   // 跳转到B站
   void _jumpToBilibili() async {
@@ -2447,6 +2371,215 @@ class _SongInfoPageState extends State<SongInfoPage> {
       if (await canLaunchUrl(webUrl)) {
         await launchUrl(webUrl);
       }
+    }
+  }
+
+  // 查看相关收藏品
+  void _viewRelatedCollectibles() {
+    if (_songData == null) return;
+
+    final songTitle = _songData!['basic_info']['title'];
+    _fetchRelatedCollections(songTitle);
+  }
+
+  // 获取相关收藏品
+  Future<void> _fetchRelatedCollections(String songTitle) async {
+    try {
+      // 显示加载对话框
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Dialog(
+            child: Container(
+              padding: EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('正在加载相关收藏品...'),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+
+      // 获取歌曲类型
+      final songType = _songData!['type'] ?? '';
+      
+      // 使用SongInfoService获取相关收藏品
+      final relatedCollections = await SongInfoService().fetchRelatedCollections(songTitle, songType);
+
+      // 关闭加载对话框
+      Navigator.of(context).pop();
+
+      // 显示相关收藏品
+      _showRelatedCollectionsDialog(songTitle, relatedCollections);
+    } catch (e) {
+      print('获取相关收藏品时出错: $e');
+      // 关闭加载对话框
+      Navigator.of(context).pop();
+      // 显示错误信息
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('错误'),
+            content: Text('获取相关收藏品时出错，请稍后重试'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text('关闭'),
+              ),
+            ],
+          );
+        },
+      );
+    }
+  }
+
+  // 显示相关收藏品对话框
+  void _showRelatedCollectionsDialog(String songTitle, List<Map<String, dynamic>> relatedCollections) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        final dialogWidth = screenWidth * 0.95; // 对话框宽度为屏幕宽度的95%
+        
+        return AlertDialog(
+          title: Text('${songTitle}的相关收藏品'),
+          content: Container(
+            width: dialogWidth,
+            child: SingleChildScrollView(
+              child: relatedCollections.isEmpty
+                  ? Text('未找到与该歌曲相关的收藏品')
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: relatedCollections.map((item) {
+                        return GestureDetector(
+                          onTap: () {
+                            // 跳转到收藏品详情页面
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => CollectionInfoPage(
+                                  collectionId: (item['collection'] as Collection).id,
+                                  collectionType: item['type'],
+                                ),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            margin: EdgeInsets.only(bottom: 12),
+                            padding: EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey[200]!),
+                              borderRadius: BorderRadius.circular(8),
+                              color: Colors.white,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: _getCollectionTypeColor(item['type']),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        _getCollectionTypeName(item['type']),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        item['name'],
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.arrow_forward_ios,
+                                      size: 16,
+                                      color: Colors.grey[400],
+                                    ),
+                                  ],
+                                ),
+                                if (item['description'] != null && item['description'].isNotEmpty)
+                                  Padding(
+                                    padding: EdgeInsets.only(top: 8),
+                                    child: Text(
+                                      item['description'],
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('关闭'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 获取收藏品类型名称
+  String _getCollectionTypeName(String type) {
+    switch (type) {
+      case 'trophies':
+        return '称号';
+      case 'icons':
+        return '头像';
+      case 'plates':
+        return '姓名框';
+      case 'frames':
+        return '背景';
+      default:
+        return '未知类型';
+    }
+  }
+
+  // 获取收藏品类型颜色
+  Color _getCollectionTypeColor(String type) {
+    switch (type) {
+      case 'trophies':
+        return Colors.orange;
+      case 'icons':
+        return Colors.blue;
+      case 'plates':
+        return Colors.green;
+      case 'frames':
+        return Colors.purple;
+      default:
+        return Colors.grey;
     }
   }
 

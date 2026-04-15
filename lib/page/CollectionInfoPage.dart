@@ -490,6 +490,134 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
       );
     }
 
+    // 检查描述中是否包含 RANK 信息
+    if (_collection?.description != null) {
+      final description = _collection!.description!;
+      final rankRegex = RegExp(r'RANK\s*(S+\+?)');
+      final match = rankRegex.firstMatch(description);
+      String requiredRate = '';
+      
+      // 检查是否包含 CLEAR 字样
+      bool hasClear = description.toLowerCase().contains('clear');
+      // 检查是否包含 RANK A 字样
+      bool hasRankA = description.toLowerCase().contains('rank a');
+      
+      if (match != null) {
+        final rank = match.group(1);
+        
+        // 根据 RANK 级别确定所需最低达成率
+        switch (rank) {
+          case 'S':
+            requiredRate = '97%';
+            break;
+          case 'S+':
+            requiredRate = '98%';
+            break;
+          case 'SS':
+            requiredRate = '99%';
+            break;
+          case 'SS+':
+            requiredRate = '99.5%';
+            break;
+          case 'SSS':
+            requiredRate = '100%';
+            break;
+          case 'SSS+':
+            requiredRate = '100.5%';
+            break;
+        }
+      } else if (hasClear || hasRankA) {
+        // 如果没有 RANK 信息但有 CLEAR 或 RANK A 字样，设置为 80%
+        requiredRate = '80%';
+      }
+      
+      if (requiredRate.isNotEmpty) {
+        // 根据达成率确定颜色
+        Color rateColor = Colors.grey[800]!;
+        if (requiredRate == '80%') {
+          rateColor = Colors.red;
+        } else if (['97%', '98%', '99%', '99.5%'].contains(requiredRate)) {
+          rateColor = Colors.blue;
+        } else if (['100%', '100.5%'].contains(requiredRate)) {
+          rateColor = Colors.orange;
+        }
+        
+        mergedConditions.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '所需最低达成率:',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: rateColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: rateColor, width: 1),
+                  ),
+                  child: Text(
+                    requiredRate,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: rateColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+      
+      // 检查是否包含 SPEED SONIC 字样
+      bool hasSpeedSonic = description.toLowerCase().contains('speed sonic');
+      if (hasSpeedSonic) {
+        mergedConditions.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '所需游玩流速:',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.blue, width: 1),
+                  ),
+                  child: Text(
+                    'SONIC',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    }
+
     // 处理所需连击和同步
     for (final requiredItem in requiredList) {
       // 处理fc字段

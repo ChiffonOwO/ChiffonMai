@@ -63,40 +63,70 @@ class CollectionSearchService {
 
     for (var collection in collections) {
       // 搜索名称
-      if (collection.name.toLowerCase().contains(lowerKeyword)) {
-        results.add(collection);
-        continue;
+      try {
+        if (collection.name.toLowerCase().contains(lowerKeyword)) {
+          results.add(collection);
+          continue;
+        }
+      } catch (e) {
+        print('搜索名称时出错: $e');
+      }
+
+      // 搜索描述
+      try {
+        if (collection.description != null && collection.description!.toLowerCase().contains(lowerKeyword)) {
+          results.add(collection);
+          continue;
+        }
+      } catch (e) {
+        print('搜索描述时出错: $e');
       }
 
       // 搜索达成条件
       if (collection.required != null) {
         for (var req in collection.required!) {
           // 搜索评级类型
-          if (req.rate != null && req.rate!.toLowerCase().contains(lowerKeyword)) {
-            results.add(collection);
-            break;
+          try {
+            if (req.rate != null && req.rate!.toLowerCase().contains(lowerKeyword)) {
+              results.add(collection);
+              break;
+            }
+          } catch (e) {
+            print('搜索评级类型时出错: $e');
           }
 
           // 搜索 FC 类型
-          if (req.fc != null && req.fc!.toLowerCase().contains(lowerKeyword)) {
-            results.add(collection);
-            break;
+          try {
+            if (req.fc != null && req.fc!.toLowerCase().contains(lowerKeyword)) {
+              results.add(collection);
+              break;
+            }
+          } catch (e) {
+            print('搜索 FC 类型时出错: $e');
           }
 
           // 搜索 FS 类型
-          if (req.fs != null && req.fs!.toLowerCase().contains(lowerKeyword)) {
-            results.add(collection);
-            break;
+          try {
+            if (req.fs != null && req.fs!.toLowerCase().contains(lowerKeyword)) {
+              results.add(collection);
+              break;
+            }
+          } catch (e) {
+            print('搜索 FS 类型时出错: $e');
           }
 
           // 搜索曲目
-          if (req.songs != null) {
-            for (var song in req.songs!) {
-              if (song.title.toLowerCase().contains(lowerKeyword)) {
-                results.add(collection);
-                break;
+          try {
+            if (req.songs != null) {
+              for (var song in req.songs!) {
+                if (song.title.toLowerCase().contains(lowerKeyword)) {
+                  results.add(collection);
+                  break;
+                }
               }
             }
+          } catch (e) {
+            print('搜索曲目时出错: $e');
           }
         }
       }

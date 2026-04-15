@@ -216,7 +216,7 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
                         TextField(
                           controller: _searchController,
                           decoration: InputDecoration(
-                            hintText: '搜索收藏品名称或达成条件',
+                            hintText: '搜索收藏品相关信息',
                             suffixIcon: IconButton(
                               icon: Icon(Icons.search),
                               onPressed: _performSearch,
