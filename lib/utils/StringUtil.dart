@@ -45,7 +45,7 @@ class StringUtil {
     return version;
   }
 
-  static String formatVersionForSongInfoPage(String version) {
+  static String formatVersion2(String version) {
     if (version == 'maimai') {
       return 'maimai 真';
     }

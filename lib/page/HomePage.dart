@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/page/B50Page.dart';
+import 'package:my_first_flutter_app/page/Best50Page.dart';
 import 'package:my_first_flutter_app/page/CollectionSearchPage.dart';
 import 'package:my_first_flutter_app/page/DiffBest50Page.dart';
+import 'package:my_first_flutter_app/page/GuessChartByAliaPage.dart';
 import 'package:my_first_flutter_app/page/GuessChartByBlurredCoverPage.dart';
 import 'package:my_first_flutter_app/page/GuessChartByCoverPage.dart';
 import 'package:my_first_flutter_app/page/GuessChartByInfoPage.dart';
 import 'package:my_first_flutter_app/page/GuessChartBySongExcerptPage.dart';
+import 'package:my_first_flutter_app/page/GuessSongByOpenLettersPage.dart';
 import 'package:my_first_flutter_app/page/MaimaiServerStatusPage.dart';
 import 'package:my_first_flutter_app/page/RandomChartPage.dart';
 import 'package:my_first_flutter_app/page/RecommendByTagsPage.dart';
@@ -147,6 +149,7 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.collections_bookmark, title: '收藏品查询', subtitle: '查看收藏品查询'),
     ButtonItem(icon: Icons.leaderboard, title: 'Best50查询', subtitle: '我去,龙币!'),
     ButtonItem(icon: Icons.analytics, title: '拟合Best50查询', subtitle: '我w55怎么拟合才w52?!'),
+    ButtonItem(icon: Icons.person_search_outlined, title: '个性化Best50查询', subtitle: '我超，名刀50!'),
     ButtonItem(icon: Icons.label, title: '基于标签推荐', subtitle: '基于你游玩的谱面标签推荐曲目'),
     ButtonItem(icon: Icons.shuffle, title: '随机乐曲', subtitle: '随机选曲1-4首'),
     ButtonItem(icon: Icons.calculate, title: '单曲Rating计算', subtitle: '我鸟加这个有分吃吗？'),
@@ -157,6 +160,8 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.gamepad, title: '根据部分曲绘猜歌', subtitle: '舞萌笑传之猜猜呗2'),
     ButtonItem(icon: Icons.gamepad, title: '根据模糊曲绘猜歌', subtitle: '舞萌笑传之猜猜呗3'),
     ButtonItem(icon: Icons.gamepad, title: '根据歌曲片段猜歌', subtitle: '舞萌笑传之猜猜呗4'),
+    ButtonItem(icon: Icons.gamepad, title: '根据别名猜歌', subtitle: '舞萌笑传之猜猜呗5'),
+    ButtonItem(icon: Icons.gamepad, title: '舞萌开字母', subtitle: '舞萌笑传之猜猜呗6'),
     ButtonItem(icon: Icons.file_upload_sharp, title: '刷新数据', subtitle: '刷新你的舞萌数据'),
     ButtonItem(icon: Icons.network_check, title: '服务器状态', subtitle: '查看舞萌服务器状态'),
     ButtonItem(icon: Icons.update, title: '检查更新', subtitle: '检查应用是否有新版本'),
@@ -673,6 +678,18 @@ class _HomePageState extends State<HomePage> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => GuessChartBySongExcerptPage()),
+            );
+          }
+          if (item.title == '根据别名猜歌'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => GuessChartByAliaPage()),
+            );
+          }
+          if (item.title == '舞萌开字母'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => GuessSongByOpenLettersPage()),
             );
           }
           if (item.title == '服务器状态'){

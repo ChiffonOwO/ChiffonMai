@@ -1106,7 +1106,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                               _buildStatItem(
                                   'BPM', basicInfo['bpm'].toString()),
                               _buildStatItem(
-                                  '版本', StringUtil.formatVersionForSongInfoPage(basicInfo['from'])),
+                                  '版本', StringUtil.formatVersion2(basicInfo['from'])),
                               _buildStatItem(
                                   '曲师', basicInfo['artist'].split('/').last),
                             ],
