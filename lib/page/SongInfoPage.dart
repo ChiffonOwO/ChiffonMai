@@ -98,8 +98,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
       if (_songData != null) {
         final levels = _songData!['level'];
         if (levels != null && levels is List) {
-          // 对于难度数量大于等于4个的歌曲，默认选择第4个难度
-          if (levels.length >= 4 && widget.initialLevelIndex == 0) {
+          // 对于难度数量大于等于4个的歌曲，默认选择第4个难度（仅当 initialLevelIndex 是默认值0时）
+          if (levels.length >= 4 && widget.initialLevelIndex == 0 && _currentDiffIndex == 0) {
             _currentDiffIndex = 3; // 第4个难度（索引为3）
           } else if (_currentDiffIndex >= levels.length) {
             _currentDiffIndex = levels.length - 1;
@@ -846,7 +846,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                             children: [
                                               Text(
                                                 basicInfo['title'],
-                                                style: TextStyle(
+                                                      style: TextStyle(
+                                                      fontFamily: "Source Han Sans",
                                                   fontSize: 20,
                                                   fontWeight: FontWeight.bold,
                                                   color: accentColor,
@@ -1267,6 +1268,20 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                                   .width *
                                                               0.042,
                                                       color: Colors.grey,
+                                                      fontFamily: "Source Han Sans",
+                                                    ),
+                                                  ),
+                                                  TextSpan(
+                                                    text:
+                                                        '(MAX -${_calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex) - userRecord['dxScore']})',
+                                                    style: TextStyle(
+                                                      fontSize:
+                                                          MediaQuery.of(context)
+                                                                  .size
+                                                                  .width *
+                                                              0.042,
+                                                      color: Colors.grey,
+                                                      fontFamily: "Source Han Sans",
                                                     ),
                                                   ),
                                                 ],
@@ -1281,6 +1296,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                     style: TextStyle(
                                                       fontSize: MediaQuery.of(context).size.width * 0.042,
                                                       color: Colors.grey,
+                                                      fontFamily: "Source Han Sans",
                                                     ),
                                                   ),
                                                   TextSpan(
@@ -1292,18 +1308,20 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                               int.parse(widget.songId),
                                                               _currentDiffIndex,
                                                               userRecord['dxScore'])),
+                                                      fontFamily: "Source Han Sans",
                                                     ),
                                                   ),
                                                   TextSpan(
                                                     text: _calculateStarsBonus(int.parse(widget.songId), _currentDiffIndex, userRecord['dxScore']),
-                                              style: TextStyle(
-                                                fontSize: MediaQuery.of(context).size.width * 0.042,
-                                                color: _getStarsColor(
-                                                    _calculateStars(
-                                                        int.parse(widget.songId),
-                                                        _currentDiffIndex,
-                                                        userRecord['dxScore'])),
-                                              ),
+                                                    style: TextStyle(
+                                                      fontSize: MediaQuery.of(context).size.width * 0.042,
+                                                      color: _getStarsColor(
+                                                          _calculateStars(
+                                                              int.parse(widget.songId),
+                                                              _currentDiffIndex,
+                                                              userRecord['dxScore'])),
+                                                      fontFamily: "Source Han Sans",
+                                                    ),
                                             ),
                                                 ],
                                               ),
@@ -2276,7 +2294,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
     double scoreRate = _calculateScoreRate(songId, levelIndex, score);
 
     // 确定星星等级
-    if (scoreRate >= 0.97) {
+    if (scoreRate >= 0.99) {
+      return '\u2726 6';
+    } else if (scoreRate >= 0.98) {
+      return '\u2726 5.5';
+    } else if (scoreRate >= 0.97) {
       return '\u2726 5';
     } else if (scoreRate >= 0.95) {
       return '\u2726 4';
@@ -2295,11 +2317,17 @@ class _SongInfoPageState extends State<SongInfoPage> {
   String _calculateStarsBonus(int songId, int levelIndex, int score) {
     int maxScore = _calculateMaxDxScore(songId, levelIndex);
     double scoreRate = score / maxScore;
-    int starLevel = 0;
+    dynamic starLevel = 0;
     double minRate = 0.0;
 
     // 确定当前星星等级和对应的最低达成率
-    if (scoreRate >= 0.97) {
+    if (scoreRate >= 0.99) {
+      starLevel = 6;
+      minRate = 0.99;
+    } else if (scoreRate >= 0.98) {
+      starLevel = 5.5;
+      minRate = 0.98;
+    } else if (scoreRate >= 0.97) {
       starLevel = 5;
       minRate = 0.97;
     } else if (scoreRate >= 0.95) {
@@ -2326,7 +2354,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
     String symbol = difference >= 0 ? '+' : '';
 
     // 0星时显示1星的差距
-    int displayStarLevel = starLevel == 0 ? 1 : starLevel;
+    dynamic displayStarLevel = starLevel == 0 ? 1 : starLevel;
 
     return '\u2726 $displayStarLevel $symbol$difference';
   }
@@ -2334,6 +2362,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
   // 获取星星颜色
   Color _getStarsColor(String stars) {
     switch (stars) {
+      case '\u2726 6':
+      case '\u2726 5.5':
       case '\u2726 5':
         return Colors.yellow;
       case '\u2726 4':
@@ -2447,10 +2477,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
       context: context,
       builder: (BuildContext context) {
         final screenWidth = MediaQuery.of(context).size.width;
-        final dialogWidth = screenWidth * 0.95; // 对话框宽度为屏幕宽度的95%
+        final dialogWidth = screenWidth * 0.98; // 对话框宽度为屏幕宽度的98%
         
         return AlertDialog(
           title: Text('${songTitle}的相关收藏品'),
+          contentPadding: EdgeInsets.all(8.0), // 减小对话框内边距
           content: Container(
             width: dialogWidth,
             child: SingleChildScrollView(

@@ -6,8 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/service/GuessSongByOpenLettersService.dart';
+import 'package:my_first_flutter_app/service/GuessChartCommonSettingsService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
+import 'package:my_first_flutter_app/utils/CommonCacheUtil.dart';
 
 class GuessSongByOpenLettersPage extends StatefulWidget {
   const GuessSongByOpenLettersPage({super.key});
@@ -25,6 +27,20 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
   List<Song> _guessHistory = [];
   bool _isGameOver = false;
   bool _isWon = false;
+  int _maxGuesses = 10; // 从设置中加载
+  int _timeLimit = 0; // 从设置中加载，0表示无限制
+  int _songCount = 3; // 每次抽取的歌曲数，默认3首
+  
+  // 倒计时相关
+  int _remainingTime = 0;
+  Timer? _countdownTimer;
+  
+  // 设置相关
+  List<String> _selectedVersions = [];
+  double _masterMinDx = 1.0;
+  double _masterMaxDx = 15.0;
+  List<String> _selectedGenres = [];
+  late GuessChartCommonSettingsService _settingsService;
 
   // 排序状态
   bool _isAscending = true; // true: 顺序, false: 逆序
@@ -40,10 +56,70 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
   static const Duration _searchDelay = Duration(milliseconds: 800);
   bool _showSearchResults = false;
 
+  // 缓存工具
+  final _cacheUtil = CommonCacheUtil();
+  
+  // 游戏时间记录
+  DateTime? _gameStartTime;
+
+  // 统计数据
+  Map<String, dynamic> _stats = {
+    'correct': 0,
+    'wrong': 0,
+    'accuracy': 0.0,
+    'avgTime': 0.0,
+  };
+
   @override
   void initState() {
     super.initState();
+    _settingsService = GuessChartCommonSettingsService();
+    _loadSettings();
     _initGame();
+  }
+  
+  // 加载设置
+  Future<void> _loadSettings() async {
+    final settings = await _settingsService.loadSettings();
+    setState(() {
+      _selectedVersions = settings['selectedVersions'] ?? [];
+      _masterMinDx = settings['masterMinDx'] ?? 1.0;
+      _masterMaxDx = settings['masterMaxDx'] ?? 15.0;
+      _selectedGenres = settings['selectedGenres'] ?? [];
+      _maxGuesses = settings['maxGuesses'] ?? 10;
+      _timeLimit = settings['timeLimit'] ?? 0;
+      _songCount = settings['songCount'] ?? 3;
+    });
+  }
+  
+  // 加载统计数据
+  Future<void> _loadStats() async {
+    // 直接获取最新统计数据，不需要重置数据
+    final stats = await _cacheUtil.getStats('6');
+    setState(() {
+      _stats = Map.from(stats); // 创建新的Map实例，确保触发重新构建
+    });
+  }
+  
+  // 记录游戏结果
+  Future<void> _recordGameResult(bool isWon) async {
+    if (_gameStartTime == null) return;
+    
+    // 计算游戏用时
+    final gameTime = DateTime.now().difference(_gameStartTime!).inSeconds;
+    
+    // 记录结果
+    if (isWon) {
+      await _cacheUtil.recordSuccess('6');
+    } else {
+      await _cacheUtil.recordFailure('6');
+    }
+    
+    // 结算游戏
+    await _cacheUtil.settleGame('6', gameTime);
+    
+    // 重新加载统计数据
+    await _loadStats();
   }
 
   @override
@@ -51,11 +127,15 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
     _openLetterController.dispose();
     _answerController.dispose();
     _searchTimer?.cancel();
+    _countdownTimer?.cancel();
     super.dispose();
   }
 
   // 初始化游戏
   Future<void> _initGame() async {
+    // 初始化缓存
+    await _cacheUtil.initCache('6');
+    await _loadStats();
     // 初始化歌曲别名管理器
     await SongAliasManager.instance.init();
     await _startNewGame();
@@ -63,6 +143,12 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
 
   // 开始新游戏
   Future<void> _startNewGame() async {
+    // 取消之前的倒计时
+    _countdownTimer?.cancel();
+    
+    // 加载最新的设置
+    await _loadSettings();
+    
     setState(() {
       _isGameStarted = false;
       _isGameOver = false;
@@ -75,10 +161,18 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
       _answerController.clear();
       _searchResults = [];
       _showSearchResults = false;
+      _remainingTime = _timeLimit; // 重置倒计时
+      _gameStartTime = DateTime.now(); // 记录游戏开始时间
     });
 
-    // 随机选择5首目标歌曲
-    _targetSongs = await GuessSongByOpenLettersService.randomSelectSongs(5);
+    // 随机选择目标歌曲（使用设置的筛选条件和歌曲数量）
+    _targetSongs = await GuessSongByOpenLettersService.randomSelectSongs(
+      _songCount,
+      selectedVersions: _selectedVersions,
+      masterMinDx: _masterMinDx,
+      masterMaxDx: _masterMaxDx,
+      selectedGenres: _selectedGenres,
+    );
     if (_targetSongs.isNotEmpty) {
       // 初始化掩码
       for (var song in _targetSongs) {
@@ -88,14 +182,43 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
       setState(() {
         _isGameStarted = true;
       });
+      
+      // 启动倒计时
+      _startCountdown();
     }
+  }
+  
+  // 启动倒计时
+  void _startCountdown() {
+    if (_timeLimit <= 0) return; // 无时间限制
+    
+    _countdownTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+      setState(() {
+        if (_isGameOver) {
+          _countdownTimer?.cancel();
+        } else if (_remainingTime > 0) {
+          _remainingTime--;
+        } else {
+          // 时间到，游戏结束
+          _countdownTimer?.cancel();
+          _isGameOver = true;
+          _isWon = false;
+          // 记录失败
+          _recordGameResult(false);
+        }
+      });
+    });
   }
 
   // 生成初始掩码
   String _maskTitle(String title) {
     String result = '';
     for (int i = 0; i < title.length; i++) {
-      result += '□';
+      if (title[i] == ' ') {
+        result += ' ';
+      } else {
+        result += '□';
+      }
     }
     return result;
   }
@@ -159,6 +282,8 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
         if (_guessedSongs.length == _targetSongs.length) {
           _isGameOver = true;
           _isWon = true;
+          // 记录成功
+          _recordGameResult(true);
         }
       });
       
@@ -466,7 +591,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                     ),
                     // 第三行：masterDs | remasterDs | version
                     Text(
-                      '${song.ds.length > 3 ? song.ds[3].toString() : '-'} | ${song.ds.length > 4 ? song.ds[4].toString() : '-'} | ${_formatVersion(song.basicInfo.from)}',
+                      '${song.ds.length > 3 ? song.ds[3].toString() : '-'} | ${song.ds.length > 4 ? song.ds[4].toString() : '-'} | ${StringUtil.formatVersion2(song.basicInfo.from)}',
                       style: TextStyle(
                         fontSize: screenWidth * 0.03,
                         color: Colors.grey,
@@ -483,10 +608,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
     );
   }
 
-  // 格式化版本
-  String _formatVersion(String version) {
-    return StringUtil.formatVersion2(version);
-  }
+
 
   // 显示规则说明对话框
   void _showRulesDialog() {
@@ -499,7 +621,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('1. 游戏开始时，系统会随机从舞萌曲库中抽取5首歌曲。'),
+                Text('1. 游戏开始时，系统会随机从舞萌曲库中抽取${_songCount}首歌曲。'),
                 const SizedBox(height: 8),
                 const Text('2. 玩家可以发送 "开字母 X"（X 为任意汉字、日文、数字或符号，只能输入一个字符）。'),
                 const SizedBox(height: 8),
@@ -517,6 +639,268 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
+              },
+              child: const Text('确定'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // 显示设置对话框
+  void _showSettingsDialog() async {
+    // 加载最新的设置
+    await _loadSettings();
+    
+    // 加载所有版本和流派
+    final allSongs = await GuessSongByOpenLettersService.loadAllSongs();
+    Set<String> versions = {};
+    Set<String> genres = {};
+    
+    if (allSongs != null) {
+      for (var song in allSongs) {
+        versions.add(song.basicInfo.from);
+        genres.add(song.basicInfo.genre);
+      }
+    }
+    
+    // 按照游戏发布顺序排序版本
+    List<String> allVersions = versions.toList()..sort((a, b) {
+      // 定义版本顺序映射
+      final Map<String, int> versionOrder = {
+        'maimai': 1,
+        'maimai PLUS': 2,
+        'maimai GreeN': 3,
+        'maimai GreeN PLUS': 4,
+        'maimai ORANGE': 5,
+        'maimai ORANGE PLUS': 6,
+        'maimai PiNK': 7,
+        'maimai PiNK PLUS': 8,
+        'maimai MURASAKi': 9,
+        'maimai MURASAKi PLUS': 10,
+        'maimai MiLK': 11,
+        'MiLK PLUS': 12,
+        'maimai FiNALE': 13,
+        'maimai でらっくす': 14,
+        'maimai でらっくす Splash': 15,
+        'maimai でらっくす UNiVERSE': 16,
+        'maimai でらっくす FESTiVAL': 17,
+        'maimai でらっくす BUDDiES': 18,
+        'maimai でらっくす PRiSM': 19,
+      };
+      
+      int orderA = versionOrder[a] ?? 999;
+      int orderB = versionOrder[b] ?? 999;
+      return orderA.compareTo(orderB);
+    });
+    // 移除宴会场选项
+    genres.remove('宴会场');
+    List<String> allGenres = genres.toList();
+    
+    // 临时变量用于存储设置
+    List<String> tempSelectedVersions = List.from(_selectedVersions);
+    double tempMasterMinDx = _masterMinDx;
+    double tempMasterMaxDx = _masterMaxDx;
+    List<String> tempSelectedGenres = List.from(_selectedGenres);
+    int tempMaxGuesses = _maxGuesses;
+    int tempTimeLimit = _timeLimit;
+    int tempSongCount = _songCount;
+    bool showNoSongsError = false;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('设置'),
+          contentPadding: EdgeInsets.all(8.0), // 减小对话框内边距
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CommonWidgetUtil.buildGuessChartSettingsWidget(
+                      context,
+                      allVersions,
+                      allGenres,
+                      tempSelectedVersions,
+                      tempMasterMinDx,
+                      tempMasterMaxDx,
+                      tempSelectedGenres,
+                      tempMaxGuesses,
+                      tempTimeLimit,
+                      (versions) {
+                        setState(() {
+                          tempSelectedVersions = versions;
+                          showNoSongsError = false; // 重置错误提示
+                        });
+                      },
+                      (min, max) {
+                        setState(() {
+                          tempMasterMinDx = min;
+                          tempMasterMaxDx = max;
+                          showNoSongsError = false; // 重置错误提示
+                        });
+                      },
+                      (genres) {
+                        setState(() {
+                          tempSelectedGenres = genres;
+                          showNoSongsError = false; // 重置错误提示
+                        });
+                      },
+                      (guesses) {
+                        setState(() {
+                          tempMaxGuesses = guesses;
+                          showNoSongsError = false; // 重置错误提示
+                        });
+                      },
+                      (time) {
+                        setState(() {
+                          tempTimeLimit = time;
+                          showNoSongsError = false; // 重置错误提示
+                        });
+                      },
+                      () {
+                        setState(() {
+                          tempSelectedVersions = [];
+                          tempMasterMinDx = 1.0;
+                          tempMasterMaxDx = 15.0;
+                          tempSelectedGenres = [];
+                          tempMaxGuesses = 10;
+                          tempTimeLimit = 0;
+                          tempSongCount = 3;
+                          showNoSongsError = false; // 重置错误提示
+                        });
+                      },
+                    ),
+                    // 歌曲数量设置
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '每次抽取歌曲数',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color.fromARGB(255, 84, 97, 97),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Column(
+                            children: [
+                              Slider(
+                                value: tempSongCount.toDouble(),
+                                min: 1,
+                                max: 10,
+                                divisions: 9,
+                                label: '$tempSongCount 首',
+                                onChanged: (value) {
+                                  setState(() {
+                                    tempSongCount = value.toInt();
+                                  });
+                                },
+                              ),
+                              Text('$tempSongCount 首'),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    // 重置按钮
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Center(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              tempSelectedVersions = [];
+                              tempMasterMinDx = 1.0;
+                              tempMasterMaxDx = 15.0;
+                              tempSelectedGenres = [];
+                              tempMaxGuesses = 10;
+                              tempTimeLimit = 0;
+                              tempSongCount = 3;
+                              showNoSongsError = false; // 重置错误提示
+                            });
+                          },
+                          child: Text('重置所有设置'),
+                        ),
+                      ),
+                    ),
+                    // 显示错误提示
+                    if (showNoSongsError)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          '没有找到符合条件的乐曲！请检查设置！',
+                          style: TextStyle(color: Colors.red, fontSize: 14),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () async {
+                // 检查是否有符合条件的乐曲
+                final testSongs = await GuessSongByOpenLettersService.randomSelectSongs(
+                  tempSongCount,
+                  selectedVersions: tempSelectedVersions,
+                  masterMinDx: tempMasterMinDx,
+                  masterMaxDx: tempMasterMaxDx,
+                  selectedGenres: tempSelectedGenres,
+                );
+                
+                if (testSongs.isEmpty) {
+                  // 没有找到符合条件的乐曲，显示错误提示
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return AlertDialog(
+                        title: const Text('提示'),
+                        content: const Text('没有找到符合条件的乐曲！请检查设置！'),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                            },
+                            child: const Text('确定'),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                  return;
+                }
+                
+                // 保存设置到持久化存储
+                await _settingsService.saveSettings(
+                  selectedVersions: tempSelectedVersions,
+                  masterMinDx: tempMasterMinDx,
+                  masterMaxDx: tempMasterMaxDx,
+                  selectedGenres: tempSelectedGenres,
+                  maxGuesses: tempMaxGuesses,
+                  timeLimit: tempTimeLimit,
+                  songCount: tempSongCount,
+                );
+                
+                Navigator.of(context).pop();
+                
+                // 提示设置已保存，将在下局生效
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('设置已保存，将在下局游戏生效')),
+                );
               },
               child: const Text('确定'),
             ),
@@ -634,6 +1018,56 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                                                   style: TextStyle(
                                                       fontSize:
                                                           screenWidth * 0.04),
+                                                ),
+                                                if (_timeLimit > 0)
+                                                  Text(
+                                                    '剩余时间: ${_remainingTime}秒',
+                                                    style: TextStyle(
+                                                        fontSize:
+                                                            screenWidth * 0.04,
+                                                        color: _remainingTime / _timeLimit <= 0.3 ? Colors.red : null),
+                                                  ),
+                                                // 统计数据
+                                                Container(
+                                                  margin: const EdgeInsets.only(top: 8),
+                                                  child: Row(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            Text(
+                                                              '今日统计: 正确${_stats['correct']} | 错误${_stats['wrong']}',
+                                                              style: TextStyle(
+                                                                  fontSize: screenWidth * 0.04,
+                                                                  color: Colors.black
+                                                              ),
+                                                            ),
+                                                            Text(
+                                                              '正确率${_stats['accuracy'].toStringAsFixed(1)}% | 平均用时${_stats['avgTime'].toStringAsFixed(1)}秒',
+                                                              style: TextStyle(
+                                                                  fontSize: screenWidth * 0.04,
+                                                                  color: Colors.black
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                      IconButton(
+                                                        padding: EdgeInsets.zero,
+                                                        icon: const Icon(
+                                                            Icons.refresh,
+                                                            color: Color.fromARGB(255, 84, 97, 97),
+                                                            size: 20),
+                                                        onPressed: () async {
+                                                          await _cacheUtil.resetStats('6');
+                                                          await _loadStats();
+                                                        },
+                                                      ),
+                                                    ],
+                                                  ),
                                                 ),
                                                 if (_isGameOver)
                                                   Text(
@@ -779,7 +1213,17 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                                                       size: 24),
                                                   onPressed: _showRulesDialog,
                                                 ),
-                                                const SizedBox(width: 16),
+                                                const SizedBox(width: 8),
+                                                // 设置按钮
+                                                IconButton(
+                                                  icon: const Icon(
+                                                      Icons.settings,
+                                                      color: Color.fromARGB(
+                                                          255, 84, 97, 97),
+                                                      size: 24),
+                                                  onPressed: _showSettingsDialog,
+                                                ),
+                                                const SizedBox(width: 8),
                                                 // 刷新按钮
                                                 IconButton(
                                                   icon: const Icon(Icons.refresh,
@@ -788,7 +1232,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                                                       size: 24),
                                                   onPressed: _startNewGame,
                                                 ),
-                                                const SizedBox(width: 16),
+                                                const SizedBox(width: 8),
                                                 // 排序按钮
                                                 IconButton(
                                                   icon: Icon(
@@ -806,7 +1250,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                                                     });
                                                   },
                                                 ),
-                                                const SizedBox(width: 16),
+                                                const SizedBox(width: 8),
                                                 // 投降按钮
                                                 if (!_isGameOver)
                                                   TextButton(
@@ -819,6 +1263,8 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                                                       setState(() {
                                                         _isGameOver = true;
                                                         _isWon = false;
+                                                        // 记录失败
+                                                        _recordGameResult(false);
                                                       });
                                                     },
                                                     child: const Text('投降'),

@@ -355,7 +355,7 @@ class _AchievementRateCalculatorState
 
                       // 计算按钮
                       Container(
-                        padding: EdgeInsets.all(screenWidth * 0.03),
+                        margin: EdgeInsets.fromLTRB(screenWidth * 0.03, screenWidth * 0.03, screenWidth * 0.03, screenWidth * 0.03),
                         child: ElevatedButton(
                           onPressed: _calculateAchievementRate,
                           style: ElevatedButton.styleFrom(
@@ -370,6 +370,7 @@ class _AchievementRateCalculatorState
                               borderRadius: BorderRadius.circular(8.0),
                             ),
                             elevation: 5,
+                            minimumSize: Size(double.infinity, 0),
                           ),
                           child: const Text('计算达成率'),
                         ),
@@ -499,14 +500,15 @@ class _AchievementRateCalculatorState
         // Perfect部分
         Container(
           color: Colors.yellow[400],
-          padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01), // 垂直 padding 为屏幕高度的1%
+          padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01, horizontal: screenWidth * 0.03), // 增加水平padding
           child: Text(
-            'Perfect',
+            'PERFECT',
             style: TextStyle(
               fontSize: screenWidth * 0.027, // 字体大小为屏幕宽度的2.7%
               fontWeight: FontWeight.bold,
               color: Colors.orange,
             ),
+            textAlign: TextAlign.left,
           ),
         ),
         _buildBreakRow('大P', _breakP, (val) => setState(() => _breakP = val), _breakPController),
@@ -517,26 +519,27 @@ class _AchievementRateCalculatorState
         // Great部分
         Container(
           color: Colors.pink[200],
-          padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01), // 垂直 padding 为屏幕高度的1%
+          padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01, horizontal: screenWidth * 0.03), // 增加水平padding
           child: Text(
-            'Great',
+            'GREAT',
             style: TextStyle(
               fontSize: screenWidth * 0.027, // 字体大小为屏幕宽度的2.7%
               fontWeight: FontWeight.bold,
               color: Colors.purple,
             ),
+            textAlign: TextAlign.left,
           ),
         ),
-        _buildBreakRow('80%', _break80, (val) => setState(() => _break80 = val), _break80Controller),
-        _buildBreakRow('60%', _break60, (val) => setState(() => _break60 = val), _break60Controller),
-        _buildBreakRow('50%', _break50g, (val) => setState(() => _break50g = val), _break50gController),
+        _buildBreakRow('80%', _break80, (val) => setState(() => _break80 = val), _break80Controller, color: Colors.pink[200], textColor: Colors.black),
+        _buildBreakRow('60%', _break60, (val) => setState(() => _break60 = val), _break60Controller, color: Colors.pink[200], textColor: Colors.black),
+        _buildBreakRow('50%', _break50g, (val) => setState(() => _break50g = val), _break50gController, color: Colors.pink[200], textColor: Colors.black),
         SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
 
         // GOOD和MISS
         _buildBreakRow('GOOD', _breakGo, (val) => setState(() => _breakGo = val), _breakGoController,
-            color: Colors.green[200]),
+            color: Colors.green[200], textColor: Colors.black),
         _buildBreakRow('MISS', _breakM, (val) => setState(() => _breakM = val), _breakMController,
-            color: Colors.grey[200]),
+            color: Colors.grey[200], textColor: Colors.black),
         SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
 
         // Break总数
@@ -653,9 +656,9 @@ class _AchievementRateCalculatorState
 
   // 构建BREAK音符行
   Widget _buildBreakRow(String label, int value, Function(int) onChanged, TextEditingController controller,
-      {Color? color}) {
+      {Color? color, Color? textColor = Colors.orange}) {
     final screenWidth = MediaQuery.of(context).size.width;
-    //final screenHeight = MediaQuery.of(context).size.height;
+    final screenHeight = MediaQuery.of(context).size.height;
     
     return Row(
       children: [
@@ -664,12 +667,13 @@ class _AchievementRateCalculatorState
           child: Container(
             color: color ?? Colors.yellow[100],
             padding: EdgeInsets.all(screenWidth * 0.03), // padding 为屏幕宽度的3%
+            alignment: Alignment.center,
             child: Text(
               label,
               style: TextStyle(
                 fontSize: screenWidth * 0.024, // 字体大小为屏幕宽度的2.4%
                 fontWeight: FontWeight.bold,
-                color: Colors.orange,
+                color: textColor,
               ),
               textAlign: TextAlign.center,
             ),
@@ -678,6 +682,7 @@ class _AchievementRateCalculatorState
         Expanded(
           flex: 3,
           child: Container(
+            height: screenHeight * 0.05, // 设置固定高度
             padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02), // 水平 padding 为屏幕宽度的2%
             decoration: BoxDecoration(
               border: Border.all(color: Colors.grey),
@@ -687,6 +692,7 @@ class _AchievementRateCalculatorState
               decoration: InputDecoration(
                 border: InputBorder.none,
                 hintText: value == 0 ? '' : value.toString(),
+                contentPadding: EdgeInsets.zero,
               ),
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],

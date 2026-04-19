@@ -1,5 +1,6 @@
 // ignore_for_file: slash_for_doc_comments
 
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:my_first_flutter_app/entity/Song.dart';
@@ -9,6 +10,7 @@ import 'package:my_first_flutter_app/entity/UserPlayDataEntity.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RecommendByTagsService {
   static const int MAX_LIMIT = 70; // 最大推荐数
@@ -72,6 +74,7 @@ class RecommendByTagsService {
   static const String GROUP_CONFIG = 'config';
   static const String GROUP_DIFFICULTY = 'difficulty';
   static const String GROUP_EVALUATION = 'evaluation';
+  static const String RECOMMENDATION_CACHE_KEY = 'recommendation_results'; // 推荐结果缓存键
 }
 
 /**
@@ -930,6 +933,20 @@ Future<Map<String, List<RecommendationResult>>> recommendSongs() async {
     final best15Recommendations = await best15Future;
     print('计算得到 ${best15Recommendations.length} 条Best15推荐结果');
     best15Recommendations.sort((a, b) => b.similarity.compareTo(a.similarity));
+
+    // 保存推荐结果到缓存
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final resultMap = {
+        'Best55': best55Recommendations.map((r) => r.toJson()).toList(),
+        'Best15': best15Recommendations.map((r) => r.toJson()).toList(),
+      };
+      final resultJson = json.encode(resultMap);
+      await prefs.setString(RecommendByTagsService.RECOMMENDATION_CACHE_KEY, resultJson);
+      print('推荐结果已保存到缓存');
+    } catch (e) {
+      print('保存推荐结果到缓存失败: $e');
+    }
 
     // 返回推荐结果
     return {

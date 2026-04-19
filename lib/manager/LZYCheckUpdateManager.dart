@@ -105,7 +105,12 @@ class LZYCheckUpdateManager {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("更新内容：\n${info["updateLog"]}"),
+            Container(
+              constraints: BoxConstraints(maxHeight: 200),
+              child: SingleChildScrollView(
+                child: Text("更新内容：\n${info["updateLog"]}"),
+              ),
+            ),
             SizedBox(height: 10),
             Text("当前版本：${info["currentVersion"]}"),
           ],

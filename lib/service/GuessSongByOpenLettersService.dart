@@ -7,7 +7,13 @@ import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 
 class GuessSongByOpenLettersService {
   // 随机选择指定数量的歌曲
-  static Future<List<Song>> randomSelectSongs(int count) async {
+  static Future<List<Song>> randomSelectSongs(
+    int count,
+    {List<String> selectedVersions = const [],
+    double masterMinDx = 1.0,
+    double masterMaxDx = 15.0,
+    List<String> selectedGenres = const [],
+  }) async {
     try {
       final songs = await loadAllSongs();
       if (songs == null || songs.isEmpty) {
@@ -15,7 +21,31 @@ class GuessSongByOpenLettersService {
       }
 
       // 过滤掉宴会场谱面（id为六位数的谱面）
-      final filteredSongs = songs.where((song) => song.id.length != 6).toList();
+      var filteredSongs = songs.where((song) => song.id.length != 6).toList();
+      
+      // 按版本筛选
+      if (selectedVersions.isNotEmpty) {
+        filteredSongs = filteredSongs.where((song) => selectedVersions.contains(song.basicInfo.from)).toList();
+      }
+      
+      // 按流派筛选
+      if (selectedGenres.isNotEmpty) {
+        filteredSongs = filteredSongs.where((song) => selectedGenres.contains(song.basicInfo.genre)).toList();
+      }
+      
+      // 按Master定数筛选
+      filteredSongs = filteredSongs.where((song) {
+        if (song.ds.length > 3) {
+          try {
+            final masterDx = double.parse(song.ds[3].toString());
+            return masterDx >= masterMinDx && masterDx <= masterMaxDx;
+          } catch (e) {
+            return false;
+          }
+        }
+        return false;
+      }).toList();
+      
       if (filteredSongs.isEmpty) {
         return [];
       }
@@ -49,8 +79,8 @@ class GuessSongByOpenLettersService {
   static String _maskTitle(String title, String letter) {
     String result = '';
     for (int i = 0; i < title.length; i++) {
-      if (title[i] == letter) {
-        result += letter;
+      if (title[i] == ' ' || (letter.isNotEmpty && (title[i] == letter || title[i].toLowerCase() == letter.toLowerCase()))) {
+        result += title[i];
       } else {
         result += '□';
       }
@@ -65,9 +95,9 @@ class GuessSongByOpenLettersService {
       if (currentMask[i] != '□') {
         // 保留已经显示的字符
         result += currentMask[i];
-      } else if (title[i] == letter) {
-        // 显示新的字符
-        result += letter;
+      } else if (title[i] == ' ' || (letter.isNotEmpty && (title[i] == letter || title[i].toLowerCase() == letter.toLowerCase()))) {
+        // 显示空格或匹配的字符（大小写不敏感）
+        result += title[i];
       } else {
         // 保持掩码
         result += '□';

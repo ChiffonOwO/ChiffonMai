@@ -1,10 +1,11 @@
 // ignore: file_names
 import 'package:flutter/material.dart';
-import 'dart:convert';
 import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:my_first_flutter_app/utils/StringUtil.dart';
+import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import '../service/DiffBest50Service.dart';
 import '../service/DiffBest50ConvertToImgService.dart';
 import '../manager/MaimaiMusicDataManager.dart';
@@ -39,7 +40,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
   Future<void> _loadDiffBest50Data() async {
     try {
       // 加载maimai音乐数据
-      // 优先使用缓存的API数据
+      // 直接使用缓存的API数据
       if (await MaimaiMusicDataManager().hasCachedData()) {
         final songs = await MaimaiMusicDataManager().getCachedSongs();
         if (songs != null) {
@@ -67,15 +68,6 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
             }).toList();
           });
         }
-      } else {
-        // 如果API数据不存在，尝试从资产文件加载JSON数据作为 fallback
-        final maimaiContents = 
-            await rootBundle.loadString('assets/maimai_music_data.json');
-        final maimaiJsonData = json.decode(maimaiContents);
-
-        setState(() {
-          _maimaiMusicData = maimaiJsonData;
-        });
       }
 
       // 计算DiffBest50数据
@@ -319,7 +311,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
 
                         // 基于拟合难度的Best50 卡片网格
                         _buildDataCardGrid(_diffSongs,
-                            MediaQuery.of(context).size.width > 600 ? 1.7 : 1.5),
+                            MediaQuery.of(context).size.width > 600 ? 1.8 : 1.6),
                       ],
                     ),
                   ),
@@ -376,6 +368,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                     fontSize: MediaQuery.of(context).size.width * 0.045,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
+                    fontFamily: "Source Han Sans",
                   ),
                 ),
                 SizedBox(height: 4.0),
@@ -388,6 +381,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                           fontSize: MediaQuery.of(context).size.width * 0.045,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
+                          fontFamily: "Source Han Sans",
                         ),
                       ),
                       TextSpan(
@@ -395,6 +389,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                         style: TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.03,
                           color: Colors.black,
+                          fontFamily: "Source Han Sans",
                         ),
                       ),
                     ],
@@ -404,17 +399,19 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                 Text(
                   '与Best50差值',
                   style: TextStyle(
-                    fontSize: MediaQuery.of(context).size.width * 0.04,
+                    fontSize: MediaQuery.of(context).size.width * 0.045,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
+                    fontFamily: "Source Han Sans",
                   ),
                 ),
                 Text(
                   '${best50Diff > 0 ? '+' : ''}$best50Diff',
                   style: TextStyle(
-                    fontSize: MediaQuery.of(context).size.width * 0.04,
+                    fontSize: MediaQuery.of(context).size.width * 0.045,
                     color: best50Diff >= 0 ? Colors.green : Colors.red,
                     fontWeight: FontWeight.bold,
+                    fontFamily: "Source Han Sans",
                   ),
                 ),
               ],
@@ -429,9 +426,10 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                 Text(
                   '拟合Best50 平均达成率/DX分达成率',
                   style: TextStyle(
-                    fontSize: MediaQuery.of(context).size.width * 0.035,
+                    fontSize: MediaQuery.of(context).size.width * 0.04,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
+                    fontFamily: "Source Han Sans",
                   ),
                 ),
                 _buildDualDecimalText(
@@ -623,7 +621,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                     Row(
                       children: [
                         Text(
-                          '$rating | $score |',
+                          '$rating | $score | ',
                           style: TextStyle(
                             fontSize: otherFontSize,
                             color: Colors.white,
@@ -682,9 +680,10 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
         Text(
           integerPart,
           style: TextStyle(
-            fontSize: MediaQuery.of(context).size.width * 0.04,
+            fontSize: MediaQuery.of(context).size.width * 0.045,
             fontWeight: FontWeight.bold,
             color: color,
+            fontFamily: "Source Han Sans",
           ),
         ),
         // 小数部分和百分号
@@ -694,6 +693,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
             fontSize: MediaQuery.of(context).size.width * 0.03,
             fontWeight: FontWeight.bold,
             color: color,
+            fontFamily: "Source Han Sans",
           ),
         ),
       ],
@@ -766,8 +766,9 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
     int songId = songData['song_id'];
 
     // 计算星星等级
-    String stars = _calculateStars(songId, levelIndex, score);
-    Color starsColor = _getStarsColor(stars);
+    double scoreRate = _calculateScoreRate(songId, levelIndex, score);
+    String stars = StringUtil.formatStars(scoreRate);
+    Color starsColor = ColorUtil.getStarsColor(stars);
 
     // 映射FC属性
     String fcText = '-';
@@ -909,41 +910,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
     return maxScore > 0 ? score / maxScore : 0.0;
   }
 
-  // 计算星星等级
-  String _calculateStars(int songId, int levelIndex, int score) {
-    double scoreRate = _calculateScoreRate(songId, levelIndex, score);
 
-    // 确定星星等级
-    if (scoreRate >= 0.97) {
-      return '\u27265';
-    } else if (scoreRate >= 0.95) {
-      return '\u27264';
-    } else if (scoreRate >= 0.93) {
-      return '\u27263';
-    } else if (scoreRate >= 0.90) {
-      return '\u27262';
-    } else if (scoreRate >= 0.85) {
-      return '\u27261';
-    } else {
-      return '\u27260';
-    }
-  }
-
-  // 获取星星颜色
-  Color _getStarsColor(String stars) {
-    switch (stars) {
-      case '\u27265':
-        return Colors.yellow;
-      case '\u27264':
-      case '\u27263':
-        return Colors.orange;
-      case '\u27262':
-      case '\u27261':
-        return Colors.green.shade300;
-      default:
-        return Colors.white;
-    }
-  }
 
   // 构建导出按钮
   Widget _buildExportButton() {

@@ -599,7 +599,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                 _debouncedSearch(value);
                               },
                               decoration: InputDecoration(
-                                hintText: '输入歌曲标题、艺术家、BPM、谱师、别名',
+                                hintText: '输入歌曲标题、艺术家、BPM、谱师、别名、歌曲ID',
                                 hintStyle: TextStyle(fontSize: smallFontSize),
                                 prefixIcon: const Icon(Icons.search),
                                 border: OutlineInputBorder(
@@ -1039,6 +1039,10 @@ class _SongSearchPageState extends State<SongSearchPage> {
     String query = _searchController.text.toLowerCase();
     if (query.isEmpty) return matchInfos;
 
+    // 检查歌曲ID匹配
+    if (song.id.toString() == _searchController.text) {
+      matchInfos.add({'type': '歌曲ID', 'value': song.id.toString()});
+    }
     // 检查标题匹配
     if (song.basicInfo.title.toLowerCase().contains(query)) {
       matchInfos.add({'type': '歌名', 'value': song.basicInfo.title});

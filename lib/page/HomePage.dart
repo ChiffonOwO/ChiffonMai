@@ -9,6 +9,7 @@ import 'package:my_first_flutter_app/page/GuessChartByInfoPage.dart';
 import 'package:my_first_flutter_app/page/GuessChartBySongExcerptPage.dart';
 import 'package:my_first_flutter_app/page/GuessSongByOpenLettersPage.dart';
 import 'package:my_first_flutter_app/page/MaimaiServerStatusPage.dart';
+import 'package:my_first_flutter_app/page/PersonalizedBest50Page.dart';
 import 'package:my_first_flutter_app/page/RandomChartPage.dart';
 import 'package:my_first_flutter_app/page/RecommendByTagsPage.dart';
 import 'package:my_first_flutter_app/page/SingleRatingCalculatorPage.dart';
@@ -337,6 +338,7 @@ class _HomePageState extends State<HomePage> {
   // 构建用户信息文本
   Widget _buildUserInfo(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
     
     // 检查是否有缓存数据（通过检查用户昵称为默认值判断）
     bool hasNoCachedData = _userNickname == "U+5E78";
@@ -385,16 +387,22 @@ class _HomePageState extends State<HomePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            _userNickname,
-            style: TextStyle(
-              color: AppConstants.textPrimaryColor,
-              fontSize: screenWidth * 0.07,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1,
-              height: 0.6,
+          Container(
+            width: screenWidth * 0.4, // 设置一个最大宽度，例如屏幕宽度的40%
+            child: Text(
+              _userNickname,
+              style: TextStyle(
+                color: AppConstants.textPrimaryColor,
+                fontSize: screenWidth * 0.07,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1,
+                height: 0.6,
+              ),
+              overflow: TextOverflow.ellipsis, // 超出显示省略号
+              maxLines: 1, // 只显示一行
             ),
           ),
+          SizedBox(height: screenHeight * 0.005), // 在玩家名和Rating中间添加SizedBox
           Text(
             "Rating",
             style: TextStyle(
@@ -473,6 +481,15 @@ class _HomePageState extends State<HomePage> {
     });
     
     try {
+      // 清除推荐结果缓存
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(RecommendByTagsService.RECOMMENDATION_CACHE_KEY);
+        print('推荐结果缓存已清除');
+      } catch (e) {
+        print('清除推荐结果缓存失败: $e');
+      }
+      
       // 从API获取并更新音乐数据
       await MaimaiMusicDataManager().fetchAndUpdateMusicData();
       
@@ -696,6 +713,12 @@ class _HomePageState extends State<HomePage> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => MaimaiServerStatusPage()),
+            );
+          }
+          if (item.title == '个性化Best50查询'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => PersonalizedBest50Page()),
             );
           }
           if (item.title == '检查更新'){

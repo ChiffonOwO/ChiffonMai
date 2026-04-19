@@ -36,6 +36,10 @@ class SongSearchService {
     final lowerQuery = query.toLowerCase();
 
     return allSongs!.where((song) {
+      // 检查歌曲ID（精确匹配）
+      if (song.id.toString() == query) {
+        return true;
+      }
       // 检查标题
       if (song.basicInfo.title.toLowerCase().contains(lowerQuery)) {
         return true;

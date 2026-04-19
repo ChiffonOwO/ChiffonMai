@@ -10,6 +10,8 @@ class ColorUtil {
    */
   static Color getStarsColor(String stars) {
     switch (stars) {
+      case '\u27266':
+      case '\u27265.5':
       case '\u27265':
         return Colors.yellow;
       case '\u27264':

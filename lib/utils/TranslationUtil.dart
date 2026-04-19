@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/DeveloperToken.dart';
 import 'package:intl/intl.dart';
 
+
 class TranslateService {
   static const String secretId = DeveloperToken.TencentSecretId;
   static const String secretKey = DeveloperToken.TencentSecretKey;
@@ -12,6 +13,81 @@ class TranslateService {
   static const String host = "tmt.tencentcloudapi.com";
   static const String version = "2018-03-21";
   static const String algorithm = "TC3-HMAC-SHA256";
+  
+  // 语言检测正则表达式
+  static final RegExp _japaneseRegex = RegExp(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uff66-\uff9f]');
+  static final RegExp _englishRegex = RegExp(r'[a-zA-Z]');
+  
+  // 检测文本中的语言
+  static String detectLanguage(String text) {
+    if (_japaneseRegex.hasMatch(text)) {
+      return 'ja';
+    } else if (_englishRegex.hasMatch(text)) {
+      return 'en';
+    } else {
+      return 'auto';
+    }
+  }
+  
+  // 分割混合语言文本
+  static List<Map<String, String>> splitMixedLanguageText(String text) {
+    List<Map<String, String>> segments = [];
+    String currentSegment = '';
+    String currentLang = '';
+    
+    for (int i = 0; i < text.length; i++) {
+      String char = text[i];
+      String charLang = 'other';
+      
+      if (_japaneseRegex.hasMatch(char)) {
+        charLang = 'ja';
+      } else if (_englishRegex.hasMatch(char)) {
+        charLang = 'en';
+      }
+      
+      if (currentLang.isEmpty) {
+        currentLang = charLang;
+        currentSegment = char;
+      } else if (currentLang == charLang) {
+        currentSegment += char;
+      } else {
+        segments.add({'text': currentSegment, 'lang': currentLang});
+        currentLang = charLang;
+        currentSegment = char;
+      }
+    }
+    
+    if (currentSegment.isNotEmpty) {
+      segments.add({'text': currentSegment, 'lang': currentLang});
+    }
+    
+    return segments;
+  }
+  
+  // 翻译混合语言文本
+  static Future<String?> translateMixedLanguage(String text, {String to = "zh"}) async {
+    try {
+      final segments = splitMixedLanguageText(text);
+      List<String> translatedSegments = [];
+      
+      for (var segment in segments) {
+        String segText = segment['text']!;
+        String segLang = segment['lang']!;
+        
+        if (segLang == 'ja' || segLang == 'en') {
+          String? translated = await translate(segText, from: segLang, to: to);
+          translatedSegments.add(translated ?? segText);
+        } else {
+          translatedSegments.add(segText);
+        }
+      }
+      
+      return translatedSegments.join('');
+    } catch (e) {
+      print("混合语言翻译失败: $e");
+      return null;
+    }
+  }
 
   // 英译中
   static Future<String?> enToZh(String text) async {
@@ -21,6 +97,11 @@ class TranslateService {
   // 日译中
   static Future<String?> jaToZh(String text) async {
     return await translate(text, from: "ja", to: "zh");
+  }
+  
+  // 混合语言翻译（自动检测并分别翻译）
+  static Future<String?> translateMixed(String text) async {
+    return await translateMixedLanguage(text);
   }
 
   // 核心翻译
@@ -77,16 +158,7 @@ class TranslateService {
 
       final targetText = data["Response"]["TargetText"];
       print("翻译结果: $targetText");
-      
-      // 尝试对结果进行二次解码
-      try {
-        final decodedText = utf8.decode(targetText.runes.toList());
-        print("二次解码后: $decodedText");
-        return decodedText;
-      } catch (e) {
-        print("二次解码失败: $e");
-        return targetText;
-      }
+      return targetText;
     } catch (e) {
       print("翻译失败: $e");
       return null;

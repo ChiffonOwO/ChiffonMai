@@ -347,7 +347,7 @@ class _B50PageState extends State<B50Page> {
 
                         // Best35 卡片网格 (sd数组)
                         _buildDataCardGrid(_sdSongs,
-                            MediaQuery.of(context).size.width > 600 ? 1.7 : 1.5),
+                            MediaQuery.of(context).size.width > 600 ? 1.8 : 1.6),
                         SizedBox(height: MediaQuery.of(context).size.height * 0.02),
 
                         // Best15 标题区域
@@ -356,7 +356,7 @@ class _B50PageState extends State<B50Page> {
                         SizedBox(height: 12.0),
 
                         // Best15 卡片网格 (dx数组)
-                        _buildDataCardGrid(_dxSongs, 1.65),
+                        _buildDataCardGrid(_dxSongs, 1.75),
                       ],
                     ),
                   ),
@@ -458,6 +458,7 @@ class _B50PageState extends State<B50Page> {
                           fontSize: MediaQuery.of(context).size.width * 0.04,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
+                          fontFamily: "Source Han Sans",
                         ),
                       ),
                       TextSpan(
@@ -465,6 +466,7 @@ class _B50PageState extends State<B50Page> {
                         style: TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.03,
                           color: Colors.black,
+                          fontFamily: "Source Han Sans",
                         ),
                       ),
                     ],
@@ -488,6 +490,7 @@ class _B50PageState extends State<B50Page> {
                           fontSize: MediaQuery.of(context).size.width * 0.04,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
+                          fontFamily: "Source Han Sans",
                         ),
                       ),
                       TextSpan(
@@ -495,6 +498,7 @@ class _B50PageState extends State<B50Page> {
                         style: TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.03,
                           color: Colors.black,
+                          fontFamily: "Source Han Sans",
                         ),
                       ),
                     ],
@@ -507,6 +511,7 @@ class _B50PageState extends State<B50Page> {
                     fontSize: MediaQuery.of(context).size.width * 0.04,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
+                    fontFamily: "Source Han Sans",
                   ),
                 ),
                 RichText(
@@ -518,6 +523,7 @@ class _B50PageState extends State<B50Page> {
                           fontSize: MediaQuery.of(context).size.width * 0.04,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
+                          fontFamily: "Source Han Sans",
                         ),
                       ),
                       TextSpan(
@@ -525,6 +531,7 @@ class _B50PageState extends State<B50Page> {
                         style: TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.03,
                           color: Colors.black,
+                          fontFamily: "Source Han Sans",
                         ),
                       ),
                     ],
@@ -694,10 +701,11 @@ class _B50PageState extends State<B50Page> {
                           Text(
                             difficulty.toString().split('.')[0],
                             style: TextStyle(
-                              fontSize: decimalMainFontSize * 0.9,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
+                          fontSize: decimalMainFontSize * 0.9,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontFamily: "Source Han Sans",
+                        ),
                           ),
                           if (difficulty.toString().split('.').length > 1)
                             Text(
@@ -706,6 +714,7 @@ class _B50PageState extends State<B50Page> {
                                 fontSize: decimalSmallFontSize * 0.9,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
+                                fontFamily: "Source Han Sans",
                               ),
                             ),
                         ],
@@ -827,6 +836,7 @@ class _B50PageState extends State<B50Page> {
             fontSize: MediaQuery.of(context).size.width * 0.04,
             fontWeight: FontWeight.bold,
             color: color,
+            fontFamily: "Source Han Sans",
           ),
         ),
         // 小数部分和百分号
@@ -836,6 +846,7 @@ class _B50PageState extends State<B50Page> {
             fontSize: MediaQuery.of(context).size.width * 0.03,
             fontWeight: FontWeight.bold,
             color: color,
+            fontFamily: "Source Han Sans",
           ),
         ),
       ],
@@ -862,6 +873,7 @@ class _B50PageState extends State<B50Page> {
                 fontSize: fontSize,
                 fontWeight: FontWeight.bold,
                 color: color,
+                fontFamily: "Source Han Sans",
               ),
             ),
             _buildDecimalText(value2, context,

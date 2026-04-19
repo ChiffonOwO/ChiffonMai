@@ -41,6 +41,9 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   // 当前选中的按钮索引
   int _selectedButtonIndex = 0;
   
+  // 缓存DX分达成率，避免重复计算
+  Map<dynamic, double> _dxRateCache = {};
+  
   // 当前排序方式
   String _currentSortBy = 'Rating'; // 默认选择Rating
   
@@ -143,6 +146,8 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
     try {
       _userPlayData = await _service.getUserPlayData();
       if (_userPlayData != null) {
+        // 初始化歌曲缓存，确保星数计算时缓存可用
+        await _service.initSongCache();
         _sortedSongs = await _service.getSortedSongs(_userPlayData!, _currentSortBy);
         // 应用筛选条件
         _sortedSongs = await _service.filterSongs(_sortedSongs, _filterConditions);
@@ -202,8 +207,8 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                     },
                   ),
                   RadioListTile<String>(
-                    title: Text('DX分达成率'),
-                    value: 'DX分达成率',
+                    title: Text('DX分数达成率'),
+                    value: 'DX分数达成率',
                     groupValue: _currentSortBy,
                     onChanged: (value) {
                       setState(() {
@@ -725,8 +730,8 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   }
   
   // 使用UserScoreSearchService中的方法计算DX分达成率
-  Future<double> _calculateDXScoreRate(dynamic record) {
-    return _service.calculateDXScoreRate(record);
+  double _calculateDXScoreRate(dynamic record) {
+    return _service.calculateDXScoreRateSync(record);
   }
   
   // 构建星数统计项
@@ -773,7 +778,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
         return Colors.orange;
       case '✦ 2':
       case '✦ 1':
-        return Colors.green.shade300;
+        return Colors.green.shade200;
       default:
         return Colors.white;
     }
@@ -834,7 +839,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
             children: [
               // 标题栏
               Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 16),
+                padding: EdgeInsets.fromLTRB(16, 46, 16, 8),
                 child: Row(
                   children: [
                     // 返回按钮
@@ -1111,117 +1116,148 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                           ),
                                           child: Row(
                                             children: [
-                                              // 四个小按钮组合
-                                              Row(
-                                                children: [
-                                                  ElevatedButton(
-                                                    onPressed: () {
-                                                      setState(() {
-                                                        _selectedButtonIndex = 0;
-                                                      });
-                                                    },
-                                                    style: ElevatedButton.styleFrom(
-                                                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                                      minimumSize: Size(_smallButtonWidth, _smallButtonHeight),
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(2), // 方形按钮
+                                              // 可横向滚动的按钮容器 - 占据更多空间
+                                              Expanded(
+                                                flex: 3, // 增加权重，让容器占据更多空间
+                                                child: SingleChildScrollView(
+                                                  scrollDirection: Axis.horizontal,
+                                                  padding: EdgeInsets.symmetric(vertical: 4),
+                                                  child: Row(
+                                                    children: [
+                                                      ElevatedButton(
+                                                        onPressed: () {
+                                                          setState(() {
+                                                            _selectedButtonIndex = 0;
+                                                          });
+                                                        },
+                                                        style: ElevatedButton.styleFrom(
+                                                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                          minimumSize: Size(_smallButtonWidth, _smallButtonHeight),
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius: BorderRadius.circular(4),
+                                                          ),
+                                                          backgroundColor: _selectedButtonIndex == 0 ? Colors.blue : null,
+                                                        ),
+                                                        child: Text('评级', 
+                                                          style: TextStyle(
+                                                            fontSize: _smallButtonFontSize, 
+                                                            color: _selectedButtonIndex == 0 ? Colors.white : Colors.black,
+                                                          ),
+                                                        ),
                                                       ),
-                                                      backgroundColor: _selectedButtonIndex == 0 ? Colors.blue : null,
-                                                    ),
-                                                    child: Text('评级', 
-                                                      style: TextStyle(
-                                                        fontSize: _smallButtonFontSize, 
-                                                        color: _selectedButtonIndex == 0 ? Colors.white : Colors.black,
+                                                      SizedBox(width: 4),
+                                                      ElevatedButton(
+                                                        onPressed: () {
+                                                          setState(() {
+                                                            _selectedButtonIndex = 1;
+                                                          });
+                                                        },
+                                                        style: ElevatedButton.styleFrom(
+                                                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                          minimumSize: Size(_smallButtonWidth, _smallButtonHeight),
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius: BorderRadius.circular(4),
+                                                          ),
+                                                          backgroundColor: _selectedButtonIndex == 1 ? Colors.blue : null,
+                                                        ),
+                                                        child: Text('连击', 
+                                                          style: TextStyle(
+                                                            fontSize: _smallButtonFontSize, 
+                                                            color: _selectedButtonIndex == 1 ? Colors.white : Colors.black,
+                                                          ),
+                                                        ),
                                                       ),
-                                                    ),
+                                                      SizedBox(width: 4),
+                                                      ElevatedButton(
+                                                        onPressed: () {
+                                                          setState(() {
+                                                            _selectedButtonIndex = 2;
+                                                          });
+                                                        },
+                                                        style: ElevatedButton.styleFrom(
+                                                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                          minimumSize: Size(_smallButtonWidth, _smallButtonHeight),
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius: BorderRadius.circular(4),
+                                                          ),
+                                                          backgroundColor: _selectedButtonIndex == 2 ? Colors.blue : null,
+                                                        ),
+                                                        child: Text('同步', 
+                                                          style: TextStyle(
+                                                            fontSize: _smallButtonFontSize, 
+                                                            color: _selectedButtonIndex == 2 ? Colors.white : Colors.black,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      SizedBox(width: 4),
+                                                      ElevatedButton(
+                                                        onPressed: () {
+                                                          setState(() {
+                                                            _selectedButtonIndex = 3;
+                                                          });
+                                                        },
+                                                        style: ElevatedButton.styleFrom(
+                                                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                          minimumSize: Size(_smallButtonWidth, _smallButtonHeight),
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius: BorderRadius.circular(4),
+                                                          ),
+                                                          backgroundColor: _selectedButtonIndex == 3 ? Colors.blue : null,
+                                                        ),
+                                                        child: Text('得分', 
+                                                          style: TextStyle(
+                                                            fontSize: _smallButtonFontSize, 
+                                                            color: _selectedButtonIndex == 3 ? Colors.white : Colors.black,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      SizedBox(width: 4),
+                                                      ElevatedButton(
+                                                        onPressed: () {
+                                                          setState(() {
+                                                            _selectedButtonIndex = 4;
+                                                          });
+                                                        },
+                                                        style: ElevatedButton.styleFrom(
+                                                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                          minimumSize: Size(_smallButtonWidth, _smallButtonHeight),
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius: BorderRadius.circular(4),
+                                                          ),
+                                                          backgroundColor: _selectedButtonIndex == 4 ? Colors.blue : null,
+                                                        ),
+                                                        child: Text('星数', 
+                                                          style: TextStyle(
+                                                            fontSize: _smallButtonFontSize, 
+                                                            color: _selectedButtonIndex == 4 ? Colors.white : Colors.black,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
-                                                  SizedBox(width: 4),
-                                                  ElevatedButton(
-                                                    onPressed: () {
-                                                      setState(() {
-                                                        _selectedButtonIndex = 1;
-                                                      });
-                                                    },
-                                                    style: ElevatedButton.styleFrom(
-                                                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                                      minimumSize: Size(_smallButtonWidth, _smallButtonHeight),
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(2), // 方形按钮
-                                                      ),
-                                                      backgroundColor: _selectedButtonIndex == 1 ? Colors.blue : null,
-                                                    ),
-                                                    child: Text('连击', 
-                                                      style: TextStyle(
-                                                        fontSize: _smallButtonFontSize, 
-                                                        color: _selectedButtonIndex == 1 ? Colors.white : Colors.black,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  SizedBox(width: 4),
-                                                  ElevatedButton(
-                                                    onPressed: () {
-                                                      setState(() {
-                                                        _selectedButtonIndex = 2;
-                                                      });
-                                                    },
-                                                    style: ElevatedButton.styleFrom(
-                                                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                                      minimumSize: Size(_smallButtonWidth, _smallButtonHeight),
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(2), // 方形按钮
-                                                      ),
-                                                      backgroundColor: _selectedButtonIndex == 2 ? Colors.blue : null,
-                                                    ),
-                                                    child: Text('同步', 
-                                                      style: TextStyle(
-                                                        fontSize: _smallButtonFontSize, 
-                                                        color: _selectedButtonIndex == 2 ? Colors.white : Colors.black,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  SizedBox(width: 4),
-                                                  ElevatedButton(
-                                                    onPressed: () {
-                                                      setState(() {
-                                                        _selectedButtonIndex = 3;
-                                                      });
-                                                    },
-                                                    style: ElevatedButton.styleFrom(
-                                                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                                      minimumSize: Size(_smallButtonWidth, _smallButtonHeight),
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(2), // 方形按钮
-                                                      ),
-                                                      backgroundColor: _selectedButtonIndex == 3 ? Colors.blue : null,
-                                                    ),
-                                                    child: Text('得分', 
-                                                      style: TextStyle(
-                                                        fontSize: _smallButtonFontSize, 
-                                                        color: _selectedButtonIndex == 3 ? Colors.white : Colors.black,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
+                                                ),
                                               ),
-                                              Spacer(), // 中间占位，将右侧内容推到右边
-                                              // 每页显示输入框
-                                              Row(
-                                                children: [
-                                                  Text('每页显示 ', style: TextStyle(fontSize: 12)), // 减小字体大小
-                                                  Container(
-                                                    width: screenWidth * 0.12, // 略微增加输入框宽度，从0.1增加到0.12
-                                                    height: 24, // 固定高度，减小输入框高度
-                                                    child: TextField(
-                                                      controller: _pageSizeController,
-                                                      keyboardType: TextInputType.number,
-                                                      onSubmitted: (_) => _changePageSize(),
-                                                      decoration: InputDecoration(
-                                                        border: OutlineInputBorder(),
-                                                        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 0), // 进一步减小内边距
+                                              SizedBox(width: 8), // 替换Spacer为固定宽度，让右侧内容更紧凑
+                                              // 每页显示输入框 - 占据较少空间
+                                              Container(
+                                                child: Row(
+                                                  children: [
+                                                    Text('每页显示 ', style: TextStyle(fontSize: 12)), // 减小字体大小
+                                                    Container(
+                                                      width: screenWidth * 0.1, // 减小输入框宽度，从0.12减小到0.1
+                                                      height: 24, // 固定高度，减小输入框高度
+                                                      child: TextField(
+                                                        controller: _pageSizeController,
+                                                        keyboardType: TextInputType.number,
+                                                        onSubmitted: (_) => _changePageSize(),
+                                                        decoration: InputDecoration(
+                                                          border: OutlineInputBorder(),
+                                                          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 0), // 进一步减小内边距
+                                                        ),
                                                       ),
                                                     ),
-                                                  ),
-                                                ],
+                                                  ],
+                                                ),
                                               ),
                                             ],
                                           ),
@@ -1254,6 +1290,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                               
                                               // 获取要显示的信息
                                               String displayText = '';
+                                              String displaySubText = '';
                                               Color displayColor = Colors.white;
                                               
                                               switch (_selectedButtonIndex) {
@@ -1347,6 +1384,49 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                     displayColor = Colors.white;
                                                   }
                                                   break;
+                                                case 4: // 星数
+                                                  if (song.containsKey('dxScore')) {
+                                                    // 计算DX分达成率
+                                                    double rate = 0.0;
+                                                    if (_dxRateCache.containsKey(song)) {
+                                                      rate = _dxRateCache[song]!;
+                                                    } else {
+                                                      rate = _calculateDXScoreRate(song);
+                                                      _dxRateCache[song] = rate;
+                                                    }
+                                                    
+                                                    // 计算星数
+                                                    String stars = '';
+                                                    if (rate >= 0.99) {
+                                                      stars = '\u2726 6';
+                                                      displayColor = Colors.yellow;
+                                                    } else if (rate >= 0.98) {
+                                                      stars = '\u2726 5.5';
+                                                      displayColor = Colors.yellow;
+                                                    } else if (rate >= 0.97) {
+                                                      stars = '\u2726 5';
+                                                      displayColor = Colors.yellow;
+                                                    } else if (rate >= 0.95) {
+                                                      stars = '\u2726 4';
+                                                      displayColor = Colors.orange;
+                                                    } else if (rate >= 0.93) {
+                                                      stars = '\u2726 3';
+                                                      displayColor = Colors.orange;
+                                                    } else if (rate >= 0.90) {
+                                                      stars = '\u2726 2';
+                                                      displayColor = Colors.green.shade200;
+                                                    } else if (rate >= 0.85) {
+                                                      stars = '\u2726 1';
+                                                      displayColor = Colors.green.shade200;
+                                                    } else {
+                                                      stars = '\u2726 0';
+                                                      displayColor = Colors.grey.shade300;
+                                                    }
+                                                    
+                                                    displayText = stars;
+                                                    displaySubText = '${(rate * 100).toStringAsFixed(2)}%';
+                                                  }
+                                                  break;
                                               }
                                               
                                               return GestureDetector(
@@ -1388,14 +1468,38 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                             borderRadius: BorderRadius.circular(6),
                                                           ),
                                                           child: Center(
-                                                            child: Text(
-                                                              displayText,
-                                                              style: TextStyle(
-                                                                color: displayColor,
-                                                                fontSize: itemSize * 0.2,
-                                                                fontWeight: FontWeight.bold,
+                                                            child: _selectedButtonIndex == 4 ?
+                                                              Column(
+                                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                                children: [
+                                                                  Text(
+                                                                    displayText,
+                                                                    style: TextStyle(
+                                                                      color: displayColor,
+                                                                      fontSize: itemSize * 0.18,
+                                                                      fontWeight: FontWeight.bold,
+                                                                    ),
+                                                                  ),
+                                                                  if (displaySubText.isNotEmpty)
+                                                                    Text(
+                                                                      displaySubText,
+                                                                      style: TextStyle(
+                                                                        color: displayColor,
+                                                                        fontSize: itemSize * 0.15,
+                                                                        fontWeight: FontWeight.bold,
+                                                                      ),
+                                                                    ),
+                                                                ],
+                                                              )
+                                                            :
+                                                              Text(
+                                                                displayText,
+                                                                style: TextStyle(
+                                                                  color: displayColor,
+                                                                  fontSize: itemSize * 0.2,
+                                                                  fontWeight: FontWeight.bold,
+                                                                ),
                                                               ),
-                                                            ),
                                                           ),
                                                         ),
                                                     ],

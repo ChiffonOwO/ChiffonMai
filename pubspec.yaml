@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.2.0+5
+version: 1.4.1+10
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -83,6 +83,14 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  fonts:
+    - family: "Source Han Sans"
+      fonts:
+      - asset: assets/fonts/SourceHanSansSC-Regular-2.otf
+        weight: 400  # 常规
+      - asset: assets/fonts/SourceHanSansSC-Bold-2.otf
+        weight: 700  # 粗体
+
    # 图片资源配置（注意缩进：assets 是 flutter 的子项，前面有2个空格）
   assets:
     - assets/bg/
@@ -90,15 +98,7 @@ flutter:
     - assets/version/
     - assets/background.png
     - assets/userinfobg.png
-    - assets/chiffon.png
     - assets/chiffon2.png
-    - assets/menubg.png
-    - assets/b50testdata.json
-    - assets/maimai_music_data.json
-    - assets/userPlayData.json
-    - assets/maiTags.json
-    - assets/songDiffData.json
-    - assets/maimai_alias.json
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
@@ -132,6 +132,6 @@ flutter:
 flutter_launcher_icons:
   android: true  # 开启Android图标生成
   ios: true      # 开启iOS图标生成
-  image_path: "assets/chiffonIcon.png"  # 你的基础图标路径（1024×1024px）
+  image_path: "assets/chiffonIcon2.png"  # 基础图标路径（1024×1024px）
   adaptive_icon_background: "#FFFFFF"      # Android 自适应图标背景色（可选）
-  adaptive_icon_foreground: "assets/chiffonIcon.png"  # Android 自适应图标前景（可选）
+  adaptive_icon_foreground: "assets/chiffonIcon2.png"  # Android 自适应图标前景（可选）

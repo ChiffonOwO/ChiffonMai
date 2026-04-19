@@ -192,7 +192,11 @@ class StringUtil {
    * @return 格式化后的星星等级字符串
    */
   static String formatStars(num scoreRate) {
-    if (scoreRate >= 0.97) {
+    if (scoreRate >= 0.99) {
+      return '\u27266';
+    } else if (scoreRate >= 0.98) {
+      return '\u27265.5';
+    } else if (scoreRate >= 0.97) {
       return '\u27265';
     } else if (scoreRate >= 0.95) {
       return '\u27264';

@@ -24,7 +24,7 @@ Future<void> main() async {
   await collectionsManager.fetchIconsCollections();
   await collectionsManager.fetchPlatesCollections();
   await collectionsManager.fetchFramesCollections();
-  
+
   // 初始化落雪歌曲数据
   final luoXueSongsManager = LuoXueSongsManager();
   await luoXueSongsManager.getLuoXueSongs();
@@ -45,6 +45,32 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false, // 隐藏右上角调试横幅
       home: const HomePage(), // 应用首页为HomePage组件
+      theme: ThemeData(
+        // 全局默认字体
+        fontFamily: "Source Han Sans",
+        textTheme: TextTheme(
+          bodyLarge: TextStyle(fontFamily: "Source Han Sans"),
+          bodyMedium: TextStyle(fontFamily: "Source Han Sans"),
+          bodySmall: TextStyle(fontFamily: "Source Han Sans"),
+          displayLarge: TextStyle(fontFamily: "Source Han Sans"),
+          displayMedium: TextStyle(fontFamily: "Source Han Sans"),
+          displaySmall: TextStyle(fontFamily: "Source Han Sans"),
+          headlineLarge: TextStyle(fontFamily: "Source Han Sans"),
+          headlineMedium: TextStyle(fontFamily: "Source Han Sans"),
+          headlineSmall: TextStyle(fontFamily: "Source Han Sans"),
+          titleLarge: TextStyle(fontFamily: "Source Han Sans"),
+          titleMedium: TextStyle(fontFamily: "Source Han Sans"),
+          titleSmall: TextStyle(fontFamily: "Source Han Sans"),
+        ),
+      ),
+
+      builder: (context, child) {
+        // 强制文字不跟随系统缩放
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
+          child: child!,
+        );
+      },
     );
   }
 }

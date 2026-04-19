@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -5,6 +6,7 @@ import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
 import 'package:my_first_flutter_app/entity/RecommendationResult.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RecommendByTags extends StatefulWidget {
   const RecommendByTags({super.key});
@@ -28,10 +30,8 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   @override
   void initState() {
     super.initState();
-    // 页面加载后延迟一点时间再获取推荐结果，确保页面先显示
-    Future.delayed(Duration(milliseconds: 4000), () {
-      _fetchRecommendations();
-    });
+    // 立即开始获取推荐结果，同时确保加载动画至少显示7秒
+    _fetchRecommendations();
   }
 
   // 获取推荐结果
@@ -42,8 +42,43 @@ class _RecommendByTagsState extends State<RecommendByTags> {
         _errorMessage = null;
       });
       
+      // 先尝试从缓存读取推荐结果
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cachedResult = prefs.getString(RecommendByTagsService.RECOMMENDATION_CACHE_KEY);
+        if (cachedResult != null) {
+          final resultMap = json.decode(cachedResult);
+          final best55 = (resultMap['Best55'] as List).map((item) => RecommendationResult.fromJson(item)).toList();
+          final best15 = (resultMap['Best15'] as List).map((item) => RecommendationResult.fromJson(item)).toList();
+          
+          setState(() {
+            _recommendations = {
+              'Best55': best55,
+              'Best15': best15,
+            };
+            _isLoading = false;
+            _errorMessage = null;
+          });
+          print('从缓存读取推荐结果成功');
+          return;
+        }
+      } catch (e) {
+        print('从缓存读取推荐结果失败: $e');
+      }
+      
+      // 记录开始时间
+      final startTime = DateTime.now();
+      
       // 直接异步执行推荐算法，让UI先显示加载状态
       final result = await recommendSongs();
+      
+      // 计算已用时间
+      final elapsedTime = DateTime.now().difference(startTime).inMilliseconds;
+      
+      // 确保加载动画至少显示5秒
+      if (elapsedTime < 5000) {
+        await Future.delayed(Duration(milliseconds: 5000 - elapsedTime));
+      }
       
       setState(() {
         _recommendations = result;
@@ -51,6 +86,9 @@ class _RecommendByTagsState extends State<RecommendByTags> {
         _errorMessage = null; // 成功时清除错误信息
       });
     } catch (e) {
+      // 即使出错，也要确保加载动画至少显示5秒
+      await Future.delayed(Duration(milliseconds: 5000));
+      
       setState(() {
         _errorMessage = '获取推荐结果失败：$e';
         _isLoading = false;

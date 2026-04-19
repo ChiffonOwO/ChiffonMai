@@ -29,7 +29,7 @@ class B50ConvertToImg {
       // 创建一个OverlayEntry
       OverlayEntry overlayEntry = OverlayEntry(
         builder: (context) => Material(
-          type: MaterialType.transparency,
+          type: MaterialType.canvas,
           child: Stack(
             children: [
               // 临时添加到widget树中，位置设为屏幕外
@@ -228,6 +228,7 @@ class B50ConvertToImg {
     return Container(
       width: containerWidth,
       decoration: BoxDecoration(
+        color: Colors.white, // 添加白色背景作为兜底
         image: DecorationImage(
           image: AssetImage('assets/bg/b50_bg.png'),
           fit: BoxFit.cover,
@@ -277,7 +278,7 @@ class B50ConvertToImg {
     double titleFontSize = screenWidth * 0.044; // 22.0 / 500
     double mainFontSize = screenWidth * 0.04; // 20.0 / 500
     double subFontSize = screenWidth * 0.032; // 16.0 / 500
-    double sectionTitleFontSize = screenWidth * 0.036; // 18.0 / 500
+    double sectionTitleFontSize = screenWidth * 0.04; // 20.0 / 500 (增大右侧标题字体)
     
     return Container(
       decoration: BoxDecoration(
@@ -310,6 +311,7 @@ class B50ConvertToImg {
                           fontSize: mainFontSize,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
+                          fontFamily: "Source Han Sans",
                         ),
                       ),
                       TextSpan(
@@ -317,6 +319,7 @@ class B50ConvertToImg {
                         style: TextStyle(
                           fontSize: subFontSize,
                           color: Colors.black,
+                          fontFamily: "Source Han Sans",
                         ),
                       ),
                     ],
@@ -329,6 +332,7 @@ class B50ConvertToImg {
                     fontSize: mainFontSize,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
+                    fontFamily: "Source Han Sans",
                   ),
                 ),
                 RichText(
@@ -340,6 +344,7 @@ class B50ConvertToImg {
                           fontSize: mainFontSize,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
+                          fontFamily: "Source Han Sans",
                         ),
                       ),
                       TextSpan(
@@ -347,6 +352,7 @@ class B50ConvertToImg {
                         style: TextStyle(
                           fontSize: subFontSize,
                           color: Colors.black,
+                          fontFamily: "Source Han Sans",
                         ),
                       ),
                     ],
@@ -359,6 +365,7 @@ class B50ConvertToImg {
                     fontSize: mainFontSize,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
+                    fontFamily: "Source Han Sans",
                   ),
                 ),
                 RichText(
@@ -370,6 +377,7 @@ class B50ConvertToImg {
                           fontSize: mainFontSize,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
+                          fontFamily: "Source Han Sans",
                         ),
                       ),
                       TextSpan(
@@ -377,6 +385,7 @@ class B50ConvertToImg {
                         style: TextStyle(
                           fontSize: subFontSize,
                           color: Colors.black,
+                          fontFamily: "Source Han Sans",
                         ),
                       ),
                     ],
@@ -581,6 +590,7 @@ class B50ConvertToImg {
                               fontSize: decimalMainFontSize * 0.9,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
+                              fontFamily: "Source Han Sans",
                             ),
                           ),
                           if (difficulty.toString().split('.').length > 1)
@@ -590,6 +600,7 @@ class B50ConvertToImg {
                                 fontSize: decimalSmallFontSize * 0.9,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
+                                fontFamily: "Source Han Sans",
                               ),
                             ),
                         ],
@@ -632,6 +643,7 @@ class B50ConvertToImg {
                             fontSize: decimalMainFontSize,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
+                            fontFamily: "Source Han Sans",
                           ),
                         ),
                         Text(
@@ -640,6 +652,7 @@ class B50ConvertToImg {
                             fontSize: decimalSmallFontSize,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
+                            fontFamily: "Source Han Sans",
                           ),
                         ),
                       ],
@@ -654,6 +667,7 @@ class B50ConvertToImg {
                             fontSize: otherFontSize,
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
+                            fontFamily: "Source Han Sans",
                           ),
                         ),
                         Text(
@@ -662,6 +676,7 @@ class B50ConvertToImg {
                             fontSize: otherFontSize,
                             color: starsColor,
                             fontWeight: FontWeight.bold,
+                            fontFamily: "Source Han Sans",
                           ),
                         ),
                       ],
@@ -674,6 +689,7 @@ class B50ConvertToImg {
                         fontSize: gradeFontSize,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
+                        fontFamily: "Source Han Sans",
                       ),
                     ),
                   ],
@@ -696,8 +712,8 @@ class B50ConvertToImg {
     final screenWidth = MediaQuery.of(context).size.width;
     
     // 根据屏幕宽度计算字体大小
-    double mainFontSize = screenWidth * 0.032; // 16.0 / 500
-    double subFontSize = screenWidth * 0.024; // 12.0 / 500
+    double mainFontSize = screenWidth * 0.04; // 20.0 / 500 (进一步增大数字字体)
+    double subFontSize = screenWidth * 0.032; // 16.0 / 500 (进一步增大小数部分字体)
     
     String text = value.toStringAsFixed(decimalPlaces);
 
@@ -719,6 +735,7 @@ class B50ConvertToImg {
             fontSize: mainFontSize,
             fontWeight: FontWeight.bold,
             color: color,
+            fontFamily: "Source Han Sans",
           ),
         ),
         // 小数部分和百分号
@@ -728,6 +745,7 @@ class B50ConvertToImg {
             fontSize: subFontSize,
             fontWeight: FontWeight.bold,
             color: color,
+            fontFamily: "Source Han Sans",
           ),
         ),
       ],
@@ -744,7 +762,7 @@ class B50ConvertToImg {
     final screenWidth = MediaQuery.of(context).size.width;
     
     // 根据屏幕宽度计算字体大小
-    double fontSize = screenWidth * 0.032; // 16.0 / 500
+    double fontSize = screenWidth * 0.036; // 18.0 / 500 (增大分隔符字体)
     
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -754,10 +772,11 @@ class B50ConvertToImg {
         Text(
           '/',
           style: TextStyle(
-            fontSize: fontSize,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
+                fontSize: fontSize,
+                fontWeight: FontWeight.bold,
+                color: color,
+                fontFamily: "Source Han Sans",
+              ),
         ),
         _buildDecimalText(context, value2,
             decimalPlaces: decimalPlaces2, color: color),

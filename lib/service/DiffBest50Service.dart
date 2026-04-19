@@ -1,6 +1,5 @@
-import 'dart:convert';
-import 'package:flutter/services.dart';
 import '../manager/UserPlayDataManager.dart';
+import '../manager/DiffMusicDataManager.dart';
 
 class DiffBest50Service {
   // 单例模式
@@ -37,8 +36,26 @@ class DiffBest50Service {
   // 加载歌曲难度数据
   Future<Map<String, dynamic>> loadSongDiffData() async {
     try {
-      final diffData = await rootBundle.loadString('assets/songDiffData.json');
-      return json.decode(diffData);
+      // 从 DiffMusicDataManager 获取缓存的拟合难度数据
+      final diffMusicDataManager = DiffMusicDataManager();
+      if (await diffMusicDataManager.hasCachedData()) {
+        final diffSong = await diffMusicDataManager.getCachedDiffData();
+        if (diffSong != null) {
+          // 构建歌曲难度数据结构
+          Map<String, dynamic> diffData = {'charts': {}};
+          diffSong.charts.forEach((songId, diffDataList) {
+            List<Map<String, dynamic>> songCharts = [];
+            for (var diffDataItem in diffDataList) {
+              songCharts.add({
+                'fit_diff': diffDataItem.fitDiff.toDouble()
+              });
+            }
+            diffData['charts'][songId] = songCharts;
+          });
+          return diffData;
+        }
+      }
+      return {};
     } catch (e) {
       print('加载歌曲难度数据失败: $e');
       return {};

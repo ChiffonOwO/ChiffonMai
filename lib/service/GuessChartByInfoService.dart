@@ -57,43 +57,7 @@ class GuessChartByInfoService {
   ];
 
   // 处理版本字符串，使其在前端简化展示
-  // ignore: unused_element
-  static String _formatVersion(String version) {
-    if (version == 'maimai') {
-      return 'maimai';
-    }
-    if (version == 'maimai PLUS') {
-      return 'maimai+';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059') {
-      return 'DX 2020';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 Splash') {
-      return 'DX 2021';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 UNiVERSE') {
-      return 'DX 2022';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 FESTiVAL') {
-      return 'DX 2023';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 BUDDiES') {
-      return 'DX 2024';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM') {
-      return 'DX 2025';
-    }
-    if (version.contains(' PLUS')) {
-      version = version.replaceFirst(' PLUS', '+');
-    }
-    if (version.contains('maimai') && version != 'maimai') {
-      version = version.replaceFirst('maimai ', '');
-    }
-    if (version.contains('\u3067\u3089\u3063\u304f\u3059')) {
-      version = version.replaceFirst('\u3067\u3089\u3063\u304f\u3059 ', '');
-    }
-    return version;
-  }
+  // 使用StringUtil.formatVersion方法
 
   // 加载所有歌曲数据（带缓存）
   static Future<List<Song>?> loadAllSongs() async {
@@ -174,7 +138,12 @@ class GuessChartByInfoService {
   }
 
   // 随机选择1首歌曲(不考虑宴会场谱面，即id为六位数的谱面)
-  static Future<Song?> randomSelectSong() async {
+  static Future<Song?> randomSelectSong({
+    List<String> selectedVersions = const [],
+    double masterMinDx = 1.0,
+    double masterMaxDx = 15.0,
+    List<String> selectedGenres = const [],
+  }) async {
     try {
       final songs = await loadAllSongs();
       if (songs == null || songs.isEmpty) {
@@ -182,7 +151,31 @@ class GuessChartByInfoService {
       }
 
       // 过滤掉宴会场谱面（id为六位数的谱面）
-      final filteredSongs = songs.where((song) => song.id.length != 6).toList();
+      var filteredSongs = songs.where((song) => song.id.length != 6).toList();
+      
+      // 根据版本筛选
+      if (selectedVersions.isNotEmpty) {
+        filteredSongs = filteredSongs.where((song) => selectedVersions.contains(song.basicInfo.from)).toList();
+      }
+      
+      // 根据流派筛选（跳过宴会场流派，因为相关谱面已经被过滤掉）
+      if (selectedGenres.isNotEmpty) {
+        // 过滤掉宴会场流派
+        final validGenres = selectedGenres.where((genre) => genre != '\u5bb4\u4f1a\u5834').toList();
+        if (validGenres.isNotEmpty) {
+          filteredSongs = filteredSongs.where((song) => validGenres.contains(song.basicInfo.genre)).toList();
+        }
+      }
+      
+      // 根据MASTER定数范围筛选
+      filteredSongs = filteredSongs.where((song) {
+        if (song.ds.length > 3) {
+          double masterDs = song.ds[3];
+          return masterDs >= masterMinDx && masterDs <= masterMaxDx;
+        }
+        return false;
+      }).toList();
+      
       if (filteredSongs.isEmpty) {
         return null;
       }

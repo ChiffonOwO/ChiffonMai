@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/entity/GuessSong.dart';
+import 'package:my_first_flutter_app/entity/MaiTagsEntity.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
+import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 
 class GuessChartByCoverService {
@@ -74,6 +76,62 @@ class GuessChartByCoverService {
     return version;
   }
 
+  // 从缓存中尝试加载出标签数据并解析
+  static Future<MaiTagsEntity?> loadTagData() async {
+    try {
+      final maiTagsManager = MaiTagsManager();
+      
+      // 检查是否有缓存数据
+      if (await maiTagsManager.hasCachedData()) {
+        // 从缓存获取标签数据
+        final maiTagsEntity = await maiTagsManager.getTags();
+        return maiTagsEntity;
+      } else {
+        // 初始化标签数据（从网络获取并缓存）
+        await maiTagsManager.initializeTags();
+        // 再次尝试获取
+        final maiTagsEntity = await maiTagsManager.getTags();
+        return maiTagsEntity;
+      }
+    } catch (e) {
+      print('加载标签数据失败: $e');
+      return null;
+    }
+  }
+
+  // 构建 谱面标识 = 谱面ID + 谱面类型 + 谱面难度 到 标签ID列表 的映射
+  static Future<Map<String, List<int>>> buildSongIdToTagIdsMap() async {
+    try {
+      final maiTagsEntity = await loadTagData();
+      if (maiTagsEntity != null) {
+        final maiTagsManager = MaiTagsManager();
+        return maiTagsManager.buildSongIdToTagIdsMap(maiTagsEntity);
+      }
+      return {};
+    } catch (e) {
+      print('构建谱面标识到标签ID列表的映射失败: $e');
+      return {};
+    }
+  }
+
+  // 构建 标签ID → 标签名称 的映射
+  static Future<Map<int, String>> buildTagIdToNameMap() async {
+    try {
+      final maiTagsEntity = await loadTagData();
+      if (maiTagsEntity != null) {
+        Map<int, String> tagIdToNameMap = {};
+        for (var tag in maiTagsEntity.tags) {
+          tagIdToNameMap[tag.id] = tag.localizedName.zhHans;
+        }
+        return tagIdToNameMap;
+      }
+      return {};
+    } catch (e) {
+      print('构建标签ID到名称映射失败: $e');
+      return {};
+    }
+  }
+
   // 加载所有歌曲数据（带缓存）
   static Future<List<Song>?> loadAllSongs() async {
     try {
@@ -97,7 +155,12 @@ class GuessChartByCoverService {
   }
 
   // 随机选择1首歌曲(不考虑宴会场谱面，即id为六位数的谱面)
-  static Future<Song?> randomSelectSong() async {
+  static Future<Song?> randomSelectSong({
+    List<String> selectedVersions = const [],
+    double masterMinDx = 1.0,
+    double masterMaxDx = 15.0,
+    List<String> selectedGenres = const [],
+  }) async {
     try {
       final songs = await loadAllSongs();
       if (songs == null || songs.isEmpty) {
@@ -105,7 +168,30 @@ class GuessChartByCoverService {
       }
 
       // 过滤掉宴会场谱面（id为六位数的谱面）
-      final filteredSongs = songs.where((song) => song.id.length != 6).toList();
+      var filteredSongs = songs.where((song) => song.id.length != 6).toList();
+      
+      // 应用过滤条件
+      if (selectedVersions.isNotEmpty) {
+        filteredSongs = filteredSongs.where((song) => selectedVersions.contains(song.basicInfo.from)).toList();
+      }
+      
+      if (selectedGenres.isNotEmpty) {
+        filteredSongs = filteredSongs.where((song) => selectedGenres.contains(song.basicInfo.genre)).toList();
+      }
+      
+      // 过滤Master定数
+      filteredSongs = filteredSongs.where((song) {
+        if (song.ds.length > 3) {
+          try {
+            double dx = double.parse(song.ds[3].toString());
+            return dx >= masterMinDx && dx <= masterMaxDx;
+          } catch (e) {
+            return false;
+          }
+        }
+        return false;
+      }).toList();
+      
       if (filteredSongs.isEmpty) {
         return null;
       }
@@ -150,6 +236,15 @@ class GuessChartByCoverService {
   // 为本局猜测的对象构建所需实体
   static Future<GuessSong> buildGuessSongEntity(Song song) async {
     try {
+      // 获取标签数据
+      final tagIdToNameMap = await buildTagIdToNameMap();
+      final songIdToTagIdsMap = await buildSongIdToTagIdsMap();
+
+      // 构建谱面标识
+      String songKey = '${song.title}#${song.type == 'DX' ? 'dx' : 'std'}#master';
+      // 获取Master难度的标签
+      final tagIds = songIdToTagIdsMap[songKey] ?? [];
+      final masterTags = tagIds.map((tagId) => tagIdToNameMap[tagId] ?? '').where((tag) => tag.isNotEmpty).toList();
       // 构建GuessSong实体
       return GuessSong(
         songId: int.parse(song.id),
@@ -163,7 +258,7 @@ class GuessChartByCoverService {
         remasterCharter: song.charts.length > 4 ? song.charts[4].charter : '',
         genre: song.basicInfo.genre,
         version: song.basicInfo.from,
-        masterTags: [],
+        masterTags: masterTags,
       );
     } catch (e) {
       print('构建GuessSong实体失败: $e');
@@ -188,6 +283,25 @@ class GuessChartByCoverService {
   // 根据用户猜测和目标歌曲，返回颜色提示并填入用户猜测实体
   static Future<GuessSong> calculateGuessResult(GuessSong guessedSong, Song targetSong) async {
     try {
+      // 获取标签数据
+      final tagIdToNameMap = await buildTagIdToNameMap();
+      final songIdToTagIdsMap = await buildSongIdToTagIdsMap();
+
+      // 构建目标歌曲的谱面标识
+      String targetSongKey = '${targetSong.title}#${targetSong.type == 'DX' ? 'dx' : 'std'}#master';
+      // 获取目标歌曲Master难度的标签
+      final targetTagIds = songIdToTagIdsMap[targetSongKey] ?? [];
+      final targetTags = targetTagIds.map((tagId) => tagIdToNameMap[tagId] ?? '').where((tag) => tag.isNotEmpty).toList();
+      
+      // 构建猜测歌曲的谱面标识
+      String guessedSongKey = '${guessedSong.title}#${guessedSong.type == 'DX' ? 'dx' : 'std'}#master';
+      // 获取猜测歌曲Master难度的标签
+      final guessedTagIds = songIdToTagIdsMap[guessedSongKey] ?? [];
+      final guessedTags = guessedTagIds.map((tagId) => tagIdToNameMap[tagId] ?? '').where((tag) => tag.isNotEmpty).toList();
+      
+      // 设置猜测歌曲的标签
+      guessedSong.masterTags = guessedTags;
+
       // 计算各属性的颜色
       guessedSong.titleBgColor = guessedSong.title == targetSong.basicInfo.title ? Colors.green : Colors.grey;
       guessedSong.typeBgColor = guessedSong.type == targetSong.type ? Colors.green : Colors.grey;
@@ -282,6 +396,11 @@ class GuessChartByCoverService {
           guessedSong.versionArrow = null;
         }
       }
+
+      // 标签比较
+      guessedSong.tagBgColors = guessedSong.masterTags?.map((tag) {
+        return targetTags.contains(tag) ? Colors.green : Colors.grey;
+      }).toList();
 
       return guessedSong;
     } catch (e) {
