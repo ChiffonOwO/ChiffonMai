@@ -40,6 +40,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
   double _masterMinDx = 1.0;
   double _masterMaxDx = 15.0;
   List<String> _selectedGenres = [];
+  int _nonEnglishCharThreshold = 50; // 非英文字符占比阈值，默认50%
   late GuessChartCommonSettingsService _settingsService;
 
   // 排序状态
@@ -89,6 +90,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
       _maxGuesses = settings['maxGuesses'] ?? 10;
       _timeLimit = settings['timeLimit'] ?? 0;
       _songCount = settings['songCount'] ?? 3;
+      _nonEnglishCharThreshold = settings['nonEnglishCharThreshold'] ?? 50;
     });
   }
   
@@ -172,6 +174,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
       masterMinDx: _masterMinDx,
       masterMaxDx: _masterMaxDx,
       selectedGenres: _selectedGenres,
+      nonEnglishCharThreshold: _nonEnglishCharThreshold,
     );
     if (_targetSongs.isNotEmpty) {
       // 初始化掩码
@@ -706,6 +709,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
     int tempMaxGuesses = _maxGuesses;
     int tempTimeLimit = _timeLimit;
     int tempSongCount = _songCount;
+    int tempNonEnglishCharThreshold = _nonEnglishCharThreshold;
     bool showNoSongsError = false;
     
     showDialog(
@@ -770,6 +774,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                           tempMaxGuesses = 10;
                           tempTimeLimit = 0;
                           tempSongCount = 3;
+                          tempNonEnglishCharThreshold = 50;
                           showNoSongsError = false; // 重置错误提示
                         });
                       },
@@ -809,6 +814,47 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                         ],
                       ),
                     ),
+                    // 非英文字符占比阈值设置
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '非英文字符过滤百分比',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color.fromARGB(255, 84, 97, 97),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Column(
+                            children: [
+                              Slider(
+                                value: tempNonEnglishCharThreshold.toDouble(),
+                                min: 0,
+                                max: 100,
+                                divisions: 100,
+                                label: '$tempNonEnglishCharThreshold%',
+                                onChanged: (value) {
+                                  setState(() {
+                                    tempNonEnglishCharThreshold = value.toInt();
+                                  });
+                                },
+                              ),
+                              Text('$tempNonEnglishCharThreshold%'),
+                              const SizedBox(height: 8),
+                              Text(
+                                '过滤日语+除空格以外的非英文字符在歌名中的占比大于等于此值的歌曲',
+                                style: TextStyle(fontSize: 14, color: Colors.grey),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                     // 重置按钮
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -823,6 +869,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                               tempMaxGuesses = 10;
                               tempTimeLimit = 0;
                               tempSongCount = 3;
+                              tempNonEnglishCharThreshold = 50;
                               showNoSongsError = false; // 重置错误提示
                             });
                           },
@@ -860,6 +907,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                   masterMinDx: tempMasterMinDx,
                   masterMaxDx: tempMasterMaxDx,
                   selectedGenres: tempSelectedGenres,
+                  nonEnglishCharThreshold: tempNonEnglishCharThreshold,
                 );
                 
                 if (testSongs.isEmpty) {
@@ -893,6 +941,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                   maxGuesses: tempMaxGuesses,
                   timeLimit: tempTimeLimit,
                   songCount: tempSongCount,
+                  nonEnglishCharThreshold: tempNonEnglishCharThreshold,
                 );
                 
                 Navigator.of(context).pop();

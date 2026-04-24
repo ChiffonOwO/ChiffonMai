@@ -1,10 +1,10 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/manager/DiffMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/CollectionsManager.dart';
+import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 import 'package:my_first_flutter_app/entity/Collection.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -84,14 +84,6 @@ class SongInfoService {
             };
           }
         }
-      } else {
-        // 如果 API 数据不存在，尝试从资产文件加载 JSON 数据作为 fallback
-        final songData = await rootBundle.loadString('assets/maimai_music_data.json');
-        final List<dynamic> songList = json.decode(songData);
-        int songIndex = songList.indexWhere((song) => song['id'] == songId);
-        if (songIndex != -1) {
-          result['songData'] = songList[songIndex];
-        }
       }
 
       // 加载难度数据
@@ -105,18 +97,22 @@ class SongInfoService {
       final userPlayDataManager = UserPlayDataManager();
       result['userData'] = await userPlayDataManager.getCachedUserPlayData();
 
-      // 如果缓存中没有用户数据，尝试从资产文件加载 JSON 数据作为 fallback
-      if (result['userData'] == null) {
-        final userData = await rootBundle.loadString('assets/userPlayData.json');
-        final Map<String, dynamic> userMap = json.decode(userData);
-        result['userData'] = userMap;
-      }
-
       // 加载标签数据
-      final tagData = await rootBundle.loadString('assets/maiTags.json');
-      final Map<String, dynamic> tagMap = json.decode(tagData);
-      result['tagData'] = tagMap['tags'];
-      result['tagSongsData'] = tagMap['tagSongs'];
+      final maiTagsManager = MaiTagsManager();
+      final tagsEntity = await maiTagsManager.getTags();
+      if (tagsEntity != null) {
+        result['tagData'] = tagsEntity.tags.map((tag) => {
+          'id': tag.id,
+          'name': tag.localizedName.zhHans,
+          'group_id': tag.groupId
+        }).toList();
+        result['tagSongsData'] = tagsEntity.tagSongs.map((tagSong) => {
+          'song_id': tagSong.songId,
+          'sheet_type': tagSong.sheetType,
+          'sheet_difficulty': tagSong.sheetDifficulty,
+          'tag_id': tagSong.tagId
+        }).toList();
+      }
     } catch (e) {
       print('加载数据失败: $e');
     }

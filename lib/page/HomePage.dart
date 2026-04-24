@@ -4,6 +4,7 @@ import 'package:my_first_flutter_app/page/CollectionSearchPage.dart';
 import 'package:my_first_flutter_app/page/DiffBest50Page.dart';
 import 'package:my_first_flutter_app/page/GuessChartByAliaPage.dart';
 import 'package:my_first_flutter_app/page/GuessChartByBlurredCoverPage.dart';
+//import 'package:my_first_flutter_app/page/GuessChartByChartExcerptPage.dart';
 import 'package:my_first_flutter_app/page/GuessChartByCoverPage.dart';
 import 'package:my_first_flutter_app/page/GuessChartByInfoPage.dart';
 import 'package:my_first_flutter_app/page/GuessChartBySongExcerptPage.dart';
@@ -166,6 +167,7 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.file_upload_sharp, title: '刷新数据', subtitle: '刷新你的舞萌数据'),
     ButtonItem(icon: Icons.network_check, title: '服务器状态', subtitle: '查看舞萌服务器状态'),
     ButtonItem(icon: Icons.update, title: '检查更新', subtitle: '检查应用是否有新版本'),
+    //ButtonItem(icon: Icons.play_arrow, title: '谱面播放', subtitle: '播放谱面'),
   ];
 
   @override
@@ -388,7 +390,7 @@ class _HomePageState extends State<HomePage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: screenWidth * 0.4, // 设置一个最大宽度，例如屏幕宽度的40%
+            // 移除固定宽度限制，让文本根据内容自动调整宽度
             child: Text(
               _userNickname,
               style: TextStyle(
@@ -721,6 +723,12 @@ class _HomePageState extends State<HomePage> {
               MaterialPageRoute(builder: (context) => PersonalizedBest50Page()),
             );
           }
+          // if (item.title == '谱面播放'){
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(builder: (context) => GuessChartByChartExcerptPage()),
+          //   );
+          // }
           if (item.title == '检查更新'){
             // 显示加载对话框
             showDialog(

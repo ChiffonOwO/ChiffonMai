@@ -777,6 +777,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                           : Padding(
                               padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
                               child: ListView(
+                                key: Key('collection_${widget.collectionId}_${widget.collectionType}'),
                                 children: [
                                   // 收藏品图片
                                   if (widget.collectionType == 'icons')

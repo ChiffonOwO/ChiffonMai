@@ -188,38 +188,38 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
               ),
             ),
 
-            // 页面标题
-            const Positioned(
-              top: 60,
+            // 标题栏 - 与有数据时保持一致的布局
+            Positioned(
+              top: 0,
               left: 0,
               right: 0,
-              child: Center(
-                child: Text(
-                  "拟合Best50查询",
-                  style: TextStyle(
-                    color: Color.fromARGB(255, 84, 97, 97),
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                  ),
-                ),
-              ),
-            ),
-
-            // 返回按钮 - 放在最后，确保在最上层
-            Positioned(
-              top: 40,
-              left: 10,
-              child: GestureDetector(
-                onTap: () {
-                  print('返回按钮被点击');
-                  Navigator.pop(context); // 返回到主页
-                },
-                child: Container(
-                  padding: EdgeInsets.all(16), // 增加点击区域
-                  color: Colors.transparent, // 透明背景，不影响视觉
-                  child: Icon(Icons.arrow_back,
-                      color: Color.fromARGB(255, 84, 97, 97), size: 28), // 增大图标
+              child: Container(
+                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
+                child: Row(
+                  children: [
+                    // 返回按钮
+                    IconButton(
+                      icon: Icon(Icons.arrow_back, color: Color.fromARGB(255, 84, 97, 97)),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                    // 标题
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          '拟合Best50查询',
+                          style: TextStyle(
+                            color: Color.fromARGB(255, 84, 97, 97),
+                            fontSize: screenWidth * 0.06,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // 占位，保持标题居中
+                    SizedBox(width: 48),
+                  ],
                 ),
               ),
             ),
@@ -471,6 +471,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
     double achievementRate = 0.0,
     double difficulty = 0.0,
     bool dxMode = false,
+    bool isUtage = false,
     int score = 0,
     int rating = 0,
     String stars = '',
@@ -523,7 +524,16 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (dxMode)
+                      if (isUtage)
+                        Text(
+                          'UT',
+                          style: TextStyle(
+                            fontSize: dxFontSize,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red,
+                          ),
+                        ),
+                      if (dxMode && !isUtage)
                         Text(
                           'DX',
                           style: TextStyle(
@@ -532,7 +542,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                             color: Colors.orange,
                           ),
                         ),
-                      if (dxMode == false)
+                      if (!dxMode && !isUtage)
                         Text(
                           'ST',
                           style: TextStyle(
@@ -835,10 +845,17 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
     String grade = '$rateText | $fcText | $fsText';
 
     // 获取卡片颜色
-    Color cardColor = _getCardColor(levelIndex);
+      Color cardColor;
+      // 对于6位数ID的歌曲，使用粉色
+      if (songId.toString().length == 6) {
+        cardColor = Color(0xFFFFB3D1); // 加深的粉色
+      } else {
+        cardColor = _getCardColor(levelIndex);
+      }
 
-    // 判断是否为DX模式
-    bool dxMode = type == 'DX';
+    // 判断是否为DX模式或UT模式
+      bool dxMode = type == 'DX';
+      bool isUtage = songId.toString().length == 6; // 6位数ID为UTAGE
 
     return GestureDetector(
       onTap: () {
@@ -848,6 +865,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
             builder: (context) => SongInfoPage(
               songId: songId.toString(),
               initialLevelIndex: levelIndex,
+              isDefaultLevelIndex: false, // 防止默认跳转到Master难度
             ),
           ),
         );
@@ -858,6 +876,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
         achievementRate: achievementRate,
         difficulty: difficulty,
         dxMode: dxMode,
+        isUtage: isUtage,
         score: score,
         rating: rating,
         stars: stars,

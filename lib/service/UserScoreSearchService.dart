@@ -287,16 +287,36 @@ class UserScoreSearchService {
       // 难度筛选
       if (filterConditions['难度筛选'] != null && filterConditions['难度筛选']!.isNotEmpty) {
         String difficulty = filterConditions['难度筛选']!;
-        Map<String, int> difficultyMap = {
-          'BASIC': 0,
-          'ADVANCED': 1,
-          'EXPERT': 2,
-          'MASTER': 3,
-          'Re:MASTER': 4,
-        };
-        int? levelIndex = difficultyMap[difficulty];
-        if (levelIndex != null && song['level_index'] != levelIndex) {
-          return false;
+        
+        // 处理UTAGE选项，筛选ID为6位数的歌曲
+        if (difficulty == 'UTAGE') {
+          String songId = song['song_id'].toString();
+          if (songId.length != 6 || int.tryParse(songId) == null) {
+            return false;
+          }
+        } else {
+          Map<String, int> difficultyMap = {
+            'BASIC': 0,
+            'ADVANCED': 1,
+            'EXPERT': 2,
+            'MASTER': 3,
+            'Re:MASTER': 4,
+          };
+          int? levelIndex = difficultyMap[difficulty];
+          if (levelIndex != null) {
+            // 检查难度是否匹配
+            if (song['level_index'] != levelIndex) {
+              return false;
+            }
+            
+            // 选择BASIC的时候，过滤掉ID为6位数的歌曲
+            if (difficulty == 'BASIC') {
+              String songId = song['song_id'].toString();
+              if (songId.length == 6 && int.tryParse(songId) != null) {
+                return false;
+              }
+            }
+          }
         }
       }
       

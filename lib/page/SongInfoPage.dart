@@ -14,9 +14,10 @@ import 'CollectionInfoPage.dart';
 class SongInfoPage extends StatefulWidget {
   final String songId;
   final int initialLevelIndex;
+  final bool isDefaultLevelIndex; // 标记是否使用默认值
 
   const SongInfoPage(
-      {super.key, required this.songId, this.initialLevelIndex = 0});
+      {super.key, required this.songId, this.initialLevelIndex = 0, this.isDefaultLevelIndex = true});
 
   @override
   State<SongInfoPage> createState() => _SongInfoPageState();
@@ -98,8 +99,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
       if (_songData != null) {
         final levels = _songData!['level'];
         if (levels != null && levels is List) {
-          // 对于难度数量大于等于4个的歌曲，默认选择第4个难度（仅当 initialLevelIndex 是默认值0时）
-          if (levels.length >= 4 && widget.initialLevelIndex == 0 && _currentDiffIndex == 0) {
+          // 对于难度数量大于等于4个的歌曲，默认选择第4个难度（仅当使用默认值时）
+          if (levels.length >= 4 && widget.isDefaultLevelIndex && widget.initialLevelIndex == 0 && _currentDiffIndex == 0) {
             _currentDiffIndex = 3; // 第4个难度（索引为3）
           } else if (_currentDiffIndex >= levels.length) {
             _currentDiffIndex = levels.length - 1;
@@ -192,7 +193,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
       // 根据标签ID获取标签详情
       for (int tagId in tagIds) {
         final tag =
-            _tagData!.firstWhere((t) => t['id'] == tagId, orElse: () => null);
+            _tagData!.firstWhere((t) => t['id'] == tagId, orElse: () => <String, Object>{});
 
         if (tag != null) {
           int groupId = tag['group_id'] ?? 0;
@@ -230,6 +231,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
       difficultyCount = _songData!['level'].length;
     }
 
+    // 对于6位数ID的歌曲，使用独特的粉色主题
+    if (widget.songId.length == 6) {
+      return Color(0xFFFFE6F0); // 柔和的粉色，与Master难度区分
+    }
+
     // 对于只有1或2个难度的歌曲，所有难度的背景全部采用粉色
     if (difficultyCount <= 2) {
       return Color(0xFFE9D8FF); // Master难度的颜色
@@ -239,7 +245,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
       case 0: // Basic
         return Color(0xFFE8F5E8); // 浅绿色
       case 1: // Advan
-        return Color(0xFFFFF8E1); // 浅黄色
+        return Color(0xFFFFE0B2); // 深黄色
       case 2: // Expert
         return Color(0xFFFCE4EC); // 浅红色
       case 3: // Master
@@ -259,6 +265,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
       difficultyCount = _songData!['level'].length;
     }
 
+    // 对于6位数ID的歌曲，使用独特的粉色主题
+    if (widget.songId.length == 6) {
+      return Color(0xFFFFB3D1); // 稍深的粉色，与Master难度区分
+    }
+
     // 对于只有1或2个难度的歌曲，所有难度的背景全部采用粉色
     if (difficultyCount <= 2) {
       return Color(0xFFD4BFFF); // Master难度的颜色
@@ -268,7 +279,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
       case 0: // Basic
         return Color(0xFFC8E6C9); // 浅绿色
       case 1: // Advan
-        return Color(0xFFFFE0B2); // 浅黄色
+        return Color(0xFFFFB74D); // 深黄色
       case 2: // Expert
         return Color(0xFFF8BBD0); // 浅红色
       case 3: // Master
@@ -288,6 +299,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
       difficultyCount = _songData!['level'].length;
     }
 
+    // 对于6位数ID的歌曲，使用独特的粉色主题
+    if (widget.songId.length == 6) {
+      return Color(0xFFFF69B4); // 亮粉色，与Master难度区分
+    }
+
     // 对于只有1或2个难度的歌曲，所有难度的背景全部采用粉色
     if (difficultyCount <= 2) {
       return Color(0xFF9966CC); // Master难度的颜色
@@ -297,7 +313,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
       case 0: // Basic
         return Color(0xFF4CAF50); // 绿色
       case 1: // Advan
-        return Color(0xFFFF9800); // 橙色
+        return Color(0xFFF57C00); // 深橙色
       case 2: // Expert
         return Color(0xFFE91E63); // 红色
       case 3: // Master
@@ -378,7 +394,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              '星数-最低DX分对照表',
+              '星数-最低DX分数对照表',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -409,10 +425,19 @@ class _SongInfoPageState extends State<SongInfoPage> {
               border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('星数', style: TextStyle(fontSize: 16, color: Colors.grey)),
-                const Text('最低DX分', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                Expanded(
+                  flex: 3, // 星数列占3份
+                  child: const Text('星数', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                ),
+                Expanded(
+                  flex: 2, // 最低DX分数列占2份
+                  child: const Text('最低DX分数', style: TextStyle(fontSize: 16, color: Colors.grey), textAlign: TextAlign.center),
+                ),
+                Expanded(
+                  flex: 1, // MAX-列占1份
+                  child: const Text('MAX-', style: TextStyle(fontSize: 16, color: Colors.grey), textAlign: TextAlign.end),
+                ),
               ],
             ),
           ),
@@ -433,44 +458,61 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            '\u2726 ${star.toString()}',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: color,
-                              shadows: [
-                                Shadow(
-                                  color: color.withOpacity(0.5),
-                                  blurRadius: 2,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            '${(rate * 100).toStringAsFixed(1)}%',
-                            style: const TextStyle(fontSize: 16, color: Colors.black),
-                          ),
-                        ],
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          if (delta != null) 
+                      Expanded(
+                        flex: 3, // 星数列占3份
+                        child: Row(
+                          children: [
                             Text(
-                              '↑$delta',
-                              style: const TextStyle(fontSize: 14, color: Colors.grey),
+                              '\u2726 ${star.toString()}',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: color,
+                                shadows: [
+                                  Shadow(
+                                    color: color.withOpacity(0.5),
+                                    blurRadius: 2,
+                                  ),
+                                ],
+                              ),
                             ),
-                          Text(
-                            minScore.toString(),
-                            style: const TextStyle(fontSize: 16, color: Colors.black),
-                          ),
-                        ],
+                            const SizedBox(width: 12),
+                            Text(
+                              '${(rate * 100).toStringAsFixed(1)}%',
+                              style: const TextStyle(fontSize: 16, color: Colors.black),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2, // 最低DX分数列占2份
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            if (delta != null) 
+                              Text(
+                                '↑$delta',
+                                style: const TextStyle(fontSize: 14, color: Colors.grey),
+                              ),
+                            Text(
+                              minScore.toString(),
+                              style: const TextStyle(fontSize: 16, color: Colors.black),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1, // MAX-列占1份
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              '-${maxScore - minScore}',
+                              style: const TextStyle(fontSize: 16, color: Colors.black),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -486,6 +528,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
   Widget _buildAchievementScoreTable() {
     if (_songData == null) return Container();
     
+    // 检查歌曲id是否为6位数
+    bool isSixDigitId = widget.songId.length == 6;
+    
     double difficulty = double.tryParse(_songData!['ds'][_currentDiffIndex].toString()) ?? 0.0;
     
     // 计算每个达成率对应的得分
@@ -493,12 +538,14 @@ class _SongInfoPageState extends State<SongInfoPage> {
     for (var item in maimaiRatingMultiplier) {
       double completion = item['completion'];
       String rating = item['rating'];
-      int score = _calculateSingleRating(difficulty, completion);
+      // 如果是6位数id的歌曲，得分设为0
+      int score = isSixDigitId ? 0 : _calculateSingleRating(difficulty, completion);
       scoreData.add({"completion": completion, "rating": rating, "score": score});
     }
     
     // 对于定数大于等于12.0的谱面，添加额外的达成率点（比基准达成率高1分）
-    if (difficulty >= 12.0) {
+    // 但6位数id的歌曲不添加额外达成率点
+    if (difficulty >= 12.0 && !isSixDigitId) {
       // 定义需要添加额外点的基准达成率
       List<double> baseCompletions = [97.0, 98.0, 99.0, 99.5, 100.0];
       
@@ -801,7 +848,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
                     boxShadow: [defaultShadow],
                   ),
@@ -855,8 +902,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                               ),
                                               SizedBox(height: 16),
                                               Container(
-                                                width: 300,
-                                                height: 300,
+                                                width: 250,
+                                                height: 250,
                                                 child: ClipRRect(
                                                   borderRadius: BorderRadius.circular(8),
                                                   child: CoverUtil.buildCoverWidgetWithContext(context, widget.songId.toString(), 300),
@@ -866,18 +913,18 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                               Row(
                                                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                                 children: [
-                                                  ElevatedButton(
-                                                    onPressed: () {
-                                                      // 保存到本地相册
-                                                      // 这里需要实现保存图片的逻辑
-                                                      Navigator.of(context).pop();
-                                                    },
-                                                    child: Text('保存到相册'),
-                                                    style: ElevatedButton.styleFrom(
-                                                      backgroundColor: accentColor,
-                                                      foregroundColor: Colors.white,
-                                                    ),
-                                                  ),
+                                                  // ElevatedButton(
+                                                  //   onPressed: () {
+                                                  //     // 保存到本地相册
+                                                  //     // 这里需要实现保存图片的逻辑 
+                                                  //     Navigator.of(context).pop();
+                                                  //   },
+                                                  //   child: Text('保存到相册'),
+                                                  //   style: ElevatedButton.styleFrom(
+                                                  //     backgroundColor: accentColor,
+                                                  //     foregroundColor: Colors.white,
+                                                  //   ),
+                                                  // ),
                                                   ElevatedButton(
                                                     onPressed: () {
                                                       Navigator.of(context).pop();
@@ -1477,8 +1524,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                       ),
                                                     ),
                                                     child: Text(
-                                                      tag['localized_name']
-                                                          ['zh-Hans'],
+                                                      tag['name'],
                                                       style: TextStyle(
                                                         fontSize: 12,
                                                         fontWeight:

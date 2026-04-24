@@ -15,6 +15,7 @@ class GuessChartCommonSettingsService {
   static const int defaultTimeLimit = 0; // 0表示无限制
   static const int defaultBlurLevel = 50; // 模糊程度，默认50%
   static const int defaultSongCount = 3; // 每次抽取歌曲数，默认3首
+  static const int defaultNonEnglishCharThreshold = 50; // 非英文字符占比阈值，默认50%
 
   // 保存设置
   Future<void> saveSettings({
@@ -26,6 +27,7 @@ class GuessChartCommonSettingsService {
     required int timeLimit,
     int? blurLevel,
     int? songCount,
+    int? nonEnglishCharThreshold,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('guessChart_selectedVersions', selectedVersions);
@@ -39,6 +41,9 @@ class GuessChartCommonSettingsService {
     }
     if (songCount != null) {
       await prefs.setInt('guessChart_songCount', songCount);
+    }
+    if (nonEnglishCharThreshold != null) {
+      await prefs.setInt('guessChart_nonEnglishCharThreshold', nonEnglishCharThreshold);
     }
   }
 
@@ -54,6 +59,7 @@ class GuessChartCommonSettingsService {
       'timeLimit': prefs.getInt('guessChart_timeLimit') ?? defaultTimeLimit,
       'blurLevel': prefs.getInt('guessChart_blurLevel') ?? defaultBlurLevel,
       'songCount': prefs.getInt('guessChart_songCount') ?? defaultSongCount,
+      'nonEnglishCharThreshold': prefs.getInt('guessChart_nonEnglishCharThreshold') ?? defaultNonEnglishCharThreshold,
     };
   }
 
@@ -68,6 +74,7 @@ class GuessChartCommonSettingsService {
       timeLimit: defaultTimeLimit,
       blurLevel: defaultBlurLevel,
       songCount: defaultSongCount,
+      nonEnglishCharThreshold: defaultNonEnglishCharThreshold,
     );
   }
 
@@ -101,6 +108,12 @@ class GuessChartCommonSettingsService {
     // 检查歌曲数量
     int songCount = settings['songCount'] ?? defaultSongCount;
     if (songCount < 1 || songCount > 10) {
+      return false;
+    }
+
+    // 检查非英文字符占比阈值
+    int nonEnglishCharThreshold = settings['nonEnglishCharThreshold'] ?? defaultNonEnglishCharThreshold;
+    if (nonEnglishCharThreshold < 0 || nonEnglishCharThreshold > 100) {
       return false;
     }
 

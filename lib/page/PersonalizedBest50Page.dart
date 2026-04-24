@@ -19,7 +19,6 @@ class PersonalizedBest50Page extends StatefulWidget {
 }
 
 class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
-  Map<String, dynamic>? _personalizedData;
   List<Map<String, dynamic>> _personalizedSongs = [];
   bool _isLoading = true;
   String _selectedType = 'ap_plus_50'; // 默认选择AP+50
@@ -27,6 +26,8 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
   Map<String, int>? _charterCounts; // charter出现次数
   String? _selectedVersion; // 选中的版本
   Map<String, int>? _versionCounts; // 版本出现次数
+  String? _selectedGenre; // 选中的流派
+  Map<String, int>? _genreCounts; // 流派出现次数
   List<dynamic>? _maimaiMusicData;
 
   // 下拉选择的选项
@@ -35,9 +36,18 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     {'value': 'ap_50', 'label': 'AP50'},
     {'value': 'fc_50', 'label': 'FC50'},
     {'value': 'fc_plus_50', 'label': 'FC+50'},
+    {'value': 'fs_50', 'label': 'FS50'},
+    {'value': 'fs_plus_50', 'label': 'FS+50'},
+    {'value': 'fsd_50', 'label': 'FDX50'},
+    {'value': 'fsdp_50', 'label': 'FDX+50'},
     {'value': 'cun_50', 'label': '寸50'},
     {'value': 'mingdao_50', 'label': '名刀50/锁血50'},
+    {'value': 'cuniao_plus_50', 'label': '寸鸟加50'},
+    {'value': 'suoxue_plus_50', 'label': '锁血鸟加50'},
+    {'value': 'cuniao_50', 'label': '寸鸟50'},
+    {'value': 'suoxue_50', 'label': '锁血鸟50'},
     {'value': 'charter_50', 'label': '谱师50'},
+    {'value': 'genre_50', 'label': '流派50'},
     {'value': 'version_50', 'label': '版本50'},
     {'value': 'dx_50', 'label': 'DX50'},
     {'value': 'st_50', 'label': 'ST50'},
@@ -89,10 +99,11 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
         });
       }
 
-      // 加载charter出现次数和版本出现次数
+      // 加载charter出现次数、版本出现次数和流派出现次数
       final service = PersonalizedBest50Service();
       _charterCounts = await service.getCharterCounts();
       _versionCounts = await service.getVersionCounts();
+      _genreCounts = await service.getGenreCounts();
 
       // 加载个性化数据
       await _fetchPersonalizedData();
@@ -149,6 +160,35 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
         case 'st_50':
           data = await service.getST50Data();
           break;
+        case 'fs_50':
+          data = await service.getFS50Data();
+          break;
+        case 'fs_plus_50':
+          data = await service.getFSPlus50Data();
+          break;
+        case 'fsd_50':
+          data = await service.getFDX50Data();
+          break;
+        case 'fsdp_50':
+          data = await service.getFDXPlus50Data();
+          break;
+        case 'cuniao_plus_50':
+          data = await service.getCuniaoPlus50Data();
+          break;
+        case 'suoxue_plus_50':
+          data = await service.getSuoxuePlus50Data();
+          break;
+        case 'cuniao_50':
+          data = await service.getCuniao50Data();
+          break;
+        case 'suoxue_50':
+          data = await service.getSuoxue50Data();
+          break;
+        case 'genre_50':
+          if (_selectedGenre != null) {
+            data = await service.getGenre50Data(_selectedGenre!);
+          }
+          break;
       }
 
       if (data != null) {
@@ -156,13 +196,11 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
         final enrichedRecords = await service.enrichRecordsWithSongInfo((data['records'] is List ? data['records'] : []) as List<dynamic>);
         
         setState(() {
-          _personalizedData = data;
           _personalizedSongs = enrichedRecords;
           _isLoading = false;
         });
       } else {
         setState(() {
-          _personalizedData = null;
           _personalizedSongs = [];
           _isLoading = false;
         });
@@ -170,7 +208,6 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     } catch (e) {
       print('Error fetching personalized data: $e');
       setState(() {
-        _personalizedData = null;
         _personalizedSongs = [];
         _isLoading = false;
       });
@@ -184,109 +221,6 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
         backgroundColor: Colors.transparent,
         body: Center(
           child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    // 如果没有数据，显示空状态
-    if (_personalizedData == null || _personalizedSongs.isEmpty) {
-      return Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Stack(
-          children: [
-            // 背景
-            CommonWidgetUtil.buildCommonBgWidget(),
-            CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-            // 浅白色背景区域
-            Positioned(
-              top: MediaQuery.of(context).size.height * 0.12,
-              left: MediaQuery.of(context).size.width * 0.02,
-              right: MediaQuery.of(context).size.width * 0.02,
-              bottom: MediaQuery.of(context).size.height * 0.03,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(12.0),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 8.0,
-                      offset: Offset(2.0, 2.0),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.refresh,
-                        size: 64,
-                        color: Colors.grey,
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        _selectedType == 'charter_50' && _selectedCharter != null
-                            ? '暂无谱师50 - ${_selectedCharter!} 数据'
-                            : _selectedType == 'version_50' && _selectedVersion != null
-                                ? '暂无版本50 - ${StringUtil.formatVersion2(_selectedVersion!)} 数据'
-                                : '暂无${_options.firstWhere((option) => option['value'] == _selectedType)['label']!}数据',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        '请返回首页点击"刷新数据"按钮获取',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // 页面标题
-            const Positioned(
-              top: 60,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  "个性化Best50",
-                  style: TextStyle(
-                    color: Color.fromARGB(255, 84, 97, 97),
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                  ),
-                ),
-              ),
-            ),
-
-            // 返回按钮
-            Positioned(
-              top: 40,
-              left: 10,
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.pop(context);
-                },
-                child: Container(
-                  padding: EdgeInsets.all(16),
-                  color: Colors.transparent,
-                  child: Icon(Icons.arrow_back,
-                      color: Color.fromARGB(255, 84, 97, 97), size: 28),
-                ),
-              ),
-            ),
-          ],
         ),
       );
     }
@@ -373,7 +307,9 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                                 ? '选择类型: 谱师50 - ${_selectedCharter!}'
                                 : _selectedType == 'version_50' && _selectedVersion != null
                                     ? '选择类型: 版本50 - ${StringUtil.formatVersion2(_selectedVersion!)}'
-                                    : '选择类型: ${_options.firstWhere((option) => option['value'] == _selectedType)['label']!}',
+                                    : _selectedType == 'genre_50' && _selectedGenre != null
+                                        ? '选择类型: 流派50 - ${_selectedGenre!}'
+                                        : '选择类型: ${_options.firstWhere((option) => option['value'] == _selectedType)['label']!}',
                             style: TextStyle(
                               fontSize: MediaQuery.of(context).size.width * 0.04,
                               color: Colors.white,
@@ -423,11 +359,16 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                       // 显示版本选择对话框
                       Navigator.of(context).pop();
                       _showVersionSelectionDialog();
+                    } else if (option['value'] == 'genre_50') {
+                      // 显示流派选择对话框
+                      Navigator.of(context).pop();
+                      _showGenreSelectionDialog();
                     } else {
                       setState(() {
                         _selectedType = option['value']!;
                         _selectedCharter = null;
                         _selectedVersion = null;
+                        _selectedGenre = null;
                       });
                       Navigator.of(context).pop();
                       _fetchPersonalizedData();
@@ -550,6 +491,70 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     );
   }
 
+  // 显示流派选择对话框
+  void _showGenreSelectionDialog() {
+    if (_genreCounts == null || _genreCounts!.isEmpty) {
+      // 没有流派数据
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('提示'),
+            content: Text('没有找到流派数据'),
+            actions: [
+              TextButton(
+                child: Text('确定'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
+
+    // 按出现次数排序
+    List<MapEntry<String, int>> sortedGenres = _genreCounts!.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('选择流派'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: sortedGenres.map((entry) {
+                return ListTile(
+                  title: Text('${entry.key} (${entry.value}首)'),
+                  selected: _selectedGenre == entry.key,
+                  onTap: () {
+                    setState(() {
+                      _selectedType = 'genre_50';
+                      _selectedGenre = entry.key;
+                    });
+                    Navigator.of(context).pop();
+                    _fetchPersonalizedData();
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text('取消'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // 显示charter选择对话框
   void _showCharterSelectionDialog() {
     if (_charterCounts == null || _charterCounts!.isEmpty) {
@@ -640,7 +645,9 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                   ? '谱师50 - ${_selectedCharter!} 统计'
                   : _selectedType == 'version_50' && _selectedVersion != null
                       ? '版本50 - ${StringUtil.formatVersion2(_selectedVersion!)} 统计'
-                      : '${_options.firstWhere((option) => option['value'] == _selectedType)['label']!} 统计',
+                      : _selectedType == 'genre_50' && _selectedGenre != null
+                          ? '流派50 - ${_selectedGenre!} 统计'
+                          : '${_options.firstWhere((option) => option['value'] == _selectedType)['label']!} 统计',
               style: TextStyle(
                 fontSize: MediaQuery.of(context).size.width * 0.045,
                 fontWeight: FontWeight.bold,
@@ -747,6 +754,47 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
 
   // 构建歌曲列表
   Widget _buildSongList() {
+    if (_personalizedSongs.isEmpty) {
+      return Container(
+        padding: EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.refresh,
+              size: 64,
+              color: Colors.grey,
+            ),
+            SizedBox(height: 16),
+            Text(
+              _selectedType == 'charter_50' && _selectedCharter != null
+                  ? '暂无谱师50 - ${_selectedCharter!} 数据'
+                  : _selectedType == 'version_50' && _selectedVersion != null
+                      ? '暂无版本50 - ${StringUtil.formatVersion2(_selectedVersion!)} 数据'
+                      : _selectedType == 'genre_50' && _selectedGenre != null
+                          ? '暂无流派50 - ${_selectedGenre!} 数据'
+                          : '暂无${_options.firstWhere((option) => option['value'] == _selectedType)['label']!}数据',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 8),
+            Text(
+              '请返回首页点击"刷新数据"按钮获取',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+    
     return GridView.builder(
       shrinkWrap: true,
       physics: NeverScrollableScrollPhysics(),
@@ -797,10 +845,17 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     String grade = '$rateText | $fcText | $fsText';
 
     // 获取卡片颜色
-    Color cardColor = ColorUtil.getCardColor(levelIndex);
+      Color cardColor;
+      // 对于6位数ID的歌曲，使用粉色
+      if (songId.toString().length == 6) {
+        cardColor = Color(0xFFFF99C2); // 进一步加深的粉色
+      } else {
+        cardColor = ColorUtil.getCardColor(levelIndex);
+      }
 
-    // 判断是否为DX模式
-    bool dxMode = type == 'DX';
+    // 判断是否为DX模式或UT模式
+      bool dxMode = type == 'DX';
+      bool isUtage = songId.toString().length == 6; // 6位数ID为UTAGE
 
     return GestureDetector(
       onTap: () {
@@ -810,6 +865,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
             builder: (context) => SongInfoPage(
               songId: songId.toString(),
               initialLevelIndex: levelIndex,
+              isDefaultLevelIndex: false, // 防止默认跳转到Master难度
             ),
           ),
         );
@@ -820,6 +876,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
         achievementRate: achievementRate,
         difficulty: difficulty,
         dxMode: dxMode,
+        isUtage: isUtage,
         score: score,
         rating: rating,
         stars: stars,
@@ -837,6 +894,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     double achievementRate = 0.0,
     double difficulty = 0.0,
     bool dxMode = false,
+    bool isUtage = false,
     int score = 0,
     int rating = 0,
     String stars = '',
@@ -891,7 +949,16 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (dxMode)
+                      if (isUtage)
+                        Text(
+                          'UT',
+                          style: TextStyle(
+                            fontSize: dxFontSize,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red,
+                          ),
+                        ),
+                      if (dxMode && !isUtage)
                         Text(
                           'DX',
                           style: TextStyle(
@@ -900,7 +967,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                             color: Colors.orange,
                           ),
                         ),
-                      if (dxMode == false)
+                      if (!dxMode && !isUtage)
                         Text(
                           'ST',
                           style: TextStyle(
@@ -1039,21 +1106,47 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     if (songIndex == -1) return 0.0;
     dynamic songData = _maimaiMusicData![songIndex];
 
-    if (songData['charts'] == null) return 0.0;
+    int maxScore = _calculateMaxDxScore(songData, levelIndex);
+
+    // 计算scoreRate
+    return maxScore > 0 ? score / maxScore : 0.0;
+  }
+
+  // 计算最大DX分
+  // 当ds数组长度为2时，返回两个难度谱面DX分之和
+  // 否则返回当前难度的最大分数
+  int _calculateMaxDxScore(dynamic songData, int levelIndex) {
+    if (songData == null) return 0;
+
+    // 检查ds数组长度
+    List<dynamic> ds = songData['ds'];
+    if (ds.length == 2) {
+      // 计算两个难度谱面的最大分数之和
+      int maxScore1 = _calculateMaxScore(songData, 0);
+      int maxScore2 = _calculateMaxScore(songData, 1);
+      return maxScore1 + maxScore2;
+    } else {
+      // 返回当前难度的最大分数
+      return _calculateMaxScore(songData, levelIndex);
+    }
+  }
+
+  // 计算单个难度的最大分数
+  int _calculateMaxScore(dynamic songData, int levelIndex) {
+    if (songData == null) return 0;
+
+    if (songData['charts'] == null) return 0;
 
     // 查找对应的charts
     List<dynamic> charts = songData['charts'];
-    if (levelIndex < 0 || levelIndex >= charts.length) return 0.0;
+    if (levelIndex < 0 || levelIndex >= charts.length) return 0;
 
     dynamic chart = charts[levelIndex];
-    if (chart['notes'] == null) return 0.0;
+    if (chart['notes'] == null) return 0;
 
     // 计算maxScore
     List<dynamic> notes = chart['notes'];
     int notesSum = notes.fold(0, (sum, note) => sum + (note as int));
-    int maxScore = notesSum * 3;
-
-    // 计算scoreRate
-    return maxScore > 0 ? score / maxScore : 0.0;
+    return notesSum * 3;
   }
 }

@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.4.1+10
+version: 1.4.2+11
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -42,7 +42,7 @@ dependencies:
   # 基础依赖：处理权限（Android 需申请存储权限）
   permission_handler: ^11.3.1
   # 基础依赖：处理字节数据
-  http: ^0.13.5
+  http: ^1.6.0
   # 基础依赖：扫描文件并通知系统更新
   media_scanner: ^2.2.0
   # 图表库
@@ -58,9 +58,12 @@ dependencies:
   flutter_cache_manager: ^3.3.1  
   # 音频播放
   just_audio: ^0.9.34  
-  audioplayers: ^5.2.1
+  audioplayers: ^6.5.1
   package_info_plus: ^9.0.1
   crypto: ^3.0.7
+  # simai_flutter: ^0.2.5
+  # flutter_soloud: ^3.4.10
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

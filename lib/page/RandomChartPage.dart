@@ -511,7 +511,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
 
                               // 歌曲展示区（一行显示，不滚动）
                               Container(
-                                height: screenWidth * 0.4, // 减小高度
+                                height: screenWidth * 0.3, // 减小高度
                                 child: Row(
                                   children: [
                                     for (int i = 0; i < _drawCount; i++)

@@ -30,8 +30,11 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   @override
   void initState() {
     super.initState();
-    // 立即开始获取推荐结果，同时确保加载动画至少显示7秒
-    _fetchRecommendations();
+    // 延迟一小段时间再开始获取推荐结果，确保页面能够完全加载并显示加载动画
+    // 这样可以避免在首页点击标签时出现卡顿
+    Future.delayed(Duration(milliseconds: 1000), () {
+      _fetchRecommendations();
+    });
   }
 
   // 获取推荐结果
@@ -75,9 +78,9 @@ class _RecommendByTagsState extends State<RecommendByTags> {
       // 计算已用时间
       final elapsedTime = DateTime.now().difference(startTime).inMilliseconds;
       
-      // 确保加载动画至少显示5秒
-      if (elapsedTime < 5000) {
-        await Future.delayed(Duration(milliseconds: 5000 - elapsedTime));
+      // 确保加载动画至少显示2秒，避免闪烁
+      if (elapsedTime < 2000) {
+        await Future.delayed(Duration(milliseconds: 2000 - elapsedTime));
       }
       
       setState(() {
@@ -86,8 +89,8 @@ class _RecommendByTagsState extends State<RecommendByTags> {
         _errorMessage = null; // 成功时清除错误信息
       });
     } catch (e) {
-      // 即使出错，也要确保加载动画至少显示5秒
-      await Future.delayed(Duration(milliseconds: 5000));
+      // 即使出错，也要确保加载动画至少显示2秒
+      await Future.delayed(Duration(milliseconds: 2000));
       
       setState(() {
         _errorMessage = '获取推荐结果失败：$e';

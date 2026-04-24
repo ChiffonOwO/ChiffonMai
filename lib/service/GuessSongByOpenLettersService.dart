@@ -13,6 +13,7 @@ class GuessSongByOpenLettersService {
     double masterMinDx = 1.0,
     double masterMaxDx = 15.0,
     List<String> selectedGenres = const [],
+    int nonEnglishCharThreshold = 50,
   }) async {
     try {
       final songs = await loadAllSongs();
@@ -45,6 +46,14 @@ class GuessSongByOpenLettersService {
         }
         return false;
       }).toList();
+      
+      // 按非英文字符占比筛选
+      if (nonEnglishCharThreshold > 0) {
+        filteredSongs = filteredSongs.where((song) {
+          double ratio = _calculateNonEnglishCharRatio(song.basicInfo.title);
+          return ratio < nonEnglishCharThreshold / 100.0;
+        }).toList();
+      }
       
       if (filteredSongs.isEmpty) {
         return [];
@@ -154,6 +163,24 @@ class GuessSongByOpenLettersService {
     return results.take(20).toList();
   }
   
+  // 计算非英文字符占比（包括日语和其他非英文字符，除空格外）
+  static double _calculateNonEnglishCharRatio(String title) {
+    if (title.isEmpty) return 0.0;
+    
+    int totalChars = title.replaceAll(' ', '').length;
+    if (totalChars == 0) return 0.0;
+    
+    int nonEnglishChars = 0;
+    for (int i = 0; i < title.length; i++) {
+      String char = title[i];
+      if (char != ' ' && !RegExp(r'^[a-zA-Z0-9]+$').hasMatch(char)) {
+        nonEnglishChars++;
+      }
+    }
+    
+    return nonEnglishChars / totalChars;
+  }
+
   // 加载所有歌曲数据（带缓存）
   static Future<List<Song>?> loadAllSongs() async {
     try {

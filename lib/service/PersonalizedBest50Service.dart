@@ -269,6 +269,186 @@ class PersonalizedBest50Service {
     }
   }
 
+  // 获取寸鸟加50数据
+  Future<Map<String, dynamic>?> getCuniaoPlus50Data() async {
+    try {
+      // 获取用户游玩数据
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+
+      // 确保records是List类型
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      // 过滤出achievements字段在[100.4800-100.4999]范围内的记录
+      final cuniaoPlusRecords = records.where((record) {
+        if (record is Map<String, dynamic>) {
+          double achievements = double.tryParse(record['achievements'].toString()) ?? 0.0;
+          return achievements >= 100.4800 && achievements <= 100.4999;
+        }
+        return false;
+      }).toList();
+
+      // 按ra值降序排序
+      cuniaoPlusRecords.sort((a, b) {
+        if (a is Map<String, dynamic> && b is Map<String, dynamic>) {
+          int raB = (b['ra'] ?? 0) as int;
+          int raA = (a['ra'] ?? 0) as int;
+          return raB.compareTo(raA);
+        }
+        return 0;
+      });
+
+      // 取前50条
+      final top50Records = cuniaoPlusRecords.take(50).toList();
+
+      // 构建返回数据
+      return {
+        'records': top50Records,
+        'total': top50Records.length,
+        'type': 'cuniao_plus_50'
+      };
+    } catch (e) {
+      print('获取寸鸟加50数据时出错: $e');
+      return null;
+    }
+  }
+
+  // 获取锁血鸟加50数据
+  Future<Map<String, dynamic>?> getSuoxuePlus50Data() async {
+    try {
+      // 获取用户游玩数据
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+
+      // 确保records是List类型
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      // 过滤出achievements字段在[100.5000,100.5500]范围内的记录
+      final suoxuePlusRecords = records.where((record) {
+        if (record is Map<String, dynamic>) {
+          double achievements = double.tryParse(record['achievements'].toString()) ?? 0.0;
+          return achievements >= 100.5000 && achievements <= 100.5500;
+        }
+        return false;
+      }).toList();
+
+      // 按ra值降序排序
+      suoxuePlusRecords.sort((a, b) {
+        if (a is Map<String, dynamic> && b is Map<String, dynamic>) {
+          int raB = (b['ra'] ?? 0) as int;
+          int raA = (a['ra'] ?? 0) as int;
+          return raB.compareTo(raA);
+        }
+        return 0;
+      });
+
+      // 取前50条
+      final top50Records = suoxuePlusRecords.take(50).toList();
+
+      // 构建返回数据
+      return {
+        'records': top50Records,
+        'total': top50Records.length,
+        'type': 'suoxue_plus_50'
+      };
+    } catch (e) {
+      print('获取锁血鸟加50数据时出错: $e');
+      return null;
+    }
+  }
+
+  // 获取寸鸟50数据
+  Future<Map<String, dynamic>?> getCuniao50Data() async {
+    try {
+      // 获取用户游玩数据
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+
+      // 确保records是List类型
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      // 过滤出achievements字段在[99.9800-99.9999]范围内的记录
+      final cuniaoRecords = records.where((record) {
+        if (record is Map<String, dynamic>) {
+          double achievements = double.tryParse(record['achievements'].toString()) ?? 0.0;
+          return achievements >= 99.9800 && achievements <= 99.9999;
+        }
+        return false;
+      }).toList();
+
+      // 按ra值降序排序
+      cuniaoRecords.sort((a, b) {
+        if (a is Map<String, dynamic> && b is Map<String, dynamic>) {
+          int raB = (b['ra'] ?? 0) as int;
+          int raA = (a['ra'] ?? 0) as int;
+          return raB.compareTo(raA);
+        }
+        return 0;
+      });
+
+      // 取前50条
+      final top50Records = cuniaoRecords.take(50).toList();
+
+      // 构建返回数据
+      return {
+        'records': top50Records,
+        'total': top50Records.length,
+        'type': 'cuniao_50'
+      };
+    } catch (e) {
+      print('获取寸鸟50数据时出错: $e');
+      return null;
+    }
+  }
+
+  // 获取锁血鸟50数据
+  Future<Map<String, dynamic>?> getSuoxue50Data() async {
+    try {
+      // 获取用户游玩数据
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+
+      // 确保records是List类型
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      // 过滤出achievements字段在[100.0000,100.0500]范围内的记录
+      final suoxueRecords = records.where((record) {
+        if (record is Map<String, dynamic>) {
+          double achievements = double.tryParse(record['achievements'].toString()) ?? 0.0;
+          return achievements >= 100.0000 && achievements <= 100.0500;
+        }
+        return false;
+      }).toList();
+
+      // 按ra值降序排序
+      suoxueRecords.sort((a, b) {
+        if (a is Map<String, dynamic> && b is Map<String, dynamic>) {
+          int raB = (b['ra'] ?? 0) as int;
+          int raA = (a['ra'] ?? 0) as int;
+          return raB.compareTo(raA);
+        }
+        return 0;
+      });
+
+      // 取前50条
+      final top50Records = suoxueRecords.take(50).toList();
+
+      // 构建返回数据
+      return {
+        'records': top50Records,
+        'total': top50Records.length,
+        'type': 'suoxue_50'
+      };
+    } catch (e) {
+      print('获取锁血鸟50数据时出错: $e');
+      return null;
+    }
+  }
+
   // 为记录添加歌曲信息
   Future<List<Map<String, dynamic>>> enrichRecordsWithSongInfo(dynamic records) async {
     try {
@@ -594,6 +774,273 @@ class PersonalizedBest50Service {
       };
     } catch (e) {
       print('获取ST50数据时出错: $e');
+      return null;
+    }
+  }
+
+  // 获取FS50数据
+  Future<Map<String, dynamic>?> getFS50Data() async {
+    try {
+      // 获取用户游玩数据
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+
+      // 确保records是List类型
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      // 过滤出fs字段为fs的记录
+      final fsRecords = records.where((record) {
+        if (record is Map<String, dynamic>) {
+          return record['fs'] == 'fs';
+        }
+        return false;
+      }).toList();
+
+      // 按ra值降序排序
+      fsRecords.sort((a, b) {
+        if (a is Map<String, dynamic> && b is Map<String, dynamic>) {
+          int raB = (b['ra'] ?? 0) as int;
+          int raA = (a['ra'] ?? 0) as int;
+          return raB.compareTo(raA);
+        }
+        return 0;
+      });
+
+      // 取前50条
+      final top50Records = fsRecords.take(50).toList();
+
+      // 构建返回数据
+      return {
+        'records': top50Records,
+        'total': top50Records.length,
+        'type': 'fs_50'
+      };
+    } catch (e) {
+      print('获取FS50数据时出错: $e');
+      return null;
+    }
+  }
+
+  // 获取FS+50数据
+  Future<Map<String, dynamic>?> getFSPlus50Data() async {
+    try {
+      // 获取用户游玩数据
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+
+      // 确保records是List类型
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      // 过滤出fs字段为fsp的记录
+      final fspRecords = records.where((record) {
+        if (record is Map<String, dynamic>) {
+          return record['fs'] == 'fsp';
+        }
+        return false;
+      }).toList();
+
+      // 按ra值降序排序
+      fspRecords.sort((a, b) {
+        if (a is Map<String, dynamic> && b is Map<String, dynamic>) {
+          int raB = (b['ra'] ?? 0) as int;
+          int raA = (a['ra'] ?? 0) as int;
+          return raB.compareTo(raA);
+        }
+        return 0;
+      });
+
+      // 取前50条
+      final top50Records = fspRecords.take(50).toList();
+
+      // 构建返回数据
+      return {
+        'records': top50Records,
+        'total': top50Records.length,
+        'type': 'fs_plus_50'
+      };
+    } catch (e) {
+      print('获取FS+50数据时出错: $e');
+      return null;
+    }
+  }
+
+  // 获取FDX50数据
+  Future<Map<String, dynamic>?> getFDX50Data() async {
+    try {
+      // 获取用户游玩数据
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+
+      // 确保records是List类型
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      // 过滤出fs字段为fsd的记录
+      final fsdRecords = records.where((record) {
+        if (record is Map<String, dynamic>) {
+          return record['fs'] == 'fsd';
+        }
+        return false;
+      }).toList();
+
+      // 按ra值降序排序
+      fsdRecords.sort((a, b) {
+        if (a is Map<String, dynamic> && b is Map<String, dynamic>) {
+          int raB = (b['ra'] ?? 0) as int;
+          int raA = (a['ra'] ?? 0) as int;
+          return raB.compareTo(raA);
+        }
+        return 0;
+      });
+
+      // 取前50条
+      final top50Records = fsdRecords.take(50).toList();
+
+      // 构建返回数据
+      return {
+        'records': top50Records,
+        'total': top50Records.length,
+        'type': 'fsd_50'
+      };
+    } catch (e) {
+      print('获取FDX50数据时出错: $e');
+      return null;
+    }
+  }
+
+  // 获取FDX+50数据
+  Future<Map<String, dynamic>?> getFDXPlus50Data() async {
+    try {
+      // 获取用户游玩数据
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+
+      // 确保records是List类型
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      // 过滤出fs字段为fsdp的记录
+      final fsdpRecords = records.where((record) {
+        if (record is Map<String, dynamic>) {
+          return record['fs'] == 'fsdp';
+        }
+        return false;
+      }).toList();
+
+      // 按ra值降序排序
+      fsdpRecords.sort((a, b) {
+        if (a is Map<String, dynamic> && b is Map<String, dynamic>) {
+          int raB = (b['ra'] ?? 0) as int;
+          int raA = (a['ra'] ?? 0) as int;
+          return raB.compareTo(raA);
+        }
+        return 0;
+      });
+
+      // 取前50条
+      final top50Records = fsdpRecords.take(50).toList();
+
+      // 构建返回数据
+      return {
+        'records': top50Records,
+        'total': top50Records.length,
+        'type': 'fsdp_50'
+      };
+    } catch (e) {
+      print('获取FDX+50数据时出错: $e');
+      return null;
+    }
+  }
+
+  // 获取流派列表
+  Future<Map<String, int>> getGenreCounts() async {
+    try {
+      // 获取所有歌曲数据
+      final allSongs = await MaimaiMusicDataManager().getCachedSongs();
+      if (allSongs == null) return {};
+
+      // 统计流派出现次数
+      Map<String, int> genreCounts = {};
+      for (var song in allSongs) {
+        String genre = song.basicInfo.genre;
+        if (genre.isNotEmpty) {
+          genreCounts[genre] = (genreCounts[genre] ?? 0) + 1;
+        }
+      }
+
+      return genreCounts;
+    } catch (e) {
+      print('获取流派出现次数时出错: $e');
+      return {};
+    }
+  }
+
+  // 获取特定流派的top50记录
+  Future<Map<String, dynamic>?> getGenre50Data(String genre) async {
+    try {
+      // 获取用户游玩数据
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+
+      // 确保records是List类型
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      // 获取所有歌曲数据
+      final allSongs = await MaimaiMusicDataManager().getCachedSongs();
+      if (allSongs == null) return null;
+
+      // 构建歌曲ID到歌曲信息的映射
+      final songMap = { for (var song in allSongs) song.id: song };
+
+      // 过滤出该流派的歌曲的记录
+      final genreRecords = records.where((record) {
+        if (record is Map<String, dynamic>) {
+          final songId = record['song_id'];
+          final song = songMap[songId.toString()];
+          
+          if (song != null) {
+            return song.basicInfo.genre == genre;
+          }
+        }
+        return false;
+      }).toList();
+
+      // 排序：如果是\u5bb4\u4f1a\u5834（宴会场）流派，按达成率降序排序；否则按ra值降序排序
+      if (genre == '\u5bb4\u4f1a\u5834') {
+        genreRecords.sort((a, b) {
+          if (a is Map<String, dynamic> && b is Map<String, dynamic>) {
+            double achievementsB = double.tryParse(b['achievements'].toString()) ?? 0.0;
+            double achievementsA = double.tryParse(a['achievements'].toString()) ?? 0.0;
+            return achievementsB.compareTo(achievementsA);
+          }
+          return 0;
+        });
+      } else {
+        genreRecords.sort((a, b) {
+          if (a is Map<String, dynamic> && b is Map<String, dynamic>) {
+            int raB = (b['ra'] ?? 0) as int;
+            int raA = (a['ra'] ?? 0) as int;
+            return raB.compareTo(raA);
+          }
+          return 0;
+        });
+      }
+
+      // 取前50条
+      final top50Records = genreRecords.take(50).toList();
+
+      // 构建返回数据
+      return {
+        'records': top50Records,
+        'total': top50Records.length,
+        'type': 'genre_50',
+        'genre': genre
+      };
+    } catch (e) {
+      print('获取genre50数据时出错: $e');
       return null;
     }
   }

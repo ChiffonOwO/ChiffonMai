@@ -34,6 +34,12 @@ class _B50PageState extends State<B50Page> {
     super.initState();
     _loadB50Data();
   }
+  
+  @override
+  void dispose() {
+    super.dispose();
+    // 清理资源，确保页面销毁时不会有异步操作仍在执行
+  }
 
   @override
   void didUpdateWidget(B50Page oldWidget) {
@@ -618,6 +624,7 @@ class _B50PageState extends State<B50Page> {
     double achievementRate = 0.0,
     double difficulty = 0.0,
     bool dxMode = false,
+    bool isUtage = false,
     int score = 0,
     int rating = 0,
     String stars = '',
@@ -673,7 +680,16 @@ class _B50PageState extends State<B50Page> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (dxMode)
+                      if (isUtage)
+                        Text(
+                          'UT',
+                          style: TextStyle(
+                            fontSize: dxFontSize,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red,
+                          ),
+                        ),
+                      if (dxMode && !isUtage)
                         Text(
                           'DX',
                           style: TextStyle(
@@ -682,7 +698,7 @@ class _B50PageState extends State<B50Page> {
                             color: Colors.orange,
                           ),
                         ),
-                      if (dxMode == false)
+                      if (!dxMode && !isUtage)
                         Text(
                           'ST',
                           style: TextStyle(
@@ -937,10 +953,17 @@ class _B50PageState extends State<B50Page> {
     String grade = '$rateText | $fcText | $fsText';
 
     // 获取卡片颜色
-    Color cardColor = ColorUtil.getCardColor(levelIndex);
+      Color cardColor;
+      // 对于6位数ID的歌曲，使用粉色
+      if (songId.toString().length == 6) {
+        cardColor = Color(0xFFFFB3D1); // 加深的粉色
+      } else {
+        cardColor = ColorUtil.getCardColor(levelIndex);
+      }
 
-    // 判断是否为DX模式
-    bool dxMode = type == 'DX';
+    // 判断是否为DX模式或UT模式
+      bool dxMode = type == 'DX';
+      bool isUtage = songId.toString().length == 6; // 6位数ID为UTAGE
 
     return GestureDetector(
       onTap: () {
@@ -950,6 +973,7 @@ class _B50PageState extends State<B50Page> {
             builder: (context) => SongInfoPage(
               songId: songId.toString(),
               initialLevelIndex: levelIndex,
+              isDefaultLevelIndex: false, // 防止默认跳转到Master难度
             ),
           ),
         );
@@ -960,6 +984,7 @@ class _B50PageState extends State<B50Page> {
         achievementRate: achievementRate,
         difficulty: difficulty,
         dxMode: dxMode,
+        isUtage: isUtage,
         score: score,
         rating: rating,
         stars: stars,

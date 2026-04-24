@@ -296,6 +296,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
               onPressed: () {
                 setState(() {
                   _filterConditions['版本筛选'] = selectedVersion;
+                  _currentPage = 1; // 筛选条件变化时，切换到第1页
                 });
                 Navigator.of(context).pop();
                 _loadData(); // 重新加载数据
@@ -383,6 +384,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                 
                 setState(() {
                   _filterConditions['定数筛选'] = range;
+                  _currentPage = 1; // 筛选条件变化时，切换到第1页
                 });
                 Navigator.of(context).pop();
                 _loadData(); // 重新加载数据
@@ -400,7 +402,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
       context: context,
       builder: (BuildContext context) {
         String selectedDifficulty = _filterConditions['难度筛选'] ?? '';
-        List<String> difficulties = ['', 'BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'Re:MASTER'];
+        List<String> difficulties = ['', 'BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'Re:MASTER', 'UTAGE'];
         return AlertDialog(
           title: Text('难度筛选'),
           content: StatefulBuilder(
@@ -434,6 +436,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
               onPressed: () {
                 setState(() {
                   _filterConditions['难度筛选'] = selectedDifficulty;
+                  _currentPage = 1; // 筛选条件变化时，切换到第1页
                 });
                 Navigator.of(context).pop();
                 _loadData(); // 重新加载数据
@@ -521,6 +524,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                 
                 setState(() {
                   _filterConditions['达成率筛选'] = range;
+                  _currentPage = 1; // 筛选条件变化时，切换到第1页
                 });
                 Navigator.of(context).pop();
                 _loadData(); // 重新加载数据
@@ -578,6 +582,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
               onPressed: () {
                 setState(() {
                   _filterConditions['连击/同步筛选'] = selectedFilter;
+                  _currentPage = 1; // 筛选条件变化时，切换到第1页
                 });
                 Navigator.of(context).pop();
                 _loadData(); // 重新加载数据
@@ -1283,7 +1288,13 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                             itemBuilder: (context, index) {
                                               final song = _pagedSongs[index];
                                               final levelIndex = song['level_index'] ?? 0;
-                                              final borderColor = _service.getBorderColor(levelIndex);
+                                              var borderColor = _service.getBorderColor(levelIndex);
+                                              
+                                              // 当歌曲id为6位数时，曲绘边框强制设为粉色
+                                              final songId = song['song_id']?.toString() ?? '';
+                                              if (songId.length == 6 && int.tryParse(songId) != null) {
+                                                borderColor = Color(0xFFFF69B4); // 粉色
+                                              }
                                               
                                               // 计算每个网格项的大小，确保正方形显示
                                               final itemSize = (screenWidth - 4 - (4 * 2)) / 5; // 4是左右边距（各2），4是间隔数（因为是5列），每个间隔2像素
@@ -1437,6 +1448,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                       builder: (context) => SongInfoPage(
                                                         songId: song['song_id'].toString(),
                                                         initialLevelIndex: levelIndex,
+                                                        isDefaultLevelIndex: false, // 禁用默认难度选择逻辑
                                                       ),
                                                     ),
                                                   );

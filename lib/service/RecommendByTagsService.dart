@@ -15,12 +15,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 class RecommendByTagsService {
   static const int MAX_LIMIT = 70; // 最大推荐数
   static const int RA_RANGE_LIMIT = 20; // Rating极差上限
-  static const String USER_PLAY_DATA_FILE_PATH =
-      'assets/userPlayData.json'; // 玩家游玩记录文件路径
-  static const String MAIN_TAG_FILE_PATH =
-      'assets/maiTags.json'; // 标签文件路径（作为 fallback）
-  static const String MAIMAI_MUSIC_DATA_FILE_PATH =
-      'assets/maimai_music_data.json'; // 谱面数据文件路径
 
   /**
    * 初始化标签数据，在 app 启动时调用，或在刷新数据时调用

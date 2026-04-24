@@ -33,7 +33,7 @@ class ColorUtil {
   static Color getCardColor(int levelIndex) {
     List<Color> colors = [
       Colors.green, // level_index 0
-      Colors.yellow, // level_index 1
+      Color(0xFFFFCC00), // level_index 1 - 深黄色，让DX能够分辨可见
       Colors.red, // level_index 2
       Colors.purple.shade400, // level_index 3
       Colors.purple.shade200, // level_index 4
