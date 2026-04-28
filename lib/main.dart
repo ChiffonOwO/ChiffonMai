@@ -5,7 +5,9 @@ import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/DiffMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/CollectionsManager.dart';
 import 'package:my_first_flutter_app/manager/LuoXueSongsManager.dart';
+import 'package:my_first_flutter_app/manager/KnowledgeManager.dart';
 import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
+import 'package:my_first_flutter_app/constant/LoadingTipsConstant.dart';
 
 // 程序入口：运行Flutter应用，根组件为MyApp
 void main() {
@@ -55,6 +57,9 @@ class _MyAppState extends State<MyApp> {
         final cachedSongs = await maimaiMusicManager.getCachedSongs();
         luoXueSongsManager.mapLuoXueSongsToCachedSongs(cachedSongs ?? []);
       }
+
+      // 初始化知识数据
+      await KnowledgeManager().getKnowledgeData();
     } catch (e) {
       print('初始化失败: $e');
     } finally {
@@ -69,11 +74,12 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false, // 拦截系统返回手势
+      canPop: true, // 允许系统处理返回手势
       onPopInvoked: (didPop) {
         // 处理返回手势
         if (didPop) {
-          // 返回手势已执行
+          // 可以在这里添加额外的返回处理逻辑
+          // 例如清理资源、保存状态等
         }
       },
       child: MaterialApp(
@@ -119,6 +125,8 @@ class _MyAppState extends State<MyApp> {
             CircularProgressIndicator(),
             SizedBox(height: 20),
             Text('初始化各项数据中,请稍等(^ ^)...'),
+            SizedBox(height: 10),
+            Text(LoadingTipsConstant.getRandomLoadingTip()),
           ],
         ),
       ),

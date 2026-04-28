@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:my_first_flutter_app/utils/StringUtil.dart';
 
 // 应用常量类：集中管理所有硬编码的配置值
 class AppConstants {
@@ -146,37 +147,77 @@ class ImagePreviewDialog extends StatelessWidget {
 }
 
 // 版本对照表页面
-class VersionView extends StatelessWidget {
-  // 具体版本数据
-  final List<VersionData> versionList = [
-    VersionData(name: "maimai PLUS", imagePath: "assets/version/maimai_PLUS.png", code: "真"),
-    VersionData(name: "GreeN", imagePath: "assets/version/maimai_GreeN.png", code: "超"),
-    VersionData(name: "GreeN PLUS", imagePath: "assets/version/maimai_GreeN_PLUS.png", code: "檄"),
-    VersionData(name: "ORANGE", imagePath: "assets/version/maimai_ORANGE.png", code: "橙"),
-    VersionData(name: "ORANGE PLUS", imagePath: "assets/version/maimai_ORANGE_PLUS.png", code: "晓"),
-    VersionData(name: "PiNK", imagePath: "assets/version/maimai_PiNK.png", code: "桃"),
-    VersionData(name: "PiNK PLUS", imagePath: "assets/version/maimai_PiNK_PLUS.png", code: "樱"),
-    VersionData(name: "MURASAKi", imagePath: "assets/version/maimai_MURASAKi.png", code: "紫"),
-    VersionData(name: "MURASAKi PLUS", imagePath: "assets/version/maimai_MURASAKi_PLUS.png", code: "堇"),
-    VersionData(name: "MiLK", imagePath: "assets/version/maimai_MiLK.png", code: "白"),
-    VersionData(name: "MiLK PLUS", imagePath: "assets/version/maimai_MiLK_PLUS.png", code: "雪"),
-    VersionData(name: "FiNALE", imagePath: "assets/version/maimai_FiNALE.png", code: "辉"),
-    VersionData(name: "ALL FiNALE", imagePath: "assets/version/WuShen.png", code: "舞"),
-    VersionData(name: "DX", imagePath: "assets/version/maimai_DX.png", code: "熊"),
-    VersionData(name: "DX PLUS", imagePath: "assets/version/maimai_DX_PLUS.png", code: "華"),
-    VersionData(name: "Splash", imagePath: "assets/version/maimai_DX_Splash.png", code: "爽"),
-    VersionData(name: "Splash PLUS", imagePath: "assets/version/maimai_DX_Splash_PLUS.png", code: "煌"),
-    VersionData(name: "UNiVERSE", imagePath: "assets/version/maimai_DX_UNiVERSE.png", code: "宙"),
-    VersionData(name: "UNiVERSE PLUS", imagePath: "assets/version/maimai_DX_UNiVERSE_PLUS.png", code: "星"),
-    VersionData(name: "FESTiVAL", imagePath: "assets/version/maimai_DX_FESTiVAL.png", code: "祭"),
-    VersionData(name: "FESTiVAL PLUS", imagePath: "assets/version/maimai_DX_FESTiVAL_PLUS.png", code: "祝"),
-    VersionData(name: "BUDDiES", imagePath: "assets/version/maimai_DX_BUDDiES.png", code: "双"),
-    VersionData(name: "BUDDiES PLUS", imagePath: "assets/version/maimai_DX_BUDDiES_PLUS.png", code: "宴"),
-    VersionData(name: "PRiSM", imagePath: "assets/version/maimai_DX_PRiSM.png", code: "镜"),
-    VersionData(name: "PRiSM PLUS", imagePath: "assets/version/maimai_DX_PRiSM_PLUS.png", code: "彩"),
-    VersionData(name: "CiRCLE", imagePath: "assets/version/maimai_DX_CiRCLE.png", code: "丸"),
-  ];
+class VersionView extends StatefulWidget {
   VersionView({super.key});
+
+  @override
+  State<VersionView> createState() => _VersionViewState();
+}
+
+class _VersionViewState extends State<VersionView> {
+  // 切换状态：true为日服，false为国服
+  bool _isJapaneseVersion = false;
+  
+  // 日服版本数据（保持原有数据）
+  final List<VersionData> _japaneseVersionList = [
+    VersionData(name: "maimai", imagePath: "assets/version/maimai.webp", code: "真"),
+    VersionData(name: "maimai PLUS", imagePath: "assets/version/maimai_PLUS.webp", code: "真"),
+    VersionData(name: "GreeN", imagePath: "assets/version/maimai_GreeN.webp", code: "超"),
+    VersionData(name: "GreeN PLUS", imagePath: "assets/version/maimai_GreeN_PLUS.webp", code: "檄"),
+    VersionData(name: "ORANGE", imagePath: "assets/version/maimai_ORANGE.webp", code: "橙"),
+    VersionData(name: "ORANGE PLUS", imagePath: "assets/version/maimai_ORANGE_PLUS.webp", code: "晓"),
+    VersionData(name: "PiNK", imagePath: "assets/version/maimai_PiNK.webp", code: "桃"),
+    VersionData(name: "PiNK PLUS", imagePath: "assets/version/maimai_PiNK_PLUS.webp", code: "樱"),
+    VersionData(name: "MURASAKi", imagePath: "assets/version/maimai_MURASAKi.webp", code: "紫"),
+    VersionData(name: "MURASAKi PLUS", imagePath: "assets/version/maimai_MURASAKi_PLUS.webp", code: "堇"),
+    VersionData(name: "MiLK", imagePath: "assets/version/maimai_MiLK.webp", code: "白"),
+    VersionData(name: "MiLK PLUS", imagePath: "assets/version/maimai_MiLK_PLUS.webp", code: "雪"),
+    VersionData(name: "FiNALE", imagePath: "assets/version/maimai_FiNALE.webp", code: "辉"),
+    VersionData(name: "DX", imagePath: "assets/version/maimai_DX.webp", code: "熊"),
+    VersionData(name: "DX PLUS", imagePath: "assets/version/maimai_DX_PLUS.webp", code: "華"),
+    VersionData(name: "Splash", imagePath: "assets/version/maimai_DX_Splash.webp", code: "爽"),
+    VersionData(name: "Splash PLUS", imagePath: "assets/version/maimai_DX_Splash_PLUS.webp", code: "煌"),
+    VersionData(name: "UNiVERSE", imagePath: "assets/version/maimai_DX_UNiVERSE.webp", code: "宙"),
+    VersionData(name: "UNiVERSE PLUS", imagePath: "assets/version/maimai_DX_UNiVERSE_PLUS.webp", code: "星"),
+    VersionData(name: "FESTiVAL", imagePath: "assets/version/maimai_DX_FESTiVAL.webp", code: "祭"),
+    VersionData(name: "FESTiVAL PLUS", imagePath: "assets/version/maimai_DX_FESTiVAL_PLUS.webp", code: "祝"),
+    VersionData(name: "BUDDiES", imagePath: "assets/version/maimai_DX_BUDDiES.webp", code: "双"),
+    VersionData(name: "BUDDiES PLUS", imagePath: "assets/version/maimai_DX_BUDDiES_PLUS.webp", code: "宴"),
+    VersionData(name: "PRiSM", imagePath: "assets/version/maimai_DX_PRiSM.webp", code: "镜"),
+    VersionData(name: "PRiSM PLUS", imagePath: "assets/version/maimai_DX_PRiSM_PLUS.webp", code: "彩"),
+    VersionData(name: "CiRCLE", imagePath: "assets/version/maimai_DX_CiRCLE.webp", code: "丸"),
+    VersionData(name: "CiRCLE PLUS", imagePath: "assets/version/maimai_DX_CiRCLE_PLUS.webp", code: "-"),
+  ];
+  
+  // 国服版本数据（按照formatVersion2中的顺序）
+  final List<VersionData> _chineseVersionList = [
+    VersionData(name: "maimai", imagePath: "assets/version/maimai.webp", code: "真"),
+    VersionData(name: "maimai PLUS", imagePath: "assets/version/maimai_PLUS.webp", code: "真"),
+    VersionData(name: "maimai GreeN", imagePath: "assets/version/maimai_GreeN.webp", code: "超"),
+    VersionData(name: "maimai GreeN PLUS", imagePath: "assets/version/maimai_GreeN_PLUS.webp", code: "檄"),
+    VersionData(name: "maimai ORANGE", imagePath: "assets/version/maimai_ORANGE.webp", code: "橙"),
+    VersionData(name: "maimai ORANGE PLUS", imagePath: "assets/version/maimai_ORANGE_PLUS.webp", code: "晓"),
+    VersionData(name: "maimai PiNK", imagePath: "assets/version/maimai_PiNK.webp", code: "桃"),
+    VersionData(name: "maimai PiNK PLUS", imagePath: "assets/version/maimai_PiNK_PLUS.webp", code: "樱"),
+    VersionData(name: "maimai MURASAKi", imagePath: "assets/version/maimai_MURASAKi.webp", code: "紫"),
+    VersionData(name: "maimai MURASAKi PLUS", imagePath: "assets/version/maimai_MURASAKi_PLUS.webp", code: "堇"),
+    VersionData(name: "maimai MiLK", imagePath: "assets/version/maimai_MiLK.webp", code: "白"),
+    VersionData(name: "maimai MiLK PLUS", imagePath: "assets/version/maimai_MiLK_PLUS.webp", code: "雪"),
+    VersionData(name: "maimai FiNALE", imagePath: "assets/version/maimai_FiNALE.webp", code: "辉"),
+    VersionData(name: "maimai でらっくす", imagePath: "assets/version/maimai_2020.webp", code: "熊/華"),
+    VersionData(name: "maimai でらっくす Splash", imagePath: "assets/version/maimai_2021.webp", code: "爽/煌"),
+    VersionData(name: "maimai でらっくす UNiVERSE", imagePath: "assets/version/maimai_2022.webp", code: "宙/星"),
+    VersionData(name: "maimai でらっくす FESTiVAL", imagePath: "assets/version/maimai_2023.webp", code: "祭/祝"),
+    VersionData(name: "maimai でらっくす BUDDiES", imagePath: "assets/version/maimai_2024.webp", code: "双/宴"),
+    VersionData(name: "maimai でらっくす PRiSM", imagePath: "assets/version/maimai_2025.webp", code: "镜/彩"),
+  ];
+  
+  // 切换版本
+  void _toggleVersion() {
+    setState(() {
+      _isJapaneseVersion = !_isJapaneseVersion;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -233,8 +274,23 @@ class VersionView extends StatelessWidget {
                         ),
                       ),
                     ),
-                    // 占位，保持标题居中
-                    SizedBox(width: 48),
+                    // 版本切换按钮
+                    ElevatedButton(
+                      onPressed: _toggleVersion,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _isJapaneseVersion ? Colors.blue : Colors.green,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        _isJapaneseVersion ? '日服' : '国服',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -309,14 +365,17 @@ class VersionView extends StatelessWidget {
                               ),
                             ),
                           ],
-                      rows: versionList.map((version) {
+                      rows: (_isJapaneseVersion ? _japaneseVersionList : _chineseVersionList).map((version) {
+                        // 对于国服版本，使用formatVersion2格式化显示
+                        String displayName = _isJapaneseVersion ? version.name : StringUtil.formatVersion2(version.name);
+                        
                         return DataRow(cells: [
                           DataCell(
                             SizedBox(
                               width: column1Width,
                               child: Align(
                                 alignment: Alignment.centerLeft,
-                                child: Text(version.name, style: TextStyle(fontSize: tableContentFontSize)),
+                                child: Text(displayName, style: TextStyle(fontSize: tableContentFontSize)),
                               )
                             ),
                           ),
@@ -340,20 +399,27 @@ class VersionView extends StatelessWidget {
                                         );
                                       }
                                     },
-                                    child: Image.asset(
-                                      version.imagePath,
-                                      width: imageSize,
-                                      height: imageSize,
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Container(
-                                          width: imageSize,
-                                          height: imageSize,
-                                          color: Colors.grey[200],
-                                          child: Center(child: Text('图片缺失', style: TextStyle(fontSize: tableContentFontSize))),
-                                        );
-                                      },
-                                    ),
+                                    child: version.imagePath.isNotEmpty
+                                        ? Image.asset(
+                                            version.imagePath,
+                                            width: imageSize,
+                                            height: imageSize,
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Container(
+                                                width: imageSize,
+                                                height: imageSize,
+                                                color: Colors.grey[200],
+                                                child: Center(child: Text('图片缺失', style: TextStyle(fontSize: tableContentFontSize))),
+                                              );
+                                            },
+                                          )
+                                        : Container(
+                                            width: imageSize,
+                                            height: imageSize,
+                                            color: Colors.grey[200],
+                                            child: Center(child: Text('暂无图片', style: TextStyle(fontSize: tableContentFontSize))),
+                                          ),
                                   ),
                                 ),
                               ),

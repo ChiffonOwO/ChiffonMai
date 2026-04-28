@@ -4,6 +4,7 @@ import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:my_first_flutter_app/utils/StringUtil.dart';
 
 class RandomChartPage extends StatefulWidget {
   const RandomChartPage({super.key});
@@ -280,7 +281,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                             return DropdownMenuItem<String>(
                                               value: version,
                                               child: Text(
-                                                version,
+                                                version == '全部版本' ? version : StringUtil.formatVersion2(version),
                                                 style: TextStyle(
                                                     fontSize: textSizeSmall),
                                               ),
@@ -509,7 +510,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
 
                               SizedBox(height: spacingLarge),
 
-                              // 歌曲展示区（一行显示，不滚动）
+                               // 歌曲展示区（一行显示，不滚动）
                               Container(
                                 height: screenWidth * 0.3, // 减小高度
                                 child: Row(

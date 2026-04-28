@@ -97,7 +97,60 @@ class RandomChartService {
       versions.add(song.basicInfo.from);
     }
 
-    return ['全部版本'] + versions.toList()..sort();
+    // 按照formatVersion2中的顺序排序版本
+    final List<String> sortedVersions = _sortVersionsByFormatOrder(versions.toList());
+
+    return ['全部版本'] + sortedVersions;
+  }
+  
+  // 按照formatVersion2中的顺序排序版本
+  List<String> _sortVersionsByFormatOrder(List<String> versions) {
+    // 定义版本顺序（与formatVersion2中的顺序一致）
+    final List<String> versionOrder = [
+      'maimai',
+      'maimai PLUS',
+      'maimai GreeN',
+      'maimai GreeN PLUS',
+      'maimai ORANGE',
+      'maimai ORANGE PLUS',
+      'maimai PiNK',
+      'maimai PiNK PLUS',
+      'maimai MURASAKi',
+      'maimai MURASAKi PLUS',
+      'maimai MiLK',
+      'MiLK PLUS',
+      'maimai FiNALE',
+      'maimai でらっくす',
+      'maimai でらっくす Splash',
+      'maimai でらっくす UNiVERSE',
+      'maimai でらっくす FESTiVAL',
+      'maimai でらっくす BUDDiES',
+      'maimai でらっくす PRiSM',
+    ];
+    
+    // 排序版本列表
+    versions.sort((a, b) {
+      int indexA = versionOrder.indexOf(a);
+      int indexB = versionOrder.indexOf(b);
+      
+      // 如果两个版本都在顺序列表中，按顺序排序
+      if (indexA != -1 && indexB != -1) {
+        return indexA.compareTo(indexB);
+      }
+      // 如果只有一个版本在顺序列表中，优先显示
+      else if (indexA != -1) {
+        return -1;
+      }
+      else if (indexB != -1) {
+        return 1;
+      }
+      // 如果两个版本都不在顺序列表中，按字符串排序
+      else {
+        return a.compareTo(b);
+      }
+    });
+    
+    return versions;
   }
 
   // 获取流派列表
@@ -114,6 +167,6 @@ class RandomChartService {
       genres.add(song.basicInfo.genre);
     }
 
-    return ['全部类型'] + genres.toList()..sort();
+    return ['全部类型'] + genres.toList();
   }
 }

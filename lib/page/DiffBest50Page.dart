@@ -310,8 +310,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                             height: MediaQuery.of(context).size.height * 0.015),
 
                         // 基于拟合难度的Best50 卡片网格
-                        _buildDataCardGrid(_diffSongs,
-                            MediaQuery.of(context).size.width > 600 ? 1.8 : 1.6),
+                        _buildDataCardGrid(_diffSongs, 1.75),
                       ],
                     ),
                   ),

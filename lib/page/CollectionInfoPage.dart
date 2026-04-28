@@ -332,6 +332,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
   // 获取唯一的歌曲列表
   List<Widget> _getUniqueSongLists(List<CollectionRequired> requiredList) {
     final Set<String> seenSongLists = {};
+    final Set<String> seenSongs = {}; // 用于统计唯一歌曲数量
     final List<Widget> uniqueSongLists = [];
 
     for (final requiredItem in requiredList) {
@@ -341,6 +342,11 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
         
         if (!seenSongLists.contains(songListKey)) {
           seenSongLists.add(songListKey);
+          
+          // 统计唯一歌曲数量
+          for (final song in requiredItem.songs!) {
+            seenSongs.add('${song.id}:${song.title}:${song.type}');
+          }
           
           uniqueSongLists.add(
             Column(
@@ -447,6 +453,23 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
           );
         }
       }
+    }
+
+    // 添加歌曲数量显示
+    if (seenSongs.isNotEmpty) {
+      uniqueSongLists.insert(0, Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '总计 ${seenSongs.length} 首歌曲',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+          SizedBox(height: 8),
+        ],
+      ));
     }
 
     return uniqueSongLists;

@@ -352,8 +352,7 @@ class _B50PageState extends State<B50Page> {
                             height: MediaQuery.of(context).size.height * 0.015),
 
                         // Best35 卡片网格 (sd数组)
-                        _buildDataCardGrid(_sdSongs,
-                            MediaQuery.of(context).size.width > 600 ? 1.8 : 1.6),
+                        _buildDataCardGrid(_sdSongs, 1.75),
                         SizedBox(height: MediaQuery.of(context).size.height * 0.02),
 
                         // Best15 标题区域

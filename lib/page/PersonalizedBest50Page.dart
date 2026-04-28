@@ -803,7 +803,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
         crossAxisCount: 2,
         crossAxisSpacing: MediaQuery.of(context).size.width * 0.01,
         mainAxisSpacing: MediaQuery.of(context).size.width * 0.01,
-        childAspectRatio: MediaQuery.of(context).size.width > 600 ? 1.8 : 1.6,
+        childAspectRatio: 1.75,
       ),
       itemCount: _personalizedSongs.length,
       itemBuilder: (context, index) {

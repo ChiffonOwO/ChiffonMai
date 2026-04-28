@@ -9,6 +9,7 @@ import 'package:my_first_flutter_app/page/GuessChartByCoverPage.dart';
 import 'package:my_first_flutter_app/page/GuessChartByInfoPage.dart';
 import 'package:my_first_flutter_app/page/GuessChartBySongExcerptPage.dart';
 import 'package:my_first_flutter_app/page/GuessSongByOpenLettersPage.dart';
+import 'package:my_first_flutter_app/page/KnowledgeSearchPage.dart';
 import 'package:my_first_flutter_app/page/MaimaiServerStatusPage.dart';
 import 'package:my_first_flutter_app/page/PersonalizedBest50Page.dart';
 import 'package:my_first_flutter_app/page/RandomChartPage.dart';
@@ -99,6 +100,9 @@ class _HomePageState extends State<HomePage> {
   int _best35TotalRA = 10670;
   int _best15TotalRA = 4379;
   
+  // 缓存的QQ号
+  String _cachedQQ = "";
+  
   // 初始化方法，用于从本地存储加载数据
   @override
   void initState() {
@@ -132,6 +136,7 @@ class _HomePageState extends State<HomePage> {
       _best50TotalRA = prefs.getInt('best50TotalRA') ?? 15049;
       _best35TotalRA = prefs.getInt('best35TotalRA') ?? 10670;
       _best15TotalRA = prefs.getInt('best15TotalRA') ?? 4379;
+      _cachedQQ = prefs.getString('cachedQQ') ?? "";
     });
   }
   
@@ -144,11 +149,21 @@ class _HomePageState extends State<HomePage> {
     await prefs.setInt('best15TotalRA', _best15TotalRA);
   }
   
+  // 保存QQ号到本地存储
+  Future<void> _saveQQ(String qq) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('cachedQQ', qq);
+    setState(() {
+      _cachedQQ = qq;
+    });
+  }
+  
   // 按钮数据源：使用类型安全的ButtonItem模型
   final List<ButtonItem> buttonItems = const [
     ButtonItem(icon: Icons.music_note, title: '乐曲查询', subtitle: '查询舞萌曲库的乐曲'),
     ButtonItem(icon: Icons.score, title: '成绩查询', subtitle: '查看游玩数据'),
     ButtonItem(icon: Icons.collections_bookmark, title: '收藏品查询', subtitle: '查看收藏品查询'),
+    ButtonItem(icon: Icons.bookmark_add, title: '舞萌百科', subtitle: '到底什么是错位?'),
     ButtonItem(icon: Icons.leaderboard, title: 'Best50查询', subtitle: '我去,龙币!'),
     ButtonItem(icon: Icons.analytics, title: '拟合Best50查询', subtitle: '我w55怎么拟合才w52?!'),
     ButtonItem(icon: Icons.person_search_outlined, title: '个性化Best50查询', subtitle: '我超，名刀50!'),
@@ -345,9 +360,11 @@ class _HomePageState extends State<HomePage> {
     // 检查是否有缓存数据（通过检查用户昵称为默认值判断）
     bool hasNoCachedData = _userNickname == "U+5E78";
     
+    Widget userInfoContent;
+    
     if (hasNoCachedData) {
       // 没有缓存数据时显示提示信息
-      return Column(
+      userInfoContent = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -385,7 +402,7 @@ class _HomePageState extends State<HomePage> {
       );
     } else {
       // 有缓存数据时显示正常信息
-      return Column(
+      userInfoContent = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -433,11 +450,25 @@ class _HomePageState extends State<HomePage> {
         ],
       );
     }
+    
+    // 包装成可点击的Widget
+    return GestureDetector(
+      onTap: () {
+        if (_cachedQQ.isNotEmpty) {
+          // 如果有缓存的QQ号，直接执行刷新操作
+          _refreshDataWithoutNavigation(_cachedQQ);
+        } else {
+          // 否则显示刷新数据对话框
+          _showRefreshDataDialog(context);
+        }
+      },
+      child: userInfoContent,
+    );
   }
 
   // 显示刷新数据对话框
   void _showRefreshDataDialog(BuildContext context) {
-    final TextEditingController qqController = TextEditingController();
+    final TextEditingController qqController = TextEditingController(text: _cachedQQ);
     
     showDialog(
       context: context,
@@ -465,6 +496,7 @@ class _HomePageState extends State<HomePage> {
               onPressed: () async {
                 Navigator.of(context).pop();
                 if (qqController.text.isNotEmpty) {
+                  await _saveQQ(qqController.text);
                   await _refreshBest50Data(qqController.text);
                 }
               },
@@ -474,6 +506,96 @@ class _HomePageState extends State<HomePage> {
         );
       },
     );
+  }
+  
+  // 刷新数据（不跳转）
+  Future<void> _refreshDataWithoutNavigation(String qq) async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      // 清除推荐结果缓存
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(RecommendByTagsService.RECOMMENDATION_CACHE_KEY);
+        print('推荐结果缓存已清除');
+      } catch (e) {
+        print('清除推荐结果缓存失败: $e');
+      }
+      
+      // 从API获取并更新音乐数据
+      await MaimaiMusicDataManager().fetchAndUpdateMusicData();
+      
+      // 从API获取并更新难度数据
+      await DiffMusicDataManager().fetchAndUpdateDiffData();
+      
+      // 刷新标签数据
+      await RecommendByTagsService.initializeTags();
+      
+      // 从API获取并更新用户游玩数据
+      final userPlayDataManager = UserPlayDataManager();
+      final userPlayData = await userPlayDataManager.fetchUserPlayData(qq);
+      
+      final best50Manager = UserBest50Manager();
+      final best50Data = await best50Manager.getUserBest50(qq);
+      print(best50Data);
+      
+      // 更新用户昵称
+      if (userPlayData != null && userPlayData.containsKey('nickname')) {
+        setState(() {
+          _userNickname = userPlayData['nickname'];
+        });
+      }
+      
+      // 计算Best50、Best35、Best15总RA
+      int totalRA = 0;
+      int best35RA = 0;
+      int best15RA = 0;
+      
+      // 计算Best35总RA (sd charts)
+      for (var record in best50Data.charts.sd) {
+        best35RA += record.ra;
+      }
+      
+      // 计算Best15总RA (dx charts)
+      for (var record in best50Data.charts.dx) {
+        best15RA += record.ra;
+      }
+      
+      // 计算Best50总RA (sd + dx)
+      totalRA = best35RA + best15RA;
+      
+      // 更新状态
+      setState(() {
+        _best50TotalRA = totalRA;
+        _best35TotalRA = best35RA;
+        _best15TotalRA = best15RA;
+      });
+      
+      // 保存数据到本地存储
+      await _saveUserData();
+      
+      // 显示成功提示
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('数据刷新成功!'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      // 显示错误提示
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('刷新数据失败：$e'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
   
   // 刷新Best50数据
@@ -721,6 +843,12 @@ class _HomePageState extends State<HomePage> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => PersonalizedBest50Page()),
+            );
+          }
+          if (item.title == '舞萌百科'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => KnowledgeSearchPage()),
             );
           }
           // if (item.title == '谱面播放'){

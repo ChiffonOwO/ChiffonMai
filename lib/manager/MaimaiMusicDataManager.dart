@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:my_first_flutter_app/api/ApiUrls.dart';
-import 'package:my_first_flutter_app/entity/Song.dart';
+import '../api/ApiUrls.dart';
+import '../entity/Song.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MaimaiMusicDataManager {
@@ -68,5 +68,24 @@ class MaimaiMusicDataManager {
     }
     
     return null;
+  }
+
+  // 根据歌曲ID获取缓存的歌曲数据
+  Future<Song?> getCachedSongById(String songId) async {
+    try {
+      final songs = await getCachedSongs();
+      if (songs != null) {
+        return songs.firstWhere((song) => song.id == songId);
+      }
+    } catch (e) {
+      print('根据ID获取缓存歌曲数据时出错: $e');
+    }
+    
+    return null;
+  }
+
+  // 强制更新音乐数据
+  Future<bool> forceUpdateMusicData() async {
+    return await fetchAndUpdateMusicData();
   }
 }

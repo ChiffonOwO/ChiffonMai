@@ -10,6 +10,7 @@ import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'CollectionInfoPage.dart';
+import 'SongPlayPage.dart';
 
 class SongInfoPage extends StatefulWidget {
   final String songId;
@@ -74,6 +75,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
   static const int _slideWeight = 3;
   static const int _touchWeight = 1;
   static const int _breakWeight = 5;
+  
+  // 相关收藏品数量
+  int _relatedCollectionsCount = 0;
 
   @override
   void initState() {
@@ -92,6 +96,13 @@ class _SongInfoPageState extends State<SongInfoPage> {
       _userData = result['userData'];
       _tagData = result['tagData'];
       _tagSongsData = result['tagSongsData'];
+      
+      // 加载相关收藏品数量
+      if (_songData != null) {
+        final songTitle = _songData!['basic_info']['title'];
+        final songType = _songData!['type'] ?? '';
+        await _loadRelatedCollectionsCount(songTitle, songType);
+      }
     } catch (e) {
       print('加载数据失败: $e');
     } finally {
@@ -124,6 +135,21 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
       setState(() {
         _isLoading = false;
+      });
+    }
+  }
+  
+  // 加载相关收藏品数量
+  Future<void> _loadRelatedCollectionsCount(String songTitle, String songType) async {
+    try {
+      final relatedCollections = await SongInfoService().fetchRelatedCollections(songTitle, songType);
+      setState(() {
+        _relatedCollectionsCount = relatedCollections.length;
+      });
+    } catch (e) {
+      print('获取相关收藏品数量时出错: $e');
+      setState(() {
+        _relatedCollectionsCount = 0;
       });
     }
   }
@@ -379,6 +405,35 @@ class _SongInfoPageState extends State<SongInfoPage> {
       starScoreData.add({"star": star, "rate": rate, "minScore": minScore, "color": color});
     }
     
+    // 获取玩家最佳成绩
+    final userRecord = _getUserBestRecord();
+    
+    // 如果存在玩家最佳成绩，将其添加到表格中
+    if (userRecord != null && userRecord['dxScore'] != null) {
+      int userScore = userRecord['dxScore'];
+      
+      // 找到合适的插入位置
+      int insertIndex = 0;
+      while (insertIndex < starScoreData.length && userScore < starScoreData[insertIndex]['minScore']) {
+        insertIndex++;
+      }
+      
+      // 计算玩家成绩对应的达成率
+      double userRate = userScore / maxScore;
+      
+      // 确定玩家成绩的颜色
+      Color userColor = Colors.blue;
+      
+      // 插入玩家成绩
+      starScoreData.insert(insertIndex, {
+        "star": "玩家",
+        "rate": userRate,
+        "minScore": userScore,
+        "color": userColor,
+        "isUserRecord": true
+      });
+    }
+    
     // 计算提升值
     for (int i = starScoreData.length - 1; i > 0; i--) {
       int currentScore = starScoreData[i]['minScore'];
@@ -394,7 +449,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              '星数-最低DX分数对照表',
+              '星数-DX分数对照表',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -431,8 +486,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                   child: const Text('星数', style: TextStyle(fontSize: 16, color: Colors.grey)),
                 ),
                 Expanded(
-                  flex: 2, // 最低DX分数列占2份
-                  child: const Text('最低DX分数', style: TextStyle(fontSize: 16, color: Colors.grey), textAlign: TextAlign.center),
+                  flex: 2, // DX分数列占2份
+                  child: const Text('DX分数', style: TextStyle(fontSize: 16, color: Colors.grey), textAlign: TextAlign.center),
                 ),
                 Expanded(
                   flex: 1, // MAX-列占1份
@@ -446,16 +501,18 @@ class _SongInfoPageState extends State<SongInfoPage> {
             Column(
               children: starScoreData.asMap().entries.map((entry) {
                 var item = entry.value;
-                num star = item['star'];
+                dynamic star = item['star'];
                 double rate = item['rate'];
                 int minScore = item['minScore'];
                 int? delta = item['delta'];
                 Color color = item['color'];
+                bool isUserRecord = item['isUserRecord'] ?? false;
                 
                 return Container(
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   decoration: BoxDecoration(
                     border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+                    color: isUserRecord ? Colors.blue.shade50 : Colors.transparent,
                   ),
                   child: Row(
                     children: [
@@ -464,7 +521,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         child: Row(
                           children: [
                             Text(
-                              '\u2726 ${star.toString()}',
+                              star == "玩家" ? '玩家' : '\u2726 ${star.toString()}',
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
@@ -497,7 +554,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
                               ),
                             Text(
                               minScore.toString(),
-                              style: const TextStyle(fontSize: 16, color: Colors.black),
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: isUserRecord ? Colors.blue : Colors.black,
+                                fontWeight: isUserRecord ? FontWeight.bold : FontWeight.normal,
+                              ),
                             ),
                           ],
                         ),
@@ -509,7 +570,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
                           children: [
                             Text(
                               '-${maxScore - minScore}',
-                              style: const TextStyle(fontSize: 16, color: Colors.black),
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: isUserRecord ? Colors.blue : Colors.black,
+                                fontWeight: isUserRecord ? FontWeight.bold : FontWeight.normal,
+                              ),
                             ),
                           ],
                         ),
@@ -615,6 +680,29 @@ class _SongInfoPageState extends State<SongInfoPage> {
       scoreData.sort((a, b) => b['completion'].compareTo(a['completion']));
     }
     
+    // 获取玩家最佳成绩
+    final userRecord = _getUserBestRecord();
+    
+    // 如果存在玩家最佳成绩，将其添加到表格中
+    if (userRecord != null && userRecord['achievements'] != null && userRecord['ra'] != null) {
+      double userCompletion = userRecord['achievements'];
+      int userScore = userRecord['ra'];
+      
+      // 找到合适的插入位置：对比玩家的达成率与每一行的达成率
+      int insertIndex = 0;
+      while (insertIndex < scoreData.length && userCompletion < scoreData[insertIndex]['completion']) {
+        insertIndex++;
+      }
+      
+      // 插入玩家成绩（暂时不计算差距值）
+      scoreData.insert(insertIndex, {
+        "completion": userCompletion,
+        "rating": "玩家",
+        "score": userScore,
+        "isUserRecord": true
+      });
+    }
+    
     // 计算得分提升值
     for (int i = scoreData.length - 1; i > 0; i--) {
       int currentScore = scoreData[i]['score'];
@@ -673,45 +761,51 @@ class _SongInfoPageState extends State<SongInfoPage> {
             Column(
               children: scoreData.asMap().entries.map((entry) {
                 var item = entry.value;
-                String rating = item['rating'];
+                dynamic rating = item['rating'];
                 double completion = item['completion'];
                 int score = item['score'];
                 int? delta = item['delta'];
+                bool isUserRecord = item['isUserRecord'] ?? false;
                 
                 // 获取评级颜色
                 Color ratingColor = Colors.black;
-                switch (rating) {
-                  case 'SSS+':
-                  case 'SSS':
-                    ratingColor = Colors.yellow;
-                    break;
-                  case 'SS+':
-                  case 'SS':
-                    ratingColor = Color(0xFFFFAA00);
-                    break;
-                  case 'S+':
-                  case 'S':
-                    ratingColor = Color(0xFFFF9900);
-                    break;
-                  case 'AAA':
-                  case 'AA':
-                  case 'A':
-                    ratingColor = Color(0xFFFF4444);
-                    break;
-                  case 'BBB':
-                  case 'BB':
-                  case 'B':
-                    ratingColor = Color(0xFF44AAFF);
-                    break;
-                  case 'C':
-                    ratingColor = Color(0xFF88CCAA);
-                    break;
+                if (rating == "玩家") {
+                  ratingColor = Colors.blue;
+                } else {
+                  switch (rating) {
+                    case 'SSS+':
+                    case 'SSS':
+                      ratingColor = Colors.yellow;
+                      break;
+                    case 'SS+':
+                    case 'SS':
+                      ratingColor = Color(0xFFFFAA00);
+                      break;
+                    case 'S+':
+                    case 'S':
+                      ratingColor = Color(0xFFFF9900);
+                      break;
+                    case 'AAA':
+                    case 'AA':
+                    case 'A':
+                      ratingColor = Color(0xFFFF4444);
+                      break;
+                    case 'BBB':
+                    case 'BB':
+                    case 'B':
+                      ratingColor = Color(0xFF44AAFF);
+                      break;
+                    case 'C':
+                      ratingColor = Color(0xFFFF4444);
+                      break;
+                  }
                 }
                 
                 return Container(
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   decoration: BoxDecoration(
                     border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+                    color: isUserRecord ? Colors.blue.shade50 : Colors.transparent,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -719,7 +813,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                       Row(
                         children: [
                           Text(
-                            rating,
+                            rating.toString(),
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -749,7 +843,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
                             ),
                           Text(
                             score.toString(),
-                            style: const TextStyle(fontSize: 16, color: Colors.black),
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: isUserRecord ? Colors.blue : Colors.black,
+                              fontWeight: isUserRecord ? FontWeight.bold : FontWeight.normal,
+                            ),
                           ),
                         ],
                       ),
@@ -1402,39 +1500,95 @@ class _SongInfoPageState extends State<SongInfoPage> {
                             ),
                           ),
 
-                          // 按钮行（跳转到B站和查看收藏品）
+                          // 按钮行（跳转到B站、播放音乐、查看谱面代码和查看收藏品）
                           Container(
-                            margin: const EdgeInsets.only(top: 12),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: _jumpToBilibili,
-                                    child: const Text('跳转到B站'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.pink,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
+                            margin: const EdgeInsets.only(top: 0),
+                            child: GridView.builder(
+                              shrinkWrap: true,
+                              physics: NeverScrollableScrollPhysics(),
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                crossAxisSpacing: 8,
+                                mainAxisSpacing: 8,
+                                childAspectRatio: 3.0,
+                              ),
+                              itemCount: 4,
+                              itemBuilder: (context, index) {
+                                switch (index) {
+                                  case 0:
+                                    return ElevatedButton(
+                                      onPressed: _jumpToBilibili,
+                                      child: const Text('B站谱面确认'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.pink,
+                                        foregroundColor: Colors.white,
+                                        padding: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: _viewRelatedCollectibles,
-                                    child: const Text('相关收藏品'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.purple,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
+                                    );
+                                  case 1:
+                                    return ElevatedButton(
+                                      onPressed: _playMusic,
+                                      child: const Text('播放音乐'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.blue,
+                                        foregroundColor: Colors.white,
+                                        padding: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                                    );
+                                  case 2:
+                                    return ElevatedButton(
+                                      onPressed: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (BuildContext context) {
+                                            return AlertDialog(
+                                              title: Text('开发中'),
+                                              content: Text('开发中，敬请期待~（把这个按钮放上来是为了整齐，不然不好看了）'),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () {
+                                                    Navigator.of(context).pop();
+                                                  },
+                                                  child: Text('关闭'),
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        );
+                                      },
+                                      child: const Text('查看谱面代码'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.green,
+                                        foregroundColor: Colors.white,
+                                        padding: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                    );
+                                  case 3:
+                                    return ElevatedButton(
+                                      onPressed: _viewRelatedCollectibles,
+                                      child: Text('相关收藏品 $_relatedCollectionsCount'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.purple,
+                                        foregroundColor: Colors.white,
+                                        padding: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                    );
+                                  default:
+                                    return Container();
+                                }
+                              },
                             ),
                           ),
 
@@ -1524,7 +1678,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                       ),
                                                     ),
                                                     child: Text(
-                                                      tag['name'],
+                                                      tag['name']?.toString() ?? '未知标签',
                                                       style: TextStyle(
                                                         fontSize: 12,
                                                         fontWeight:
@@ -2450,6 +2604,20 @@ class _SongInfoPageState extends State<SongInfoPage> {
     }
   }
 
+  // 播放音乐
+  void _playMusic() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SongPlayPage(
+          songId: widget.songId,
+          songTitle: _songData!['basic_info']['title'],
+          songType: _songData!['type'],
+        ),
+      ),
+    );
+  }
+
   // 查看相关收藏品
   void _viewRelatedCollectibles() {
     if (_songData == null) return;
@@ -2527,12 +2695,15 @@ class _SongInfoPageState extends State<SongInfoPage> {
         
         return AlertDialog(
           title: Text('${songTitle}的相关收藏品'),
-          contentPadding: EdgeInsets.all(8.0), // 减小对话框内边距
+          contentPadding: relatedCollections.isEmpty ? EdgeInsets.all(20.0) : EdgeInsets.all(8.0), // 未找到时使用默认内边距
           content: Container(
             width: dialogWidth,
             child: SingleChildScrollView(
               child: relatedCollections.isEmpty
-                  ? Text('未找到与该歌曲相关的收藏品')
+                  ? Container(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Text('未找到与该歌曲相关的收藏品'),
+                    )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: relatedCollections.map((item) {
