@@ -60,6 +60,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
   
   // 表格展开状态
   bool _starScoreTableExpanded = false; // 星星等级表格默认收起
+  bool _showNextStarDiff = false; // 是否显示到下一星级的差距
   bool _achievementScoreTableExpanded = false; // 达成率表格默认收起
   bool _tagsTableExpanded = false; // 谱面标签默认收起
   bool _toleranceCalculationExpanded = false; // 容错计算默认收起
@@ -1433,19 +1434,44 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                               ),
                                             ),
                                             const SizedBox(height: 8),
-                                            RichText(
-                                              text: TextSpan(
-                                                children: [
-                                                  TextSpan(
-                                                    text: 'DX分数达成率: ',
-                                                    style: TextStyle(
-                                                      fontSize: MediaQuery.of(context).size.width * 0.042,
-                                                      color: Colors.grey,
-                                                      fontFamily: "Source Han Sans",
-                                                    ),
+                                            Row(
+                                              children: [
+                                                RichText(
+                                                  text: TextSpan(
+                                                    children: [
+                                                      TextSpan(
+                                                        text: 'DX分数达成率: ',
+                                                        style: TextStyle(
+                                                          fontSize: MediaQuery.of(context).size.width * 0.042,
+                                                          color: Colors.grey,
+                                                          fontFamily: "Source Han Sans",
+                                                        ),
+                                                      ),
+                                                      TextSpan(
+                                                        text: '${(userRecord['dxScore'] / _calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex) * 100).toStringAsFixed(2)}%  ',
+                                                        style: TextStyle(
+                                                          fontSize: MediaQuery.of(context).size.width * 0.042,
+                                                          color: _getStarsColor(
+                                                              _calculateStars(
+                                                                  int.parse(widget.songId),
+                                                                  _currentDiffIndex,
+                                                                  userRecord['dxScore'])),
+                                                          fontFamily: "Source Han Sans",
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
-                                                  TextSpan(
-                                                    text: '${(userRecord['dxScore'] / _calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex) * 100).toStringAsFixed(2)}%  ',
+                                                ),
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    setState(() {
+                                                      _showNextStarDiff = !_showNextStarDiff;
+                                                    });
+                                                  },
+                                                  child: Text(
+                                                    _showNextStarDiff
+                                                        ? _calculateNextStarDiff(int.parse(widget.songId), _currentDiffIndex, userRecord['dxScore'])
+                                                        : _calculateStarsBonus(int.parse(widget.songId), _currentDiffIndex, userRecord['dxScore']),
                                                     style: TextStyle(
                                                       fontSize: MediaQuery.of(context).size.width * 0.042,
                                                       color: _getStarsColor(
@@ -1456,20 +1482,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                       fontFamily: "Source Han Sans",
                                                     ),
                                                   ),
-                                                  TextSpan(
-                                                    text: _calculateStarsBonus(int.parse(widget.songId), _currentDiffIndex, userRecord['dxScore']),
-                                                    style: TextStyle(
-                                                      fontSize: MediaQuery.of(context).size.width * 0.042,
-                                                      color: _getStarsColor(
-                                                          _calculateStars(
-                                                              int.parse(widget.songId),
-                                                              _currentDiffIndex,
-                                                              userRecord['dxScore'])),
-                                                      fontFamily: "Source Han Sans",
-                                                    ),
-                                            ),
-                                                ],
-                                              ),
+                                                ),
+                                              ],
                                             ),
                                             const SizedBox(height: 8),
                                             
@@ -1500,12 +1514,15 @@ class _SongInfoPageState extends State<SongInfoPage> {
                             ),
                           ),
 
+                          SizedBox(height: 12),
+
                           // 按钮行（跳转到B站、播放音乐、查看谱面代码和查看收藏品）
                           Container(
                             margin: const EdgeInsets.only(top: 0),
                             child: GridView.builder(
                               shrinkWrap: true,
                               physics: NeverScrollableScrollPhysics(),
+                              padding: EdgeInsets.zero,
                               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: 2,
                                 crossAxisSpacing: 8,
@@ -2441,7 +2458,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
       case 3:
         return 'Master';
       case 4:
-        return 'ReMAS';
+        return 'Re:MAS';
       default:
         return '';
     }
@@ -2557,6 +2574,63 @@ class _SongInfoPageState extends State<SongInfoPage> {
     dynamic displayStarLevel = starLevel == 0 ? 1 : starLevel;
 
     return '\u2726 $displayStarLevel $symbol$difference';
+  }
+
+  // 计算到下一星级还需要多少分
+  String _calculateNextStarDiff(int songId, int levelIndex, int score) {
+    int maxScore = _calculateMaxDxScore(songId, levelIndex);
+    double scoreRate = score / maxScore;
+
+    // 定义各星级对应的最低达成率
+    Map<dynamic, double> starRates = {
+      0: 0.85,   // 1星最低
+      1: 0.85,   // 1星
+      2: 0.90,   // 2星
+      3: 0.93,   // 3星
+      4: 0.95,   // 4星
+      5: 0.97,   // 5星
+      5.5: 0.98, // 5.5星
+      6: 0.99,   // 6星
+    };
+
+    // 确定当前星星等级
+    dynamic currentStar = 0;
+    if (scoreRate >= 0.99) {
+      currentStar = 6;
+    } else if (scoreRate >= 0.98) {
+      currentStar = 5.5;
+    } else if (scoreRate >= 0.97) {
+      currentStar = 5;
+    } else if (scoreRate >= 0.95) {
+      currentStar = 4;
+    } else if (scoreRate >= 0.93) {
+      currentStar = 3;
+    } else if (scoreRate >= 0.90) {
+      currentStar = 2;
+    } else if (scoreRate >= 0.85) {
+      currentStar = 1;
+    } else {
+      currentStar = 0;
+    }
+
+    // 确定下一星级
+    List<dynamic> starOrder = [0, 1, 2, 3, 4, 5, 5.5, 6];
+    int currentIndex = starOrder.indexOf(currentStar);
+
+    // 如果已经是最高星级，显示已满
+    if (currentIndex >= starOrder.length - 1) {
+      return '\u2726 6 已满';
+    }
+
+    // 获取下一星级和对应的最低分数
+    dynamic nextStar = starOrder[currentIndex + 1];
+    double nextRate = starRates[nextStar]!;
+    int nextMinScore = (maxScore * nextRate).ceil();
+
+    // 计算还需要多少分
+    int diff = nextMinScore - score;
+
+    return '\u2726 $nextStar -$diff';
   }
 
   // 获取星星颜色

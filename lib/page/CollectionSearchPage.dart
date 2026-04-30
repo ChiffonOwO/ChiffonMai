@@ -149,7 +149,7 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
     final screenWidth = MediaQuery.of(context).size.width;
 
     // 按钮相关配置
-    final buttonHeight = 48.0; // 降低按钮高度
+    final buttonHeight = 36.0; // 降低按钮高度
     final buttonBorderRadius = 8.0;
 
     return Scaffold(
@@ -271,10 +271,25 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
                                     )
                                   : ListView.builder(
                                       shrinkWrap: true,
-                                      padding: EdgeInsets.zero,
-                                      itemCount: _searchResults.length,
+                                      padding: EdgeInsets.only(top: 8),
+                                      itemCount: _searchResults.length + 1,
                                       itemBuilder: (context, index) {
-                                        final collection = _searchResults[index];
+                                        // 第一个item显示搜索结果数量
+                                        if (index == 0) {
+                                          return Padding(
+                                            padding: EdgeInsets.only(bottom: 8),
+                                            child: Center(
+                                              child: Text(
+                                                '找到 ${_searchResults.length} 个收藏品',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                        final collection = _searchResults[index - 1];
                                         return Card(
                                           margin: EdgeInsets.symmetric(vertical: 4.0),
                                           child: InkWell(
@@ -310,6 +325,17 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
                                                                 style: TextStyle(
                                                                   fontSize: 18,
                                                                   fontWeight: FontWeight.bold,
+                                                                ),
+                                                              ),
+                                                              // 显示收藏品ID
+                                                              Padding(
+                                                                padding: const EdgeInsets.only(top: 4.0),
+                                                                child: Text(
+                                                                  'ID: ${collection.id}',
+                                                                  style: TextStyle(
+                                                                    fontSize: 12,
+                                                                    color: Colors.grey[500],
+                                                                  ),
                                                                 ),
                                                               ),
                                                               if (collection.description != null)
@@ -404,6 +430,17 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
                                                                     ),
                                                                   ),
                                                               ],
+                                                            ),
+                                                            // 显示收藏品ID
+                                                            Padding(
+                                                              padding: const EdgeInsets.only(top: 4.0),
+                                                              child: Text(
+                                                                'ID: ${collection.id}',
+                                                                style: TextStyle(
+                                                                  fontSize: 12,
+                                                                  color: Colors.grey[500],
+                                                                ),
+                                                              ),
                                                             ),
                                                             if (collection.description != null)
                                                               Padding(

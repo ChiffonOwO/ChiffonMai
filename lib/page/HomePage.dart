@@ -9,6 +9,7 @@ import 'package:my_first_flutter_app/page/GuessChartByCoverPage.dart';
 import 'package:my_first_flutter_app/page/GuessChartByInfoPage.dart';
 import 'package:my_first_flutter_app/page/GuessChartBySongExcerptPage.dart';
 import 'package:my_first_flutter_app/page/GuessSongByOpenLettersPage.dart';
+import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeSelectPage.dart';
 import 'package:my_first_flutter_app/page/KnowledgeSearchPage.dart';
 import 'package:my_first_flutter_app/page/MaimaiServerStatusPage.dart';
 import 'package:my_first_flutter_app/page/PersonalizedBest50Page.dart';
@@ -167,6 +168,7 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.leaderboard, title: 'Best50查询', subtitle: '我去,龙币!'),
     ButtonItem(icon: Icons.analytics, title: '拟合Best50查询', subtitle: '我w55怎么拟合才w52?!'),
     ButtonItem(icon: Icons.person_search_outlined, title: '个性化Best50查询', subtitle: '我超，名刀50!'),
+    ButtonItem(icon: Icons.door_back_door, title: 'KALEIDXSCOPE', subtitle: '白xx!(bushi'),
     ButtonItem(icon: Icons.label, title: '基于标签推荐', subtitle: '基于你游玩的谱面标签推荐曲目'),
     ButtonItem(icon: Icons.shuffle, title: '随机乐曲', subtitle: '随机选曲1-4首'),
     ButtonItem(icon: Icons.calculate, title: '单曲Rating计算', subtitle: '我鸟加这个有分吃吗？'),
@@ -849,6 +851,12 @@ class _HomePageState extends State<HomePage> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => KnowledgeSearchPage()),
+            );
+          }
+          if (item.title == 'KALEIDXSCOPE'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => KaleidXScopeSelectPage()),
             );
           }
           // if (item.title == '谱面播放'){

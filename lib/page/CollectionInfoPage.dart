@@ -6,6 +6,7 @@ import '../utils/LuoXueToDivingFishUtil.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/CollectionsImageUtil.dart';
 import '../utils/CoverUtil.dart';
+import '../utils/StringUtil.dart';
 import '../utils/TranslationUtil.dart';
 import 'SongInfoPage.dart';
 
@@ -208,6 +209,17 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
     }
   }
 
+  // 获取定数显示（第3,4,5个定数，第5个没有显示为-）
+  String _getDsDisplay(List<double>? dsList) {
+    if (dsList == null || dsList.isEmpty) {
+      return '- / - / -';
+    }
+    String ds3 = dsList.length > 2 ? dsList[2].toStringAsFixed(1) : '-';
+    String ds4 = dsList.length > 3 ? dsList[3].toStringAsFixed(1) : '-';
+    String ds5 = dsList.length > 4 ? dsList[4].toStringAsFixed(1) : '-';
+    return '$ds3 / $ds4 / $ds5';
+  }
+
   // 获取难度显示
   Widget _getDifficultiesDisplay(List<int> difficulties) {
     final Map<int, Map<String, dynamic>> difficultyMap = {
@@ -365,16 +377,10 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                   itemBuilder: (context, index) {
                     final requiredSong = requiredItem.songs![index];
                     final song = _songMap?[requiredSong];
-                    // 获取MASTER和REMASTER定数
-                    String masterDs = '-';
-                    String remasterDs = '-';
+                    // 获取定数列表
+                    List<double> dsList = [];
                     if (song != null && song.ds != null && song.ds is List) {
-                      if (song.ds.length > 3) {
-                        masterDs = song.ds[3].toStringAsFixed(1);
-                      }
-                      if (song.ds.length > 4) {
-                        remasterDs = song.ds[4].toStringAsFixed(1);
-                      }
+                      dsList = song.ds;
                     }
                     return GestureDetector(
                       onTap: () {
@@ -398,41 +404,53 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                             width: 1,
                           ),
                         ),
-                        padding: EdgeInsets.all(4), // 进一步减小内边距
+                        padding: EdgeInsets.all(4),
                         child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center, // 垂直居中对齐
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             // 曲绘
                             Container(
-                              width: 40, // 增大曲绘尺寸
-                              height: 40, // 增大曲绘尺寸
+                              width: 40,
+                              height: 40,
                               child: CoverUtil.buildCoverWidgetWithContext(
                                 context,
                                 song?.id.toString() ?? requiredSong.id.toString(),
                                 40,
                               ),
                             ),
-                            SizedBox(width: 6), // 调整间距，适应增大的曲绘尺寸
+                            SizedBox(width: 6),
                             // 歌曲信息
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center, // 垂直居中
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
                                     requiredSong.title,
                                     style: TextStyle(
-                                      fontSize: 11, // 进一步减小字体大小
+                                      fontSize: 11,
                                       fontWeight: FontWeight.w500,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                  SizedBox(height: 1), // 进一步减小间距
+                                  SizedBox(height: 1),
+                                  // 第二行：类型|版本
                                   Text(
-                                    '${_getTypeDisplay(requiredSong.type)} | $masterDs | $remasterDs',
+                                    '${_getTypeDisplay(requiredSong.type)} | ${song != null ? StringUtil.formatVersion2(song.basicInfo.from) : '-'}',
                                     style: TextStyle(
-                                      fontSize: 9, // 进一步减小字体大小
+                                      fontSize: 9,
+                                      color: Colors.grey[600],
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  SizedBox(height: 1),
+                                  // 第三行：第3,4,5个定数（EXPERT/MASTER/RE:MASTER）
+                                  Text(
+                                    _getDsDisplay(dsList),
+                                    style: TextStyle(
+                                      fontSize: 9,
                                       color: Colors.grey[600],
                                     ),
                                     maxLines: 1,
@@ -831,6 +849,14 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                       fontSize: 24,
                                       fontWeight: FontWeight.bold,
                                       color: textPrimaryColor,
+                                    ),
+                                  ),
+                                  // 收藏品ID
+                                  Text(
+                                    'ID: ${widget.collectionId}',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[600],
                                     ),
                                   ),
                                   // 如果名称包含英文或日文，显示翻译按钮和结果

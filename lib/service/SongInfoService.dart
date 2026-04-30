@@ -574,7 +574,7 @@ class SongInfoService {
       case 3:
         return 'Master';
       case 4:
-        return 'ReMAS';
+        return 'Re:MAS';
       default:
         return '';
     }
