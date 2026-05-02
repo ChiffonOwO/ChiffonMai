@@ -62,13 +62,13 @@ class StringUtil {
       return 'ORANGE 橙';
     }
     if (version == 'maimai ORANGE PLUS'){
-      return 'ORANGE+ 晓';
+      return 'ORANGE+ 暁';
     }
     if (version == 'maimai PiNK'){
       return 'PiNK 桃';
     }
     if (version == 'maimai PiNK PLUS'){
-      return 'PiNK+ 樱';
+      return 'PiNK+ 櫻';
     }
     if (version == 'maimai MURASAKi'){
       return 'MURASAKi 紫';
@@ -77,7 +77,7 @@ class StringUtil {
       return 'MURASAKi 紫';
     }
     if (version == 'maimai MURASAKi PLUS'){
-      return 'MURASAKi+ 堇';
+      return 'MURASAKi+ 菫';
     }
     if (version == 'maimai MiLK'){
       return 'MiLK 白';
@@ -86,7 +86,7 @@ class StringUtil {
       return 'MiLK+ 雪';
     }
     if (version == 'maimai FiNALE'){
-      return 'FiNALE 辉';
+      return 'FiNALE 輝';
     }
     if (version == 'maimai \u3067\u3089\u3063\u304f\u3059') {
       return 'DX 2020 熊/華';
@@ -209,5 +209,14 @@ class StringUtil {
     } else {
       return '\u27260';
     }
+  }
+
+  /**
+   * 格式化歌曲类型字符串
+   * @param type 歌曲类型字符串
+   * @return 格式化后的歌曲类型字符串
+   */
+  static String formatSongType(String type) {
+    return type == "DX" ? "DX" : "ST";
   }
 }

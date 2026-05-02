@@ -41,5 +41,13 @@ class ColorUtil {
     return colors[levelIndex.clamp(0, 4)];
   }
 
+  /**
+   * 获取封面边框颜色
+   * @param levelIndex 等级索引
+   * @return 封面边框颜色
+   */
+  static Color getCoverBorderColor(int levelIndex) {
+    return getCardColor(levelIndex);
+  }
 
 }

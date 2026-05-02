@@ -2,16 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/page/Best50Page.dart';
 import 'package:my_first_flutter_app/page/CollectionSearchPage.dart';
 import 'package:my_first_flutter_app/page/DiffBest50Page.dart';
-import 'package:my_first_flutter_app/page/GuessChartByAliaPage.dart';
-import 'package:my_first_flutter_app/page/GuessChartByBlurredCoverPage.dart';
+import 'package:my_first_flutter_app/page/GuessChartGame/GuessChartByAliaPage.dart';
+import 'package:my_first_flutter_app/page/GuessChartGame/GuessChartByBlurredCoverPage.dart';
 //import 'package:my_first_flutter_app/page/GuessChartByChartExcerptPage.dart';
-import 'package:my_first_flutter_app/page/GuessChartByCoverPage.dart';
-import 'package:my_first_flutter_app/page/GuessChartByInfoPage.dart';
-import 'package:my_first_flutter_app/page/GuessChartBySongExcerptPage.dart';
-import 'package:my_first_flutter_app/page/GuessSongByOpenLettersPage.dart';
+import 'package:my_first_flutter_app/page/GuessChartGame/GuessChartByCoverPage.dart';
+import 'package:my_first_flutter_app/page/GuessChartGame/GuessChartByInfoPage.dart';
+import 'package:my_first_flutter_app/page/GuessChartGame/GuessChartBySongExcerptPage.dart';
+import 'package:my_first_flutter_app/page/GuessChartGame/GuessSongByOpenLettersPage.dart';
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeSelectPage.dart';
 import 'package:my_first_flutter_app/page/KnowledgeSearchPage.dart';
+import 'package:my_first_flutter_app/page/LevelScorePage.dart';
 import 'package:my_first_flutter_app/page/MaimaiServerStatusPage.dart';
+import 'package:my_first_flutter_app/page/PaiziProgressPage.dart';
 import 'package:my_first_flutter_app/page/PersonalizedBest50Page.dart';
 import 'package:my_first_flutter_app/page/RandomChartPage.dart';
 import 'package:my_first_flutter_app/page/RecommendByTagsPage.dart';
@@ -163,6 +165,8 @@ class _HomePageState extends State<HomePage> {
   final List<ButtonItem> buttonItems = const [
     ButtonItem(icon: Icons.music_note, title: '乐曲查询', subtitle: '查询舞萌曲库的乐曲'),
     ButtonItem(icon: Icons.score, title: '成绩查询', subtitle: '查看游玩数据'),
+    ButtonItem(icon: Icons.wysiwyg_rounded, title: '牌子进度', subtitle: '真代没有真将哦'),
+    ButtonItem(icon: Icons.grading_rounded, title: '等级成绩查询', subtitle: '我去!15神!'),
     ButtonItem(icon: Icons.collections_bookmark, title: '收藏品查询', subtitle: '查看收藏品查询'),
     ButtonItem(icon: Icons.bookmark_add, title: '舞萌百科', subtitle: '到底什么是错位?'),
     ButtonItem(icon: Icons.leaderboard, title: 'Best50查询', subtitle: '我去,龙币!'),
@@ -857,6 +861,18 @@ class _HomePageState extends State<HomePage> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => KaleidXScopeSelectPage()),
+            );
+          }
+          if (item.title == '牌子进度'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => PaiziProgressPage()),
+            );
+          }
+          if (item.title == '等级成绩查询'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => LevelScorePage()),
             );
           }
           // if (item.title == '谱面播放'){

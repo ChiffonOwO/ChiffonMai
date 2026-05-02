@@ -1238,6 +1238,28 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                           ),
                                                         ),
                                                       ),
+                                                      SizedBox(width: 4),
+                                                      ElevatedButton(
+                                                        onPressed: () {
+                                                          setState(() {
+                                                            _selectedButtonIndex = 5;
+                                                          });
+                                                        },
+                                                        style: ElevatedButton.styleFrom(
+                                                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                          minimumSize: Size(_smallButtonWidth, _smallButtonHeight),
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius: BorderRadius.circular(4),
+                                                          ),
+                                                          backgroundColor: _selectedButtonIndex == 5 ? Colors.blue : null,
+                                                        ),
+                                                        child: Text('定数', 
+                                                          style: TextStyle(
+                                                            fontSize: _smallButtonFontSize, 
+                                                            color: _selectedButtonIndex == 5 ? Colors.white : Colors.black,
+                                                          ),
+                                                        ),
+                                                      ),
                                                     ],
                                                   ),
                                                 ),
@@ -1438,8 +1460,14 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                     displaySubText = '${(rate * 100).toStringAsFixed(2)}%';
                                                   }
                                                   break;
+                                                case 5: // 定数
+                                                  if (song.containsKey('ds')) {
+                                                    displayText = song['ds'].toString();
+                                                    displayColor = Colors.white;
+                                                  }
+                                                  break;
                                               }
-                                              
+                                               
                                               return GestureDetector(
                                                 onTap: () {
                                                   Navigator.push(

@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/service/GuessSongByOpenLettersService.dart';
-import 'package:my_first_flutter_app/service/GuessChartCommonSettingsService.dart';
+import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartCommonSettingsService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonCacheUtil.dart';
