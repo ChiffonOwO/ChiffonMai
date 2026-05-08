@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../api/ApiUrls.dart';
 import '../entity/Song.dart';
+import '../service/GuessChartGame/MultiplayerCloudBaseService.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MaimaiMusicDataManager {
@@ -12,6 +13,9 @@ class MaimaiMusicDataManager {
 
   // API 地址
   static const String _apiUrl = ApiUrls.MusicDataApi;
+  
+  // 多人游戏云服务
+  final MultiplayerCloudBaseService _cloudService = MultiplayerCloudBaseService();
 
   // 从 API 获取音乐数据并更新缓存
   Future<bool> fetchAndUpdateMusicData() async {
@@ -87,5 +91,37 @@ class MaimaiMusicDataManager {
   // 强制更新音乐数据
   Future<bool> forceUpdateMusicData() async {
     return await fetchAndUpdateMusicData();
+  }
+
+  // 将本地缓存的歌曲数据上传到服务器
+  Future<bool> uploadCachedSongsToServer() async {
+    try {
+      // 获取本地缓存的歌曲数据
+      final songs = await getCachedSongs();
+      if (songs == null || songs.isEmpty) {
+        print('没有缓存的歌曲数据可上传');
+        return false;
+      }
+      
+      // 转换为 Map 列表
+      List<Map<String, dynamic>> songMaps = songs.map((song) => song.toJson()).toList();
+      
+      // 上传到服务器
+      await _cloudService.uploadSongs(songMaps);
+      print('成功将 ${songs.length} 首歌曲上传到服务器');
+      return true;
+    } catch (e) {
+      print('上传歌曲数据到服务器时出错: $e');
+      return false;
+    }
+  }
+
+  // 获取服务器上的歌曲数量
+  Future<void> getServerSongCount() async {
+    try {
+      await _cloudService.getSongCount();
+    } catch (e) {
+      print('获取服务器歌曲数量时出错: $e');
+    }
   }
 }

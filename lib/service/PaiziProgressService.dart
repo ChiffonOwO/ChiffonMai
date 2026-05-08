@@ -85,12 +85,32 @@ class PaiziProgressService {
   }
 
   // 获取称号类型选项
-  List<String> getTitleTypeOptions() {
-    return ['極', '将', '神', '舞舞'];
+  // 当firstChar为'舞'时，额外添加'霸者'选项
+  List<String> getTitleTypeOptions({String? firstChar}) {
+    final options = ['極', '将', '神', '舞舞'];
+    if (firstChar == '舞') {
+      options.add('霸者');
+    }
+    return options;
   }
 
   // 根据第一个字和称号类型获取对应的收藏品
   Future<Collection?> getPlateBySelection(String firstChar, String titleType) async {
+    // 特殊处理：霸者称号查找id为6148的收藏品（需要从所有plates中查找）
+    if (titleType == '霸者') {
+      final collectionsManager = CollectionsManager();
+      final collectionData = await collectionsManager.fetchPlatesCollections();
+      if (collectionData?.plates == null) {
+        return null;
+      }
+      try {
+        return collectionData!.plates!.firstWhere((plate) => plate.id == 6148);
+      } catch (e) {
+        return null;
+      }
+    }
+    
+    // 其他称号类型从匹配的plates中查找
     final plates = await getMatchingPlates();
     final targetName = firstChar + titleType;
     
@@ -170,6 +190,11 @@ class PaiziProgressService {
         // fs字段为fsd或fsdp
         final fs = record['fs'] as String?;
         return fs == 'fsd' || fs == 'fsdp';
+      
+      case '霸者':
+        // 达成率大于等于80%
+        final achievements = double.tryParse(record['achievements'].toString()) ?? 0;
+        return achievements >= 80;
       
       default:
         return false;

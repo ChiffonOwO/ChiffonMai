@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_first_flutter_app/manager/MultiplayerManager.dart';
 import 'package:my_first_flutter_app/page/HomePage.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
@@ -11,7 +12,9 @@ import 'package:my_first_flutter_app/constant/LoadingTipsConstant.dart';
 
 // 程序入口：运行Flutter应用，根组件为MyApp
 void main() {
-  runApp(const MyApp());
+  runApp(
+    MyApp()
+  );
 }
 
 /// 应用根组件：有状态组件，配置MaterialApp基础属性并管理初始化

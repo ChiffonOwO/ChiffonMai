@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/page/Best50Page.dart';
+import 'package:my_first_flutter_app/page/Multiplayer/MultiplayerLobbyPage.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:my_first_flutter_app/page/Best50/Best50Page.dart';
 import 'package:my_first_flutter_app/page/CollectionSearchPage.dart';
-import 'package:my_first_flutter_app/page/DiffBest50Page.dart';
+import 'package:my_first_flutter_app/page/Best50/DiffBest50Page.dart';
 import 'package:my_first_flutter_app/page/GuessChartGame/GuessChartByAliaPage.dart';
 import 'package:my_first_flutter_app/page/GuessChartGame/GuessChartByBlurredCoverPage.dart';
 //import 'package:my_first_flutter_app/page/GuessChartByChartExcerptPage.dart';
@@ -14,7 +16,7 @@ import 'package:my_first_flutter_app/page/KnowledgeSearchPage.dart';
 import 'package:my_first_flutter_app/page/LevelScorePage.dart';
 import 'package:my_first_flutter_app/page/MaimaiServerStatusPage.dart';
 import 'package:my_first_flutter_app/page/PaiziProgressPage.dart';
-import 'package:my_first_flutter_app/page/PersonalizedBest50Page.dart';
+import 'package:my_first_flutter_app/page/Best50/PersonalizedBest50Page.dart';
 import 'package:my_first_flutter_app/page/RandomChartPage.dart';
 import 'package:my_first_flutter_app/page/RecommendByTagsPage.dart';
 import 'package:my_first_flutter_app/page/SingleRatingCalculatorPage.dart';
@@ -185,9 +187,11 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.gamepad, title: '根据歌曲片段猜歌', subtitle: '舞萌笑传之猜猜呗4'),
     ButtonItem(icon: Icons.gamepad, title: '根据别名猜歌', subtitle: '舞萌笑传之猜猜呗5'),
     ButtonItem(icon: Icons.gamepad, title: '舞萌开字母', subtitle: '舞萌笑传之猜猜呗6'),
+    ButtonItem(icon: Icons.gamepad, title: '多人猜歌游戏', subtitle: '什么叫你随便答了一个就对了?!'),
     ButtonItem(icon: Icons.file_upload_sharp, title: '刷新数据', subtitle: '刷新你的舞萌数据'),
     ButtonItem(icon: Icons.network_check, title: '服务器状态', subtitle: '查看舞萌服务器状态'),
     ButtonItem(icon: Icons.update, title: '检查更新', subtitle: '检查应用是否有新版本'),
+    ButtonItem(icon: Icons.poll_outlined, title: '问卷调查', subtitle: '助力ChiffonMai更上一层楼!'),
     //ButtonItem(icon: Icons.play_arrow, title: '谱面播放', subtitle: '播放谱面'),
   ];
 
@@ -731,7 +735,7 @@ class _HomePageState extends State<HomePage> {
           ),
           elevation: 0,
         ),
-        onPressed: () {
+        onPressed: () async {
           debugPrint("点击了：${item.title}");
           // 版本对照按钮点击事件
           if (item.title == '版本对照') {
@@ -839,6 +843,12 @@ class _HomePageState extends State<HomePage> {
               MaterialPageRoute(builder: (context) => GuessSongByOpenLettersPage()),
             );
           }
+          if (item.title == '多人猜歌游戏'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => MultiplayerLobbyPage()),
+            );
+          }
           if (item.title == '服务器状态'){
             Navigator.push(
               context,
@@ -881,6 +891,12 @@ class _HomePageState extends State<HomePage> {
           //     MaterialPageRoute(builder: (context) => GuessChartByChartExcerptPage()),
           //   );
           // }
+          if (item.title == '问卷调查') {
+            final uri = Uri.parse('https://wj.qq.com/s2/26540572/7828/');
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
+          }
           if (item.title == '检查更新'){
             // 显示加载对话框
             showDialog(
@@ -903,35 +919,8 @@ class _HomePageState extends State<HomePage> {
             
             // 检查更新
             final updateManager = LZYCheckUpdateManager();
-            updateManager.checkUpdate().then((updateInfo) {
+            updateManager.showUpdateDialog(context, force: true).then((_) {
               Navigator.of(context).pop(); // 关闭加载对话框
-              if (updateInfo['hasUpdate']) {
-                // 显示更新提示
-                if (context.mounted) {
-                  updateManager.showUpdateDialog(context);
-                }
-              } else {
-                // 显示没有更新的提示
-                if (context.mounted) {
-                  showDialog(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return AlertDialog(
-                        title: Text('检查更新'),
-                        content: Text('当前已是最新版本'),
-                        actions: [
-                          TextButton(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                            },
-                            child: Text('确定'),
-                          ),
-                        ],
-                      );
-                    },
-                  );
-                }
-              }
             }).catchError((error) {
               Navigator.of(context).pop(); // 关闭加载对话框
               // 显示错误提示

@@ -1,0 +1,15 @@
+{
+  "envId": "{{env.ENV_ID}}",
+  "functionRoot": "./functions",
+  "functions": [],
+  "ai": {
+    "defaultAgent": "{{env.AI_DEFAULT_AGENT}}",
+    "agents": {
+      "claude": {
+        "type": "cloudbase",
+        "provider": "kimi-exp",
+        "model": "kimi-k2-instruct-local"
+      }
+    }
+  }
+}

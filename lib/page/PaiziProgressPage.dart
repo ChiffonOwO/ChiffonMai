@@ -96,8 +96,8 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
     });
 
     try {
-      _titleTypeOptions = _service.getTitleTypeOptions();
       _firstCharOptions = await _service.getFirstCharOptions();
+      _titleTypeOptions = _service.getTitleTypeOptions(firstChar: _firstCharOptions.isNotEmpty ? _firstCharOptions[0] : null);
 
       // 获取保存的用户选项
       final savedOptions = await _service.getSavedOptions();
@@ -109,6 +109,10 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
             ? savedFirstChar
             : (_firstCharOptions.contains('真') ? '真' : _firstCharOptions[0]);
       }
+      
+      // 根据选中的首字更新称号类型选项（确保正确显示霸者按钮）
+      _titleTypeOptions = _service.getTitleTypeOptions(firstChar: _selectedFirstChar);
+      
       if (_titleTypeOptions.isNotEmpty) {
         final savedTitleType = savedOptions['titleType'] as String;
         _selectedTitleType = _titleTypeOptions.contains(savedTitleType) && savedTitleType.isNotEmpty
@@ -538,6 +542,12 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                       setState(() {
                         _selectedFirstChar = char;
                         _cachedSongsWithStatus = null; // 清空缓存
+                        // 更新称号类型选项
+                        _titleTypeOptions = _service.getTitleTypeOptions(firstChar: char);
+                        // 如果当前选中的称号类型不在新选项中，重置为第一个选项
+                        if (_selectedTitleType != null && !_titleTypeOptions.contains(_selectedTitleType)) {
+                          _selectedTitleType = _titleTypeOptions.isNotEmpty ? _titleTypeOptions[0] : null;
+                        }
                       });
                       await _updateDifficultyOptions();
                       await _loadCurrentPlate();
@@ -1011,7 +1021,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                           });
                         },
                         child: Text(
-                          _useLevelDisplay ? '等级显示' : '定数显示',
+                          _useLevelDisplay ? '当前:等级' : '当前:定数',
                           style: TextStyle(fontSize: _textSizeS),
                         ),
                       ),
@@ -1032,7 +1042,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                           });
                         },
                         child: Text(
-                          _showListMode ? '列表' : '曲绘',
+                          _showListMode ? '当前:列表' : '当前:曲绘',
                           style: TextStyle(fontSize: _textSizeS),
                         ),
                       ),

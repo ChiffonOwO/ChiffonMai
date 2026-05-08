@@ -138,6 +138,22 @@ class LevelScoreService {
         final fc = record['fc'] as String?;
         return fc == 'ap' || fc == 'app';
 
+      case '全97':
+        final achievements = double.tryParse(record['achievements'].toString()) ?? 0;
+        return achievements >= 97;
+
+      case '全98':
+        final achievements = double.tryParse(record['achievements'].toString()) ?? 0;
+        return achievements >= 98;
+
+      case '全99':
+        final achievements = double.tryParse(record['achievements'].toString()) ?? 0;
+        return achievements >= 99;
+
+      case '全99.5':
+        final achievements = double.tryParse(record['achievements'].toString()) ?? 0;
+        return achievements >= 99.5;
+
       default:
         return false;
     }
@@ -253,7 +269,7 @@ class LevelScoreService {
 
   // 获取称号类型选项
   List<String> getTitleTypeOptions() {
-    return ['極', '将', '神'];
+    return ['極', '将', '神', '全97', '全98', '全99', '全99.5'];
   }
 
   // 获取难度选项
