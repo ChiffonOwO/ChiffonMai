@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:marquee/marquee.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
+import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/entity/DiffSong.dart';
 import 'package:my_first_flutter_app/entity/Collection.dart';
+import 'package:my_first_flutter_app/entity/Song.dart';
+import 'package:my_first_flutter_app/page/SongMaidataPage.dart';
 import 'package:my_first_flutter_app/service/SongInfoService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
@@ -79,6 +82,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
   
   // 相关收藏品数量
   int _relatedCollectionsCount = 0;
+  
+  // 另一种谱面的歌曲ID（如果存在）
+  String? _alternativeSongId;
 
   @override
   void initState() {
@@ -103,6 +109,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
         final songTitle = _songData!['basic_info']['title'];
         final songType = _songData!['type'] ?? '';
         await _loadRelatedCollectionsCount(songTitle, songType);
+        
+        // 检测是否存在另一种谱面
+        await _checkAlternativeSong(songTitle, songType);
       }
     } catch (e) {
       print('加载数据失败: $e');
@@ -152,6 +161,57 @@ class _SongInfoPageState extends State<SongInfoPage> {
       setState(() {
         _relatedCollectionsCount = 0;
       });
+    }
+  }
+  
+  // 检测是否存在另一种谱面的歌曲
+  Future<void> _checkAlternativeSong(String songTitle, String currentType) async {
+    try {
+      // 获取所有歌曲数据
+      final songs = await MaimaiMusicDataManager().getCachedSongs();
+      if (songs == null || songs.isEmpty) {
+        _alternativeSongId = null;
+        return;
+      }
+      
+      // 确定要查找的另一种类型
+      String targetType = currentType == 'DX' ? 'SD' : 'DX';
+      
+      // 查找同名但类型不同的歌曲
+      final alternativeSong = songs.firstWhere(
+        (song) => 
+          song.basicInfo.title == songTitle && 
+          song.type == targetType &&
+          song.id != widget.songId,
+        orElse: () => Song(
+          id: '',
+          title: '',
+          type: '',
+          ds: [],
+          level: [],
+          cids: [],
+          charts: [],
+          basicInfo: BasicInfo(
+            title: '',
+            artist: '',
+            genre: '',
+            bpm: 0,
+            releaseDate: '',
+            from: '',
+            isNew: false,
+          ),
+        ),
+      );
+      
+      // 如果找到另一种谱面，设置其ID
+      if (alternativeSong.id.isNotEmpty) {
+        _alternativeSongId = alternativeSong.id;
+      } else {
+        _alternativeSongId = null;
+      }
+    } catch (e) {
+      print('检测另一种谱面时出错: $e');
+      _alternativeSongId = null;
     }
   }
 
@@ -1170,6 +1230,56 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                             color: Colors.grey[600],
                                           ),
                                         ),
+                                        // 如果存在另一种谱面，显示切换按钮
+                                        if (_alternativeSongId != null)
+                                          GestureDetector(
+                                            onTap: () {
+                                              Navigator.pushReplacement(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) => SongInfoPage(
+                                                    songId: _alternativeSongId!,
+                                                    initialLevelIndex: _currentDiffIndex,
+                                                    isDefaultLevelIndex: false,
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            child: Container(
+                                              margin: const EdgeInsets.only(left: 8),
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: _songData!['type'] == 'SD' ? Colors.orange : Colors.blue,
+                                                borderRadius: BorderRadius.circular(8),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black12,
+                                                    blurRadius: 2,
+                                                    offset: Offset(1, 1),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.swap_horizontal_circle,
+                                                    size: 14,
+                                                    color: Colors.white,
+                                                  ),
+                                                  SizedBox(width: 4),
+                                                  Text(
+                                                    _songData!['type'] == 'SD' ? 'DX' : 'ST',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
                                       ],
                                     ),
                                   ],
@@ -1269,7 +1379,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                   _songData!['ds'][_currentDiffIndex]
                                       .toStringAsFixed(1)),
                               _buildStatItem(
-                                  '拟合难度',
+                                  '拟合定数',
                                   currentDiffData != null
                                       ? (currentDiffData is DiffData
                                               ? currentDiffData.fitDiff
@@ -1560,25 +1670,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                     );
                                   case 2:
                                     return ElevatedButton(
-                                      onPressed: () {
-                                        showDialog(
-                                          context: context,
-                                          builder: (BuildContext context) {
-                                            return AlertDialog(
-                                              title: Text('开发中'),
-                                              content: Text('开发中，敬请期待~（把这个按钮放上来是为了整齐，不然不好看了）'),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () {
-                                                    Navigator.of(context).pop();
-                                                  },
-                                                  child: Text('关闭'),
-                                                ),
-                                              ],
-                                            );
-                                          },
-                                        );
-                                      },
+                                      onPressed: _viewMaidata,
                                       child: const Text('查看谱面代码'),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.green,
@@ -3202,6 +3294,28 @@ class _SongInfoPageState extends State<SongInfoPage> {
               color: Colors.grey[600],
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // 查看谱面代码（跳转到maidata页面）
+  void _viewMaidata() {
+    if (_songData == null) return;
+
+    final songTitle = _songData!['basic_info']['title'];
+    final genre = _songData!['basic_info']['genre'];
+    final songType = _songData!['type'];
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SongMaidataPage(
+          songId: widget.songId,
+          songTitle: songTitle,
+          genre: genre,
+          songType: songType,
+          difficultyIndex: _currentDiffIndex,
         ),
       ),
     );

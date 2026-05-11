@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const https = require('https');
 const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
 
@@ -8,6 +9,12 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 80;
+
+// 与 Flutter 前端相同的音乐数据 API
+const MUSIC_DATA_API = 'https://www.diving-fish.com/api/maimaidxprober/music_data';
+
+// 定时刷新歌曲缓存的间隔（分钟）
+const SONG_CACHE_REFRESH_INTERVAL = 60; // 每小时刷新一次
 
 // 全局房间存储
 const rooms = new Map();
@@ -24,6 +31,17 @@ class Player {
     this.surrendered = false;
     this.socket = null;
     this.currentRoomId = null;
+    this.currentGuesses = 0; // 当前回合的猜测次数（独立于其他玩家）
+  }
+  
+  // 重置当前回合的猜测次数
+  resetGuesses() {
+    this.currentGuesses = 0;
+  }
+  
+  // 增加猜测次数
+  incrementGuesses() {
+    this.currentGuesses++;
   }
 }
 
@@ -38,7 +56,7 @@ function generateRoomCode() {
 
 // 房间类
 class Room {
-  constructor(id, gameType, maxPlayers, timeLimit, maxGuesses, totalRounds, hostId) {
+  constructor(id, gameType, maxPlayers, timeLimit, maxGuesses, totalRounds, hostId, selectedVersions = [], masterMinDx = 1.0, masterMaxDx = 15.0, selectedGenres = []) {
     this.id = id;
     this.code = generateRoomCode(); // 6位房间码
     this.gameType = gameType;
@@ -57,6 +75,12 @@ class Room {
     this.createdAt = Date.now();
     this.lastActivityAt = Date.now();
     this.isRoundOver = false; // 回合是否结束
+    
+    // 歌曲筛选参数（与 GuessChartByInfoPage 保持一致）
+    this.selectedVersions = selectedVersions;
+    this.masterMinDx = masterMinDx;
+    this.masterMaxDx = masterMaxDx;
+    this.selectedGenres = selectedGenres;
   }
 
   // 更新最后活动时间
@@ -141,7 +165,13 @@ class Room {
     }
     
     this.currentRound++;
-    this.currentSong = generateRandomSong();
+    // 使用房间设置的筛选参数生成随机歌曲
+    this.currentSong = generateRandomSong(
+      this.selectedVersions,
+      this.masterMinDx,
+      this.masterMaxDx,
+      this.selectedGenres
+    );
     this.guesses = [];
     this.isRoundOver = false; // 重置回合结束状态
     this.updateActivity();
@@ -150,7 +180,16 @@ class Room {
     this.players.forEach(p => {
       p.ready = false;
       p.surrendered = false;
+      p.currentGuesses = 0; // 重置每个玩家的猜测次数
     });
+    
+    // 调试信息
+    console.log(`[DEBUG][Round ${this.currentRound}] 回合开始，重置所有玩家状态:`);
+    this.players.forEach(p => {
+      console.log(`  - 玩家 ${p.nickname} (${p.id.slice(0, 8)}): surrendered=${p.surrendered}, currentGuesses=${p.currentGuesses}`);
+    });
+    console.log(`[DEBUG][Round ${this.currentRound}] 当前共享猜测次数: ${this.guesses.length}/${this.maxGuesses}`);
+    console.log(`[DEBUG][Round ${this.currentRound}] 使用歌曲筛选参数: selectedVersions=${JSON.stringify(this.selectedVersions)}, masterMinDx=${this.masterMinDx}, masterMaxDx=${this.masterMaxDx}, selectedGenres=${JSON.stringify(this.selectedGenres)}`);
     
     return this.currentSong;
   }
@@ -182,8 +221,8 @@ class Room {
   // 添加猜测
   addGuess(playerId, songId, songName, timeSpent) {
     const correct = songId === this.currentSong.id || 
-      songName.toLowerCase().includes(this.currentSong.name.toLowerCase()) ||
-      this.currentSong.name.toLowerCase().includes(songName.toLowerCase());
+      songName.toLowerCase().includes(this.currentSong.title.toLowerCase()) ||
+      this.currentSong.title.toLowerCase().includes(songName.toLowerCase());
     
     const guess = {
       playerId,
@@ -215,13 +254,20 @@ class Room {
         ready: p.ready,
         score: p.score,
         surrendered: p.surrendered,
-        host: p.id === this.hostId
+        host: p.id === this.hostId,
+        currentGuesses: p.currentGuesses || 0
       })),
       hostId: this.hostId,
       status: this.status,
       currentRound: this.currentRound,
       createdAt: this.createdAt,
-      lastActivityAt: this.lastActivityAt
+      lastActivityAt: this.lastActivityAt,
+      
+      // 歌曲筛选参数（与 GuessChartByInfoPage 保持一致）
+      selectedVersions: this.selectedVersions,
+      masterMinDx: this.masterMinDx,
+      masterMaxDx: this.masterMaxDx,
+      selectedGenres: this.selectedGenres
     };
   }
 
@@ -241,7 +287,8 @@ class Room {
         nickname: p.nickname,
         score: p.score,
         ready: p.ready,
-        surrendered: p.surrendered
+        surrendered: p.surrendered,
+        currentGuesses: p.currentGuesses || 0
       })),
       status: this.status,
       isRoundOver: this.isRoundOver || this.allPlayersSurrendered(),
@@ -250,55 +297,172 @@ class Room {
   }
 }
 
-// 全局歌曲缓存
-let songCache = [
-  { id: '1', name: 'ヒバナ', artist: 'DECO*27' },
-  { id: '2', name: 'メリーゴーランド', artist: 'DECO*27' },
-  { id: '3', name: 'ゴーストルール', artist: 'DECO*27' },
-  { id: '4', name: 'アンハッピーリフレイン', artist: 'DECO*27' },
-  { id: '5', name: 'モザイクロール', artist: 'DECO*27' },
-  { id: '6', name: 'パンダヒーロー', artist: 'DECO*27' },
-  { id: '7', name: 'ライアーダンス', artist: 'DECO*27' },
-  { id: '8', name: 'ローリンガール', artist: 'DECO*27' },
-  { id: '9', name: 'ワールドイズマイン', artist: 'ryo' },
-  { id: '10', name: 'ブラック★ロックシューター', artist: 'ryo' },
-  { id: '11', name: 'メルト', artist: 'ryo' },
-  { id: '12', name: 'ココロ', artist: 'トラボルタP' },
-  { id: '13', name: 'ファインダー', artist: 'kz' },
-  { id: '14', name: 'レンズ', artist: 'kz' },
-  { id: '15', name: 'SPiCa', artist: 'kz' }
-];
+// 全局歌曲缓存（与前端 Song.dart 结构对齐）
+let songCache = [];
 
-// 更新歌曲缓存
+// 从 API 获取全量歌曲数据（与 Flutter 前端 MaimaiMusicDataManager.dart 相同的逻辑）
+async function fetchMusicDataFromApi() {
+  return new Promise((resolve, reject) => {
+    console.log(`[Music API] 正在从 ${MUSIC_DATA_API} 获取歌曲数据...`);
+    
+    https.get(MUSIC_DATA_API, (res) => {
+      let data = '';
+      
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      
+      res.on('end', () => {
+        try {
+          const songs = JSON.parse(data);
+          if (Array.isArray(songs)) {
+            console.log(`[Music API] 成功获取 ${songs.length} 首歌曲`);
+            resolve(songs);
+          } else {
+            reject(new Error('API 返回的数据不是数组'));
+          }
+        } catch (error) {
+          reject(new Error(`解析响应失败: ${error.message}`));
+        }
+      });
+    }).on('error', (error) => {
+      reject(new Error(`请求 API 失败: ${error.message}`));
+    });
+  });
+}
+
+// 初始化歌曲缓存
+async function initializeSongCache() {
+  try {
+    const songs = await fetchMusicDataFromApi();
+    updateSongCache(songs);
+    console.log(`[Music API] 歌曲缓存初始化完成，共 ${songCache.length} 首歌曲`);
+  } catch (error) {
+    console.error(`[Music API] 初始化歌曲缓存失败: ${error.message}`);
+    console.log('[Music API] 将使用默认歌曲数据');
+    // 使用默认歌曲数据作为后备
+    songCache = getDefaultSongs();
+  }
+}
+
+// 设置定时刷新歌曲缓存
+function setupSongCacheRefresh() {
+  setInterval(async () => {
+    console.log(`[Music API] 定时刷新歌曲缓存...`);
+    try {
+      const songs = await fetchMusicDataFromApi();
+      updateSongCache(songs);
+      console.log(`[Music API] 定时刷新完成，共 ${songCache.length} 首歌曲`);
+    } catch (error) {
+      console.error(`[Music API] 定时刷新失败: ${error.message}`);
+    }
+  }, SONG_CACHE_REFRESH_INTERVAL * 60 * 1000);
+}
+
+// 获取默认歌曲数据（作为 API 请求失败时的后备）
+function getDefaultSongs() {
+  return [
+    { 
+      id: '1', 
+      title: 'ヒバナ', 
+      type: 'original',
+      ds: [10.0],
+      level: ['MASTER'],
+      cids: [1],
+      charts: [{ notes: [], charter: '' }],
+      basic_info: {
+        title: 'ヒバナ',
+        artist: 'DECO*27',
+        genre: 'VOCALOID',
+        bpm: 128,
+        release_date: '2023-01-01',
+        from: 'Maimai DX',
+        is_new: false
+      }
+    },
+    { 
+      id: '2', 
+      title: 'メリーゴーランド', 
+      type: 'original',
+      ds: [9.8],
+      level: ['MASTER'],
+      cids: [2],
+      charts: [{ notes: [], charter: '' }],
+      basic_info: {
+        title: 'メリーゴーランド',
+        artist: 'DECO*27',
+        genre: 'VOCALOID',
+        bpm: 140,
+        release_date: '2023-02-01',
+        from: 'Maimai DX',
+        is_new: false
+      }
+    },
+    { 
+      id: '3', 
+      title: 'ゴーストルール', 
+      type: 'original',
+      ds: [11.0],
+      level: ['MASTER'],
+      cids: [3],
+      charts: [{ notes: [], charter: '' }],
+      basic_info: {
+        title: 'ゴーストルール',
+        artist: 'DECO*27',
+        genre: 'VOCALOID',
+        bpm: 135,
+        release_date: '2023-03-01',
+        from: 'Maimai DX',
+        is_new: false
+      }
+    },
+    { 
+      id: '4', 
+      title: 'アンハッピーリフレイン', 
+      type: 'original',
+      ds: [10.5],
+      level: ['MASTER'],
+      cids: [4],
+      charts: [{ notes: [], charter: '' }],
+      basic_info: {
+        title: 'アンハッピーリフレイン',
+        artist: 'DECO*27',
+        genre: 'VOCALOID',
+        bpm: 150,
+        release_date: '2023-04-01',
+        from: 'Maimai DX',
+        is_new: false
+      }
+    },
+    { 
+      id: '5', 
+      title: 'モザイクロール', 
+      type: 'original',
+      ds: [9.5],
+      level: ['MASTER'],
+      cids: [5],
+      charts: [{ notes: [], charter: '' }],
+      basic_info: {
+        title: 'モザイクロール',
+        artist: 'DECO*27',
+        genre: 'VOCALOID',
+        bpm: 120,
+        release_date: '2023-05-01',
+        from: 'Maimai DX',
+        is_new: false
+      }
+    }
+  ];
+}
+
+// 更新歌曲缓存（直接替换，不合并）- 与前端 Song.dart 结构对齐
 function updateSongCache(songs) {
   if (!Array.isArray(songs)) return;
   
-  songs.forEach(song => {
-    if (song.id && song.name) {
-      const existingIndex = songCache.findIndex(s => s.id === song.id);
-      if (existingIndex >= 0) {
-        // 更新现有歌曲
-        songCache[existingIndex] = {
-          id: song.id,
-          name: song.name,
-          artist: song.artist || '',
-          level: song.level || '',
-          genre: song.genre || ''
-        };
-      } else {
-        // 添加新歌曲
-        songCache.push({
-          id: song.id,
-          name: song.name,
-          artist: song.artist || '',
-          level: song.level || '',
-          genre: song.genre || ''
-        });
-      }
-    }
-  });
+  // 直接替换整个缓存，保留完整的 Song 结构
+  songCache = songs.filter(song => song.id && song.title);
   
-  console.log(`歌曲缓存已更新，当前共 ${songCache.length} 首歌曲`);
+  console.log(`歌曲缓存已替换，当前共 ${songCache.length} 首歌曲`);
 }
 
 // 获取歌曲缓存数量
@@ -306,13 +470,90 @@ function getSongCacheCount() {
   return songCache.length;
 }
 
-// 生成随机歌曲
-function generateRandomSong() {
+// 生成随机歌曲（支持筛选参数）
+function generateRandomSong(selectedVersions = [], masterMinDx = 1.0, masterMaxDx = 15.0, selectedGenres = []) {
   if (songCache.length === 0) {
-    // 如果缓存为空，返回默认歌曲
-    return { id: '1', name: 'ヒバナ', artist: 'DECO*27' };
+    // 如果缓存为空，返回默认歌曲（与前端 Song.dart 结构对齐）
+    return { 
+      id: '1', 
+      title: 'ヒバナ', 
+      type: 'original',
+      ds: [10.0],
+      level: ['MASTER'],
+      cids: [1],
+      charts: [{ notes: [], charter: '' }],
+      basic_info: {
+        title: 'ヒバナ',
+        artist: 'DECO*27',
+        genre: 'VOCALOID',
+        bpm: 128,
+        release_date: '2023-01-01',
+        from: 'Maimai DX',
+        is_new: false
+      }
+    };
   }
-  return songCache[Math.floor(Math.random() * songCache.length)];
+  
+  // 过滤掉ID为6位数的歌曲（ID范围: 100000 - 999999）
+  let filteredSongs = songCache.filter(song => {
+    const id = String(song.id);
+    // 检查是否为6位数
+    if (id.length === 6 && /^\d+$/.test(id)) {
+      const numId = parseInt(id, 10);
+      return numId < 100000 || numId > 999999;
+    }
+    return true;
+  });
+  
+  // 应用版本筛选
+  if (selectedVersions && selectedVersions.length > 0) {
+    filteredSongs = filteredSongs.filter(song => {
+      return selectedVersions.includes(song.basic_info?.from);
+    });
+  }
+  
+  // 应用流派筛选
+  if (selectedGenres && selectedGenres.length > 0) {
+    filteredSongs = filteredSongs.filter(song => {
+      return selectedGenres.includes(song.basic_info?.genre);
+    });
+  }
+  
+  // 应用 MASTER 定数范围筛选
+  filteredSongs = filteredSongs.filter(song => {
+    const masterDs = song.ds?.[0]; // MASTER 难度的定数通常在第一个位置
+    if (masterDs === undefined || masterDs === null) return false;
+    return masterDs >= masterMinDx && masterDs <= masterMaxDx;
+  });
+  
+  // 如果过滤后没有可选歌曲，返回默认歌曲
+  if (filteredSongs.length === 0) {
+    console.log('[WARNING][generateRandomSong] 过滤后无可用歌曲，使用默认歌曲');
+    console.log(`[WARNING][generateRandomSong] 筛选条件: selectedVersions=${JSON.stringify(selectedVersions)}, masterMinDx=${masterMinDx}, masterMaxDx=${masterMaxDx}, selectedGenres=${JSON.stringify(selectedGenres)}`);
+    return { 
+      id: '1', 
+      title: 'ヒバナ', 
+      type: 'original',
+      ds: [10.0],
+      level: ['MASTER'],
+      cids: [1],
+      charts: [{ notes: [], charter: '' }],
+      basic_info: {
+        title: 'ヒバナ',
+        artist: 'DECO*27',
+        genre: 'VOCALOID',
+        bpm: 128,
+        release_date: '2023-01-01',
+        from: 'Maimai DX',
+        is_new: false
+      }
+    };
+  }
+  
+  console.log(`[DEBUG][generateRandomSong] 过滤前歌曲数: ${songCache.length}, 过滤后歌曲数: ${filteredSongs.length}`);
+  console.log(`[DEBUG][generateRandomSong] 筛选条件: selectedVersions=${JSON.stringify(selectedVersions)}, masterMinDx=${masterMinDx}, masterMaxDx=${masterMaxDx}, selectedGenres=${JSON.stringify(selectedGenres)}`);
+  
+  return filteredSongs[Math.floor(Math.random() * filteredSongs.length)];
 }
 
 // 广播消息到房间内所有玩家
@@ -372,9 +613,9 @@ wss.on('connection', (ws) => {
 
         // 创建房间
         case 'create_room': {
-          const { gameType, maxPlayers = 4, timeLimit = 60, maxGuesses = 10, totalRounds = 5 } = payload || {};
+          const { gameType, maxPlayers = 4, timeLimit = 60, maxGuesses = 10, totalRounds = 5, selectedVersions = [], masterMinDx = 1.0, masterMaxDx = 15.0, selectedGenres = [] } = payload || {};
           const roomId = uuidv4();
-          const room = new Room(roomId, gameType, maxPlayers, timeLimit, maxGuesses, totalRounds, playerId);
+          const room = new Room(roomId, gameType, maxPlayers, timeLimit, maxGuesses, totalRounds, playerId, selectedVersions, masterMinDx, masterMaxDx, selectedGenres);
           
           room.addPlayer(player);
           rooms.set(roomId, room);
@@ -386,6 +627,7 @@ wss.on('connection', (ws) => {
           });
           
           console.log(`Room created: ${roomId} by player: ${playerId}`);
+          console.log(`Room settings - selectedVersions: ${JSON.stringify(selectedVersions)}, masterMinDx: ${masterMinDx}, masterMaxDx: ${masterMaxDx}, selectedGenres: ${JSON.stringify(selectedGenres)}`);
           break;
         }
 
@@ -735,7 +977,92 @@ wss.on('connection', (ws) => {
             payload: { gameState: room.getGameState() }
           });
           
+          // 同时广播房间更新，确保玩家状态（包括投降状态）正确重置
+          broadcast(roomId, {
+            action: 'room_updated',
+            payload: { room: room.getState() }
+          });
+          
           console.log(`Game started in room: ${roomId}`);
+          break;
+        }
+
+        // 开始下一回合（房主操作）
+        case 'start_next_round': {
+          const roomId = player.currentRoomId;
+          if (!roomId) {
+            sendToPlayer(playerId, {
+              action: 'error',
+              payload: { message: '您不在任何房间中' }
+            });
+            return;
+          }
+          
+          const room = rooms.get(roomId);
+          if (!room) {
+            player.currentRoomId = null;
+            sendToPlayer(playerId, {
+              action: 'error',
+              payload: { message: '房间不存在' }
+            });
+            return;
+          }
+          
+          // 检查是否是房主
+          if (room.hostId !== playerId) {
+            sendToPlayer(playerId, {
+              action: 'error',
+              payload: { message: '只有房主可以开始下一回合' }
+            });
+            return;
+          }
+          
+          // 检查房间状态
+          if (room.status !== 'playing') {
+            sendToPlayer(playerId, {
+              action: 'error',
+              payload: { message: '游戏未在进行中' }
+            });
+            return;
+          }
+          
+          // 检查是否所有回合都已完成
+          if (room.currentRound >= room.totalRounds) {
+            sendToPlayer(playerId, {
+              action: 'error',
+              payload: { message: '所有回合已完成' }
+            });
+            return;
+          }
+          
+          // 开始下一回合
+          const song = room.startRound();
+          if (!song) {
+            sendToPlayer(playerId, {
+              action: 'error',
+              payload: { message: '无法开始回合' }
+            });
+            return;
+          }
+          
+          // 设置回合计时器
+          room.roundTimer = setTimeout(() => {
+            endRoundHandler(roomId);
+          }, room.timeLimit * 1000);
+          
+          // 广播回合开始
+          broadcast(roomId, {
+            action: 'round_start',
+            payload: { gameState: room.getGameState() }
+          });
+          
+          // 同时广播房间更新，确保玩家状态（包括投降状态）正确重置
+          broadcast(roomId, {
+            action: 'room_updated',
+            payload: { room: room.getState() }
+          });
+          
+          console.log(`Round ${room.currentRound} started in room: ${roomId}`);
           break;
         }
 
@@ -768,10 +1095,30 @@ wss.on('connection', (ws) => {
             return;
           }
           
+          // 检查该玩家是否已达到最大猜测次数
+          // 检查房间是否已达到最大猜测次数（共享）
+          if (room.guesses.length >= room.maxGuesses) {
+            sendToPlayer(playerId, {
+              action: 'error',
+              payload: { message: '房间已达到最大猜测次数' }
+            });
+            return;
+          }
+          
           const { songId, songName } = payload || {};
           const timeSpent = room.timeLimit - Math.floor((room.roundTimer?._idleStart ? (Date.now() - room.roundTimer._idleStart) / 1000 : 0));
           
+          // 增加该玩家的猜测次数（保留用于统计）
+          player.incrementGuesses();
+          
           const guess = room.addGuess(playerId, songId, songName, timeSpent);
+          
+          // 调试信息
+          console.log(`[DEBUG][Round ${room.currentRound}] 玩家 ${player.nickname} (${playerId.slice(0, 8)}) 提交猜测:`);
+          console.log(`  - 猜测内容: songId=${songId}, songName=${songName}`);
+          console.log(`  - 是否正确: ${guess.correct}`);
+          console.log(`  - 玩家个人猜测次数: ${player.currentGuesses}`);
+          console.log(`  - 房间共享猜测次数: ${room.guesses.length}/${room.maxGuesses}`);
           
           // 广播猜测
           broadcast(roomId, {
@@ -779,13 +1126,25 @@ wss.on('connection', (ws) => {
             payload: { guess }
           });
           
-          // 检查是否达到最大正确猜测数
-          if (guess.correct && room.guesses.filter(g => g.correct).length >= room.maxGuesses) {
+          // 广播房间更新（包含玩家猜测次数）
+          broadcast(roomId, {
+            action: 'room_updated',
+            payload: { room: room.getState() }
+          });
+          
+          // 广播游戏状态更新（包含共享的猜测次数）
+          broadcast(roomId, {
+            action: 'game_state_updated',
+            payload: { gameState: room.getGameState() }
+          });
+          
+          // 如果答对了，结束回合
+          if (guess.correct) {
             clearTimeout(room.roundTimer);
             endRoundHandler(roomId);
           }
           
-          console.log(`Guess submitted by ${playerId} in room ${roomId}: ${songName} (correct: ${guess.correct})`);
+          console.log(`Guess submitted by ${playerId} in room ${roomId}: ${songName} (correct: ${guess.correct}, guesses: ${player.currentGuesses})`);
           break;
         }
 
@@ -819,6 +1178,14 @@ wss.on('connection', (ws) => {
           }
           
           room.setPlayerSurrendered(playerId);
+          
+          // 调试信息
+          console.log(`[DEBUG][Round ${room.currentRound}] 玩家 ${player.nickname} (${playerId.slice(0, 8)}) 投降`);
+          console.log(`[DEBUG][Round ${room.currentRound}] 当前投降状态:`);
+          room.players.forEach(p => {
+            console.log(`  - 玩家 ${p.nickname}: surrendered=${p.surrendered}`);
+          });
+          console.log(`[DEBUG][Round ${room.currentRound}] 是否所有玩家都投降: ${room.allPlayersSurrendered()}`);
           
           // 广播投降
           broadcast(roomId, {
@@ -999,42 +1366,40 @@ function endRoundHandler(roomId) {
   // 结束当前回合
   room.endRound();
   
-  // 广播回合结束
+  // 检查是否所有回合都已完成
+  if (room.currentRound >= room.totalRounds) {
+    room.endGame();
+    broadcast(roomId, {
+      action: 'game_over',
+      payload: { gameState: room.getGameState() }
+    });
+    console.log(`Game ended in room: ${roomId}`);
+    return;
+  }
+  
+  // 广播回合结束（不自动开始下一回合，等待房主操作）
   broadcast(roomId, {
     action: 'round_over',
     payload: { gameState: room.getGameState() }
   });
   
-  // 延迟后开始下一回合或结束游戏
-  setTimeout(() => {
-    if (!rooms.has(roomId)) return;
-    
-    const currentRoom = rooms.get(roomId);
-    if (currentRoom.status !== 'playing') return;
-    
-    const song = currentRoom.startRound();
-    if (!song) {
-      // 游戏结束
-      broadcast(roomId, {
-        action: 'game_over',
-        payload: { gameState: currentRoom.getGameState() }
-      });
-      console.log(`Game ended in room: ${roomId}`);
-      return;
-    }
-    
-    // 开始下一回合
-    currentRoom.roundTimer = setTimeout(() => {
-      endRoundHandler(roomId);
-    }, currentRoom.timeLimit * 1000);
-    
-    broadcast(roomId, {
-      action: 'round_start',
-      payload: { gameState: currentRoom.getGameState() }
-    });
-  }, 3000);
+  console.log(`Round ${room.currentRound} ended in room: ${roomId}, waiting for host to start next round`);
 }
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// 启动服务器
+async function startServer() {
+  // 初始化歌曲缓存（从 API 获取全量歌曲数据）
+  await initializeSongCache();
+  
+  // 设置定时刷新歌曲缓存（每小时）
+  setupSongCacheRefresh();
+  
+  // 启动 WebSocket 服务器
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`当前歌曲缓存: ${songCache.length} 首歌曲`);
+  });
+}
+
+// 启动服务器
+startServer();

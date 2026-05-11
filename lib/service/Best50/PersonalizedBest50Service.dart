@@ -515,15 +515,8 @@ class PersonalizedBest50Service {
         }
       }
 
-      // 筛选出出现次数大于等于10次的charter
-      Map<String, int> filteredCharterCounts = {};
-      charterCounts.forEach((charter, count) {
-        if (count >= 10) {
-          filteredCharterCounts[charter] = count;
-        }
-      });
-
-      return filteredCharterCounts;
+      // 返回所有charter，不再按谱面数量筛选
+      return charterCounts;
     } catch (e) {
       print('获取charter出现次数时出错: $e');
       return {};
@@ -975,6 +968,147 @@ class PersonalizedBest50Service {
       print('获取流派出现次数时出错: $e');
       return {};
     }
+  }
+
+  // 获取星数50数据
+  Future<Map<String, dynamic>?> getStar50Data(String starLabel) async {
+    try {
+      // 获取用户游玩数据
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+
+      // 确保records是List类型
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      // 获取所有歌曲数据
+      final allSongs = await MaimaiMusicDataManager().getCachedSongs();
+      if (allSongs == null) return null;
+
+      // 构建歌曲ID到歌曲信息的映射
+      final songMap = { for (var song in allSongs) song.id: song };
+
+      // 根据星数标签确定达成率范围
+      double minRate;
+      double maxRate = 1.0; // 最大达成率为100%
+      
+      switch (starLabel) {
+        case '\u27266':
+          minRate = 0.99;
+          break;
+        case '\u27265.5':
+          minRate = 0.98;
+          maxRate = 0.989999;
+          break;
+        case '\u27265':
+          minRate = 0.97;
+          maxRate = 0.979999;
+          break;
+        case '\u27264':
+          minRate = 0.95;
+          maxRate = 0.969999;
+          break;
+        case '\u27263':
+          minRate = 0.93;
+          maxRate = 0.949999;
+          break;
+        case '\u27262':
+          minRate = 0.90;
+          maxRate = 0.929999;
+          break;
+        case '\u27261':
+          minRate = 0.85;
+          maxRate = 0.899999;
+          break;
+        case '\u27260':
+        default:
+          minRate = 0.0;
+          maxRate = 0.849999;
+          break;
+      }
+
+      // 过滤出达成率在对应区间的记录
+      final starRecords = records.where((record) {
+        if (record is Map<String, dynamic>) {
+          final songId = record['song_id'];
+          final levelIndex = record['level_index'] ?? 0;
+          final dxScore = record['dxScore'] ?? 0;
+          final song = songMap[songId.toString()];
+          
+          if (song != null) {
+            // 计算最大DX分数
+            int maxDxScore = _calculateMaxDxScore(song, levelIndex);
+            
+            if (maxDxScore > 0) {
+              // 计算DX分数达成率
+              double dxRate = dxScore / maxDxScore;
+              return dxRate >= minRate && dxRate <= maxRate;
+            }
+          }
+        }
+        return false;
+      }).toList();
+
+      // 按ra值降序排序
+      starRecords.sort((a, b) {
+        if (a is Map<String, dynamic> && b is Map<String, dynamic>) {
+          int raB = (b['ra'] ?? 0) as int;
+          int raA = (a['ra'] ?? 0) as int;
+          return raB.compareTo(raA);
+        }
+        return 0;
+      });
+
+      // 取前50条
+      final top50Records = starRecords.take(50).toList();
+
+      // 构建返回数据
+      return {
+        'records': top50Records,
+        'total': top50Records.length,
+        'type': 'star_50',
+        'star': starLabel
+      };
+    } catch (e) {
+      print('获取星数50数据时出错: $e');
+      return null;
+    }
+  }
+
+  // 计算最大DX分数
+  int _calculateMaxDxScore(dynamic song, int levelIndex) {
+    if (song == null) return 0;
+
+    // 检查ds数组长度
+    List<double> ds = song.ds;
+    if (ds.length == 2) {
+      // 计算两个难度谱面的最大分数之和
+      int maxScore1 = _calculateSingleMaxScore(song, 0);
+      int maxScore2 = _calculateSingleMaxScore(song, 1);
+      return maxScore1 + maxScore2;
+    } else {
+      // 返回当前难度的最大分数
+      return _calculateSingleMaxScore(song, levelIndex);
+    }
+  }
+
+  // 计算单个难度的最大分数
+  int _calculateSingleMaxScore(dynamic song, int levelIndex) {
+    if (song == null) return 0;
+
+    if (song.charts == null) return 0;
+
+    // 查找对应的charts
+    List<dynamic> charts = song.charts;
+    if (levelIndex < 0 || levelIndex >= charts.length) return 0;
+
+    dynamic chart = charts[levelIndex];
+    if (chart.notes == null) return 0;
+
+    // 计算maxScore
+    List<int> notes = chart.notes;
+    int notesSum = notes.fold(0, (sum, note) => sum + note);
+    return notesSum * 3;
   }
 
   // 获取特定流派的top50记录

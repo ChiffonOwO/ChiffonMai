@@ -38,6 +38,18 @@ class RoomEntity {
   
   /// 最后活动时间
   final DateTime lastActivityAt;
+  
+  /// 选中的版本列表（歌曲筛选参数）
+  final List<String> selectedVersions;
+  
+  /// MASTER定数最小值
+  final double masterMinDx;
+  
+  /// MASTER定数最大值
+  final double masterMaxDx;
+  
+  /// 选中的流派列表（歌曲筛选参数）
+  final List<String> selectedGenres;
 
   RoomEntity({
     required this.roomId,
@@ -52,6 +64,10 @@ class RoomEntity {
     required this.createdAt,
     DateTime? lastActivityAt,
     this.totalRounds = 5,
+    this.selectedVersions = const [],
+    this.masterMinDx = 1.0,
+    this.masterMaxDx = 15.0,
+    this.selectedGenres = const [],
   }) : _roomCode = roomCode,
        lastActivityAt = lastActivityAt ?? createdAt;
 
@@ -82,6 +98,14 @@ class RoomEntity {
       return DateTime.now();
     }
     
+    // 解析歌曲筛选参数
+    List<String> parseStringList(dynamic value) {
+      if (value is List) {
+        return value.map((e) => e.toString()).toList();
+      }
+      return [];
+    }
+    
     return RoomEntity(
       roomId: roomId,
       roomCode: json['room_code'] ?? json['roomCode'] ?? json['code'] ?? '',
@@ -95,6 +119,14 @@ class RoomEntity {
       totalRounds: json['total_rounds'] ?? json['totalRounds'] ?? 5,
       createdAt: parseDateTime(json['created_at'] ?? json['createdAt']),
       lastActivityAt: parseDateTime(json['last_activity_at'] ?? json['lastActivityAt']),
+      selectedVersions: parseStringList(json['selectedVersions'] ?? json['selected_versions']),
+      masterMinDx: (json['masterMinDx'] ?? json['master_min_dx'] ?? 1.0) is double 
+          ? (json['masterMinDx'] ?? json['master_min_dx']) 
+          : double.parse((json['masterMinDx'] ?? json['master_min_dx'] ?? '1.0').toString()),
+      masterMaxDx: (json['masterMaxDx'] ?? json['master_max_dx'] ?? 15.0) is double 
+          ? (json['masterMaxDx'] ?? json['master_max_dx']) 
+          : double.parse((json['masterMaxDx'] ?? json['master_max_dx'] ?? '15.0').toString()),
+      selectedGenres: parseStringList(json['selectedGenres'] ?? json['selected_genres']),
     );
   }
 
@@ -112,12 +144,17 @@ class RoomEntity {
       'total_rounds': totalRounds,
       'created_at': createdAt.toIso8601String(),
       'last_activity_at': lastActivityAt.toIso8601String(),
+      'selected_versions': selectedVersions,
+      'master_min_dx': masterMinDx,
+      'master_max_dx': masterMaxDx,
+      'selected_genres': selectedGenres,
     };
   }
 
   /// 创建副本并更新属性
   RoomEntity copyWith({
     String? roomId,
+    String? roomCode,
     GameType? gameType,
     List<PlayerEntity>? players,
     RoomStatus? status,
@@ -128,9 +165,14 @@ class RoomEntity {
     int? totalRounds,
     DateTime? createdAt,
     DateTime? lastActivityAt,
+    List<String>? selectedVersions,
+    double? masterMinDx,
+    double? masterMaxDx,
+    List<String>? selectedGenres,
   }) {
     return RoomEntity(
       roomId: roomId ?? this.roomId,
+      roomCode: roomCode ?? _roomCode,
       gameType: gameType ?? this.gameType,
       players: players ?? this.players,
       status: status ?? this.status,
@@ -141,6 +183,10 @@ class RoomEntity {
       totalRounds: totalRounds ?? this.totalRounds,
       createdAt: createdAt ?? this.createdAt,
       lastActivityAt: lastActivityAt ?? this.lastActivityAt,
+      selectedVersions: selectedVersions ?? this.selectedVersions,
+      masterMinDx: masterMinDx ?? this.masterMinDx,
+      masterMaxDx: masterMaxDx ?? this.masterMaxDx,
+      selectedGenres: selectedGenres ?? this.selectedGenres,
     );
   }
 

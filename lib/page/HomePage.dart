@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/page/Multiplayer/MultiplayerLobbyPage.dart';
+import 'package:my_first_flutter_app/page/PersonalizedChartPlayConfigure.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:my_first_flutter_app/page/Best50/Best50Page.dart';
 import 'package:my_first_flutter_app/page/CollectionSearchPage.dart';
@@ -13,7 +14,7 @@ import 'package:my_first_flutter_app/page/GuessChartGame/GuessChartBySongExcerpt
 import 'package:my_first_flutter_app/page/GuessChartGame/GuessSongByOpenLettersPage.dart';
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeSelectPage.dart';
 import 'package:my_first_flutter_app/page/KnowledgeSearchPage.dart';
-import 'package:my_first_flutter_app/page/LevelScorePage.dart';
+import 'package:my_first_flutter_app/page/PersonalizedScorePage.dart';
 import 'package:my_first_flutter_app/page/MaimaiServerStatusPage.dart';
 import 'package:my_first_flutter_app/page/PaiziProgressPage.dart';
 import 'package:my_first_flutter_app/page/Best50/PersonalizedBest50Page.dart';
@@ -168,7 +169,7 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.music_note, title: '乐曲查询', subtitle: '查询舞萌曲库的乐曲'),
     ButtonItem(icon: Icons.score, title: '成绩查询', subtitle: '查看游玩数据'),
     ButtonItem(icon: Icons.wysiwyg_rounded, title: '牌子进度', subtitle: '真代没有真将哦'),
-    ButtonItem(icon: Icons.grading_rounded, title: '等级成绩查询', subtitle: '我去!15神!'),
+    ButtonItem(icon: Icons.grading_rounded, title: '个性化成绩查询', subtitle: '目前支持等级/谱师的牌子查询'),
     ButtonItem(icon: Icons.collections_bookmark, title: '收藏品查询', subtitle: '查看收藏品查询'),
     ButtonItem(icon: Icons.bookmark_add, title: '舞萌百科', subtitle: '到底什么是错位?'),
     ButtonItem(icon: Icons.leaderboard, title: 'Best50查询', subtitle: '我去,龙币!'),
@@ -192,7 +193,7 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.network_check, title: '服务器状态', subtitle: '查看舞萌服务器状态'),
     ButtonItem(icon: Icons.update, title: '检查更新', subtitle: '检查应用是否有新版本'),
     ButtonItem(icon: Icons.poll_outlined, title: '问卷调查', subtitle: '助力ChiffonMai更上一层楼!'),
-    //ButtonItem(icon: Icons.play_arrow, title: '谱面播放', subtitle: '播放谱面'),
+    ButtonItem(icon: Icons.play_arrow, title: '自定义谱面播放', subtitle: '播放你自己本地的谱面'),
   ];
 
   @override
@@ -879,18 +880,18 @@ class _HomePageState extends State<HomePage> {
               MaterialPageRoute(builder: (context) => PaiziProgressPage()),
             );
           }
-          if (item.title == '等级成绩查询'){
+          if (item.title == '个性化成绩查询'){
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => LevelScorePage()),
+              MaterialPageRoute(builder: (context) => PersonalizedScorePage()),
             );
           }
-          // if (item.title == '谱面播放'){
-          //   Navigator.push(
-          //     context,
-          //     MaterialPageRoute(builder: (context) => GuessChartByChartExcerptPage()),
-          //   );
-          // }
+          if (item.title == '自定义谱面播放'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => PersonalizedChartPlayConfigure()),
+            );
+          }
           if (item.title == '问卷调查') {
             final uri = Uri.parse('https://wj.qq.com/s2/26540572/7828/');
             if (await canLaunchUrl(uri)) {

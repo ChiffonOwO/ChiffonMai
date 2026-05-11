@@ -51,7 +51,22 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     {'value': 'version_50', 'label': '版本50'},
     {'value': 'dx_50', 'label': 'DX50'},
     {'value': 'st_50', 'label': 'ST50'},
+    {'value': 'star_50', 'label': '星数50'},
   ];
+
+  // 星数选项
+  final List<Map<String, dynamic>> _starOptions = [
+    {'value': 6, 'label': '\u27266', 'rate': 0.99},
+    {'value': 5.5, 'label': '\u27265.5', 'rate': 0.98},
+    {'value': 5, 'label': '\u27265', 'rate': 0.97},
+    {'value': 4, 'label': '\u27264', 'rate': 0.95},
+    {'value': 3, 'label': '\u27263', 'rate': 0.93},
+    {'value': 2, 'label': '\u27262', 'rate': 0.90},
+    {'value': 1, 'label': '\u27261', 'rate': 0.85},
+    {'value': 0, 'label': '\u27260', 'rate': 0.0},
+  ];
+
+  String? _selectedStar; // 选中的星数
 
   @override
   void initState() {
@@ -189,6 +204,11 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
             data = await service.getGenre50Data(_selectedGenre!);
           }
           break;
+        case 'star_50':
+          if (_selectedStar != null) {
+            data = await service.getStar50Data(_selectedStar!);
+          }
+          break;
       }
 
       if (data != null) {
@@ -309,7 +329,9 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                                     ? '选择类型: 版本50 - ${StringUtil.formatVersion2(_selectedVersion!)}'
                                     : _selectedType == 'genre_50' && _selectedGenre != null
                                         ? '选择类型: 流派50 - ${_selectedGenre!}'
-                                        : '选择类型: ${_options.firstWhere((option) => option['value'] == _selectedType)['label']!}',
+                                        : _selectedType == 'star_50' && _selectedStar != null
+                                            ? '选择类型: 星数50 - ${_selectedStar!}'
+                                            : '选择类型: ${_options.firstWhere((option) => option['value'] == _selectedType)['label']!}',
                             style: TextStyle(
                               fontSize: MediaQuery.of(context).size.width * 0.04,
                               color: Colors.white,
@@ -363,12 +385,17 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                       // 显示流派选择对话框
                       Navigator.of(context).pop();
                       _showGenreSelectionDialog();
+                    } else if (option['value'] == 'star_50') {
+                      // 显示星数选择对话框
+                      Navigator.of(context).pop();
+                      _showStarSelectionDialog();
                     } else {
                       setState(() {
                         _selectedType = option['value']!;
                         _selectedCharter = null;
                         _selectedVersion = null;
                         _selectedGenre = null;
+                        _selectedStar = null;
                       });
                       Navigator.of(context).pop();
                       _fetchPersonalizedData();
@@ -555,6 +582,44 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     );
   }
 
+  // 显示星数选择对话框
+  void _showStarSelectionDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('选择星数'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: _starOptions.map((option) {
+                return ListTile(
+                  title: Text(option['label']!),
+                  selected: _selectedStar == option['label'],
+                  onTap: () {
+                    setState(() {
+                      _selectedType = 'star_50';
+                      _selectedStar = option['label'];
+                    });
+                    Navigator.of(context).pop();
+                    _fetchPersonalizedData();
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text('取消'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // 显示charter选择对话框
   void _showCharterSelectionDialog() {
     if (_charterCounts == null || _charterCounts!.isEmpty) {
@@ -647,7 +712,9 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                       ? '版本50 - ${StringUtil.formatVersion2(_selectedVersion!)} 统计'
                       : _selectedType == 'genre_50' && _selectedGenre != null
                           ? '流派50 - ${_selectedGenre!} 统计'
-                          : '${_options.firstWhere((option) => option['value'] == _selectedType)['label']!} 统计',
+                          : _selectedType == 'star_50' && _selectedStar != null
+                              ? '星数50 - ${_selectedStar!} 统计'
+                              : '${_options.firstWhere((option) => option['value'] == _selectedType)['label']!} 统计',
               style: TextStyle(
                 fontSize: MediaQuery.of(context).size.width * 0.045,
                 fontWeight: FontWeight.bold,
@@ -774,7 +841,9 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                       ? '暂无版本50 - ${StringUtil.formatVersion2(_selectedVersion!)} 数据'
                       : _selectedType == 'genre_50' && _selectedGenre != null
                           ? '暂无流派50 - ${_selectedGenre!} 数据'
-                          : '暂无${_options.firstWhere((option) => option['value'] == _selectedType)['label']!}数据',
+                          : _selectedType == 'star_50' && _selectedStar != null
+                              ? '暂无星数50 - ${_selectedStar!} 数据'
+                              : '暂无${_options.firstWhere((option) => option['value'] == _selectedType)['label']!}数据',
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.grey,

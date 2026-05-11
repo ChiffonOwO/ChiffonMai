@@ -87,7 +87,7 @@ class PaiziProgressService {
   // 获取称号类型选项
   // 当firstChar为'舞'时，额外添加'霸者'选项
   List<String> getTitleTypeOptions({String? firstChar}) {
-    final options = ['極', '将', '神', '舞舞'];
+    final options = ['極', '将', '大将', '神', '舞舞'];
     if (firstChar == '舞') {
       options.add('霸者');
     }
@@ -110,9 +110,25 @@ class PaiziProgressService {
       }
     }
     
+    // 特殊处理：真将和真大将使用真神的歌曲列表
+    if (firstChar == '真' && (titleType == '将' || titleType == '大将')) {
+      final plates = await getMatchingPlates();
+      try {
+        return plates.firstWhere((plate) => plate.name == '真神');
+      } catch (e) {
+        return null;
+      }
+    }
+    
+    // 特殊处理：大将显示将的图片
+    String targetTitleType = titleType;
+    if (titleType == '大将') {
+      targetTitleType = '将';
+    }
+    
     // 其他称号类型从匹配的plates中查找
     final plates = await getMatchingPlates();
-    final targetName = firstChar + titleType;
+    final targetName = firstChar + targetTitleType;
     
     try {
       return plates.firstWhere((plate) => plate.name == targetName);
@@ -180,6 +196,11 @@ class PaiziProgressService {
         // achievements字段大于等于100
         final achievements = double.tryParse(record['achievements'].toString()) ?? 0;
         return achievements >= 100;
+      
+      case '大将':
+        // achievements字段大于等于100.5
+        final achievements = double.tryParse(record['achievements'].toString()) ?? 0;
+        return achievements >= 100.5;
       
       case '神':
         // fc字段为ap或app
@@ -255,6 +276,7 @@ class PaiziProgressService {
   static const String _keyDifficulty = 'paizi_progress_difficulty';
   static const String _keyShowListMode = 'paizi_progress_show_list_mode';
   static const String _keyUseLevelDisplay = 'paizi_progress_use_level_display';
+  static const String _keyFilterMode = 'paizi_progress_filter_mode';
 
   // 保存用户选择的选项
   Future<void> saveSelectedOptions({
@@ -263,6 +285,7 @@ class PaiziProgressService {
     required int? difficulty,
     required bool showListMode,
     required bool useLevelDisplay,
+    required String? filterMode,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyFirstChar, firstChar ?? '');
@@ -270,6 +293,7 @@ class PaiziProgressService {
     await prefs.setInt(_keyDifficulty, difficulty ?? -1);
     await prefs.setBool(_keyShowListMode, showListMode);
     await prefs.setBool(_keyUseLevelDisplay, useLevelDisplay);
+    await prefs.setString(_keyFilterMode, filterMode ?? 'all');
   }
 
   // 获取保存的用户选项
@@ -281,6 +305,7 @@ class PaiziProgressService {
       'difficulty': prefs.getInt(_keyDifficulty) ?? -1,
       'showListMode': prefs.getBool(_keyShowListMode) ?? true,
       'useLevelDisplay': prefs.getBool(_keyUseLevelDisplay) ?? true,
+      'filterMode': prefs.getString(_keyFilterMode) ?? 'all',
     };
   }
 

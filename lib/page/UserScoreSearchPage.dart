@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import '../service/UserScoreSearchService.dart';
+import '../manager/MaimaiMusicDataManager.dart';
 import 'HomePage.dart';
 import 'SongInfoPage.dart';
 import '../utils/CoverUtil.dart';
@@ -308,89 +309,194 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
     );
   }
   
+  // 根据定数计算等级显示（x或x+）
+  String _getLevelDisplay(double ds) {
+    if (ds >= 15.0) {
+      return '15';
+    }
+    int integerPart = ds.floor();
+    double decimalPart = ds - integerPart;
+    if (decimalPart <= 0.5) {
+      return '$integerPart';
+    } else {
+      return '${integerPart}+';
+    }
+  }
+  
+  // 获取等级选项（参考 PersonalizedScoreService.getAllLevelOptions）
+  Future<List<String>> _getLevelOptions() async {
+    final musicManager = MaimaiMusicDataManager();
+    final songs = await musicManager.getCachedSongs();
+    
+    Set<String> levels = {};
+    if (songs != null) {
+      for (final song in songs) {
+        if (song.id.length == 6 && int.tryParse(song.id) != null) {
+          continue;
+        }
+        for (final ds in song.ds) {
+          levels.add(_getLevelDisplay(ds));
+        }
+      }
+    }
+    
+    if (levels.isEmpty) {
+      for (int i = 1; i <= 14; i++) {
+        levels.add('$i');
+        levels.add('${i}+');
+      }
+      levels.add('15');
+    }
+    
+    return levels.toList()..sort((a, b) {
+      double parseLevel(String level) {
+        if (level == '15') return 15.0;
+        if (level.endsWith('+')) {
+          return double.parse(level.substring(0, level.length - 1)) + 0.5;
+        }
+        return double.tryParse(level) ?? 0.0;
+      }
+      return parseLevel(b).compareTo(parseLevel(a));
+    });
+  }
+  
   // 显示定数筛选对话框
   void _showDsFilterDialog() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        String currentRange = _filterConditions['定数筛选'] ?? '';
-        TextEditingController minController = TextEditingController();
-        TextEditingController maxController = TextEditingController();
-        
-        // 解析当前范围
-        if (currentRange.contains('-')) {
-          List<String> parts = currentRange.split('-');
-          if (parts.length == 2) {
-            minController.text = parts[0];
-            maxController.text = parts[1];
-          }
-        }
-        
-        return AlertDialog(
-          title: Text('定数筛选'),
-          content: StatefulBuilder(
-            builder: (BuildContext context, StateSetter setState) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: minController,
-                          keyboardType: TextInputType.numberWithOptions(decimal: true),
-                          decoration: InputDecoration(
-                            labelText: '下界',
-                            hintText: '1.0',
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: TextField(
-                          controller: maxController,
-                          keyboardType: TextInputType.numberWithOptions(decimal: true),
-                          decoration: InputDecoration(
-                            labelText: '上界',
-                            hintText: '15.0',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 8),
-                  Text('最多一位小数，留空表示默认值', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              child: Text('取消'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            TextButton(
-              child: Text('确认'),
-              onPressed: () {
-                String minText = minController.text.trim();
-                String maxText = maxController.text.trim();
-                String range = '';
-                
-                if (minText.isNotEmpty || maxText.isNotEmpty) {
-                  range = '$minText-$maxText';
+        return FutureBuilder<List<String>>(
+          future: _getLevelOptions(),
+          builder: (context, snapshot) {
+            List<Map<String, String>> quickOptions = [];
+            if (snapshot.hasData) {
+              for (String level in snapshot.data!) {
+                double minDs, maxDs;
+                if (level == '15') {
+                  minDs = 15.0;
+                  maxDs = 15.0;
+                } else if (level.endsWith('+')) {
+                  int base = int.parse(level.substring(0, level.length - 1));
+                  minDs = base + 0.5;
+                  maxDs = base + 1.0;
+                } else {
+                  int base = int.parse(level);
+                  minDs = base.toDouble();
+                  maxDs = base + 0.5;
                 }
-                
-                setState(() {
-                  _filterConditions['定数筛选'] = range;
-                  _currentPage = 1; // 筛选条件变化时，切换到第1页
+                quickOptions.add({
+                  'label': level,
+                  'min': minDs.toStringAsFixed(1),
+                  'max': maxDs.toStringAsFixed(1),
                 });
-                Navigator.of(context).pop();
-                _loadData(); // 重新加载数据
-              },
-            ),
-          ],
+              }
+            }
+            
+            String currentRange = _filterConditions['定数筛选'] ?? '';
+            TextEditingController minController = TextEditingController();
+            TextEditingController maxController = TextEditingController();
+            
+            if (currentRange.contains('-')) {
+              List<String> parts = currentRange.split('-');
+              if (parts.length == 2) {
+                minController.text = parts[0];
+                maxController.text = parts[1];
+              }
+            }
+            
+            return AlertDialog(
+              title: Text('定数筛选'),
+              content: SingleChildScrollView(
+                child: StatefulBuilder(
+                  builder: (BuildContext context, StateSetter setState) {
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: minController,
+                                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                decoration: InputDecoration(
+                                  labelText: '下界',
+                                  hintText: '1.0',
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 16),
+                            Expanded(
+                              child: TextField(
+                                controller: maxController,
+                                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                decoration: InputDecoration(
+                                  labelText: '上界',
+                                  hintText: '15.0',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8),
+                        Text('最多一位小数，留空表示默认值', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        SizedBox(height: 16),
+                        Text('快捷选项:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: quickOptions.map((option) {
+                            return ElevatedButton(
+                              onPressed: () {
+                                setState(() {
+                                  minController.text = option['min']!;
+                                  maxController.text = option['max']!;
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.grey[100],
+                                foregroundColor: Colors.black,
+                                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                textStyle: TextStyle(fontSize: 12),
+                              ),
+                              child: Text(option['label']!),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: Text('取消'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+                TextButton(
+                  child: Text('确认'),
+                  onPressed: () {
+                    String minText = minController.text.trim();
+                    String maxText = maxController.text.trim();
+                    String range = '';
+                    
+                    if (minText.isNotEmpty || maxText.isNotEmpty) {
+                      range = '$minText-$maxText';
+                    }
+                    
+                    setState(() {
+                      _filterConditions['定数筛选'] = range;
+                      _currentPage = 1;
+                    });
+                    Navigator.of(context).pop();
+                    _loadData();
+                  },
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -453,6 +559,19 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        // 达成率快捷选项
+        List<Map<String, String>> quickOptions = [
+          {'label': 'SSS+', 'min': '100.5', 'max': '101'},
+          {'label': 'SSS', 'min': '100', 'max': '100.4999'},
+          {'label': 'SS+', 'min': '99.5', 'max': '99.9999'},
+          {'label': 'SS', 'min': '99', 'max': '99.4999'},
+          {'label': 'S+', 'min': '98.0', 'max': '98.9999'},
+          {'label': 'S', 'min': '97', 'max': '97.9999'},
+          {'label': 'AAA', 'min': '94', 'max': '96.9999'},
+          {'label': 'AA', 'min': '90', 'max': '93.9999'},
+          {'label': 'A', 'min': '80', 'max': '89.9999'},
+        ];
+        
         String currentRange = _filterConditions['达成率筛选'] ?? '';
         TextEditingController minController = TextEditingController();
         TextEditingController maxController = TextEditingController();
@@ -468,41 +587,67 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
         
         return AlertDialog(
           title: Text('达成率筛选'),
-          content: StatefulBuilder(
-            builder: (BuildContext context, StateSetter setState) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: minController,
-                          keyboardType: TextInputType.numberWithOptions(decimal: true),
-                          decoration: InputDecoration(
-                            labelText: '下界',
-                            hintText: '0',
+          content: SingleChildScrollView(
+            child: StatefulBuilder(
+              builder: (BuildContext context, StateSetter setState) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: minController,
+                            keyboardType: TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: '下界',
+                              hintText: '0',
+                            ),
                           ),
                         ),
-                      ),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: TextField(
-                          controller: maxController,
-                          keyboardType: TextInputType.numberWithOptions(decimal: true),
-                          decoration: InputDecoration(
-                            labelText: '上界',
-                            hintText: '101',
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: TextField(
+                            controller: maxController,
+                            keyboardType: TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: '上界',
+                              hintText: '101',
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 8),
-                  Text('最多四位小数，留空表示默认值', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-              );
-            },
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    Text('最多四位小数，留空表示默认值', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    SizedBox(height: 16),
+                    Text('快捷选项:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: quickOptions.map((option) {
+                        return ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              minController.text = option['min']!;
+                              maxController.text = option['max']!;
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey[100],
+                            foregroundColor: Colors.black,
+                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            textStyle: TextStyle(fontSize: 12),
+                          ),
+                          child: Text(option['label']!),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
           actions: [
             TextButton(

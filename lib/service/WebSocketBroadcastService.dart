@@ -313,6 +313,25 @@ class WebSocketBroadcastService {
     }
   }
   
+  // 发送开始下一回合消息
+  Future<void> sendStartNextRound() async {
+    if (!_isConnected || _channel == null) {
+      print('[WebSocket] 未连接，无法发送消息');
+      return;
+    }
+    
+    try {
+      final data = json.encode({
+        'action': 'start_next_round',
+        'payload': {},
+      });
+      _channel!.sink.add(data);
+      print('[WebSocket] 发送开始下一回合消息');
+    } catch (e) {
+      print('[WebSocket] 发送开始下一回合消息失败: $e');
+    }
+  }
+  
   // 发送猜测消息
   Future<void> sendGuess(String songId, String songName) async {
     if (!_isConnected || _channel == null) {

@@ -27,6 +27,7 @@ enum MultiplayerEventType {
   roundOver,
   gameEnd,
   gameOver,
+  gameStateUpdated,
   hostChanged,
   error,
   initialized,
@@ -37,7 +38,7 @@ enum MultiplayerEventType {
 
 /// 多人游戏WebSocket服务
 class MultiplayerGameService {
-  static const String _defaultUrl = 'wss://multiplayer-game-server-255526-7-1325651420.sh.run.tcloudbase.com';
+  static const String _defaultUrl = 'ws://152.136.125.98';
   
   IOWebSocketChannel? _channel;
   StreamSubscription? _subscription;
@@ -86,6 +87,10 @@ class MultiplayerGameService {
     int timeLimit = 60,
     int maxGuesses = 10,
     int totalRounds = 5,
+    List<String> selectedVersions = const [],
+    double masterMinDx = 1.0,
+    double masterMaxDx = 15.0,
+    List<String> selectedGenres = const [],
   }) {
     _sendMessage({
       'action': 'create_room',
@@ -95,6 +100,10 @@ class MultiplayerGameService {
         'timeLimit': timeLimit,
         'maxGuesses': maxGuesses,
         'totalRounds': totalRounds,
+        'selectedVersions': selectedVersions,
+        'masterMinDx': masterMinDx,
+        'masterMaxDx': masterMaxDx,
+        'selectedGenres': selectedGenres,
       },
     });
   }
@@ -190,8 +199,19 @@ class MultiplayerGameService {
             ready: payload?['ready'] ?? false,
           ));
           break;
+        case 'player_surrendered':
+          _eventController.add(MultiplayerEvent.playerSurrender(
+            playerId: payload?['playerId'] ?? '',
+            surrendered: payload?['surrendered'] ?? false,
+          ));
+          break;
         case 'game_started':
           _eventController.add(MultiplayerEvent.gameStart(
+            gameState: GameStateEntity.fromJson(payload?['gameState'] ?? {}),
+          ));
+          break;
+        case 'round_start':
+          _eventController.add(MultiplayerEvent.roundStart(
             gameState: GameStateEntity.fromJson(payload?['gameState'] ?? {}),
           ));
           break;
@@ -213,6 +233,11 @@ class MultiplayerGameService {
         case 'room_updated':
           _eventController.add(MultiplayerEvent.roomUpdated(
             room: RoomEntity.fromJson(payload?['room'] ?? {}),
+          ));
+          break;
+        case 'game_state_updated':
+          _eventController.add(MultiplayerEvent.gameStateUpdated(
+            gameState: GameStateEntity.fromJson(payload?['gameState'] ?? {}),
           ));
           break;
         case 'left_room':
@@ -315,6 +340,9 @@ sealed class MultiplayerEvent {
   
   /// 游戏结束
   factory MultiplayerEvent.gameOver({required GameStateEntity gameState}) = GameOverEvent;
+  
+  /// 游戏状态更新
+  factory MultiplayerEvent.gameStateUpdated({required GameStateEntity gameState}) = GameStateUpdatedEvent;
   
   /// 离开房间
   factory MultiplayerEvent.leftRoom() = LeftRoomEvent;
@@ -425,6 +453,14 @@ class GuessUpdateEvent extends MultiplayerEvent {
   
   @override
   MultiplayerEventType get type => MultiplayerEventType.guessUpdate;
+}
+
+class GameStateUpdatedEvent extends MultiplayerEvent {
+  final GameStateEntity gameState;
+  const GameStateUpdatedEvent({required this.gameState});
+  
+  @override
+  MultiplayerEventType get type => MultiplayerEventType.gameStateUpdated;
 }
 
 class RoundEndEvent extends MultiplayerEvent {

@@ -104,7 +104,7 @@ class StringUtil {
       return 'DX 2024 双/宴';
     }
     if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM') {
-      return 'DX 2025 镜/彩';
+      return 'DX 2025 镜';
     }
     return version;
   }

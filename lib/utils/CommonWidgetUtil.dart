@@ -214,6 +214,7 @@ class CommonWidgetUtil {
         borderRadius: BorderRadius.circular(8),
       ),
       child: ListView.builder(
+        padding: EdgeInsets.zero,
         itemCount: items.length,
         itemBuilder: (context, index) {
           String item = items[index];

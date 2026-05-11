@@ -23,10 +23,12 @@ class MultiplayerManager {
   final StreamController<RoomEntity?> _roomController = StreamController.broadcast();
   final StreamController<GameStateEntity?> _gameStateController = StreamController.broadcast();
   final StreamController<List<RoomEntity>> _roomListController = StreamController.broadcast();
+  final StreamController<String> _errorMessageController = StreamController.broadcast();
 
   Stream<RoomEntity?> get roomStream => _roomController.stream;
   Stream<GameStateEntity?> get gameStateStream => _gameStateController.stream;
   Stream<List<RoomEntity>> get roomListStream => _roomListController.stream;
+  Stream<String> get errorMessageStream => _errorMessageController.stream;
   
   String? get currentPlayerId => _cloudService.currentPlayerId;
 
@@ -36,7 +38,7 @@ class MultiplayerManager {
     
     try {
       await _cloudService.initialize(
-        envId: 'multiplayer-game-server-255526-7-1325651420.sh.run.tcloudbase.com',
+        envId: 'ws://152.136.125.98',
         nickname: nickname,
       );
       print('[DEBUG][Manager] CloudService 初始化完成');
@@ -107,6 +109,12 @@ class MultiplayerManager {
         break;
       case MultiplayerEventType.gameOver:
         if (event is GameOverEvent) {
+          _currentGameState = event.gameState;
+          _gameStateController.add(event.gameState);
+        }
+        break;
+      case MultiplayerEventType.gameStateUpdated:
+        if (event is GameStateUpdatedEvent) {
           _currentGameState = event.gameState;
           _gameStateController.add(event.gameState);
         }
@@ -200,6 +208,9 @@ class MultiplayerManager {
         _gameStateController.add(null);
         break;
       case MultiplayerEventType.error:
+        if (event is ErrorEvent) {
+          _errorMessageController.add(event.message);
+        }
         break;
       case MultiplayerEventType.joinFailed:
         break;
@@ -233,9 +244,14 @@ class MultiplayerManager {
     int maxPlayers = 4,
     int timeLimit = 60,
     int maxGuesses = 10,
+    List<String> selectedVersions = const [],
+    double masterMinDx = 1.0,
+    double masterMaxDx = 15.0,
+    List<String> selectedGenres = const [],
   }) async {
     print('[DEBUG][Manager] 开始创建房间请求...');
     print('[DEBUG][Manager] 参数: gameType=${gameType.name}, maxPlayers=$maxPlayers, timeLimit=$timeLimit, maxGuesses=$maxGuesses');
+    print('[DEBUG][Manager] 歌曲筛选参数: selectedVersions=$selectedVersions, masterMinDx=$masterMinDx, masterMaxDx=$masterMaxDx, selectedGenres=$selectedGenres');
     
     await initialize();
     print('[DEBUG][Manager] 初始化完成');
@@ -268,6 +284,10 @@ class MultiplayerManager {
       maxPlayers: maxPlayers,
       timeLimit: timeLimit,
       maxGuesses: maxGuesses,
+      selectedVersions: selectedVersions,
+      masterMinDx: masterMinDx,
+      masterMaxDx: masterMaxDx,
+      selectedGenres: selectedGenres,
     );
     
     print('[DEBUG][Manager] 等待房间创建结果...');
@@ -333,6 +353,10 @@ class MultiplayerManager {
 
   Future<void> startGame() async {
     await _cloudService.startGame();
+  }
+
+  Future<void> startNextRound() async {
+    await _cloudService.startNextRound();
   }
 
   Future<void> submitGuess(String songId, String songName) async {

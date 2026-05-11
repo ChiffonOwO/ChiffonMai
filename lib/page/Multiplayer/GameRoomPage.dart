@@ -1,8 +1,7 @@
 import 'dart:async';
 
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/RoomEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/GameStateEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/PlayerEntity.dart';
@@ -32,15 +31,14 @@ class _GameRoomPageState extends State<GameRoomPage> {
   PlayerEntity? _currentPlayer;
   
   // 搜索相关
-  TextEditingController _searchController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   List<Song> _searchResults = [];
-  bool _isSearching = false;
   Timer? _searchTimer;
   static const Duration _searchDelay = Duration(milliseconds: 800);
   bool _showSearchResults = false;
   
   // 猜测历史
-  List<GuessSong> _guessHistory = [];
+  final List<GuessSong> _guessHistory = [];
   bool _isSubmitting = false;
   
   // 歌曲别名管理器
@@ -55,13 +53,15 @@ class _GameRoomPageState extends State<GameRoomPage> {
   
   // 回合结束原因
   bool _isRoundOverByTimeout = false;
-  bool _isRoundOverBySurrender = false;
   
   // 当前玩家是否已投降
   bool _hasSurrendered = false;
   
   // 房主变更提示消息
   String? _hostChangeMessage;
+  
+  // 游戏是否已结算（房主点击结算后变为true）
+  bool _isGameSettled = false;
 
   // 获取玩家显示名称（处理重复昵称）
   String _getPlayerDisplayName(PlayerEntity player) {
@@ -148,8 +148,13 @@ class _GameRoomPageState extends State<GameRoomPage> {
     if (_currentRoom == null) return playerNickname;
     
     // 查找对应的玩家
-    PlayerEntity? player = _currentRoom!.players
-        .firstWhereOrNull((p) => p.playerId == playerId);
+    PlayerEntity? player;
+    for (var p in _currentRoom!.players) {
+      if (p.playerId == playerId) {
+        player = p;
+        break;
+      }
+    }
     
     if (player != null) {
       return _getPlayerDisplayName(player);
@@ -175,6 +180,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
   // Stream订阅
   StreamSubscription? _roomSubscription;
   StreamSubscription? _gameStateSubscription;
+  StreamSubscription? _errorMessageSubscription;
 
   @override
   void initState() {
@@ -206,9 +212,17 @@ class _GameRoomPageState extends State<GameRoomPage> {
       print('[DEBUG][GameRoomPage] 收到 roomStream 更新: ${room?.roomId}');
       if (!mounted) return;
       
+      // 打印玩家投降状态（调试）
+      if (room != null) {
+        room.players.forEach((p) {
+          print('[DEBUG][GameRoomPage] 玩家 ${p.nickname} - 投降: ${p.isSurrendered}');
+        });
+      }
+      
       // 强制创建新的房间对象，确保 Flutter 检测到变化
       RoomEntity? newRoom = room != null ? RoomEntity(
         roomId: room.roomId,
+        roomCode: room.roomCode,
         gameType: room.gameType,
         players: List.from(room.players),
         status: room.status,
@@ -254,8 +268,6 @@ class _GameRoomPageState extends State<GameRoomPage> {
         if (_gameState != null && !_gameState!.isRoundOver && _isAllPlayersSurrendered()) {
           _gameState = _gameState!.copyWith(isRoundOver: true);
           _countdownTimer?.cancel();
-          // 设置标记表示回合因投降结束
-          _isRoundOverBySurrender = true;
         }
       });
     });
@@ -272,12 +284,17 @@ class _GameRoomPageState extends State<GameRoomPage> {
           bool wasRoundOver = _gameState?.isRoundOver ?? false;
           
           if (isNewRound) {
+            // 调试信息
+            print('[DEBUG][GameRoomPage] 新回合开始:');
+            print('  - 当前回合: ${state.currentRound}/${state.totalRounds}');
+            print('  - 共享猜测次数: ${state.currentGuesses}/${state.maxGuesses}');
+            print('  - 本地投降状态已重置: _hasSurrendered=$_hasSurrendered');
+            
             _remainingTime = state.timeRemaining;
             // 重置投降状态
             _hasSurrendered = false;
             // 重置回合结束原因（重要：防止显示上一回合的获胜者）
             _isRoundOverByTimeout = false;
-            _isRoundOverBySurrender = false;
             
             // 新回合开始时，使用服务器状态并强制清空猜测历史
             _gameState = state.copyWith(guesses: []);
@@ -311,6 +328,14 @@ class _GameRoomPageState extends State<GameRoomPage> {
             if (localCurrentGuesses != null && localCurrentGuesses > _gameState!.currentGuesses) {
               _gameState = _gameState!.copyWith(currentGuesses: localCurrentGuesses);
             }
+            
+            // 调试信息
+            print('[DEBUG][GameRoomPage] 游戏状态更新:');
+            print('  - 当前回合: ${state.currentRound}');
+            print('  - 服务器猜测次数: ${state.currentGuesses}');
+            print('  - 本地猜测次数: ${_gameState!.currentGuesses}');
+            print('  - 最大猜测次数: ${state.maxGuesses}');
+            print('  - 剩余猜测次数: ${state.maxGuesses - _gameState!.currentGuesses}');
           }
           
           // 如果回合已经结束（无论是因为投降还是答对），保持结束状态
@@ -335,29 +360,59 @@ class _GameRoomPageState extends State<GameRoomPage> {
         }
       });
     });
+
+    // 监听服务器错误消息
+    _errorMessageSubscription = _manager.errorMessageStream.listen((message) {
+      Fluttertoast.showToast(
+        msg: message,
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 1,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+    });
   }
 
-  Future<void> _loadTargetSong(String targetSongId) async {
+  Future<void> _loadTargetSong(dynamic targetSongData) async {
     try {
       final allSongs = await GuessChartByInfoService.loadAllSongs();
-      if (allSongs != null && allSongs.isNotEmpty) {
-        // 根据歌曲ID查找目标歌曲
-        _targetSong = allSongs.firstWhere(
-          (song) => song.id == targetSongId,
-          orElse: () => allSongs.first,
-        );
-        
-        // 添加调试日志
-        if (_targetSong != null) {
-          print('[DEBUG][GameRoom] 加载到目标歌曲:');
-          print('[DEBUG][GameRoom]   歌曲ID: ${_targetSong!.id}');
-          print('[DEBUG][GameRoom]   歌曲名: ${_targetSong!.basicInfo.title}');
-          print('[DEBUG][GameRoom]   艺术家: ${_targetSong!.basicInfo.artist}');
-          print('[DEBUG][GameRoom]   BPM: ${_targetSong!.basicInfo.bpm}');
-          print('[DEBUG][GameRoom]   类型: ${_targetSong!.type}');
-          print('[DEBUG][GameRoom]   Master定数: ${_targetSong!.ds.length > 0 ? _targetSong!.ds[0] : "-"}');
-          print('[DEBUG][GameRoom]   版本: ${_targetSong!.basicInfo.from}');
-        }
+      if (allSongs == null || allSongs.isEmpty) return;
+      
+      String targetSongId;
+      
+      // 处理两种情况：字符串ID或歌曲对象
+      if (targetSongData is String) {
+        targetSongId = targetSongData;
+      } else if (targetSongData is Map) {
+        targetSongId = targetSongData['id']?.toString() ?? '';
+      } else {
+        print('[DEBUG][GameRoom] 无法解析目标歌曲数据');
+        return;
+      }
+      
+      if (targetSongId.isEmpty) {
+        print('[DEBUG][GameRoom] 目标歌曲ID为空');
+        return;
+      }
+      
+      // 根据歌曲ID查找目标歌曲
+      _targetSong = allSongs.firstWhere(
+        (song) => song.id == targetSongId,
+        orElse: () => allSongs.first,
+      );
+      
+      // 添加调试日志
+      if (_targetSong != null) {
+        print('[DEBUG][GameRoom] 加载到目标歌曲:');
+        print('[DEBUG][GameRoom]   歌曲ID: ${_targetSong!.id}');
+        print('[DEBUG][GameRoom]   歌曲名: ${_targetSong!.basicInfo.title}');
+        print('[DEBUG][GameRoom]   艺术家: ${_targetSong!.basicInfo.artist}');
+        print('[DEBUG][GameRoom]   BPM: ${_targetSong!.basicInfo.bpm}');
+        print('[DEBUG][GameRoom]   类型: ${_targetSong!.type}');
+        print('[DEBUG][GameRoom]   Master定数: ${_targetSong!.ds.length > 0 ? _targetSong!.ds[0] : "-"}');
+        print('[DEBUG][GameRoom]   版本: ${_targetSong!.basicInfo.from}');
       }
     } catch (e) {
       print('[DEBUG][GameRoom] 加载目标歌曲失败: $e');
@@ -366,11 +421,21 @@ class _GameRoomPageState extends State<GameRoomPage> {
 
   @override
   void dispose() {
+    print('[DEBUG][GameRoomPage] dispose - 用户离开页面，取消所有订阅');
+    
+    // 取消搜索控制器和定时器
     _searchController.dispose();
     _searchTimer?.cancel();
     _countdownTimer?.cancel();
+    
+    // 取消房间和游戏状态订阅
     _roomSubscription?.cancel();
     _gameStateSubscription?.cancel();
+    _errorMessageSubscription?.cancel();
+    
+    // 通知管理器停止监听房间
+    _manager.stopListening();
+    
     super.dispose();
   }
 
@@ -412,10 +477,19 @@ class _GameRoomPageState extends State<GameRoomPage> {
   void _handleSurrender() {
     _countdownTimer?.cancel();
     _manager.updatePlayerSurrendered(true);
+    
+    // 调试信息
+    print('[DEBUG][GameRoomPage] 玩家发起投降:');
+    print('  - 当前回合: ${_gameState?.currentRound}');
+    print('  - 投降前状态: _hasSurrendered=$_hasSurrendered');
+    
     setState(() {
       // 投降后不结束回合，只标记投降状态
       _hasSurrendered = true;
     });
+    
+    // 调试信息
+    print('  - 投降后状态: _hasSurrendered=$_hasSurrendered');
   }
   
   // 显示规则说明对话框
@@ -480,21 +554,12 @@ class _GameRoomPageState extends State<GameRoomPage> {
     _searchTimer = Timer(_searchDelay, () async {
       if (value.isEmpty) return;
 
-      setState(() {
-        _isSearching = true;
-      });
-
       final allSongs = await GuessChartByInfoService.loadAllSongs();
       if (allSongs != null) {
         final results = await _searchSongs(allSongs, value);
         setState(() {
           _searchResults = results;
           _showSearchResults = results.isNotEmpty;
-          _isSearching = false;
-        });
-      } else {
-        setState(() {
-          _isSearching = false;
         });
       }
     });
@@ -597,8 +662,8 @@ class _GameRoomPageState extends State<GameRoomPage> {
       _guessHistory.clear();
       // 重置回合结束原因
       _isRoundOverByTimeout = false;
-      _isRoundOverBySurrender = false;
     });
+    _manager.startNextRound();
   }
 
   void _handleRestartGame() {
@@ -612,6 +677,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
   void _handleSettleGame() {
     // 结算游戏，保持游戏结束状态，不再进行新回合
     // 可以添加一些结算逻辑，比如更新最终分数等
+    setState(() {
+      _isGameSettled = true;
+    });
     print('[DEBUG][GameRoom] 游戏已结算');
   }
 
@@ -756,8 +824,8 @@ class _GameRoomPageState extends State<GameRoomPage> {
           const SizedBox(height: 16),
           _buildScoreboard(),
           
-          // 房主操作按钮
-          if (_currentPlayer?.isHost == true)
+          // 游戏未结算时显示房主操作按钮
+          if (_currentPlayer?.isHost == true && !_isGameSettled)
             Container(
               margin: const EdgeInsets.only(top: 20),
               child: Row(
@@ -873,7 +941,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
             ),
           ),
         
-        // 剩余猜测次数
+        // 剩余猜测次数（房间共享的）
         if (_gameState != null)
           Text(
             '🔢 剩余猜测次数: ${_gameState!.maxGuesses - _gameState!.currentGuesses}',
@@ -950,42 +1018,6 @@ class _GameRoomPageState extends State<GameRoomPage> {
         // 猜测历史（从游戏状态获取，实时更新）
         if (_gameState != null && _gameState!.guesses.isNotEmpty)
           _buildGuessHistory(),
-      ],
-    );
-  }
-
-  Widget _buildSongInfoCard() {
-    return Column(
-      children: [
-        const Icon(Icons.music_note, size: 64, color: Colors.white),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(flex: 1, child: Text('艺术家', style: TextStyle(color: Colors.grey[300]))),
-            Expanded(flex: 2, child: const Text('未知艺术家', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(flex: 1, child: Text('BPM', style: TextStyle(color: Colors.grey[300]))),
-            Expanded(flex: 2, child: const Text('???', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(flex: 1, child: Text('难度', style: TextStyle(color: Colors.grey[300]))),
-            Expanded(flex: 2, child: const Text('???', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(flex: 1, child: Text('流派', style: TextStyle(color: Colors.grey[300]))),
-            Expanded(flex: 2, child: const Text('???', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
-          ],
-        ),
       ],
     );
   }
@@ -1421,11 +1453,11 @@ class _GameRoomPageState extends State<GameRoomPage> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: guessSong!.tagBgColors?[i] ?? Colors.grey,
+                            color: guessSong.tagBgColors?[i] ?? Colors.grey,
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Text(
-                            guessSong!.masterTags?[i] ?? '',
+                            guessSong.masterTags?[i] ?? '',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 12,
@@ -1450,7 +1482,13 @@ class _GameRoomPageState extends State<GameRoomPage> {
       final songs = await GuessChartByInfoService.loadAllSongs();
       if (songs == null || songs.isEmpty) return null;
       
-      Song? song = songs.firstWhereOrNull((s) => s.id == guess.songId);
+      Song? song;
+      for (var s in songs) {
+        if (s.id == guess.songId) {
+          song = s;
+          break;
+        }
+      }
       if (song == null) return null;
       
       GuessSong guessSong = await GuessChartByInfoService.buildGuessSongEntity(song);
@@ -1466,274 +1504,6 @@ class _GameRoomPageState extends State<GameRoomPage> {
     }
   }
 
-  Widget _buildGuessHistoryItem(GuessSong guessSong, int index) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '猜测 #${index + 1}',
-            style: const TextStyle(fontSize: 14, color: Colors.grey),
-          ),
-          const SizedBox(height: 12),
-
-          // 第一行：曲绘，曲名
-          Row(
-            children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: CoverUtil.buildCoverWidgetWithContext(context, guessSong.songId.toString(), 60),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildInfoItem('曲名', guessSong.title,
-                    guessSong.titleBgColor ?? Colors.grey),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // 第二行：类型，BPM，曲师
-          Row(
-            children: [
-              Expanded(
-                flex: 1,
-                child: _buildInfoItem(
-                    '类型', guessSong.type == 'SD' ? 'ST' : guessSong.type, guessSong.typeBgColor ?? Colors.grey),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 1,
-                child: _buildInfoItem('BPM', guessSong.bpm.toString(),
-                    guessSong.bpmBgColor ?? Colors.grey,
-                    arrow: guessSong.bpmArrow),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: guessSong.artistBgColor ?? Colors.grey,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '曲师',
-                        style: TextStyle(fontSize: 10, color: Colors.white),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        guessSong.artist,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // 第三行：Master定数，Master谱师
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: _buildInfoItem('Master定数', guessSong.masterDs,
-                    guessSong.masterLevelBgColor ?? Colors.grey,
-                    arrow: guessSong.masterLevelArrow),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 3,
-                child: _buildInfoItem('Master谱师', guessSong.masterCharter,
-                    guessSong.masterCharterBgColor ?? Colors.grey),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // 第四行：ReMaster定数，ReMaster谱师
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: _buildInfoItem(
-                    'ReMaster定数',
-                    guessSong.remasterDs.isNotEmpty
-                        ? guessSong.remasterDs
-                        : '-',
-                    guessSong.remasterLevelBgColor ?? Colors.grey,
-                    arrow: guessSong.remasterLevelArrow),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 3,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: guessSong.remasterCharterBgColor ?? Colors.grey,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'ReMaster谱师',
-                        style: TextStyle(fontSize: 10, color: Colors.white),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        guessSong.remasterCharter.isNotEmpty
-                            ? guessSong.remasterCharter
-                            : '-',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // 第五行：流派，版本
-          Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: _buildInfoItem('流派', guessSong.genre,
-                    guessSong.genreBgColor ?? Colors.grey),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 4,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: guessSong.versionBgColor ?? Colors.grey,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '版本',
-                        style: TextStyle(fontSize: 10, color: Colors.white),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              StringUtil.formatVersion2(guessSong.version),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (guessSong.versionArrow != null)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 4),
-                              child: Text(
-                                guessSong.versionArrow!,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: guessSong.versionArrow == '↑'
-                                      ? Colors.blue
-                                      : Colors.red,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // 第六行：Master标签
-          if (guessSong.masterTags?.isNotEmpty ?? false)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Master标签',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children:
-                      List.generate(guessSong.masterTags?.length ?? 0, (i) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: guessSong.tagBgColors?[i] ?? Colors.grey,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        guessSong.masterTags?[i] ?? '',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                        ),
-                      ),
-                    );
-                  }),
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-  
   // 构建信息项
   Widget _buildInfoItem(String label, String value, Color color, {String? arrow}) {
     return Container(

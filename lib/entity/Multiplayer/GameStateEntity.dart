@@ -33,7 +33,7 @@ class GameStateEntity {
     return GameStateEntity(
       currentRound: json['currentRound'] ?? json['current_round'] ?? 1,
       totalRounds: json['totalRounds'] ?? json['total_round'] ?? 5,
-      targetSong: json['targetSong'] ?? json['target_song'],
+      targetSong: json['targetSong'] ?? json['target_song'] ?? json['currentSong'] ?? json['current_song'],
       guesses: guessesList,
       timeRemaining: json['timeRemaining'] ?? json['time_remaining'] ?? 60,
       isGameOver: json['isGameOver'] ?? json['is_game_over'] ?? false,

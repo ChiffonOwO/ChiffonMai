@@ -22,6 +22,9 @@ class PlayerEntity {
   
   /// 是否投降
   final bool isSurrendered;
+  
+  /// 当前回合的猜测次数（独立于其他玩家）
+  final int currentGuesses;
 
   PlayerEntity({
     required this.playerId,
@@ -31,6 +34,7 @@ class PlayerEntity {
     this.isReady = false,
     this.isOnline = true,
     this.isSurrendered = false,
+    this.currentGuesses = 0,
   });
 
   /// 从JSON解析（支持 snake_case、camelCase 和后端字段）
@@ -43,6 +47,7 @@ class PlayerEntity {
       isReady: json['is_ready'] ?? json['isReady'] ?? json['ready'] ?? false,
       isOnline: json['is_online'] ?? json['isOnline'] ?? json['online'] ?? true,
       isSurrendered: json['is_surrendered'] ?? json['isSurrendered'] ?? json['surrendered'] ?? false,
+      currentGuesses: json['current_guesses'] ?? json['currentGuesses'] ?? 0,
     );
   }
 
@@ -68,6 +73,7 @@ class PlayerEntity {
     bool? isReady,
     bool? isOnline,
     bool? isSurrendered,
+    int? currentGuesses,
   }) {
     return PlayerEntity(
       playerId: playerId ?? this.playerId,
@@ -77,6 +83,7 @@ class PlayerEntity {
       isReady: isReady ?? this.isReady,
       isOnline: isOnline ?? this.isOnline,
       isSurrendered: isSurrendered ?? this.isSurrendered,
+      currentGuesses: currentGuesses ?? this.currentGuesses,
     );
   }
 

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/service/LevelScoreService.dart';
+import 'package:my_first_flutter_app/service/PersonalizedScoreService.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
@@ -7,15 +7,15 @@ import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 
-class LevelScorePage extends StatefulWidget {
-  const LevelScorePage({super.key});
+class PersonalizedScorePage extends StatefulWidget {
+  const PersonalizedScorePage({super.key});
 
   @override
-  State<LevelScorePage> createState() => _LevelScorePageState();
+  State<PersonalizedScorePage> createState() => _PersonalizedScorePageState();
 }
 
-class _LevelScorePageState extends State<LevelScorePage> {
-  final LevelScoreService _service = LevelScoreService();
+class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
+  final PersonalizedScoreService _service = PersonalizedScoreService();
 
   // 选择状态
   List<String> _levelOptions = [];
@@ -24,6 +24,13 @@ class _LevelScorePageState extends State<LevelScorePage> {
 
   // 缓存的全量等级选项（用于对话框）
   List<String> _allLevelOptionsCache = [];
+
+  // 种类模式：'level' 等级模式, 'charter' 谱师模式
+  String _mode = 'level';
+  
+  // 谱师相关
+  Map<String, int>? _charterCounts;
+  String? _selectedCharter;
 
   String? _selectedLevel;
   String? _selectedTitleType;
@@ -37,6 +44,9 @@ class _LevelScorePageState extends State<LevelScorePage> {
 
   // 显示模式：true 为列表模式，false 为仅曲绘模式
   bool _showListMode = true;
+
+  // 过滤模式：'all' 全部, 'completed' 已完成, 'uncompleted' 未完成
+  String _filterMode = 'all';
 
   // 尺寸参数
   late double _paddingXS;
@@ -87,6 +97,9 @@ class _LevelScorePageState extends State<LevelScorePage> {
       // 获取全量等级选项并缓存
       _allLevelOptionsCache = await _service.getAllLevelOptions();
 
+      // 获取谱师列表
+      _charterCounts = await _service.getCharterCounts();
+
       // 更新等级选项
       await _updateLevelOptions();
       // 设置保存的等级选项
@@ -95,6 +108,18 @@ class _LevelScorePageState extends State<LevelScorePage> {
         _selectedLevel = _levelOptions.contains(savedLevel) && savedLevel.isNotEmpty
             ? savedLevel
             : _levelOptions[0];
+      }
+
+      // 设置保存的模式
+      final savedMode = savedOptions['mode'] as String;
+      _mode = ['level', 'charter'].contains(savedMode) ? savedMode : 'level';
+
+      // 设置保存的谱师（如果谱师存在）
+      final savedCharter = savedOptions['charter'] as String;
+      if (savedCharter.isNotEmpty && _charterCounts != null && _charterCounts!.containsKey(savedCharter)) {
+        _selectedCharter = savedCharter;
+      } else if (_charterCounts != null && _charterCounts!.isNotEmpty) {
+        _selectedCharter = _charterCounts!.keys.first;
       }
 
       // 设置保存的显示模式
@@ -119,6 +144,8 @@ class _LevelScorePageState extends State<LevelScorePage> {
       titleType: _selectedTitleType,
       difficulty: _selectedDifficulty,
       showListMode: _showListMode,
+      mode: _mode,
+      charter: _selectedCharter,
     );
     super.dispose();
   }
@@ -145,7 +172,7 @@ class _LevelScorePageState extends State<LevelScorePage> {
 
   // 加载歌曲完成状态（带缓存）
   Future<void> _loadSongsWithStatus() async {
-    if (_selectedLevel == null || _selectedTitleType == null || _selectedDifficulty == null) {
+    if (_selectedTitleType == null || _selectedDifficulty == null) {
       return;
     }
 
@@ -154,11 +181,26 @@ class _LevelScorePageState extends State<LevelScorePage> {
     });
 
     try {
-      final result = await _service.getSongsByLevel(
-        _selectedLevel!,
-        _selectedTitleType!,
-        _selectedDifficulty!,
-      );
+      List<Map<String, dynamic>> result;
+      
+      if (_mode == 'level') {
+        // 等级模式
+        if (_selectedLevel == null) return;
+        result = await _service.getSongsByLevel(
+          _selectedLevel!,
+          _selectedTitleType!,
+          _selectedDifficulty!,
+        );
+      } else {
+        // 谱师模式
+        if (_selectedCharter == null) return;
+        result = await _service.getSongsByCharter(
+          _selectedCharter!,
+          _selectedTitleType!,
+          _selectedDifficulty!,
+        );
+      }
+      
       setState(() {
         _cachedSongsWithStatus = result;
       });
@@ -258,7 +300,7 @@ class _LevelScorePageState extends State<LevelScorePage> {
                     Expanded(
                       child: Center(
                         child: Text(
-                          '等级極/将/神查询',
+                          '个性化成绩查询',
                           style: TextStyle(
                             color: Color.fromARGB(255, 84, 97, 97),
                             fontSize: screenWidth * 0.06,
@@ -318,9 +360,9 @@ class _LevelScorePageState extends State<LevelScorePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 选择等级
+        // 选择种类
         Text(
-          '选择等级',
+          '选择种类',
           style: TextStyle(
             fontSize: _textSizeM,
             fontWeight: FontWeight.bold,
@@ -337,9 +379,39 @@ class _LevelScorePageState extends State<LevelScorePage> {
               borderRadius: BorderRadius.circular(_borderRadiusSmall),
             ),
           ),
-          onPressed: () => _showLevelDialog(),
+          onPressed: () => _showModeDialog(),
           child: Text(
-            _selectedLevel != null ? 'Lv.${_selectedLevel}' : '请选择等级',
+            _mode == 'level' ? '等级' : '谱师',
+            style: TextStyle(fontSize: _textSizeM),
+          ),
+        ),
+
+        SizedBox(height: _paddingM),
+
+        // 选择等级/谱师
+        Text(
+          _mode == 'level' ? '选择等级' : '选择谱师',
+          style: TextStyle(
+            fontSize: _textSizeM,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[700]!,
+          ),
+        ),
+        SizedBox(height: _paddingXS),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.grey[100]!,
+            foregroundColor: Colors.grey[700]!,
+            minimumSize: Size(double.infinity, 40 * _scaleFactor),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(_borderRadiusSmall),
+            ),
+          ),
+          onPressed: () => _mode == 'level' ? _showLevelDialog() : _showCharterDialog(),
+          child: Text(
+            _mode == 'level' 
+                ? (_selectedLevel != null ? 'Lv.${_selectedLevel}' : '请选择等级')
+                : (_selectedCharter != null ? _selectedCharter! : '请选择谱师'),
             style: TextStyle(fontSize: _textSizeM),
           ),
         ),
@@ -446,6 +518,120 @@ class _LevelScorePageState extends State<LevelScorePage> {
     );
   }
 
+  // 显示模式选择对话框
+  void _showModeDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Center(child: Text('选择种类')),
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          content: Container(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: Center(child: Text('等级')),
+                  selected: _mode == 'level',
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    setState(() {
+                      _mode = 'level';
+                      _cachedSongsWithStatus = null;
+                    });
+                    await _loadSongsWithStatus();
+                  },
+                ),
+                ListTile(
+                  title: Center(child: Text('谱师')),
+                  selected: _mode == 'charter',
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    setState(() {
+                      _mode = 'charter';
+                      _cachedSongsWithStatus = null;
+                    });
+                    // 如果没有选中的谱师，设置默认谱师
+                    if (_selectedCharter == null && _charterCounts != null && _charterCounts!.isNotEmpty) {
+                      setState(() {
+                        _selectedCharter = _charterCounts!.keys.first;
+                      });
+                    }
+                    await _loadSongsWithStatus();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // 显示谱师选择对话框
+  void _showCharterDialog() {
+    if (_charterCounts == null || _charterCounts!.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('提示'),
+            content: Text('没有找到谱师数据'),
+            actions: [
+              TextButton(
+                child: Text('确定'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
+
+    // 按出现次数排序
+    List<MapEntry<String, int>> sortedCharters = _charterCounts!.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('选择谱师'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: sortedCharters.map((entry) {
+                return ListTile(
+                  title: Text('${entry.key} (${entry.value}谱面)'),
+                  selected: _selectedCharter == entry.key,
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    setState(() {
+                      _selectedCharter = entry.key;
+                      _cachedSongsWithStatus = null;
+                    });
+                    await _loadSongsWithStatus();
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text('取消'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // 显示等级选择对话框（使用缓存的全量等级选项）
   void _showLevelDialog() {
     showDialog(
@@ -522,7 +708,7 @@ class _LevelScorePageState extends State<LevelScorePage> {
     if (_cachedSongsWithStatus == null || _cachedSongsWithStatus!.isEmpty) {
       return Center(
         child: Text(
-          '当前等级没有匹配的歌曲',
+          _mode == 'level' ? '当前等级没有匹配的歌曲' : '当前谱师没有匹配的歌曲',
           style: TextStyle(
             fontSize: _textSizeM,
             color: Colors.grey[500]!,
@@ -533,9 +719,19 @@ class _LevelScorePageState extends State<LevelScorePage> {
 
     final songsWithStatus = _cachedSongsWithStatus!;
 
+    // 根据过滤模式过滤歌曲
+    List<Map<String, dynamic>> filteredSongs = songsWithStatus;
+    if (_filterMode == 'completed') {
+      filteredSongs = songsWithStatus.where((item) => item['completed'] as bool).toList();
+    } else if (_filterMode == 'uncompleted') {
+      filteredSongs = songsWithStatus.where((item) => !(item['completed'] as bool)).toList();
+    }
+
+    // 检查过滤后是否有数据（保留过滤后的列表用于后续使用，但不提前返回）
+
     // 按定数每0.1进行分组（精确到0.1）
     Map<String, List<Map<String, dynamic>>> groupedSongs = {};
-    for (final item in songsWithStatus) {
+    for (final item in filteredSongs) {
       final song = item['song'] as Song;
       final diffIndex = item['difficulty'] as int;
       String dsKey = '未知';
@@ -741,6 +937,14 @@ class _LevelScorePageState extends State<LevelScorePage> {
     // 获取难度显示名称
     final difficultyName = _selectedDifficulty == -1 ? 'ALL' : _getDifficultyName(_selectedDifficulty!);
 
+    // 根据模式获取标题
+    String title;
+    if (_mode == 'level') {
+      title = 'Lv.${_selectedLevel}(${difficultyName})的${_selectedTitleType}称号统计';
+    } else {
+      title = '谱师${_selectedCharter}(${difficultyName})的${_selectedTitleType}称号统计';
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -757,7 +961,7 @@ class _LevelScorePageState extends State<LevelScorePage> {
             children: [
               // 标题
               Text(
-                'Lv.${_selectedLevel}(${difficultyName})的${_selectedTitleType}称号统计',
+                title,
                 style: TextStyle(
                   fontSize: _textSizeL,
                   fontWeight: FontWeight.bold,
@@ -863,37 +1067,82 @@ class _LevelScorePageState extends State<LevelScorePage> {
         ),
         SizedBox(height: _paddingS),
 
-        // 切换显示模式按钮
+        // 切换显示模式按钮区域
         Container(
           alignment: Alignment.centerRight,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.grey[200]!,
-              foregroundColor: Colors.black,
-              minimumSize: Size(120 * _scaleFactor, 36 * _scaleFactor),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(_borderRadiusSmall),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              // 过滤按钮
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey[200]!,
+                  foregroundColor: Colors.black,
+                  minimumSize: Size(100 * _scaleFactor, 36 * _scaleFactor),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(_borderRadiusSmall),
+                  ),
+                ),
+                onPressed: () {
+                  setState(() {
+                    // 循环切换：全部 -> 已完成 -> 未完成 -> 全部
+                    if (_filterMode == 'all') {
+                      _filterMode = 'completed';
+                    } else if (_filterMode == 'completed') {
+                      _filterMode = 'uncompleted';
+                    } else {
+                      _filterMode = 'all';
+                    }
+                  });
+                },
+                child: Text(
+                  '当前: ${_filterMode == 'all' ? '全部' : _filterMode == 'completed' ? '已完成' : '未完成'}',
+                  style: TextStyle(fontSize: _textSizeS),
+                ),
               ),
-            ),
-            onPressed: () {
-              setState(() {
-                _showListMode = !_showListMode;
-              });
-            },
-            child: Text(
-              '当前:${_showListMode ? '列表' : '曲绘'}',
-              style: TextStyle(fontSize: _textSizeS),
-            ),
+              SizedBox(width: _paddingS),
+              // 曲绘/列表切换按钮
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey[200]!,
+                  foregroundColor: Colors.black,
+                  minimumSize: Size(100 * _scaleFactor, 36 * _scaleFactor),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(_borderRadiusSmall),
+                  ),
+                ),
+                onPressed: () {
+                  setState(() {
+                    _showListMode = !_showListMode;
+                  });
+                },
+                child: Text(
+                  '当前: ${_showListMode ? '列表' : '曲绘'}',
+                  style: TextStyle(fontSize: _textSizeS),
+                ),
+              ),
+            ],
           ),
         ),
         SizedBox(height: _paddingS),
 
         // 歌曲展示区域
-        _showListMode ?
-          // 带定数分隔线的歌曲列表
-          Column(children: songWidgets) :
-          // 仅曲绘模式
-          _buildCoverOnlyView(songsWithStatus),
+        filteredSongs.isEmpty ?
+          // 过滤后无数据时显示提示
+          Center(
+            child: Text(
+              _filterMode == 'completed' ? '暂无已完成歌曲' : _filterMode == 'uncompleted' ? '暂无未完成歌曲' : (_mode == 'level' ? '当前等级没有匹配的歌曲' : '当前谱师没有匹配的歌曲'),
+              style: TextStyle(
+                fontSize: _textSizeM,
+                color: Colors.grey[500]!,
+              ),
+            ),
+          ) :
+          _showListMode ?
+            // 带定数分隔线的歌曲列表
+            Column(children: songWidgets) :
+            // 仅曲绘模式
+            _buildCoverOnlyView(filteredSongs),
       ],
     );
   }

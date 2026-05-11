@@ -70,6 +70,9 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
   // 分割线显示模式：true 使用 _getLevelDisplay（如 15, 14+），false 直接显示定数（如 15.0, 14.5）
   bool _useLevelDisplay = true;
 
+  // 筛选模式：'all' 全部, 'completed' 已完成, 'uncompleted' 未完成
+  String _filterMode = 'all';
+
   // 尺寸参数
   late double _paddingXS;
   late double _paddingS;
@@ -132,6 +135,10 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
       // 设置保存的显示模式
       _showListMode = savedOptions['showListMode'] as bool;
       _useLevelDisplay = savedOptions['useLevelDisplay'] as bool;
+      
+      // 设置保存的筛选模式
+      final savedFilterMode = savedOptions['filterMode'] as String;
+      _filterMode = ['all', 'completed', 'uncompleted'].contains(savedFilterMode) ? savedFilterMode : 'all';
 
       await _loadCurrentPlate();
       // 加载歌曲完成状态数据
@@ -154,6 +161,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
       difficulty: _selectedDifficulty,
       showListMode: _showListMode,
       useLevelDisplay: _useLevelDisplay,
+      filterMode: _filterMode,
     );
     super.dispose();
   }
@@ -609,9 +617,17 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
 
     final songsWithStatus = _cachedSongsWithStatus!;
 
+            // 根据筛选模式过滤歌曲
+            List<Map<String, dynamic>> filteredSongs = songsWithStatus;
+            if (_filterMode == 'completed') {
+              filteredSongs = songsWithStatus.where((item) => item['completed'] as bool).toList();
+            } else if (_filterMode == 'uncompleted') {
+              filteredSongs = songsWithStatus.where((item) => !(item['completed'] as bool)).toList();
+            }
+
         // 按等级/定数分组歌曲
             Map<String, List<Map<String, dynamic>>> groupedSongs = {};
-            for (final item in songsWithStatus) {
+            for (final item in filteredSongs) {
               final dynamic song = item['song'];
               final diffIndex = item['difficulty'] as int;
               String levelKey = '未知';
@@ -845,32 +861,35 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 收藏品图片（可点击跳转）
-                Center(
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => CollectionInfoPage(
-                            collectionId: _currentPlate!.id,
-                            collectionType: 'plates',
+                // 收藏品图片（可点击跳转）- 真将和真大将不显示图片
+                if (!(_selectedFirstChar == '真' && (_selectedTitleType == '将' || _selectedTitleType == '大将')))
+                  Center(
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CollectionInfoPage(
+                              collectionId: _currentPlate!.id,
+                              collectionType: 'plates',
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      width: 280 * _scaleFactor,
-                      height: 140 * _scaleFactor,
-                      child: CollectionsImageUtil.getPlateImageURL(_currentPlate!),
+                        );
+                      },
+                      child: Container(
+                        width: 280 * _scaleFactor,
+                        height: 140 * _scaleFactor,
+                        child: CollectionsImageUtil.getPlateImageURL(_currentPlate!),
+                      ),
                     ),
                   ),
-                ),
                 SizedBox(height: _paddingS), // 减少间距
                 // 收藏品名称
                 Center(
                   child: Text(
-                    _currentPlate!.name,
+                    _selectedFirstChar == '真' && (_selectedTitleType == '将' || _selectedTitleType == '大将')
+                        ? '${_selectedFirstChar}${_selectedTitleType}'
+                        : _currentPlate!.name,
                     style: TextStyle(
                       fontSize: _textSizeL,
                       fontWeight: FontWeight.bold,
@@ -893,7 +912,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                     children: [
                       // 标题
                       Text(
-                        '${_currentPlate!.name}(${_getDifficultyName(_selectedDifficulty ?? 3)})统计',
+                        '${_selectedFirstChar}${_selectedTitleType}(${_getDifficultyName(_selectedDifficulty ?? 3)})统计',
                         style: TextStyle(
                           fontSize: _textSizeL,
                           fontWeight: FontWeight.bold,
@@ -1005,6 +1024,33 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
+                      // 筛选模式切换按钮
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[200]!,
+                          foregroundColor: Colors.black,
+                          minimumSize: Size(100 * _scaleFactor, 36 * _scaleFactor),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(_borderRadiusSmall),
+                          ),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            if (_filterMode == 'all') {
+                              _filterMode = 'completed';
+                            } else if (_filterMode == 'completed') {
+                              _filterMode = 'uncompleted';
+                            } else {
+                              _filterMode = 'all';
+                            }
+                          });
+                        },
+                        child: Text(
+                          _filterMode == 'all' ? '当前: 全部' : (_filterMode == 'completed' ? '当前: 已完成' : '当前: 未完成'),
+                          style: TextStyle(fontSize: _textSizeS),
+                        ),
+                      ),
+                      SizedBox(width: _paddingS),
                       // 分割线显示模式切换按钮
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
@@ -1021,7 +1067,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                           });
                         },
                         child: Text(
-                          _useLevelDisplay ? '当前:等级' : '当前:定数',
+                          _useLevelDisplay ? '当前: 等级' : '当前: 定数',
                           style: TextStyle(fontSize: _textSizeS),
                         ),
                       ),
@@ -1042,7 +1088,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                           });
                         },
                         child: Text(
-                          _showListMode ? '当前:列表' : '当前:曲绘',
+                          _showListMode ? '当前: 列表' : '当前: 曲绘',
                           style: TextStyle(fontSize: _textSizeS),
                         ),
                       ),
@@ -1056,7 +1102,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                   // 带等级分隔线的歌曲列表
                   Column(children: songWidgets) :
                   // 仅曲绘模式
-                  _buildCoverOnlyView(songsWithStatus),
+                  _buildCoverOnlyView(filteredSongs),
               ],
             );
       }

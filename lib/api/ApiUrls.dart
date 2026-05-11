@@ -14,6 +14,6 @@ class ApiUrls {
   static const String LuoXueSongsApi = 'https://maimai.lxns.net/api/v0/maimai/song/list';
   static const String ServerStatusApi = 'https://status.awmc.cc/api/status-page/heartbeat/maimai';
   static const String ServerStatusTitleApi = 'https://status.awmc.cc/api/status-page/maimai';
-  static const String checkUpdateApi = 'https://pastebin.com/raw/Ba1BW9ap';
+  static const String checkUpdateApi = 'http://152.136.125.98:8888/app_version.json';
   static const String knowledgeApi = 'https://pastebin.com/raw/Fcdieww7';
 }

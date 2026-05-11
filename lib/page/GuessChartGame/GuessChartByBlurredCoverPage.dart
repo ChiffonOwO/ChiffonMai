@@ -13,6 +13,7 @@ import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonCacheUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 
 class GuessChartByBlurredCoverPage extends StatefulWidget {
   const GuessChartByBlurredCoverPage({super.key});
@@ -1497,106 +1498,120 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
 
                                           // 游戏结果显示
                                           if (_isGameOver)
-                                            Container(
-                                              margin:
-                                                  const EdgeInsets.only(top: 20),
-                                              padding: const EdgeInsets.all(16),
-                                              decoration: BoxDecoration(
-                                                color: Colors.green[50],
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    _isWon ? '恭喜你猜对了！' : '本局答案',
-                                                    style: TextStyle(
-                                                      fontSize:
-                                                          screenWidth * 0.04,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: _isWon
-                                                          ? Colors.green
-                                                          : Colors.blue,
+                                            GestureDetector(
+                                              onTap: () {
+                                                if (_targetSong != null) {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) => SongInfoPage(
+                                                        songId: _targetSong!.id,
+                                                      ),
                                                     ),
-                                                  ),
-                                                  const SizedBox(height: 8),
-                                                  if (_targetSong != null)
-                                                    Row(
-                                                      children: [
-                                                        // 曲绘
-                                                        Container(
-                                                          width: 60,
-                                                          height: 60,
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            borderRadius:
-                                                                BorderRadius
-                                                                    .circular(4),
+                                                  );
+                                                }
+                                              },
+                                              child: Container(
+                                                margin:
+                                                    const EdgeInsets.only(top: 20),
+                                                padding: const EdgeInsets.all(16),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.green[50],
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      _isWon ? '恭喜你猜对了！' : '本局答案',
+                                                      style: TextStyle(
+                                                        fontSize:
+                                                            screenWidth * 0.04,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: _isWon
+                                                            ? Colors.green
+                                                            : Colors.blue,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 8),
+                                                    if (_targetSong != null)
+                                                      Row(
+                                                        children: [
+                                                          // 曲绘
+                                                          Container(
+                                                            width: 60,
+                                                            height: 60,
+                                                            decoration:
+                                                                BoxDecoration(
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(4),
+                                                            ),
+                                                            child: ClipRRect(
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(4),
+                                                              child: CoverUtil.buildCoverWidgetWithContext(context, _targetSong!.id, 60),
+                                                            ),
                                                           ),
-                                                          child: ClipRRect(
-                                                            borderRadius:
-                                                                BorderRadius
-                                                                    .circular(4),
-                                                            child: CoverUtil.buildCoverWidgetWithContext(context, _targetSong!.id, 60),
-                                                          ),
-                                                        ),
-                                                        const SizedBox(width: 12),
-                                                        Expanded(
-                                                          child: Column(
-                                                            crossAxisAlignment:
-                                                                CrossAxisAlignment
-                                                                    .start,
-                                                            children: [
-                                                              // 第一行：类型 曲名
-                                                              Row(
-                                                                children: [
-                                                                  Text(
-                                                                    _targetSong!.type == 'SD' ? 'ST' : _targetSong!.type,
-                                                                    style: TextStyle(
-                                                                      fontSize: screenWidth * 0.035,
-                                                                      fontWeight: FontWeight.bold,
-                                                                      color: _targetSong!.type == 'SD' ? Colors.blue : Colors.orange,
-                                                                    ),
-                                                                  ),
-                                                                  SizedBox(width: 8),
-                                                                  Expanded(
-                                                                    child: Text(
-                                                                      _targetSong!.basicInfo.title,
+                                                          const SizedBox(width: 12),
+                                                          Expanded(
+                                                            child: Column(
+                                                              crossAxisAlignment:
+                                                                  CrossAxisAlignment
+                                                                      .start,
+                                                              children: [
+                                                                // 第一行：类型 曲名
+                                                                Row(
+                                                                  children: [
+                                                                    Text(
+                                                                      _targetSong!.type == 'SD' ? 'ST' : _targetSong!.type,
                                                                       style: TextStyle(
                                                                         fontSize: screenWidth * 0.035,
                                                                         fontWeight: FontWeight.bold,
+                                                                        color: _targetSong!.type == 'SD' ? Colors.blue : Colors.orange,
                                                                       ),
-                                                                      overflow: TextOverflow.ellipsis,
                                                                     ),
+                                                                    SizedBox(width: 8),
+                                                                    Expanded(
+                                                                      child: Text(
+                                                                        _targetSong!.basicInfo.title,
+                                                                        style: TextStyle(
+                                                                          fontSize: screenWidth * 0.035,
+                                                                          fontWeight: FontWeight.bold,
+                                                                        ),
+                                                                        overflow: TextOverflow.ellipsis,
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                                // 第二行：曲师 | 流派
+                                                                Text(
+                                                                  '${_targetSong!.basicInfo.artist} | ${_targetSong!.basicInfo.genre}',
+                                                                  style: TextStyle(
+                                                                    fontSize: screenWidth * 0.03,
+                                                                    color: Colors.grey,
                                                                   ),
-                                                                ],
-                                                              ),
-                                                              // 第二行：曲师 | 流派
+                                                                  overflow: TextOverflow.ellipsis,
+                                                                ),
+                                                                // 第三行：masterDs | remasterDs | version
                                                               Text(
-                                                                '${_targetSong!.basicInfo.artist} | ${_targetSong!.basicInfo.genre}',
+                                                                '${_targetSong!.ds.length > 3 ? _targetSong!.ds[3].toString() : '-'} | ${_targetSong!.ds.length > 4 ? _targetSong!.ds[4].toString() : '-'} | ${StringUtil.formatVersion2(_targetSong!.basicInfo.from)}',
                                                                 style: TextStyle(
                                                                   fontSize: screenWidth * 0.03,
                                                                   color: Colors.grey,
                                                                 ),
                                                                 overflow: TextOverflow.ellipsis,
                                                               ),
-                                                              // 第三行：masterDs | remasterDs | version
-                                                            Text(
-                                                              '${_targetSong!.ds.length > 3 ? _targetSong!.ds[3].toString() : '-'} | ${_targetSong!.ds.length > 4 ? _targetSong!.ds[4].toString() : '-'} | ${StringUtil.formatVersion2(_targetSong!.basicInfo.from)}',
-                                                              style: TextStyle(
-                                                                fontSize: screenWidth * 0.03,
-                                                                color: Colors.grey,
-                                                              ),
-                                                              overflow: TextOverflow.ellipsis,
+                                                              ],
                                                             ),
-                                                            ],
                                                           ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                ],
+                                                        ],
+                                                      ),
+                                                  ],
+                                                ),
                                               ),
                                             ),
 

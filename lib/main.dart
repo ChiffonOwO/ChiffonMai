@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/manager/MultiplayerManager.dart';
 import 'package:my_first_flutter_app/page/HomePage.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';

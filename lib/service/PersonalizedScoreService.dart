@@ -3,11 +3,11 @@ import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
 
-class LevelScoreService {
+class PersonalizedScoreService {
   // 单例模式
-  static final LevelScoreService _instance = LevelScoreService._internal();
-  factory LevelScoreService() => _instance;
-  LevelScoreService._internal();
+  static final PersonalizedScoreService _instance = PersonalizedScoreService._internal();
+  factory PersonalizedScoreService() => _instance;
+  PersonalizedScoreService._internal();
 
   // 缓存的记录Map，用于加速查找
   Map<String, Map<String, dynamic>>? _recordsCache;
@@ -134,25 +134,17 @@ class LevelScoreService {
         final achievements = double.tryParse(record['achievements'].toString()) ?? 0;
         return achievements >= 100;
 
+      case '大将':
+        final achievements = double.tryParse(record['achievements'].toString()) ?? 0;
+        return achievements >= 100.5;
+
       case '神':
         final fc = record['fc'] as String?;
         return fc == 'ap' || fc == 'app';
 
-      case '全97':
-        final achievements = double.tryParse(record['achievements'].toString()) ?? 0;
-        return achievements >= 97;
-
-      case '全98':
-        final achievements = double.tryParse(record['achievements'].toString()) ?? 0;
-        return achievements >= 98;
-
-      case '全99':
-        final achievements = double.tryParse(record['achievements'].toString()) ?? 0;
-        return achievements >= 99;
-
-      case '全99.5':
-        final achievements = double.tryParse(record['achievements'].toString()) ?? 0;
-        return achievements >= 99.5;
+      case '舞舞':
+        final fs = record['fs'] as String?;
+        return fs == 'fsd' || fs == 'fsdp';
 
       default:
         return false;
@@ -269,12 +261,99 @@ class LevelScoreService {
 
   // 获取称号类型选项
   List<String> getTitleTypeOptions() {
-    return ['極', '将', '神', '全97', '全98', '全99', '全99.5'];
+    return ['極', '将', '大将', '神', '舞舞'];
   }
 
   // 获取难度选项
   List<int> getDifficultyOptions() {
     return [-1, 0, 1, 2, 3, 4];
+  }
+
+  // 获取所有谱师
+  Future<Map<String, int>> getCharterCounts() async {
+    try {
+      final songs = await getAllSongs();
+      if (songs == null) return {};
+
+      Map<String, int> charterCounts = {};
+      for (final song in songs) {
+        // 排除id为6位数的谱面
+        if (song.id.length == 6 && int.tryParse(song.id) != null) {
+          continue;
+        }
+        for (final chart in song.charts) {
+          if (chart.charter.isNotEmpty) {
+            String charter = chart.charter;
+            charterCounts[charter] = (charterCounts[charter] ?? 0) + 1;
+          }
+        }
+      }
+
+      return charterCounts;
+    } catch (e) {
+      print('获取谱师列表时出错: $e');
+      return {};
+    }
+  }
+
+  // 根据谱师获取歌曲及其完成状态
+  Future<List<Map<String, dynamic>>> getSongsByCharter(
+    String charter,
+    String titleType,
+    int difficulty,
+  ) async {
+    await _initRecordsCache();
+
+    final songs = await getAllSongs();
+    if (songs == null) {
+      return [];
+    }
+
+    final result = <Map<String, dynamic>>[];
+    
+    for (final song in songs) {
+      // 排除id为6位数的谱面
+      if (song.id.length == 6 && int.tryParse(song.id) != null) {
+        continue;
+      }
+
+      // ALL模式：为每个符合条件的难度生成独立条目
+      if (difficulty == -1) {
+        for (int i = 0; i < song.charts.length; i++) {
+          if (song.charts[i].charter == charter) {
+            final completed = isSongCompletedSync(int.parse(song.id), i, titleType);
+            result.add({
+              'song': song,
+              'completed': completed,
+              'difficulty': i,
+            });
+          }
+        }
+      } else {
+        // 指定难度模式
+        if (difficulty < song.charts.length && song.charts[difficulty].charter == charter) {
+          final completed = await isSongCompleted(int.parse(song.id), difficulty, titleType);
+          result.add({
+            'song': song,
+            'completed': completed,
+            'difficulty': difficulty,
+          });
+        }
+      }
+    }
+
+    // 按定数降序排序
+    result.sort((a, b) {
+      final songA = a['song'] as Song;
+      final songB = b['song'] as Song;
+      final diffA = a['difficulty'] as int;
+      final diffB = b['difficulty'] as int;
+      double dsA = songA.ds.length > diffA ? songA.ds[diffA] : -1;
+      double dsB = songB.ds.length > diffB ? songB.ds[diffB] : -1;
+      return dsB.compareTo(dsA);
+    });
+
+    return result;
   }
 
   // 获取难度显示名称（支持ALL）
@@ -297,6 +376,8 @@ class LevelScoreService {
   static const String _keyTitleType = 'level_score_title_type';
   static const String _keyDifficulty = 'level_score_difficulty';
   static const String _keyShowListMode = 'level_score_show_list_mode';
+  static const String _keyMode = 'level_score_mode';
+  static const String _keyCharter = 'level_score_charter';
 
   // 保存用户选择的选项
   Future<void> saveSelectedOptions({
@@ -304,12 +385,16 @@ class LevelScoreService {
     required String? titleType,
     required int? difficulty,
     required bool showListMode,
+    required String? mode,
+    required String? charter,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyLevel, level ?? '');
     await prefs.setString(_keyTitleType, titleType ?? '');
     await prefs.setInt(_keyDifficulty, difficulty ?? -1);
     await prefs.setBool(_keyShowListMode, showListMode);
+    await prefs.setString(_keyMode, mode ?? 'level');
+    await prefs.setString(_keyCharter, charter ?? '');
   }
 
   // 获取保存的用户选项
@@ -320,6 +405,8 @@ class LevelScoreService {
       'titleType': prefs.getString(_keyTitleType) ?? '',
       'difficulty': prefs.getInt(_keyDifficulty) ?? -1,
       'showListMode': prefs.getBool(_keyShowListMode) ?? true,
+      'mode': prefs.getString(_keyMode) ?? 'level',
+      'charter': prefs.getString(_keyCharter) ?? '',
     };
   }
 }
