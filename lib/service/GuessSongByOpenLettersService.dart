@@ -21,8 +21,11 @@ class GuessSongByOpenLettersService {
         return [];
       }
 
-      // 过滤掉宴会场谱面（id为六位数的谱面）
-      var filteredSongs = songs.where((song) => song.id.length != 6).toList();
+      // 过滤掉宴会场谱面（id为六位数的谱面）和从maidata追加的歌曲（cids全为0）
+      var filteredSongs = songs.where((song) => 
+        song.id.length != 6 && 
+        !_isMaidataSong(song)
+      ).toList();
       
       // 按版本筛选
       if (selectedVersions.isNotEmpty) {
@@ -161,6 +164,12 @@ class GuessSongByOpenLettersService {
 
     // 限制结果数量
     return results.take(20).toList();
+  }
+  
+  // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析）
+  static bool _isMaidataSong(Song song) {
+    if (song.cids.isEmpty) return false;
+    return song.cids.every((cid) => cid == 0);
   }
   
   // 计算非英文字符占比（包括日语和其他非英文字符，除空格外）

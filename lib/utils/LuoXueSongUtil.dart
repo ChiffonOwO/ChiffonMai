@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:just_audio/just_audio.dart';
+import '../constant/CacheTimestampConstant.dart';
 
 class LuoXueSongUtil {
   // 单例模式
@@ -17,7 +18,7 @@ class LuoXueSongUtil {
   final CacheManager _cacheManager = CacheManager(
     Config(
       'music_cache',
-      stalePeriod: Duration(days: 30), // 缓存30天
+      stalePeriod: CacheTimestampConstant.luoxueSongDuration,
       maxNrOfCacheObjects: 1000, // 最多缓存1000个文件
     ),
   );

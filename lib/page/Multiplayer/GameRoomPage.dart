@@ -345,6 +345,12 @@ class _GameRoomPageState extends State<GameRoomPage> {
             _gameState = _gameState!.copyWith(isRoundOver: true);
           }
           
+          // 如果本地已经因为超时结束回合，强制保持结束状态
+          // 这可以防止服务器延迟导致的按钮消失
+          if (_isRoundOverByTimeout) {
+            _gameState = _gameState!.copyWith(isRoundOver: true);
+          }
+          
           // 只有在回合未结束或新回合开始时才加载目标歌曲
           if (state.targetSong != null && (!wasRoundOver || isNewRound)) {
             _loadTargetSong(state.targetSong!);
@@ -475,7 +481,6 @@ class _GameRoomPageState extends State<GameRoomPage> {
   
   // 投降
   void _handleSurrender() {
-    _countdownTimer?.cancel();
     _manager.updatePlayerSurrendered(true);
     
     // 调试信息

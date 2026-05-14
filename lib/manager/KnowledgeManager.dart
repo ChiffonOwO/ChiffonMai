@@ -4,15 +4,13 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api/ApiUrls.dart';
 import '../entity/KnowledgeEntity.dart';
+import '../constant/CacheKeyConstant.dart';
+import '../constant/CacheTimestampConstant.dart';
 
 class KnowledgeManager {
   static final KnowledgeManager _instance = KnowledgeManager._internal();
   factory KnowledgeManager() => _instance;
   KnowledgeManager._internal();
-
-  static const String _cacheKey = 'knowledge_data';
-  static const String _cacheTimestampKey = 'knowledge_timestamp';
-  static const int _cacheDuration = 24 * 60 * 60 * 1000; // 1天，单位毫秒
 
   // 获取知识数据
   Future<KnowledgeEntity?> getKnowledgeData() async {
@@ -48,13 +46,13 @@ class KnowledgeManager {
   // 获取缓存数据
   Future<KnowledgeEntity?> _getCachedData() async {
     final prefs = await SharedPreferences.getInstance();
-    final cachedData = prefs.getString(_cacheKey);
-    final timestamp = prefs.getInt(_cacheTimestampKey);
+    final cachedData = prefs.getString(CacheKeyConstant.knowledgeData);
+    final timestamp = prefs.getInt(CacheKeyConstant.knowledgeTimestamp);
 
     // 检查缓存是否存在且未过期
     if (cachedData != null && timestamp != null) {
       final now = DateTime.now().millisecondsSinceEpoch;
-      if (now - timestamp < _cacheDuration) {
+      if (now - timestamp < CacheTimestampConstant.knowledgeCacheMillis) {
         try {
           final jsonData = json.decode(cachedData);
           return KnowledgeEntity.fromJson(jsonData);
@@ -85,15 +83,15 @@ class KnowledgeManager {
       };
     }).toList();
 
-    await prefs.setString(_cacheKey, json.encode(jsonData));
-    await prefs.setInt(_cacheTimestampKey, DateTime.now().millisecondsSinceEpoch);
+    await prefs.setString(CacheKeyConstant.knowledgeData, json.encode(jsonData));
+    await prefs.setInt(CacheKeyConstant.knowledgeTimestamp, DateTime.now().millisecondsSinceEpoch);
   }
 
   // 清除缓存
   Future<void> clearCache() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_cacheKey);
-    await prefs.remove(_cacheTimestampKey);
+    await prefs.remove(CacheKeyConstant.knowledgeData);
+    await prefs.remove(CacheKeyConstant.knowledgeTimestamp);
   }
 
   // 强制刷新数据

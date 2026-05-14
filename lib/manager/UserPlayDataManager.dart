@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/api/DeveloperToken.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../constant/CacheKeyConstant.dart';
 
 class UserPlayDataManager {
   // 单例模式
@@ -10,8 +11,7 @@ class UserPlayDataManager {
   factory UserPlayDataManager() => _instance;
   UserPlayDataManager._internal();
 
-  // 缓存键
-  static const String _cacheKey = 'user_play_data';
+  // 缓存时间戳键
   static const String _lastUpdateKey = 'user_play_data_last_update';
 
   // API 地址
@@ -54,7 +54,7 @@ class UserPlayDataManager {
   Future<Map<String, dynamic>?> getCachedUserPlayData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_cacheKey);
+      final jsonString = prefs.getString(CacheKeyConstant.userPlayData);
       
       if (jsonString != null) {
         return json.decode(jsonString);
@@ -70,7 +70,7 @@ class UserPlayDataManager {
   Future<void> _saveToCache(Map<String, dynamic> data) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_cacheKey, json.encode(data));
+      await prefs.setString(CacheKeyConstant.userPlayData, json.encode(data));
       await prefs.setInt(_lastUpdateKey, DateTime.now().millisecondsSinceEpoch);
     } catch (e) {
       print('保存用户游玩数据到缓存时出错: $e');
@@ -81,7 +81,7 @@ class UserPlayDataManager {
   Future<void> clearCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_cacheKey);
+      await prefs.remove(CacheKeyConstant.userPlayData);
       await prefs.remove(_lastUpdateKey);
     } catch (e) {
       print('清除用户游玩数据缓存时出错: $e');

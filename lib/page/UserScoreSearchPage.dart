@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:my_first_flutter_app/utils/StringUtil.dart';
+import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import '../service/UserScoreSearchService.dart';
 import '../manager/MaimaiMusicDataManager.dart';
 import 'HomePage.dart';
@@ -47,6 +49,9 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   
   // 当前排序方式
   String _currentSortBy = 'Rating'; // 默认选择Rating
+  
+  // 显示模式：true为曲绘模式，false为列表模式
+  bool _isCoverMode = true;
   
   // 筛选条件
   Map<String, String> _filterConditions = {
@@ -377,8 +382,8 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                   maxDs = 15.0;
                 } else if (level.endsWith('+')) {
                   int base = int.parse(level.substring(0, level.length - 1));
-                  minDs = base + 0.5;
-                  maxDs = base + 1.0;
+                  minDs = base + 0.6;
+                  maxDs = base + 0.9;
                 } else {
                   int base = int.parse(level);
                   minDs = base.toDouble();
@@ -1441,258 +1446,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                           constraints: BoxConstraints(
                                             minHeight: 300, // 设置最小高度确保内容显示
                                           ),
-                                          child: GridView.builder(
-                                            shrinkWrap: true, // 允许GridView根据内容大小调整
-                                            physics: NeverScrollableScrollPhysics(), // 禁用内部滚动，由外部SingleChildScrollView控制
-                                            padding: EdgeInsets.all(2), // 进一步减小内边距，从4减少到2
-                                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                              crossAxisCount: 5, // 保持每行5个曲绘
-                                              crossAxisSpacing: 2, // 使用固定值2作为水平间距
-                                              mainAxisSpacing: 2, // 使用固定值2作为垂直间距
-                                              childAspectRatio: 1.0, // 确保图片显示为正方形
-                                            ),
-                                            itemCount: _pagedSongs.length,
-                                            itemBuilder: (context, index) {
-                                              final song = _pagedSongs[index];
-                                              final levelIndex = song['level_index'] ?? 0;
-                                              var borderColor = _service.getBorderColor(levelIndex);
-                                              
-                                              // 当歌曲id为6位数时，曲绘边框强制设为粉色
-                                              final songId = song['song_id']?.toString() ?? '';
-                                              if (songId.length == 6 && int.tryParse(songId) != null) {
-                                                borderColor = Color(0xFFFF69B4); // 粉色
-                                              }
-                                              
-                                              // 计算每个网格项的大小，确保正方形显示
-                                              final itemSize = (screenWidth - 4 - (4 * 2)) / 5; // 4是左右边距（各2），4是间隔数（因为是5列），每个间隔2像素
-                                              
-                                              // 获取要显示的信息
-                                              String displayText = '';
-                                              String displaySubText = '';
-                                              Color displayColor = Colors.white;
-                                              
-                                              switch (_selectedButtonIndex) {
-                                                case 0: // 评级
-                                                  if (song.containsKey('achievements')) {
-                                                    double achievements = double.tryParse(song['achievements'].toString()) ?? 0;
-                                                    if (achievements >= 100.5) {
-                                                      displayText = 'SSS+';
-                                                      displayColor = Colors.yellow;
-                                                    } else if (achievements >= 100.0) {
-                                                      displayText = 'SSS';
-                                                      displayColor = Colors.yellow;
-                                                    } else if (achievements >= 99.5) {
-                                                      displayText = 'SS+';
-                                                      displayColor = Colors.orange;
-                                                    } else if (achievements >= 99.0) {
-                                                      displayText = 'SS';
-                                                      displayColor = Colors.orange;
-                                                    } else if (achievements >= 98.0) {
-                                                      displayText = 'S+';
-                                                      displayColor = Colors.orange;
-                                                    } else if (achievements >= 97.0) {
-                                                      displayText = 'S';
-                                                      displayColor = Colors.orange;
-                                                    } else if (achievements >= 94.0) {
-                                                      displayText = 'AAA';
-                                                      displayColor = Colors.red;
-                                                    } else if (achievements >= 90.0) {
-                                                      displayText = 'AA';
-                                                      displayColor = Colors.red;
-                                                    } else if (achievements >= 80.0) {
-                                                      displayText = 'A';
-                                                      displayColor = Colors.red;
-                                                    } else if (achievements >= 75.0) {
-                                                      displayText = 'BBB';
-                                                      displayColor = Colors.blue;
-                                                    } else if (achievements >= 70.0) {
-                                                      displayText = 'BB';
-                                                      displayColor = Colors.blue;
-                                                    } else if (achievements >= 60.0) {
-                                                      displayText = 'B';
-                                                      displayColor = Colors.blue;
-                                                    } else if (achievements >= 50.0) {
-                                                      displayText = 'C';
-                                                      displayColor = Colors.grey;
-                                                    } else {
-                                                      displayText = 'D';
-                                                      displayColor = Colors.grey;
-                                                    }
-                                                  }
-                                                  break;
-                                                case 1: // 连击
-                                                  if (song.containsKey('fc')) {
-                                                    String fc = song['fc'].toString().toLowerCase();
-                                                    if (fc == 'app') {
-                                                      displayText = 'AP+';
-                                                      displayColor = Colors.yellow;
-                                                    } else if (fc == 'ap') {
-                                                      displayText = 'AP';
-                                                      displayColor = Colors.orange;
-                                                    } else if (fc == 'fcp') {
-                                                      displayText = 'FC+';
-                                                      displayColor = Colors.green;
-                                                    } else if (fc == 'fc') {
-                                                      displayText = 'FC';
-                                                      displayColor = Colors.blue;
-                                                    }
-                                                  }
-                                                  break;
-                                                case 2: // 同步
-                                                  if (song.containsKey('fs')) {
-                                                    String fs = song['fs'].toString().toLowerCase();
-                                                    if (fs == 'fsdp') {
-                                                      displayText = 'FDX+';
-                                                      displayColor = Colors.yellow;
-                                                    } else if (fs == 'fsd') {
-                                                      displayText = 'FDX';
-                                                      displayColor = Colors.orange;
-                                                    } else if (fs == 'fsp') {
-                                                      displayText = 'FS+';
-                                                      displayColor = Colors.green;
-                                                    } else if (fs == 'fs') {
-                                                      displayText = 'FS';
-                                                      displayColor = Colors.blue;
-                                                    }
-                                                  }
-                                                  break;
-                                                case 3: // 得分
-                                                  if (song.containsKey('ra')) {
-                                                    displayText = song['ra'].toString();
-                                                    displayColor = Colors.white;
-                                                  }
-                                                  break;
-                                                case 4: // 星数
-                                                  if (song.containsKey('dxScore')) {
-                                                    // 计算DX分达成率
-                                                    double rate = 0.0;
-                                                    if (_dxRateCache.containsKey(song)) {
-                                                      rate = _dxRateCache[song]!;
-                                                    } else {
-                                                      rate = _calculateDXScoreRate(song);
-                                                      _dxRateCache[song] = rate;
-                                                    }
-                                                    
-                                                    // 计算星数
-                                                    String stars = '';
-                                                    if (rate >= 0.99) {
-                                                      stars = '\u2726 6';
-                                                      displayColor = Colors.yellow;
-                                                    } else if (rate >= 0.98) {
-                                                      stars = '\u2726 5.5';
-                                                      displayColor = Colors.yellow;
-                                                    } else if (rate >= 0.97) {
-                                                      stars = '\u2726 5';
-                                                      displayColor = Colors.yellow;
-                                                    } else if (rate >= 0.95) {
-                                                      stars = '\u2726 4';
-                                                      displayColor = Colors.orange;
-                                                    } else if (rate >= 0.93) {
-                                                      stars = '\u2726 3';
-                                                      displayColor = Colors.orange;
-                                                    } else if (rate >= 0.90) {
-                                                      stars = '\u2726 2';
-                                                      displayColor = Colors.green.shade200;
-                                                    } else if (rate >= 0.85) {
-                                                      stars = '\u2726 1';
-                                                      displayColor = Colors.green.shade200;
-                                                    } else {
-                                                      stars = '\u2726 0';
-                                                      displayColor = Colors.grey.shade300;
-                                                    }
-                                                    
-                                                    displayText = stars;
-                                                    displaySubText = '${(rate * 100).toStringAsFixed(2)}%';
-                                                  }
-                                                  break;
-                                                case 5: // 定数
-                                                  if (song.containsKey('ds')) {
-                                                    displayText = song['ds'].toString();
-                                                    displayColor = Colors.white;
-                                                  }
-                                                  break;
-                                              }
-                                               
-                                              return GestureDetector(
-                                                onTap: () {
-                                                  Navigator.push(
-                                                    context,
-                                                    MaterialPageRoute(
-                                                      builder: (context) => SongInfoPage(
-                                                        songId: song['song_id'].toString(),
-                                                        initialLevelIndex: levelIndex,
-                                                        isDefaultLevelIndex: false, // 禁用默认难度选择逻辑
-                                                      ),
-                                                    ),
-                                                  );
-                                                },
-                                                child: Container(
-                                                  width: itemSize,
-                                                  height: itemSize,
-                                                  decoration: BoxDecoration(
-                                                    border: Border.all(
-                                                      color: Color(borderColor.value),
-                                                      width: 2,
-                                                    ),
-                                                    borderRadius: BorderRadius.circular(8),
-                                                    color: Color(borderColor.value).withOpacity(0.3), // 给四个角添加与边框相同颜色的背景
-                                                  ),
-                                                  child: Stack(
-                                                    fit: StackFit.expand,
-                                                    children: [
-                                                      CoverUtil.buildCoverWidgetWithContextRRect(
-                                                        context, 
-                                                        song['song_id']?.toString() ?? '', 
-                                                        double.infinity
-                                                      ),
-                                                      // 叠加显示信息
-                                                      if (displayText.isNotEmpty) 
-                                                        Container(
-                                                          decoration: BoxDecoration(
-                                                            color: Colors.black.withOpacity(0.4),
-                                                            borderRadius: BorderRadius.circular(6),
-                                                          ),
-                                                          child: Center(
-                                                            child: _selectedButtonIndex == 4 ?
-                                                              Column(
-                                                                mainAxisAlignment: MainAxisAlignment.center,
-                                                                children: [
-                                                                  Text(
-                                                                    displayText,
-                                                                    style: TextStyle(
-                                                                      color: displayColor,
-                                                                      fontSize: itemSize * 0.18,
-                                                                      fontWeight: FontWeight.bold,
-                                                                    ),
-                                                                  ),
-                                                                  if (displaySubText.isNotEmpty)
-                                                                    Text(
-                                                                      displaySubText,
-                                                                      style: TextStyle(
-                                                                        color: displayColor,
-                                                                        fontSize: itemSize * 0.15,
-                                                                        fontWeight: FontWeight.bold,
-                                                                      ),
-                                                                    ),
-                                                                ],
-                                                              )
-                                                            :
-                                                              Text(
-                                                                displayText,
-                                                                style: TextStyle(
-                                                                  color: displayColor,
-                                                                  fontSize: itemSize * 0.2,
-                                                                  fontWeight: FontWeight.bold,
-                                                                ),
-                                                              ),
-                                                          ),
-                                                        ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                          ),
+                                          child: _isCoverMode ? _buildCoverGrid() : _buildListGrid(),
                                         ),
                                       ],
                                     ),
@@ -1701,7 +1455,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                 
                                 // 固定的分页控件
                                 Container(
-                                  padding: EdgeInsets.all(16),
+                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                                   decoration: BoxDecoration(
                                     border: Border(top: BorderSide(color: Colors.grey[300]!)),
                                   ),
@@ -1712,16 +1466,38 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                         onPressed: _currentPage > 1
                                             ? () => _changePage(_currentPage - 1)
                                             : null,
-                                        child: Text('上一页', style: TextStyle(color: Colors.black)),
+                                        style: ElevatedButton.styleFrom(
+                                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        ),
+                                        child: Text('上一页', style: TextStyle(color: Colors.black, fontSize: 12)),
                                       ),
-                                      SizedBox(width: 16),
-                                      Text('$_currentPage / ${_getTotalPages()}', style: TextStyle(color: Colors.black)),
-                                      SizedBox(width: 16),
+                                      SizedBox(width: 8),
+                                      Text('$_currentPage / ${_getTotalPages()}', style: TextStyle(color: Colors.black, fontSize: 14)),
+                                      SizedBox(width: 8),
                                       ElevatedButton(
                                         onPressed: _currentPage < _getTotalPages()
                                             ? () => _changePage(_currentPage + 1)
                                             : null,
-                                        child: Text('下一页', style: TextStyle(color: Colors.black)),
+                                        style: ElevatedButton.styleFrom(
+                                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        ),
+                                        child: Text('下一页', style: TextStyle(color: Colors.black, fontSize: 12)),
+                                      ),
+                                      SizedBox(width: 8),
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          setState(() {
+                                            _isCoverMode = !_isCoverMode;
+                                          });
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: _isCoverMode ? Colors.blue : Colors.green,
+                                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        ),
+                                        child: Text(
+                                          _isCoverMode ? '当前:曲绘' : '当前:列表',
+                                          style: TextStyle(color: Colors.white, fontSize: 12),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -1733,6 +1509,502 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
             ],
           ),
         ],
+      ),
+    );
+  }
+  
+  // 构建曲绘网格（5列）
+  Widget _buildCoverGrid() {
+    double screenWidth = MediaQuery.of(context).size.width;
+    
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.all(2),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 5,
+        crossAxisSpacing: 2,
+        mainAxisSpacing: 2,
+        childAspectRatio: 1.0,
+      ),
+      itemCount: _pagedSongs.length,
+      itemBuilder: (context, index) {
+        final song = _pagedSongs[index];
+        final levelIndex = song['level_index'] ?? 0;
+        var borderColor = _service.getBorderColor(levelIndex);
+        
+        final songId = song['song_id']?.toString() ?? '';
+        if (songId.length == 6 && int.tryParse(songId) != null) {
+          borderColor = Color(0xFFFF69B4);
+        }
+        
+        final itemSize = (screenWidth - 4 - (4 * 2)) / 5;
+        
+        String displayText = '';
+        String displaySubText = '';
+        Color displayColor = Colors.white;
+        
+        switch (_selectedButtonIndex) {
+          case 0: // 评级
+            if (song.containsKey('achievements')) {
+              double achievements = double.tryParse(song['achievements'].toString()) ?? 0;
+              if (achievements >= 100.5) {
+                displayText = 'SSS+';
+                displayColor = Colors.yellow;
+              } else if (achievements >= 100.0) {
+                displayText = 'SSS';
+                displayColor = Colors.yellow;
+              } else if (achievements >= 99.5) {
+                displayText = 'SS+';
+                displayColor = Colors.orange;
+              } else if (achievements >= 99.0) {
+                displayText = 'SS';
+                displayColor = Colors.orange;
+              } else if (achievements >= 98.0) {
+                displayText = 'S+';
+                displayColor = Colors.orange;
+              } else if (achievements >= 97.0) {
+                displayText = 'S';
+                displayColor = Colors.orange;
+              } else if (achievements >= 94.0) {
+                displayText = 'AAA';
+                displayColor = Colors.red;
+              } else if (achievements >= 90.0) {
+                displayText = 'AA';
+                displayColor = Colors.red;
+              } else if (achievements >= 80.0) {
+                displayText = 'A';
+                displayColor = Colors.red;
+              } else if (achievements >= 75.0) {
+                displayText = 'BBB';
+                displayColor = Colors.blue;
+              } else if (achievements >= 70.0) {
+                displayText = 'BB';
+                displayColor = Colors.blue;
+              } else if (achievements >= 60.0) {
+                displayText = 'B';
+                displayColor = Colors.blue;
+              } else if (achievements >= 50.0) {
+                displayText = 'C';
+                displayColor = Colors.grey;
+              } else {
+                displayText = 'D';
+                displayColor = Colors.grey;
+              }
+            }
+            break;
+          case 1: // 连击
+            if (song.containsKey('fc')) {
+              String fc = song['fc'].toString().toLowerCase();
+              if (fc == 'app') {
+                displayText = 'AP+';
+                displayColor = Colors.yellow;
+              } else if (fc == 'ap') {
+                displayText = 'AP';
+                displayColor = Colors.orange;
+              } else if (fc == 'fcp') {
+                displayText = 'FC+';
+                displayColor = Colors.green;
+              } else if (fc == 'fc') {
+                displayText = 'FC';
+                displayColor = Colors.blue;
+              }
+            }
+            break;
+          case 2: // 同步
+            if (song.containsKey('fs')) {
+              String fs = song['fs'].toString().toLowerCase();
+              if (fs == 'fsdp') {
+                displayText = 'FDX+';
+                displayColor = Colors.yellow;
+              } else if (fs == 'fsd') {
+                displayText = 'FDX';
+                displayColor = Colors.orange;
+              } else if (fs == 'fsp') {
+                displayText = 'FS+';
+                displayColor = Colors.green;
+              } else if (fs == 'fs') {
+                displayText = 'FS';
+                displayColor = Colors.blue;
+              }
+            }
+            break;
+          case 3: // 得分
+            if (song.containsKey('ra')) {
+              displayText = song['ra'].toString();
+              displayColor = Colors.white;
+            }
+            break;
+          case 4: // 星数
+            if (song.containsKey('dxScore')) {
+              double rate = 0.0;
+              if (_dxRateCache.containsKey(song)) {
+                rate = _dxRateCache[song]!;
+              } else {
+                rate = _calculateDXScoreRate(song);
+                _dxRateCache[song] = rate;
+              }
+              
+              String stars = '';
+              if (rate >= 0.99) {
+                stars = '\u2726 6';
+                displayColor = Colors.yellow;
+              } else if (rate >= 0.98) {
+                stars = '\u2726 5.5';
+                displayColor = Colors.yellow;
+              } else if (rate >= 0.97) {
+                stars = '\u2726 5';
+                displayColor = Colors.yellow;
+              } else if (rate >= 0.95) {
+                stars = '\u2726 4';
+                displayColor = Colors.orange;
+              } else if (rate >= 0.93) {
+                stars = '\u2726 3';
+                displayColor = Colors.orange;
+              } else if (rate >= 0.90) {
+                stars = '\u2726 2';
+                displayColor = Colors.green.shade200;
+              } else if (rate >= 0.85) {
+                stars = '\u2726 1';
+                displayColor = Colors.green.shade200;
+              } else {
+                stars = '\u2726 0';
+                displayColor = Colors.grey.shade300;
+              }
+              
+              displayText = stars;
+              displaySubText = '${(rate * 100).toStringAsFixed(2)}%';
+            }
+            break;
+          case 5: // 定数
+            if (song.containsKey('ds')) {
+              displayText = song['ds'].toString();
+              displayColor = Colors.white;
+            }
+            break;
+        }
+        
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SongInfoPage(
+                  songId: song['song_id'].toString(),
+                  initialLevelIndex: levelIndex,
+                  isDefaultLevelIndex: false,
+                ),
+              ),
+            );
+          },
+          child: Container(
+            width: itemSize,
+            height: itemSize,
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: Color(borderColor.value),
+                width: 2,
+              ),
+              borderRadius: BorderRadius.circular(8),
+              color: Color(borderColor.value).withOpacity(0.3),
+            ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                CoverUtil.buildCoverWidgetWithContextRRect(
+                  context,
+                  song['song_id']?.toString() ?? '',
+                  double.infinity
+                ),
+                if (displayText.isNotEmpty)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Center(
+                      child: _selectedButtonIndex == 4 ?
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              displayText,
+                              style: TextStyle(
+                                color: displayColor,
+                                fontSize: itemSize * 0.18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (displaySubText.isNotEmpty)
+                              Text(
+                                displaySubText,
+                                style: TextStyle(
+                                  color: displayColor,
+                                  fontSize: itemSize * 0.15,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                          ],
+                        )
+                      :
+                        Text(
+                          displayText,
+                          style: TextStyle(
+                            color: displayColor,
+                            fontSize: itemSize * 0.2,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+  
+  // 构建列表网格（2列）
+  Widget _buildListGrid() {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: MediaQuery.of(context).size.width * 0.01,
+        mainAxisSpacing: MediaQuery.of(context).size.width * 0.01,
+        childAspectRatio: 1.75,
+      ),
+      itemCount: _pagedSongs.length,
+      itemBuilder: (context, index) {
+        return _buildListCard(_pagedSongs[index]);
+      },
+    );
+  }
+  
+  // 构建列表卡片（参考Best50Page的卡片样式）
+  Widget _buildListCard(Map<String, dynamic> song) {
+    double screenWidth = MediaQuery.of(context).size.width;
+    int songId = int.tryParse(song['song_id']?.toString() ?? '0') ?? 0;
+    int levelIndex = song['level_index'] ?? 0;
+    String type = song['type']?.toString() ?? '';
+    double difficulty = double.tryParse(song['ds']?.toString() ?? '0') ?? 0;
+    String title = song['title']?.toString() ?? '未知歌曲';
+    double achievementRate = double.tryParse(song['achievements']?.toString() ?? '0') ?? 0;
+    int score = song['dxScore'] ?? 0;
+    int rating = song['ra'] ?? 0;
+    String fc = song['fc']?.toString() ?? '';
+    String fs = song['fs']?.toString() ?? '';
+    String rate = song['rate']?.toString() ?? '';
+    
+    Color cardColor;
+    if (songId.toString().length == 6) {
+      cardColor = Color(0xFFFFB3D1);
+    } else {
+      cardColor = ColorUtil.getCardColor(levelIndex);
+    }
+    
+    bool dxMode = type == 'DX';
+    bool isUtage = songId.toString().length == 6;
+    
+    double rateValue = 0.0;
+    if (_dxRateCache.containsKey(song)) {
+      rateValue = _dxRateCache[song]!;
+    } else {
+      rateValue = _calculateDXScoreRate(song);
+      _dxRateCache[song] = rateValue;
+    }
+    
+    String stars = StringUtil.formatStars(rateValue);
+    Color starsColor = ColorUtil.getStarsColor(stars);
+    
+    String fcText = fc.isNotEmpty ? StringUtil.formatFC(fc) : '-';
+    String fsText = fs.isNotEmpty ? StringUtil.formatFS(fs) : '-';
+    String rateText = StringUtil.formatRate(rate);
+    String grade = '$rateText | $fcText | $fsText';
+    
+    double coverSize = screenWidth * 0.12;
+    double songNameFontSize = screenWidth * 0.035;
+    double decimalMainFontSize = screenWidth * 0.04;
+    double decimalSmallFontSize = screenWidth * 0.03;
+    double otherFontSize = screenWidth * 0.025;
+    double gradeFontSize = screenWidth * 0.022;
+    double dxFontSize = screenWidth * 0.025;
+    
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SongInfoPage(
+              songId: songId.toString(),
+              initialLevelIndex: levelIndex,
+              isDefaultLevelIndex: false,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: cardColor,
+          border: Border.all(color: Colors.black, width: 2.0),
+          borderRadius: BorderRadius.circular(8.0),
+        ),
+        padding: EdgeInsets.all(screenWidth * 0.02),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: coverSize,
+                  height: coverSize,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: Colors.black, width: 1.0),
+                  ),
+                  child: CoverUtil.buildCoverWidgetWithContext(context, songId.toString(), coverSize),
+                ),
+                SizedBox(height: screenWidth * 0.01),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isUtage)
+                      Text(
+                        'UT',
+                        style: TextStyle(
+                          fontSize: dxFontSize,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                        ),
+                      ),
+                    if (dxMode && !isUtage)
+                      Text(
+                        'DX',
+                        style: TextStyle(
+                          fontSize: dxFontSize,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange,
+                        ),
+                      ),
+                    if (!dxMode && !isUtage)
+                      Text(
+                        'ST',
+                        style: TextStyle(
+                          fontSize: dxFontSize,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade300,
+                        ),
+                      ),
+                    SizedBox(width: screenWidth * 0.01),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          difficulty.toString().split('.')[0],
+                          style: TextStyle(
+                            fontSize: decimalMainFontSize * 0.9,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            fontFamily: "Source Han Sans",
+                          ),
+                        ),
+                        if (difficulty.toString().split('.').length > 1)
+                          Text(
+                            '.${difficulty.toString().split('.')[1]}',
+                            style: TextStyle(
+                              fontSize: decimalSmallFontSize * 0.9,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              fontFamily: "Source Han Sans",
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            SizedBox(width: screenWidth * 0.02),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: songNameFontSize,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  SizedBox(height: screenWidth * 0.007),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        achievementRate.toStringAsFixed(4).split('.')[0],
+                        style: TextStyle(
+                          fontSize: decimalMainFontSize,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        '.${achievementRate.toStringAsFixed(4).split('.')[1]}%',
+                        style: TextStyle(
+                          fontSize: decimalSmallFontSize,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Text(
+                        '$rating | $score | ',
+                        style: TextStyle(
+                          fontSize: otherFontSize,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        stars,
+                        style: TextStyle(
+                          fontSize: otherFontSize,
+                          color: starsColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    grade,
+                    style: TextStyle(
+                      fontSize: gradeFontSize,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

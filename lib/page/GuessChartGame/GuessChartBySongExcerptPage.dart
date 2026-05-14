@@ -16,6 +16,7 @@ import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonCacheUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
+import '../../constant/LoadingTipsConstant.dart';
 
 class GuessChartBySongExcerptPage extends StatefulWidget {
   const GuessChartBySongExcerptPage({super.key});
@@ -27,6 +28,7 @@ class GuessChartBySongExcerptPage extends StatefulWidget {
 class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPage> {
   // 游戏状态
   bool _isGameStarted = false;
+  String _currentLoadingTip = '';
   Song? _targetSong;
   int? _luoXueSongId;
   List<GuessSong> _guessHistory = [];
@@ -96,9 +98,25 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
     super.initState();
     _songAliasManager = SongAliasManager.instance;
     _settingsService = GuessChartCommonSettingsService();
+    _initializeLoadingTip();
     _loadSettings();
     _initCache();
     _initGame();
+  }
+
+  void _initializeLoadingTip() {
+    // 立即设置第一条提示，避免初始空白
+    setState(() {
+      _currentLoadingTip = LoadingTipsConstant.getRandomLoadingTip();
+    });
+    LoadingTipsConstant.startAutoSwitch();
+    LoadingTipsConstant.tipStream.listen((newTip) {
+      if (mounted) {
+        setState(() {
+          _currentLoadingTip = newTip;
+        });
+      }
+    });
   }
   
   // 初始化缓存
@@ -1619,9 +1637,15 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
                                               margin:
                                                   const EdgeInsets.only(top: 8),
                                               padding: const EdgeInsets.all(16),
-                                              child: const Center(
-                                                child:
+                                              child: Center(
+                                                child: Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
                                                     CircularProgressIndicator(),
+                                                    SizedBox(height: 16),
+                                                    Text(_currentLoadingTip),
+                                                  ],
+                                                ),
                                               ),
                                             ),
 
@@ -1845,8 +1869,15 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
                                               ),
                                             ),
                                         ])
-                                        : const Center(
-                                            child: CircularProgressIndicator(),
+                                        : Center(
+                                            child: Column(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                CircularProgressIndicator(),
+                                                SizedBox(height: 16),
+                                                Text(_currentLoadingTip),
+                                              ],
+                                            ),
                                           ),
                                   ],
                                 ),

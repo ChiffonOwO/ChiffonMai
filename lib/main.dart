@@ -6,6 +6,7 @@ import 'package:my_first_flutter_app/manager/DiffMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/CollectionsManager.dart';
 import 'package:my_first_flutter_app/manager/LuoXueSongsManager.dart';
 import 'package:my_first_flutter_app/manager/KnowledgeManager.dart';
+import 'package:my_first_flutter_app/manager/MaidataManager.dart';
 import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
 import 'package:my_first_flutter_app/constant/LoadingTipsConstant.dart';
 
@@ -26,19 +27,52 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   bool _isInitialized = false;
+  String _currentLoadingTip = '';
 
   @override
   void initState() {
     super.initState();
+    _initializeLoadingTip();
     _initializeApp();
+  }
+
+  void _initializeLoadingTip() {
+    // 立即设置第一条提示，避免初始空白
+    setState(() {
+      _currentLoadingTip = LoadingTipsConstant.getRandomLoadingTip();
+    });
+    LoadingTipsConstant.startAutoSwitch();
+    LoadingTipsConstant.tipStream.listen((newTip) {
+      if (mounted) {
+        setState(() {
+          _currentLoadingTip = newTip;
+        });
+      }
+    });
   }
 
   Future<void> _initializeApp() async {
     try {
       // 初始化歌曲别名管理器
       await SongAliasManager.instance.init();
-      // 从API获取并更新音乐数据
-      await MaimaiMusicDataManager().fetchAndUpdateMusicData();
+      
+      // 初始化并获取全量maidata缓存
+      final maidataManager = MaidataManager();
+      await maidataManager.initialize();
+      
+      // 如果缓存未就绪或过期，获取全量maidata
+      if (!maidataManager.isCacheReady) {
+        print('Maidata缓存未就绪，开始获取全量maidata...');
+        await maidataManager.fetchAndCacheFullMaidata();
+      }
+      
+      // 获取maidata文本列表用于追加
+      List<String> maidataTexts = maidataManager.getAllMaidataTexts();
+      print('已获取 ${maidataTexts.length} 首歌曲的maidata');
+      
+      // 从API获取并更新音乐数据（包含maidata追加）
+      await MaimaiMusicDataManager().fetchAndUpdateMusicData(maidataTexts: maidataTexts);
+      
       // 从API获取并更新难度数据
       await DiffMusicDataManager().fetchAndUpdateDiffData();
       // 初始化标签数据
@@ -128,7 +162,7 @@ class _MyAppState extends State<MyApp> {
             SizedBox(height: 20),
             Text('初始化各项数据中,请稍等(^ ^)...'),
             SizedBox(height: 10),
-            Text(LoadingTipsConstant.getRandomLoadingTip()),
+            Text(_currentLoadingTip),
           ],
         ),
       ),

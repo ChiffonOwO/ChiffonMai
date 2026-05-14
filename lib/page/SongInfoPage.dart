@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:marquee/marquee.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/manager/MaidataManager.dart';
 import 'package:my_first_flutter_app/entity/DiffSong.dart';
 import 'package:my_first_flutter_app/entity/Collection.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
@@ -11,6 +12,7 @@ import 'package:my_first_flutter_app/service/SongInfoService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
+import 'package:my_first_flutter_app/utils/MaidataDecodeUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'CollectionInfoPage.dart';
 import 'SongPlayPage.dart';
@@ -35,6 +37,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
   Map<String, dynamic>? _userData;
   List<dynamic>? _tagData;
   List<dynamic>? _tagSongsData;
+  
+  // Maidata解析的物量统计（优先使用）
+  Map<int, List<int>> _maidataNoteCounts = {}; // key: 难度索引(0-4), value: [tap, hold, slide, touch, break]
   
   // 舞萌DX 完成度-评级-乘数对照表
   final List<Map<String, dynamic>> maimaiRatingMultiplier = [
@@ -113,6 +118,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
         // 检测是否存在另一种谱面
         await _checkAlternativeSong(songTitle, songType);
       }
+      
+      // 从MaidataManager获取并解析物量统计
+      await _loadMaidataNoteCounts();
     } catch (e) {
       print('加载数据失败: $e');
     } finally {
@@ -213,6 +221,104 @@ class _SongInfoPageState extends State<SongInfoPage> {
       print('检测另一种谱面时出错: $e');
       _alternativeSongId = null;
     }
+  }
+
+  // 从MaidataManager加载并解析物量统计
+  Future<void> _loadMaidataNoteCounts() async {
+    try {
+      await MaidataManager().initialize();
+      
+      String? maidataContent = MaidataManager().getMaidata(widget.songId);
+      
+      if (maidataContent != null && maidataContent.isNotEmpty) {
+        MaidataData maidata = MaidataDecodeUtil.decode(maidataContent);
+        
+        Map<int, List<int>> newNoteCounts = {};
+        for (ChartData chart in maidata.charts) {
+          // 难度索引转换：maidata的difficultyIndex是1-6，对应界面显示的0-4（跳过EASY）
+          int index = chart.difficultyIndex - 2; // 转换为0-4
+          if (index >= 0 && index <= 4 && chart.stats != null) {
+            NoteStats stats = chart.stats!;
+            newNoteCounts[index] = [
+              stats.tap,
+              stats.hold,
+              stats.slide,
+              stats.touch,
+              stats.breakNote,
+            ];
+          }
+        }
+        
+        // 更新状态并刷新界面
+        if (newNoteCounts.isNotEmpty) {
+          setState(() {
+            _maidataNoteCounts = newNoteCounts;
+          });
+        }
+      } else {
+        // 尝试使用shortId查询
+        if (_songData != null) {
+          dynamic shortId = _songData!['basic_info']['short_id'] ?? _songData!['shortId'];
+          if (shortId != null) {
+            String shortIdStr = shortId.toString();
+            String? maidataByShortId = MaidataManager().getMaidata(shortIdStr);
+            if (maidataByShortId != null && maidataByShortId.isNotEmpty) {
+              MaidataData maidata = MaidataDecodeUtil.decode(maidataByShortId);
+              Map<int, List<int>> newNoteCounts = {};
+              for (ChartData chart in maidata.charts) {
+                int index = chart.difficultyIndex - 2;
+                if (index >= 0 && index <= 4 && chart.stats != null) {
+                  NoteStats stats = chart.stats!;
+                  newNoteCounts[index] = [
+                    stats.tap,
+                    stats.hold,
+                    stats.slide,
+                    stats.touch,
+                    stats.breakNote,
+                  ];
+                }
+              }
+              
+              // 更新状态并刷新界面
+              if (newNoteCounts.isNotEmpty) {
+                setState(() {
+                  _maidataNoteCounts = newNoteCounts;
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // 静默处理，继续使用默认数据
+    }
+  }
+
+  // 获取音符数量，优先使用Maidata解析的结果
+  List<int> _getNoteCounts(Map<String, dynamic> currentChart) {
+    // 优先使用Maidata解析的物量统计
+    if (_maidataNoteCounts.containsKey(_currentDiffIndex)) {
+      List<int> counts = _maidataNoteCounts[_currentDiffIndex]!;
+      // 检查是否所有值都为0（可能是解析失败）
+      bool allZero = counts.every((count) => count == 0);
+      if (!allZero) {
+        return counts;
+      }
+    }
+    
+    // 否则使用默认的notes数据
+    List<int> notes = List.filled(5, 0);
+    List<dynamic> chartNotes = currentChart['notes'];
+    notes[0] = chartNotes.length > 0 ? (chartNotes[0] is int ? chartNotes[0] : int.tryParse(chartNotes[0].toString()) ?? 0) : 0;
+    notes[1] = chartNotes.length > 1 ? (chartNotes[1] is int ? chartNotes[1] : int.tryParse(chartNotes[1].toString()) ?? 0) : 0;
+    notes[2] = chartNotes.length > 2 ? (chartNotes[2] is int ? chartNotes[2] : int.tryParse(chartNotes[2].toString()) ?? 0) : 0;
+    if (chartNotes.length > 4) {
+      notes[3] = chartNotes[3] is int ? chartNotes[3] : int.tryParse(chartNotes[3].toString()) ?? 0;
+      notes[4] = chartNotes[4] is int ? chartNotes[4] : int.tryParse(chartNotes[4].toString()) ?? 0;
+    } else if (chartNotes.length > 3) {
+      notes[4] = chartNotes[3] is int ? chartNotes[3] : int.tryParse(chartNotes[3].toString()) ?? 0;
+    }
+      return notes;
   }
 
   // 获取用户最佳成绩
@@ -1398,37 +1504,29 @@ class _SongInfoPageState extends State<SongInfoPage> {
                           const SizedBox(height: 20),
 
 
-                          // 音符分布网格
+                          // 音符分布网格（优先使用Maidata解析的物量统计）
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Expanded(
                                   child: _buildNoteItem('TAP',
-                                      currentChart['notes'][0].toString())),
+                                      _getNoteCounts(currentChart)[0].toString())),
                               SizedBox(width: 4),
                               Expanded(
                                   child: _buildNoteItem('HOLD',
-                                      currentChart['notes'][1].toString())),
+                                      _getNoteCounts(currentChart)[1].toString())),
                               SizedBox(width: 4),
                               Expanded(
                                   child: _buildNoteItem('SLIDE',
-                                      currentChart['notes'][2].toString())),
+                                      _getNoteCounts(currentChart)[2].toString())),
                               SizedBox(width: 4),
                               Expanded(
-                                  child: _buildNoteItem(
-                                      'BREAK',
-                                      currentChart['notes'].length > 4
-                                          ? currentChart['notes'][4].toString()
-                                          : currentChart['notes'][3]
-                                              .toString())),
+                                  child: _buildNoteItem('BREAK',
+                                      _getNoteCounts(currentChart)[4].toString())),
                               SizedBox(width: 4),
                               Expanded(
-                                  child: _buildNoteItem(
-                                      'TOUCH',
-                                      (currentChart['notes'].length > 4
-                                              ? currentChart['notes'][3]
-                                              : 0)
-                                          .toString())),
+                                  child: _buildNoteItem('TOUCH',
+                                      _getNoteCounts(currentChart)[3].toString())),
                             ],
                           ),
 
@@ -1852,14 +1950,15 @@ class _SongInfoPageState extends State<SongInfoPage> {
     if (_songData == null) return Container();
     
     final currentChart = _songData!['charts'][_currentDiffIndex];
-    final notes = currentChart['notes'];
+    // 优先使用Maidata解析的物量统计
+    List<int> noteCounts = _getNoteCounts(currentChart);
     
     // 计算总音符权重
-    int totalTap = notes.length > 0 ? notes[0] : 0;
-    int totalHold = notes.length > 1 ? notes[1] : 0;
-    int totalSlide = notes.length > 2 ? notes[2] : 0;
-    int totalTouch = notes.length == 5 ? notes[3] : 0;
-    int totalBreak = notes.length == 5 ? notes[4] : notes[3];
+    int totalTap = noteCounts[0];
+    int totalHold = noteCounts[1];
+    int totalSlide = noteCounts[2];
+    int totalTouch = noteCounts[3];
+    int totalBreak = noteCounts[4];
     
     int totalWeight = totalTap * _tapWeight +
                       totalHold * _holdWeight +

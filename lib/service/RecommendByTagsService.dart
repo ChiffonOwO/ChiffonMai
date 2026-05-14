@@ -1,3 +1,4 @@
+
 // ignore_for_file: slash_for_doc_comments
 
 import 'dart:convert';
@@ -11,6 +12,7 @@ import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../constant/CacheKeyConstant.dart';
 
 class RecommendByTagsService {
   static const int MAX_LIMIT = 70; // 最大推荐数
@@ -68,7 +70,6 @@ class RecommendByTagsService {
   static const String GROUP_CONFIG = 'config';
   static const String GROUP_DIFFICULTY = 'difficulty';
   static const String GROUP_EVALUATION = 'evaluation';
-  static const String RECOMMENDATION_CACHE_KEY = 'recommendation_results'; // 推荐结果缓存键
 }
 
 /**
@@ -936,7 +937,7 @@ Future<Map<String, List<RecommendationResult>>> recommendSongs() async {
         'Best15': best15Recommendations.map((r) => r.toJson()).toList(),
       };
       final resultJson = json.encode(resultMap);
-      await prefs.setString(RecommendByTagsService.RECOMMENDATION_CACHE_KEY, resultJson);
+      await prefs.setString(CacheKeyConstant.recommendationResults, resultJson);
       print('推荐结果已保存到缓存');
     } catch (e) {
       print('保存推荐结果到缓存失败: $e');

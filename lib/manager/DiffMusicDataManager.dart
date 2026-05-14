@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/entity/DiffSong.dart';
+import '../constant/CacheKeyConstant.dart';
 
 class DiffMusicDataManager {
   // 单例模式
@@ -13,8 +14,7 @@ class DiffMusicDataManager {
   // API 地址
   static const String _apiUrl = ApiUrls.DiffMusicDataApi;
   
-  // 缓存键
-  static const String _cacheKey = 'diff_music_data';
+  // 缓存时间戳键
   static const String _lastUpdateKey = 'diff_music_data_last_update';
 
   // 从 API 获取音乐难度数据并更新缓存
@@ -33,7 +33,7 @@ class DiffMusicDataManager {
         // 写入本地缓存
         final prefs = await SharedPreferences.getInstance();
         final diffJson = json.encode(diffSong.toJson());
-        await prefs.setString(_cacheKey, diffJson);
+        await prefs.setString(CacheKeyConstant.diffMusicData, diffJson);
         await prefs.setInt(_lastUpdateKey, DateTime.now().millisecondsSinceEpoch);
         
         print('成功从 API 获取并更新音乐难度数据');
@@ -52,7 +52,7 @@ class DiffMusicDataManager {
   Future<bool> hasCachedData() async {
     // 检查本地缓存
     final prefs = await SharedPreferences.getInstance();
-    final diffJson = prefs.getString(_cacheKey);
+    final diffJson = prefs.getString(CacheKeyConstant.diffMusicData);
     return diffJson != null && diffJson.isNotEmpty;
   }
 
@@ -61,7 +61,7 @@ class DiffMusicDataManager {
     // 从本地缓存读取
     try {
       final prefs = await SharedPreferences.getInstance();
-      final diffJson = prefs.getString(_cacheKey);
+      final diffJson = prefs.getString(CacheKeyConstant.diffMusicData);
       
       if (diffJson != null && diffJson.isNotEmpty) {
         final Map<String, dynamic> jsonData = json.decode(diffJson);
@@ -78,7 +78,7 @@ class DiffMusicDataManager {
     // 再次尝试读取
     try {
       final prefs = await SharedPreferences.getInstance();
-      final diffJson = prefs.getString(_cacheKey);
+      final diffJson = prefs.getString(CacheKeyConstant.diffMusicData);
       
       if (diffJson != null && diffJson.isNotEmpty) {
         final Map<String, dynamic> jsonData = json.decode(diffJson);
@@ -112,7 +112,7 @@ class DiffMusicDataManager {
   Future<void> clearCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_cacheKey);
+      await prefs.remove(CacheKeyConstant.diffMusicData);
       await prefs.remove(_lastUpdateKey);
     } catch (e) {
       print('清除缓存时出错: $e');

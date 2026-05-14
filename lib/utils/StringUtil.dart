@@ -106,6 +106,15 @@ class StringUtil {
     if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM') {
       return 'DX 2025 镜';
     }
+    if (version == 'maimai DX PRiSM PLUS') {
+      return 'PRiSM+';
+    }
+    if (version == 'maimai DX CiRCLE') {
+      return 'CiRCLE';
+    }
+    if (version == 'maimai DX CiRCLE PLUS') {
+      return 'CiRCLE+';
+    }
     return version;
   }
 
@@ -218,5 +227,19 @@ class StringUtil {
    */
   static String formatSongType(String type) {
     return type == "DX" ? "DX" : "ST";
+  }
+
+  /**
+   * 获取歌曲类型显示文本
+   * @param type 歌曲类型字符串
+   * @return 格式化后的类型显示文本
+   */
+  static String getTypeDisplay(String type) {
+    if (type == 'DX') {
+      return 'DX';
+    } else if (type == 'SD') {
+      return 'ST';
+    }
+    return type;
   }
 }

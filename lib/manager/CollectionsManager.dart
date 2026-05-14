@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/entity/Collection.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../constant/CacheKeyConstant.dart';
 
 class CollectionsManager {
   // 单例模式
@@ -11,11 +12,7 @@ class CollectionsManager {
   factory CollectionsManager() => _instance;
   CollectionsManager._internal();
 
-  // 缓存键
-  static const String _trophiesCacheKey = 'trophies_collections_cache_data';
-  static const String _iconsCacheKey = 'icons_collections_cache_data';
-  static const String _platesCacheKey = 'plates_collections_cache_data';
-  static const String _framesCacheKey = 'frames_collections_cache_data';
+  // 缓存时间戳键
   static const String _trophiesLastUpdateKey = 'trophies_collections_last_update';
   static const String _iconsLastUpdateKey = 'icons_collections_last_update';
   static const String _platesLastUpdateKey = 'plates_collections_last_update';
@@ -29,22 +26,22 @@ class CollectionsManager {
 
   // 获取奖杯收藏品数据
   Future<CollectionData?> fetchTrophiesCollections() async {
-    return await _fetchCollectionsWithRequired(_trophiesApi, _trophiesCacheKey, _trophiesLastUpdateKey);
+    return await _fetchCollectionsWithRequired(_trophiesApi, CacheKeyConstant.trophiesCollectionsCacheData, _trophiesLastUpdateKey);
   }
 
   // 获取图标收藏品数据
   Future<CollectionData?> fetchIconsCollections() async {
-    return await _fetchCollectionsWithRequired(_iconsApi, _iconsCacheKey, _iconsLastUpdateKey);
+    return await _fetchCollectionsWithRequired(_iconsApi, CacheKeyConstant.iconsCollectionsCacheData, _iconsLastUpdateKey);
   }
 
   // 获取铭牌收藏品数据
   Future<CollectionData?> fetchPlatesCollections() async {
-    return await _fetchCollectionsWithRequired(_platesApi, _platesCacheKey, _platesLastUpdateKey);
+    return await _fetchCollectionsWithRequired(_platesApi, CacheKeyConstant.platesCollectionsCacheData, _platesLastUpdateKey);
   }
 
   // 获取框架收藏品数据
   Future<CollectionData?> fetchFramesCollections() async {
-    return await _fetchCollectionsWithRequired(_framesApi, _framesCacheKey, _framesLastUpdateKey);
+    return await _fetchCollectionsWithRequired(_framesApi, CacheKeyConstant.framesCollectionsCacheData, _framesLastUpdateKey);
   }
 
   // 通用获取收藏品数据方法（带required参数）
@@ -232,13 +229,13 @@ class CollectionsManager {
             final List<Collection> collectionList = jsonData.map((item) => Collection.fromJson(item)).toList();
             // 根据缓存键确定类型
             String collectionType = '';
-            if (cacheKey == _trophiesCacheKey) {
+            if (cacheKey == CacheKeyConstant.trophiesCollectionsCacheData) {
               collectionType = 'trophies';
-            } else if (cacheKey == _iconsCacheKey) {
+            } else if (cacheKey == CacheKeyConstant.iconsCollectionsCacheData) {
               collectionType = 'icons';
-            } else if (cacheKey == _platesCacheKey) {
+            } else if (cacheKey == CacheKeyConstant.platesCollectionsCacheData) {
               collectionType = 'plates';
-            } else if (cacheKey == _framesCacheKey) {
+            } else if (cacheKey == CacheKeyConstant.framesCollectionsCacheData) {
               collectionType = 'frames';
             }
             
@@ -338,10 +335,10 @@ class CollectionsManager {
 
   // 清除所有缓存
   Future<void> clearAllCache() async {
-    await clearCache(_trophiesCacheKey, _trophiesLastUpdateKey);
-    await clearCache(_iconsCacheKey, _iconsLastUpdateKey);
-    await clearCache(_platesCacheKey, _platesLastUpdateKey);
-    await clearCache(_framesCacheKey, _framesLastUpdateKey);
+    await clearCache(CacheKeyConstant.trophiesCollectionsCacheData, _trophiesLastUpdateKey);
+    await clearCache(CacheKeyConstant.iconsCollectionsCacheData, _iconsLastUpdateKey);
+    await clearCache(CacheKeyConstant.platesCollectionsCacheData, _platesLastUpdateKey);
+    await clearCache(CacheKeyConstant.framesCollectionsCacheData, _framesLastUpdateKey);
   }
 
   // 手动刷新所有数据

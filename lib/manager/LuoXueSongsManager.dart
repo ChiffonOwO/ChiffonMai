@@ -5,15 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../api/ApiUrls.dart';
 import '../entity/LuoXueSongEntity.dart';
 import '../entity/Song.dart';
+import '../constant/CacheKeyConstant.dart';
 
 class LuoXueSongsManager {
   // 单例模式
   static final LuoXueSongsManager _instance = LuoXueSongsManager._internal();
   factory LuoXueSongsManager() => _instance;
   LuoXueSongsManager._internal();
-
-  // 缓存键名
-  static const String _cacheKey = 'luoxue_songs_cache';
 
   // 落雪歌曲实体
   LuoXueSongEntity? _luoXueSongEntity;
@@ -122,7 +120,7 @@ class LuoXueSongsManager {
   Future<LuoXueSongEntity?> _loadFromCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cachedData = prefs.getString(_cacheKey);
+      final cachedData = prefs.getString(CacheKeyConstant.luoxueSongsCache);
       if (cachedData != null) {
         final jsonData = json.decode(cachedData);
         return LuoXueSongEntity.fromJson(jsonData);
@@ -139,7 +137,7 @@ class LuoXueSongsManager {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonData = _entityToJson(entity);
-      await prefs.setString(_cacheKey, json.encode(jsonData));
+      await prefs.setString(CacheKeyConstant.luoxueSongsCache, json.encode(jsonData));
     } catch (e) {
       print('Error saving to cache: $e');
     }
@@ -246,7 +244,7 @@ class LuoXueSongsManager {
   Future<void> clearCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_cacheKey);
+      await prefs.remove(CacheKeyConstant.luoxueSongsCache);
       _luoXueSongEntity = null;
     } catch (e) {
       print('Error clearing cache: $e');

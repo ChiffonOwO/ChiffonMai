@@ -24,8 +24,13 @@ class RandomChartService {
       return [];
     }
 
-    // 过滤歌曲
+    // 过滤歌曲（排除从maidata追加的歌曲）
     List<Song> filteredSongs = allSongs.where((song) {
+      // 过滤掉从maidata追加的歌曲（cids全为0表示从maidata解析）
+      if (_isMaidataSong(song)) {
+        return false;
+      }
+      
       // 定数过滤
       if (minDs != null || maxDs != null) {
         // 检查是否有符合条件的难度
@@ -168,5 +173,11 @@ class RandomChartService {
     }
 
     return ['全部类型'] + genres.toList();
+  }
+  
+  // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析）
+  bool _isMaidataSong(Song song) {
+    if (song.cids.isEmpty) return false;
+    return song.cids.every((cid) => cid == 0);
   }
 }

@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:web_socket_channel/io.dart';
+import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/RoomEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/PlayerEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/GameStateEntity.dart';
@@ -38,7 +39,7 @@ enum MultiplayerEventType {
 
 /// 多人游戏WebSocket服务
 class MultiplayerGameService {
-  static const String _defaultUrl = 'ws://152.136.125.98';
+  static const String _defaultUrl = ApiUrls.MultiplayerGameServerUrl;
   
   IOWebSocketChannel? _channel;
   StreamSubscription? _subscription;

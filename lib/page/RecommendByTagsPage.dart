@@ -7,6 +7,8 @@ import 'package:my_first_flutter_app/entity/RecommendationResult.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../constant/CacheKeyConstant.dart';
+import '../constant/LoadingTipsConstant.dart';
 
 class RecommendByTags extends StatefulWidget {
   const RecommendByTags({super.key});
@@ -20,6 +22,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   Map<String, List<RecommendationResult>> _recommendations = {};
   bool _isLoading = true;
   String? _errorMessage;
+  String _currentLoadingTip = '';
   
   // 新增状态变量
   String _currentTab = 'Best55'; // 当前选中的标签，默认为Best55
@@ -30,10 +33,26 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   @override
   void initState() {
     super.initState();
+    _initializeLoadingTip();
     // 延迟一小段时间再开始获取推荐结果，确保页面能够完全加载并显示加载动画
     // 这样可以避免在首页点击标签时出现卡顿
     Future.delayed(Duration(milliseconds: 1000), () {
       _fetchRecommendations();
+    });
+  }
+
+  void _initializeLoadingTip() {
+    // 立即设置第一条提示，避免初始空白
+    setState(() {
+      _currentLoadingTip = LoadingTipsConstant.getRandomLoadingTip();
+    });
+    LoadingTipsConstant.startAutoSwitch();
+    LoadingTipsConstant.tipStream.listen((newTip) {
+      if (mounted) {
+        setState(() {
+          _currentLoadingTip = newTip;
+        });
+      }
     });
   }
 
@@ -48,7 +67,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
       // 先尝试从缓存读取推荐结果
       try {
         final prefs = await SharedPreferences.getInstance();
-        final cachedResult = prefs.getString(RecommendByTagsService.RECOMMENDATION_CACHE_KEY);
+        final cachedResult = prefs.getString(CacheKeyConstant.recommendationResults);
         if (cachedResult != null) {
           final resultMap = json.decode(cachedResult);
           final best55 = (resultMap['Best55'] as List).map((item) => RecommendationResult.fromJson(item)).toList();
@@ -240,6 +259,12 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                                         ),
                                         SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
                                         Text('正在计算推荐结果...'),
+                                        SizedBox(height: screenHeight * 0.01), // 间距为屏幕高度的1%
+                                        Text(
+                                          _currentLoadingTip,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(fontSize: screenWidth * 0.035),
+                                        ),
                                         SizedBox(height: screenHeight * 0.01), // 间距为屏幕高度的1%
                                         Text(
                                           '此功能计算量较大，可能会出现卡顿，请耐心等待',

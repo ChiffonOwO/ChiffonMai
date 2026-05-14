@@ -140,6 +140,11 @@ class GuessChartBySongExcerptService {
       var filteredEntries = songMap.entries.where((entry) {
         final song = entry.key;
         
+        // 过滤掉宴会场谱面（id为六位数的谱面）和从maidata追加的歌曲（cids全为0）
+        if (song.id.length == 6 || _isMaidataSong(song)) {
+          return false;
+        }
+        
         // 按版本筛选
         if (selectedVersions.isNotEmpty && !selectedVersions.contains(song.basicInfo.from)) {
           return false;
@@ -402,5 +407,11 @@ class GuessChartBySongExcerptService {
       print('计算猜测结果失败: $e');
       return guessedSong;
     }
+  }
+  
+  // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析）
+  bool _isMaidataSong(Song song) {
+    if (song.cids.isEmpty) return false;
+    return song.cids.every((cid) => cid == 0);
   }
 }

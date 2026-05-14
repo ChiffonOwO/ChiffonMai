@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/entity/MaiTagsEntity.dart';
+import '../constant/CacheKeyConstant.dart';
 
 class MaiTagsManager {
   // 单例模式
@@ -24,12 +25,6 @@ class MaiTagsManager {
   //   "Accept-Language": "zh-CN,zh;q=0.9,en-GB;q=0.8,en-US;q=0.7,en;q=0.6"
   // };
 
-  // 缓存相关常量
-  static const String TAGS_CACHE_KEY = 'mai_tags_cache';
-  static const String TAGS_CACHE_TIMESTAMP_KEY = 'mai_tags_cache_timestamp';
-  // 移除定时策略，缓存永不过期
-  // static const int CACHE_EXPIRY_DAYS = 1;
-
   /**
    * 初始化标签数据
    */
@@ -37,7 +32,7 @@ class MaiTagsManager {
     try {
       // 尝试从本地缓存加载
       final prefs = await SharedPreferences.getInstance();
-      final cachedData = prefs.getString(TAGS_CACHE_KEY);
+      final cachedData = prefs.getString(CacheKeyConstant.maiTagsCache);
       
       // 移除定时策略，缓存永不过期
       bool isCacheValid = cachedData != null;
@@ -54,8 +49,8 @@ class MaiTagsManager {
           final mainTagString = utf8.decode(response.bodyBytes);
           
           // 更新本地缓存
-          await prefs.setString(TAGS_CACHE_KEY, mainTagString);
-          await prefs.setInt(TAGS_CACHE_TIMESTAMP_KEY, DateTime.now().millisecondsSinceEpoch);
+          await prefs.setString(CacheKeyConstant.maiTagsCache, mainTagString);
+          await prefs.setInt(CacheKeyConstant.maiTagsCacheTimestamp, DateTime.now().millisecondsSinceEpoch);
           
           print('从网络加载标签数据并更新缓存');
         } else {
@@ -75,7 +70,7 @@ class MaiTagsManager {
   Future<MaiTagsEntity?> getTags() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cachedData = prefs.getString(TAGS_CACHE_KEY);
+      final cachedData = prefs.getString(CacheKeyConstant.maiTagsCache);
       
       if (cachedData != null) {
         Map<String, dynamic> mainTagJson = json.decode(cachedData);
@@ -86,7 +81,7 @@ class MaiTagsManager {
       await initializeTags();
       
       // 再次尝试获取
-      final updatedData = prefs.getString(TAGS_CACHE_KEY);
+      final updatedData = prefs.getString(CacheKeyConstant.maiTagsCache);
       if (updatedData != null) {
         Map<String, dynamic> mainTagJson = json.decode(updatedData);
         return MaiTagsEntity.fromJson(mainTagJson);
@@ -173,7 +168,7 @@ class MaiTagsManager {
    */
   Future<bool> hasCachedData() async {
     final prefs = await SharedPreferences.getInstance();
-    final cachedData = prefs.getString(TAGS_CACHE_KEY);
+    final cachedData = prefs.getString(CacheKeyConstant.maiTagsCache);
     return cachedData != null && cachedData.isNotEmpty;
   }
   
@@ -194,8 +189,8 @@ class MaiTagsManager {
         
         // 更新本地缓存
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(TAGS_CACHE_KEY, mainTagString);
-        await prefs.setInt(TAGS_CACHE_TIMESTAMP_KEY, DateTime.now().millisecondsSinceEpoch);
+        await prefs.setString(CacheKeyConstant.maiTagsCache, mainTagString);
+        await prefs.setInt(CacheKeyConstant.maiTagsCacheTimestamp, DateTime.now().millisecondsSinceEpoch);
         
         print('手动刷新标签数据缓存成功');
       } else {

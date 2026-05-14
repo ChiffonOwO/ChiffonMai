@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/CoverUtil.dart';
 import '../service/SongMaidataPageService.dart';
+import '../manager/MaidataManager.dart';
 import 'ChartPlayPage.dart';
 
 class SongMaidataPage extends StatefulWidget {
@@ -27,6 +28,7 @@ class SongMaidataPage extends StatefulWidget {
 
 class _SongMaidataPageState extends State<SongMaidataPage> {
   bool _isLoading = true;
+  bool _isFetchingFullCache = false;
   String _maidataContent = '';
   String? _errorMessage;
   List<String> _inoteList = [];
@@ -44,6 +46,31 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
       genre: widget.genre,
       songType: widget.songType,
     );
+    _checkAndFetchFullCache();
+  }
+
+  Future<void> _checkAndFetchFullCache() async {
+    await MaidataManager().initialize();
+    
+    if (!MaidataManager().isCacheReady) {
+      setState(() {
+        _isFetchingFullCache = true;
+      });
+      
+      print('[DEBUG][SongMaidataPage] 全量缓存不存在，开始拉取...');
+      
+      try {
+        await MaidataManager().fetchAndCacheFullMaidata();
+        print('[DEBUG][SongMaidataPage] 全量缓存拉取成功');
+      } catch (e) {
+        print('[DEBUG][SongMaidataPage] 全量缓存拉取失败，将使用独立缓存或网络请求: $e');
+      } finally {
+        setState(() {
+          _isFetchingFullCache = false;
+        });
+      }
+    }
+    
     _fetchMaidata();
   }
 
@@ -504,11 +531,34 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                       ),
                     ],
                   ),
-                  child: _isLoading
+                  child: _isFetchingFullCache
                       ? const Center(
-                          child: CircularProgressIndicator(),
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CircularProgressIndicator(),
+                                SizedBox(height: 16),
+                                Text(
+                                  '正在获取全量谱面缓存...',
+                                  style: TextStyle(fontSize: 16),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  '首次进入需要拉取大量数据，请耐心等待',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
                         )
-                      : _errorMessage != null
+                      : _isLoading
+                          ? const Center(
+                              child: CircularProgressIndicator(),
+                            )
+                          : _errorMessage != null
                           ? Center(
                               child: Padding(
                                 padding: const EdgeInsets.all(16),

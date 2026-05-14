@@ -3,11 +3,11 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:jp_transliterate/jp_transliterate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../api/ApiUrls.dart';
 import '../manager/MaimaiMusicDataManager.dart';
-
-// 缓存相关常量
-const String _cachePrefix = 'maidata_cache_';
-const int _cacheDurationDays = 30;
+import '../manager/MaidataManager.dart';
+import '../constant/CacheKeyConstant.dart';
+import '../constant/CacheTimestampConstant.dart';
 
 // 匹配结果数据类（支持自定义标题用于构建URL）
 class MatchResult {
@@ -80,7 +80,7 @@ class SongMaidataPageService {
     Set<String> addedIds = {};
     
     try {
-      final response = await http.get(Uri.parse('http://152.136.125.98:8888/index.json'));
+      final response = await http.get(Uri.parse('${ApiUrls.MaidataServerPortUrl}/index.json'));
       
       if (response.statusCode == 200) {
         Map<String, dynamic> indexData = Map<String, dynamic>.from(
@@ -220,15 +220,28 @@ class SongMaidataPageService {
       fileName += '_DX';
     }
     
-    return 'http://152.136.125.98:8888/$mappedGenre/$fileName/maidata.txt';
+    return '${ApiUrls.MaidataServerPortUrl}/$mappedGenre/$fileName/maidata.txt';
   }
 
   Future<String?> fetchMaidata({
     required void Function(List<String>) onInoteParsed,
   }) async {
+    // 首先检查全量缓存
+    await MaidataManager().initialize();
+    if (MaidataManager().isCacheReady) {
+      String? fullCacheContent = MaidataManager().getMaidata(songId);
+      if (fullCacheContent != null) {
+        print('[DEBUG][Maidata] 使用全量缓存内容');
+        List<String> inoteList = _parseInoteList(fullCacheContent);
+        onInoteParsed(inoteList);
+        return fullCacheContent;
+      }
+    }
+    
+    // 其次检查独立缓存
     String? cachedContent = await getCachedMaidata(onInoteParsed: onInoteParsed);
     if (cachedContent != null) {
-      print('[DEBUG][Maidata] 使用缓存内容');
+      print('[DEBUG][Maidata] 使用独立缓存内容');
       return cachedContent;
     }
     
@@ -276,7 +289,7 @@ class SongMaidataPageService {
   }) async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      String cacheKey = '$_cachePrefix$songId';
+      String cacheKey = '${CacheKeyConstant.maidataCachePrefix}$songId';
       String? cacheData = prefs.getString(cacheKey);
       
       if (cacheData != null) {
@@ -285,9 +298,8 @@ class SongMaidataPageService {
         String content = data['content'] as String;
         
         int now = DateTime.now().millisecondsSinceEpoch;
-        int cacheDuration = _cacheDurationDays * 24 * 60 * 60 * 1000;
         
-        if (now - timestamp < cacheDuration) {
+        if (now - timestamp < CacheTimestampConstant.songMaidataCacheMillis) {
           print('[DEBUG][Maidata] 缓存有效，时间戳: $timestamp');
           List<String> inoteList = _parseInoteList(content);
           onInoteParsed(inoteList);
@@ -306,7 +318,7 @@ class SongMaidataPageService {
   Future<void> cacheMaidata(String content) async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      String cacheKey = '$_cachePrefix$songId';
+      String cacheKey = '${CacheKeyConstant.maidataCachePrefix}$songId';
       
       Map<String, dynamic> data = {
         'timestamp': DateTime.now().millisecondsSinceEpoch,
@@ -556,7 +568,7 @@ class SongMaidataPageService {
       String mappedGenre = _genreMapping[genre] ?? genre;
       print('[DEBUG][Maidata] 搜索流派: $mappedGenre');
       
-      String genreUrl = 'http://152.136.125.98:8888/$mappedGenre/';
+      String genreUrl = '${ApiUrls.MaidataServerPortUrl}/$mappedGenre/';
       print('[DEBUG][Maidata] 尝试获取文件夹列表: $genreUrl');
       
       final response = await http.get(Uri.parse(genreUrl));
@@ -631,7 +643,7 @@ class SongMaidataPageService {
     List<String> candidateIds = [];
     
     try {
-      final response = await http.get(Uri.parse('http://152.136.125.98:8888/index.json'));
+      final response = await http.get(Uri.parse('${ApiUrls.MaidataServerPortUrl}/index.json'));
       
       if (response.statusCode == 200) {
         Map<String, dynamic> indexData = Map<String, dynamic>.from(

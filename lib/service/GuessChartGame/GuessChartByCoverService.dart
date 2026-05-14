@@ -167,8 +167,11 @@ class GuessChartByCoverService {
         return null;
       }
 
-      // 过滤掉宴会场谱面（id为六位数的谱面）
-      var filteredSongs = songs.where((song) => song.id.length != 6).toList();
+      // 过滤掉宴会场谱面（id为六位数的谱面）和从maidata追加的歌曲（cids全为0）
+      var filteredSongs = songs.where((song) => 
+        song.id.length != 6 && 
+        !_isMaidataSong(song)
+      ).toList();
       
       // 应用过滤条件
       if (selectedVersions.isNotEmpty) {
@@ -407,5 +410,11 @@ class GuessChartByCoverService {
       print('计算猜测结果失败: $e');
       return guessedSong;
     }
+  }
+  
+  // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析）
+  static bool _isMaidataSong(Song song) {
+    if (song.cids.isEmpty) return false;
+    return song.cids.every((cid) => cid == 0);
   }
 }

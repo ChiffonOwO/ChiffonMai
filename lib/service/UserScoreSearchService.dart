@@ -227,7 +227,7 @@ class UserScoreSearchService {
     }
     // 计算DX分达成率
     double rate = maxScore > 0 ? dxScore / maxScore : 0.0;
-    print('计算DX分达成率: songId=$songId, levelIndex=$levelIndex, dxScore=$dxScore, maxScore=$maxScore, rate=$rate');
+    //print('计算DX分达成率: songId=$songId, levelIndex=$levelIndex, dxScore=$dxScore, maxScore=$maxScore, rate=$rate');
     return rate;
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/page/Multiplayer/MultiplayerLobbyPage.dart';
 import 'package:my_first_flutter_app/page/PersonalizedChartPlayConfigure.dart';
+import 'package:my_first_flutter_app/page/RankListPage.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:my_first_flutter_app/page/Best50/Best50Page.dart';
 import 'package:my_first_flutter_app/page/CollectionSearchPage.dart';
@@ -31,6 +32,7 @@ import 'package:my_first_flutter_app/page/UserScoreSearchPage.dart';
 import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../constant/CacheKeyConstant.dart';
 import 'AchievementFullReverseCalculatorPage.dart';
 import 'VersionViewPage.dart';
 import 'AchievementRateCalculatorPage.dart';
@@ -175,6 +177,7 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.leaderboard, title: 'Best50查询', subtitle: '我去,龙币!'),
     ButtonItem(icon: Icons.analytics, title: '拟合Best50查询', subtitle: '我w55怎么拟合才w52?!'),
     ButtonItem(icon: Icons.person_search_outlined, title: '个性化Best50查询', subtitle: '我超，名刀50!'),
+    ButtonItem(icon: Icons.arrow_circle_up, title: '段位表', subtitle: '我去，炫彩真段位!'),
     ButtonItem(icon: Icons.door_back_door, title: 'KALEIDXSCOPE', subtitle: '白xx!(bushi'),
     ButtonItem(icon: Icons.label, title: '基于标签推荐', subtitle: '基于你游玩的谱面标签推荐曲目'),
     ButtonItem(icon: Icons.shuffle, title: '随机乐曲', subtitle: '随机选曲1-4首'),
@@ -529,14 +532,14 @@ class _HomePageState extends State<HomePage> {
       // 清除推荐结果缓存
       try {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.remove(RecommendByTagsService.RECOMMENDATION_CACHE_KEY);
+        await prefs.remove(CacheKeyConstant.recommendationResults);
         print('推荐结果缓存已清除');
       } catch (e) {
         print('清除推荐结果缓存失败: $e');
       }
       
-      // 从API获取并更新音乐数据
-      await MaimaiMusicDataManager().fetchAndUpdateMusicData();
+      // 使用智能刷新：初次拉取获取全量maidata，后续只获取追加歌曲的maidata
+      await MaimaiMusicDataManager().refreshDataWithSmartMaidata();
       
       // 从API获取并更新难度数据
       await DiffMusicDataManager().fetchAndUpdateDiffData();
@@ -619,14 +622,14 @@ class _HomePageState extends State<HomePage> {
       // 清除推荐结果缓存
       try {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.remove(RecommendByTagsService.RECOMMENDATION_CACHE_KEY);
+        await prefs.remove(CacheKeyConstant.recommendationResults);
         print('推荐结果缓存已清除');
       } catch (e) {
         print('清除推荐结果缓存失败: $e');
       }
       
-      // 从API获取并更新音乐数据
-      await MaimaiMusicDataManager().fetchAndUpdateMusicData();
+      // 使用智能刷新：初次拉取获取全量maidata，后续只获取追加歌曲的maidata
+      await MaimaiMusicDataManager().refreshDataWithSmartMaidata();
       
       // 从API获取并更新难度数据
       await DiffMusicDataManager().fetchAndUpdateDiffData();
@@ -897,6 +900,12 @@ class _HomePageState extends State<HomePage> {
             if (await canLaunchUrl(uri)) {
               await launchUrl(uri, mode: LaunchMode.externalApplication);
             }
+          }
+          if (item.title == '段位表'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => RankListPage()),
+            );
           }
           if (item.title == '检查更新'){
             // 显示加载对话框

@@ -4,6 +4,7 @@ import 'package:my_first_flutter_app/entity/Multiplayer/PlayerEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/GameStateEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/GuessRecord.dart';
 import 'package:my_first_flutter_app/entity/GameType.dart';
+import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/MultiplayerCloudBaseService.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/MultiplayerGameService.dart';
 
@@ -38,7 +39,7 @@ class MultiplayerManager {
     
     try {
       await _cloudService.initialize(
-        envId: 'ws://152.136.125.98',
+        envId: ApiUrls.MultiplayerServerUrl,
         nickname: nickname,
       );
       print('[DEBUG][Manager] CloudService 初始化完成');

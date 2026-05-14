@@ -3,18 +3,17 @@ import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/entity/MaimaiServerStatusEntity.dart';
 import 'package:my_first_flutter_app/entity/MaimaiServerStatusTitleEntity.dart';
+import '../constant/CacheTimestampConstant.dart';
 
 // 服务器状态服务
 class MaimaiServerStatusService {
   // 缓存相关
   static MaimaiServerStatusEntity? _cachedStatus;
   static DateTime? _lastFetchTime;
-  static const Duration _cacheDuration = Duration(minutes: 5);
   
   // 服务器标题缓存
   static MaimaiServerStatusTitleEntity? _cachedTitleStatus;
   static DateTime? _lastTitleFetchTime;
-  static const Duration _titleCacheDuration = Duration(days: 3);
 
   // 从API获取服务器状态数据
   static Future<MaimaiServerStatusEntity?> getServerStatus() async {
@@ -22,7 +21,7 @@ class MaimaiServerStatusService {
       // 检查缓存是否有效
       if (_cachedStatus != null && _lastFetchTime != null) {
         final timeSinceLastFetch = DateTime.now().difference(_lastFetchTime!);
-        if (timeSinceLastFetch < _cacheDuration) {
+        if (timeSinceLastFetch < CacheTimestampConstant.maimaiServerStatusDuration) {
           return _cachedStatus;
         }
       }
@@ -57,7 +56,7 @@ class MaimaiServerStatusService {
       // 检查缓存是否有效
       if (_cachedTitleStatus != null && _lastTitleFetchTime != null) {
         final timeSinceLastFetch = DateTime.now().difference(_lastTitleFetchTime!);
-        if (timeSinceLastFetch < _titleCacheDuration) {
+        if (timeSinceLastFetch < CacheTimestampConstant.maimaiServerTitleDuration) {
           return _cachedTitleStatus;
         }
       }
