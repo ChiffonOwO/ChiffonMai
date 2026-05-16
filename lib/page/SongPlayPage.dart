@@ -85,7 +85,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
         _loadAudioDuration();
       }
     } catch (e) {
-      print('加载落雪歌曲ID失败: $e');
+      debugPrint('加载落雪歌曲ID失败: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -109,7 +109,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
         }
       }
     } catch (e) {
-      print('加载曲师信息失败: $e');
+      debugPrint('加载曲师信息失败: $e');
     }
   }
 
@@ -123,7 +123,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
       }
       return '${cacheDir.path}/${songId}.mp3';
     } catch (e) {
-      print('获取缓存目录失败: $e');
+      debugPrint('获取缓存目录失败: $e');
       return '';
     }
   }
@@ -134,7 +134,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
       final filePath = await _getCachedFilePath(songId);
       return File(filePath).existsSync();
     } catch (e) {
-      print('检查缓存失败: $e');
+      debugPrint('检查缓存失败: $e');
       return false;
     }
   }
@@ -147,12 +147,12 @@ class _SongPlayPageState extends State<SongPlayPage> {
       // 检查是否已缓存
       bool isCached = await _isCached(_luoXueSongId!);
       if (isCached) {
-        print('音频已缓存，使用缓存文件');
+        debugPrint('音频已缓存，使用缓存文件');
         _cachedFilePath = await _getCachedFilePath(_luoXueSongId!);
         return;
       }
 
-      print('开始下载并缓存音频: $_audioUrl');
+      debugPrint('开始下载并缓存音频: $_audioUrl');
       // 下载音频文件
       final httpClient = HttpClient();
       final request = await httpClient.getUrl(Uri.parse(_audioUrl!));
@@ -165,12 +165,12 @@ class _SongPlayPageState extends State<SongPlayPage> {
         await sink.addStream(response);
         await sink.close();
         _cachedFilePath = filePath;
-        print('音频缓存成功: $filePath');
+        debugPrint('音频缓存成功: $filePath');
       } else {
-        print('下载音频失败: ${response.statusCode}');
+        debugPrint('下载音频失败: ${response.statusCode}');
       }
     } catch (e) {
-      print('缓存音频失败: $e');
+      debugPrint('缓存音频失败: $e');
     }
   }
 
@@ -188,7 +188,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
               ? _cachedFilePath!
               : _audioUrl!;
 
-      print('开始加载音频时长: $audioSource');
+      debugPrint('开始加载音频时长: $audioSource');
       // 预加载音频以获取时长
       if (_cachedFilePath != null && _cachedFilePath!.isNotEmpty) {
         await _audioPlayer!.setSource(DeviceFileSource(_cachedFilePath!));
@@ -199,7 +199,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
       // 主动获取时长
       Duration? duration = await _audioPlayer!.getDuration();
       if (duration != null) {
-        print('主动获取到音频时长: ${duration.inSeconds}秒');
+        debugPrint('主动获取到音频时长: ${duration.inSeconds}秒');
         setState(() {
           _totalDuration = duration.inSeconds;
         });
@@ -207,7 +207,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
 
       // 监听时长变化
       _audioPlayer!.onDurationChanged.listen((Duration duration) {
-        print('获取到音频时长: ${duration.inSeconds}秒');
+        debugPrint('获取到音频时长: ${duration.inSeconds}秒');
         setState(() {
           _totalDuration = duration.inSeconds;
         });
@@ -223,10 +223,10 @@ class _SongPlayPageState extends State<SongPlayPage> {
       });
       // 监听播放器状态变化
       _audioPlayer!.onPlayerStateChanged.listen((PlayerState state) {
-        print('播放器状态变化: $state');
+        debugPrint('播放器状态变化: $state');
       });
     } catch (e) {
-      print('加载音频时长失败: $e');
+      debugPrint('加载音频时长失败: $e');
     }
   }
 
@@ -259,7 +259,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
         _isPlaying = !_isPlaying;
       });
     } catch (e) {
-      print('播放控制失败: $e');
+      debugPrint('播放控制失败: $e');
     }
   }
 

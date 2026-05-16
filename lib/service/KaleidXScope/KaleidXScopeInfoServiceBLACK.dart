@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 
@@ -54,7 +55,7 @@ class KaleidXScopeInfoServiceBLACK {
         final song = songs.firstWhere((s) => int.parse(s.id) == id);
         result.add(song);
       } catch (e) {
-        print('未找到歌曲ID: $id');
+        debugPrint('未找到歌曲ID: $id');
       }
     }
 
@@ -116,7 +117,7 @@ class KaleidXScopeInfoServiceBLACK {
           .cast<Song>()
           .toList();
     } catch (e) {
-      print('加载Track歌曲失败: $e');
+      debugPrint('加载Track歌曲失败: $e');
     }
 
     return result;

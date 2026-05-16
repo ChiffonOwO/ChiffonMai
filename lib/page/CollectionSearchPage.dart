@@ -71,7 +71,7 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
         _searchResults = results;
       });
     } catch (e) {
-      print('搜索出错: $e');
+      debugPrint('搜索出错: $e');
       setState(() {
         _searchResults = [];
       });
@@ -108,7 +108,7 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
       // 重新执行搜索
       await _performSearch();
     } catch (e) {
-      print('清除缓存时出错: $e');
+      debugPrint('清除缓存时出错: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('清除缓存失败')),
       );

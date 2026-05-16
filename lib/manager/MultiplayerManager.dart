@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/RoomEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/PlayerEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/GameStateEntity.dart';
@@ -34,25 +35,25 @@ class MultiplayerManager {
   String? get currentPlayerId => _cloudService.currentPlayerId;
 
   Future<void> initialize({String? nickname}) async {
-    print('[DEBUG][Manager] 开始初始化...');
-    print('[DEBUG][Manager] 传入昵称: $nickname');
+    debugPrint('[DEBUG][Manager] 开始初始化...');
+    debugPrint('[DEBUG][Manager] 传入昵称: $nickname');
     
     try {
       await _cloudService.initialize(
         envId: ApiUrls.MultiplayerServerUrl,
         nickname: nickname,
       );
-      print('[DEBUG][Manager] CloudService 初始化完成');
-      print('[DEBUG][Manager] 当前玩家ID: ${_cloudService.currentPlayerId}');
-      print('[DEBUG][Manager] 当前玩家昵称: ${_cloudService.currentNickname}');
+      debugPrint('[DEBUG][Manager] CloudService 初始化完成');
+      debugPrint('[DEBUG][Manager] 当前玩家ID: ${_cloudService.currentPlayerId}');
+      debugPrint('[DEBUG][Manager] 当前玩家昵称: ${_cloudService.currentNickname}');
       
       if (_eventSubscription == null) {
-        print('[DEBUG][Manager] 创建事件订阅...');
+        debugPrint('[DEBUG][Manager] 创建事件订阅...');
         _eventSubscription = _cloudService.listen(_handleCloudEvent);
-        print('[DEBUG][Manager] 事件订阅创建完成');
+        debugPrint('[DEBUG][Manager] 事件订阅创建完成');
       }
     } catch (e) {
-      print('[DEBUG][Manager] 初始化异常: $e');
+      debugPrint('[DEBUG][Manager] 初始化异常: $e');
     }
   }
 
@@ -162,10 +163,10 @@ class MultiplayerManager {
         break;
       case MultiplayerEventType.guessResult:
         if (event is GuessResultEvent) {
-          print('[DEBUG][Manager] guessResult event: isCorrect=${event.guess.isCorrect}, player=${event.guess.playerNickname}');
+          debugPrint('[DEBUG][Manager] guessResult event: isCorrect=${event.guess.isCorrect}, player=${event.guess.playerNickname}');
           
           if (_newRoundStartTime != null && event.guess.guessedAt.isBefore(_newRoundStartTime!)) {
-            print('[DEBUG][Manager] Ignoring guessResult - belongs to previous round');
+            debugPrint('[DEBUG][Manager] Ignoring guessResult - belongs to previous round');
             _refreshRoom();
             break;
           }
@@ -174,30 +175,30 @@ class MultiplayerManager {
             _currentPlayer = _currentPlayer!.copyWith(
               score: _currentPlayer!.score + (event.guess.isCorrect ? event.guess.score : 0),
             );
-            print('[DEBUG][Manager] Updated current player score: ${_currentPlayer!.score}');
+            debugPrint('[DEBUG][Manager] Updated current player score: ${_currentPlayer!.score}');
           }
           if (_currentGameState != null) {
             List<GuessRecord> updatedGuesses = List.from(_currentGameState!.guesses);
             updatedGuesses.add(event.guess);
             
             bool isRoundOver = event.guess.isCorrect;
-            print('[DEBUG][Manager] Setting isRoundOver=$isRoundOver');
+            debugPrint('[DEBUG][Manager] Setting isRoundOver=$isRoundOver');
             
             _currentGameState = _currentGameState!.copyWith(
               guesses: updatedGuesses,
               isRoundOver: isRoundOver,
             );
             _gameStateController.add(_currentGameState);
-            print('[DEBUG][Manager] Game state updated and added to controller');
+            debugPrint('[DEBUG][Manager] Game state updated and added to controller');
           } else {
-            print('[DEBUG][Manager] _currentGameState is null');
+            debugPrint('[DEBUG][Manager] _currentGameState is null');
           }
           _refreshRoom();
         }
         break;
       case MultiplayerEventType.guessUpdate:
         if (event is GuessUpdateEvent) {
-          print('[DEBUG][Manager] guessUpdate event received');
+          debugPrint('[DEBUG][Manager] guessUpdate event received');
           _currentGameState = event.gameState;
           _gameStateController.add(event.gameState);
         }
@@ -224,7 +225,7 @@ class MultiplayerManager {
         break;
       case MultiplayerEventType.roomUpdated:
         if (event is RoomUpdatedEvent) {
-          print('[DEBUG][Manager] 收到 roomUpdated 事件，发送到 roomController');
+          debugPrint('[DEBUG][Manager] 收到 roomUpdated 事件，发送到 roomController');
           _roomController.add(event.room);
         }
         break;
@@ -250,12 +251,12 @@ class MultiplayerManager {
     double masterMaxDx = 15.0,
     List<String> selectedGenres = const [],
   }) async {
-    print('[DEBUG][Manager] 开始创建房间请求...');
-    print('[DEBUG][Manager] 参数: gameType=${gameType.name}, maxPlayers=$maxPlayers, timeLimit=$timeLimit, maxGuesses=$maxGuesses');
-    print('[DEBUG][Manager] 歌曲筛选参数: selectedVersions=$selectedVersions, masterMinDx=$masterMinDx, masterMaxDx=$masterMaxDx, selectedGenres=$selectedGenres');
+    debugPrint('[DEBUG][Manager] 开始创建房间请求...');
+    debugPrint('[DEBUG][Manager] 参数: gameType=${gameType.name}, maxPlayers=$maxPlayers, timeLimit=$timeLimit, maxGuesses=$maxGuesses');
+    debugPrint('[DEBUG][Manager] 歌曲筛选参数: selectedVersions=$selectedVersions, masterMinDx=$masterMinDx, masterMaxDx=$masterMaxDx, selectedGenres=$selectedGenres');
     
     await initialize();
-    print('[DEBUG][Manager] 初始化完成');
+    debugPrint('[DEBUG][Manager] 初始化完成');
     
     Completer<RoomEntity?> completer = Completer();
     bool completed = false;
@@ -263,23 +264,23 @@ class MultiplayerManager {
     StreamSubscription? sub;
     sub = _cloudService.events.listen((event) {
       if (!completed) {
-        print('[DEBUG][Manager] 收到事件: ${event.type}');
+        debugPrint('[DEBUG][Manager] 收到事件: ${event.type}');
         
         if (event is RoomCreatedEvent) {
           completed = true;
-          print('[DEBUG][Manager] 房间创建成功: ${event.room.roomId}');
+          debugPrint('[DEBUG][Manager] 房间创建成功: ${event.room.roomId}');
           completer.complete(event.room);
           sub?.cancel();
         } else if (event is ErrorEvent) {
           completed = true;
-          print('[DEBUG][Manager] 房间创建失败: ${event.message}');
+          debugPrint('[DEBUG][Manager] 房间创建失败: ${event.message}');
           completer.complete(null);
           sub?.cancel();
         }
       }
     });
     
-    print('[DEBUG][Manager] 调用 CloudService.createRoom...');
+    debugPrint('[DEBUG][Manager] 调用 CloudService.createRoom...');
     await _cloudService.createRoom(
       gameType: gameType,
       maxPlayers: maxPlayers,
@@ -291,12 +292,12 @@ class MultiplayerManager {
       selectedGenres: selectedGenres,
     );
     
-    print('[DEBUG][Manager] 等待房间创建结果...');
+    debugPrint('[DEBUG][Manager] 等待房间创建结果...');
     return completer.future;
   }
 
   Future<RoomEntity?> joinRoom(String roomId) async {
-    print('[DEBUG][Manager] joinRoom called with roomId: "$roomId"');
+    debugPrint('[DEBUG][Manager] joinRoom called with roomId: "$roomId"');
     await initialize();
     
     Completer<RoomEntity?> completer = Completer();
@@ -305,30 +306,30 @@ class MultiplayerManager {
     StreamSubscription? sub;
     sub = _cloudService.events.listen((event) {
       if (!completed) {
-        print('[DEBUG][Manager] joinRoom event received: ${event.type}');
+        debugPrint('[DEBUG][Manager] joinRoom event received: ${event.type}');
         if (event is RoomJoinedEvent) {
           completed = true;
-          print('[DEBUG][Manager] Room joined successfully');
+          debugPrint('[DEBUG][Manager] Room joined successfully');
           completer.complete(event.room);
           sub?.cancel();
         } else if (event is JoinFailedEvent) {
           completed = true;
-          print('[DEBUG][Manager] Join failed: ${event.reason}');
+          debugPrint('[DEBUG][Manager] Join failed: ${event.reason}');
           completer.complete(null);
           sub?.cancel();
         } else if (event is ErrorEvent) {
           completed = true;
-          print('[DEBUG][Manager] Error occurred: ${event.message}');
+          debugPrint('[DEBUG][Manager] Error occurred: ${event.message}');
           completer.complete(null);
           sub?.cancel();
         }
       }
     });
     
-    print('[DEBUG][Manager] Calling cloudService.joinRoom...');
+    debugPrint('[DEBUG][Manager] Calling cloudService.joinRoom...');
     await _cloudService.joinRoom(roomId);
     
-    print('[DEBUG][Manager] Waiting for join result...');
+    debugPrint('[DEBUG][Manager] Waiting for join result...');
     return completer.future;
   }
 
@@ -370,7 +371,7 @@ class MultiplayerManager {
     try {
       return _cloudService.getWaitingRooms();
     } catch (e) {
-      print('获取房间列表失败: $e');
+      debugPrint('获取房间列表失败: $e');
     }
     
     return [];
@@ -391,7 +392,7 @@ class MultiplayerManager {
         _roomController.add(room);
       }
     } catch (e) {
-      print('刷新房间状态失败: $e');
+      debugPrint('刷新房间状态失败: $e');
     }
   }
 

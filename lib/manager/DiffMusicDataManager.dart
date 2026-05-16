@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -36,14 +37,14 @@ class DiffMusicDataManager {
         await prefs.setString(CacheKeyConstant.diffMusicData, diffJson);
         await prefs.setInt(_lastUpdateKey, DateTime.now().millisecondsSinceEpoch);
         
-        print('成功从 API 获取并更新音乐难度数据');
+        debugPrint('成功从 API 获取并更新音乐难度数据');
         return true;
       } else {
-        print('API 请求失败，状态码: ${response.statusCode}');
+        debugPrint('API 请求失败，状态码: ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      print('获取音乐难度数据时出错: $e');
+      debugPrint('获取音乐难度数据时出错: $e');
       return false;
     }
   }
@@ -69,7 +70,7 @@ class DiffMusicDataManager {
         return diffSong;
       }
     } catch (e) {
-      print('读取本地缓存时出错: $e');
+      debugPrint('读取本地缓存时出错: $e');
     }
     
     // 如果没有缓存，尝试从 API 获取
@@ -86,7 +87,7 @@ class DiffMusicDataManager {
         return diffSong;
       }
     } catch (e) {
-      print('读取更新后的缓存时出错: $e');
+      debugPrint('读取更新后的缓存时出错: $e');
     }
     
     return null;
@@ -103,7 +104,7 @@ class DiffMusicDataManager {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getInt(_lastUpdateKey);
     } catch (e) {
-      print('获取最后更新时间时出错: $e');
+      debugPrint('获取最后更新时间时出错: $e');
       return null;
     }
   }
@@ -115,7 +116,7 @@ class DiffMusicDataManager {
       await prefs.remove(CacheKeyConstant.diffMusicData);
       await prefs.remove(_lastUpdateKey);
     } catch (e) {
-      print('清除缓存时出错: $e');
+      debugPrint('清除缓存时出错: $e');
     }
   }
 }

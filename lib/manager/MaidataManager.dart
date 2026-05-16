@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api/ApiUrls.dart';
@@ -157,21 +158,21 @@ class MaidataManager {
 
         if (now - timestamp < CacheTimestampConstant.maidataFullCacheMillis) {
           _cachedMaidata = Map<String, String>.from(json.decode(cachedData) as Map);
-          print('[DEBUG][MaidataManager] 已加载全量缓存，共 ${_cachedMaidata.length} 首歌曲');
+          debugPrint('[DEBUG][MaidataManager] 已加载全量缓存，共 ${_cachedMaidata.length} 首歌曲');
           return;
         } else {
-          print('[DEBUG][MaidataManager] 全量缓存已过期，删除旧缓存');
+          debugPrint('[DEBUG][MaidataManager] 全量缓存已过期，删除旧缓存');
           await prefs.remove(CacheKeyConstant.maidataFullCache);
           await prefs.remove(CacheKeyConstant.maidataFullCacheTimestamp);
         }
       }
     } catch (e) {
-      print('[DEBUG][MaidataManager] 加载缓存失败: $e');
+      debugPrint('[DEBUG][MaidataManager] 加载缓存失败: $e');
     }
   }
 
   Future<void> fetchAndCacheFullMaidata() async {
-    print('[DEBUG][MaidataManager] 开始获取全量maidata.txt...');
+    debugPrint('[DEBUG][MaidataManager] 开始获取全量maidata.txt...');
     
     List<String> genrePaths = [
       '${ApiUrls.MaidataServerBaseUrl}/maimai',
@@ -186,11 +187,11 @@ class MaidataManager {
     int totalFetched = 0;
 
     for (String genrePath in genrePaths) {
-      print('[DEBUG][MaidataManager] 处理流派路径: $genrePath');
+      debugPrint('[DEBUG][MaidataManager] 处理流派路径: $genrePath');
       
       try {
         List<String> folders = await _getFoldersInPath(genrePath);
-        print('[DEBUG][MaidataManager] 发现 ${folders.length} 个文件夹');
+        debugPrint('[DEBUG][MaidataManager] 发现 ${folders.length} 个文件夹');
 
         for (String folder in folders) {
           String maidataUrl = '$genrePath/$folder/maidata.txt';
@@ -205,29 +206,29 @@ class MaidataManager {
               if (songId != null) {
                 _cachedMaidata[songId] = content;
                 totalFetched++;
-                print('[DEBUG][MaidataManager] 缓存歌曲: $songId');
+                debugPrint('[DEBUG][MaidataManager] 缓存歌曲: $songId');
               } else {
-                print('[DEBUG][MaidataManager] 无法从 $maidataUrl 提取歌曲ID');
+                debugPrint('[DEBUG][MaidataManager] 无法从 $maidataUrl 提取歌曲ID');
               }
             }
           } catch (e) {
-            print('[DEBUG][MaidataManager] 获取 $maidataUrl 失败: $e');
+            debugPrint('[DEBUG][MaidataManager] 获取 $maidataUrl 失败: $e');
           }
         }
       } catch (e) {
-        print('[DEBUG][MaidataManager] 获取流派路径 $genrePath 的文件夹列表失败: $e');
+        debugPrint('[DEBUG][MaidataManager] 获取流派路径 $genrePath 的文件夹列表失败: $e');
       }
     }
 
-    print('[DEBUG][MaidataManager] 全量缓存获取完成，共 $totalFetched 首歌曲');
+    debugPrint('[DEBUG][MaidataManager] 全量缓存获取完成，共 $totalFetched 首歌曲');
 
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString(CacheKeyConstant.maidataFullCache, json.encode(_cachedMaidata));
       await prefs.setInt(CacheKeyConstant.maidataFullCacheTimestamp, DateTime.now().millisecondsSinceEpoch);
-      print('[DEBUG][MaidataManager] 已保存到SharedPreferences');
+      debugPrint('[DEBUG][MaidataManager] 已保存到SharedPreferences');
     } catch (e) {
-      print('[DEBUG][MaidataManager] 保存缓存失败: $e');
+      debugPrint('[DEBUG][MaidataManager] 保存缓存失败: $e');
     }
   }
 
@@ -249,7 +250,7 @@ class MaidataManager {
         }
       }
     } catch (e) {
-      print('[DEBUG][MaidataManager] 获取文件夹列表失败: $e');
+      debugPrint('[DEBUG][MaidataManager] 获取文件夹列表失败: $e');
     }
     
     return folders.toSet().toList();
@@ -295,7 +296,7 @@ class MaidataManager {
   
   // 根据歌曲ID列表获取对应的maidata
   Future<List<String>> fetchMaidataForSongIds(List<String> songIds) async {
-    print('[DEBUG][MaidataManager] 开始获取指定歌曲ID的maidata（共 ${songIds.length} 首）');
+    debugPrint('[DEBUG][MaidataManager] 开始获取指定歌曲ID的maidata（共 ${songIds.length} 首）');
     
     List<String> result = [];
     List<String> remainingIds = List.from(songIds);
@@ -341,20 +342,20 @@ class MaidataManager {
                   _cachedMaidata[songId] = content;
                   result.add(_cleanMaidataContent(content));
                   remainingIds.remove(songId);
-                  print('[DEBUG][MaidataManager] 获取到指定歌曲: $songId');
+                  debugPrint('[DEBUG][MaidataManager] 获取到指定歌曲: $songId');
                 }
               }
             } catch (e) {
-              print('[DEBUG][MaidataManager] 获取 $maidataUrl 失败: $e');
+              debugPrint('[DEBUG][MaidataManager] 获取 $maidataUrl 失败: $e');
             }
           }
         } catch (e) {
-          print('[DEBUG][MaidataManager] 获取流派路径 $genrePath 的文件夹列表失败: $e');
+          debugPrint('[DEBUG][MaidataManager] 获取流派路径 $genrePath 的文件夹列表失败: $e');
         }
       }
     }
     
-    print('[DEBUG][MaidataManager] 指定歌曲maidata获取完成，成功获取 ${result.length} 首');
+    debugPrint('[DEBUG][MaidataManager] 指定歌曲maidata获取完成，成功获取 ${result.length} 首');
     return result;
   }
 
@@ -366,9 +367,9 @@ class MaidataManager {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.remove(CacheKeyConstant.maidataFullCache);
       await prefs.remove(CacheKeyConstant.maidataFullCacheTimestamp);
-      print('[DEBUG][MaidataManager] 缓存已清空');
+      debugPrint('[DEBUG][MaidataManager] 缓存已清空');
     } catch (e) {
-      print('[DEBUG][MaidataManager] 清空缓存失败: $e');
+      debugPrint('[DEBUG][MaidataManager] 清空缓存失败: $e');
     }
   }
 }

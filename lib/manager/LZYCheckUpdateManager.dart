@@ -34,41 +34,41 @@ class LZYCheckUpdateManager {
         
         if (response.statusCode == 200) {
           final jsonStr = response.body.trim();
-          print("获取配置成功：$jsonStr");
+          debugPrint("获取配置成功：$jsonStr");
           return jsonDecode(jsonStr);
         } else {
-          print("获取配置失败，状态码：${response.statusCode}");
+          debugPrint("获取配置失败，状态码：${response.statusCode}");
         }
       } on SocketException catch (e) {
-        print("网络连接失败：$e");
+        debugPrint("网络连接失败：$e");
       } on HttpException catch (e) {
-        print("HTTP异常：$e");
+        debugPrint("HTTP异常：$e");
       } on FormatException catch (e) {
-        print("数据格式错误：$e");
+        debugPrint("数据格式错误：$e");
       } catch (e) {
-        print("获取配置失败：$e");
+        debugPrint("获取配置失败：$e");
       } finally {
         client.close();
       }
     } catch (e) {
-      print("获取配置失败：$e");
+      debugPrint("获取配置失败：$e");
     }
     return null;
   }
 
   /// 检查更新
   Future<Map<String, dynamic>> checkUpdate() async {
-    print("开始检查更新...");
+    debugPrint("开始检查更新...");
     try {
       PackageInfo packageInfo = await PackageInfo.fromPlatform();
       int localBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
-      print("当前版本：${packageInfo.version} (build: $localBuild)");
+      debugPrint("当前版本：${packageInfo.version} (build: $localBuild)");
 
       final cloudConfig = await _getCloudConfig();
       
       // 如果网络请求失败，返回网络错误状态
       if (cloudConfig == null) {
-        print("无法获取云端配置，可能是网络问题");
+        debugPrint("无法获取云端配置，可能是网络问题");
         return {
           "hasUpdate": false,
           "networkError": true, // 标记网络错误
@@ -81,10 +81,10 @@ class LZYCheckUpdateManager {
       String updateLog = cloudConfig["updateLog"] ?? "优化体验";
       String downloadUrl = cloudConfig["downloadUrl"] ?? "";
 
-      print("最新版本：$latestVersion (build: $latestBuild)");
+      debugPrint("最新版本：$latestVersion (build: $latestBuild)");
 
       if (latestBuild > localBuild) {
-        print("发现新版本");
+        debugPrint("发现新版本");
         return {
           "hasUpdate": true,
           "currentVersion": packageInfo.version,
@@ -95,7 +95,7 @@ class LZYCheckUpdateManager {
           "downloadUrl": downloadUrl,
         };
       } else {
-        print("已是最新版本");
+        debugPrint("已是最新版本");
         // 返回版本信息，以便在弹窗中显示
         return {
           "hasUpdate": false,
@@ -107,7 +107,7 @@ class LZYCheckUpdateManager {
         };
       }
     } catch (e) {
-      print("检查更新失败：$e");
+      debugPrint("检查更新失败：$e");
       return {
         "hasUpdate": false,
         "networkError": true,

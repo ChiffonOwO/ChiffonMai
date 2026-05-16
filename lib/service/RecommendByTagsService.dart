@@ -4,6 +4,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/entity/RecommendationResult.dart';
 import 'package:my_first_flutter_app/entity/RecordItem.dart';
@@ -91,11 +92,11 @@ Future<List<RecordItem>> getUserPlayDataRecords() async {
       return records;
     } else {
       // 如果缓存中没有数据，返回空列表
-      print('UserPlayDataManager 中没有缓存数据');
+      debugPrint('UserPlayDataManager 中没有缓存数据');
       return [];
     }
   } catch (e) {
-    print('获取玩家游玩记录失败: $e');
+    debugPrint('获取玩家游玩记录失败: $e');
     return [];
   }
 }
@@ -147,7 +148,7 @@ Future<Map<String, Map<String, int>>> countTagsByGroup(
   Map<int, (String, int)> tagIdToInfoMap =
       await maiTagsManager.getTagIdToInfoMap();
   if (tagIdToInfoMap.isEmpty) {
-    print('标签ID到信息的映射为空');
+    debugPrint('标签ID到信息的映射为空');
     return {};
   }
 
@@ -227,11 +228,11 @@ Future<Map<String, Map<String, double>>> calculatePlayerAbilityVectors(
   Map<String, Map<String, int>> groupTagCountMap =
       await countTagsByGroup(filteredRecords);
   // 打印分组统计标签出现次数
-  print('按分组统计标签出现次数:');
+  debugPrint('按分组统计标签出现次数:');
   groupTagCountMap.forEach((groupName, tagCounts) {
-    print('  $groupName:');
+    debugPrint('  $groupName:');
     tagCounts.forEach((tagName, count) {
-      print('    $tagName: $count');
+      debugPrint('    $tagName: $count');
     });
   });
   // 遍历每个分组，计算其下各标签的能力向量
@@ -247,11 +248,11 @@ Future<Map<String, Map<String, double>>> calculatePlayerAbilityVectors(
     }
   }
   // 打印玩家能力向量
-  print('玩家能力向量:');
+  debugPrint('玩家能力向量:');
   playerAbilityVectors.forEach((groupName, tagWeights) {
-    print('  $groupName:');
+    debugPrint('  $groupName:');
     tagWeights.forEach((tagName, weight) {
-      print('    $tagName: ${weight.toStringAsFixed(4)}');
+      debugPrint('    $tagName: ${weight.toStringAsFixed(4)}');
     });
   });
   return playerAbilityVectors;
@@ -279,7 +280,7 @@ Future<List<RecordItem>> getBestNRecords(
       };
     }
   } else {
-    print('MaimaiMusicDataManager 中没有缓存数据');
+    debugPrint('MaimaiMusicDataManager 中没有缓存数据');
     return [];
   }
 
@@ -583,7 +584,7 @@ Future<List<RecommendationResult>> calculateRecommendations(
   if (await maimaiMusicDataManager.hasCachedData()) {
     songs = await maimaiMusicDataManager.getCachedSongs();
   } else {
-    print('MaimaiMusicDataManager 中没有缓存数据');
+    debugPrint('MaimaiMusicDataManager 中没有缓存数据');
     return [];
   }
 
@@ -837,63 +838,63 @@ Future<Map<String, List<RecommendationResult>>> recommendSongs() async {
   try {
     // 初始化标签数据
     await MaiTagsManager().initializeTags();
-    print('标签数据初始化完成');
+    debugPrint('标签数据初始化完成');
 
     // 使用已经筛选的单曲Rating最高的70个谱面
     List<RecordItem> userPlayDataRecords = await getUserPlayDataRecords();
-    print('获取到 ${userPlayDataRecords.length} 条玩家游玩记录');
+    debugPrint('获取到 ${userPlayDataRecords.length} 条玩家游玩记录');
 
     List<RecordItem> filteredRecords = 
         filterRecordsByRating(userPlayDataRecords);
-    print('筛选后得到 ${filteredRecords.length} 条记录');
+    debugPrint('筛选后得到 ${filteredRecords.length} 条记录');
 
     // 根据Best70标签的出现频率计算玩家的能力向量(3个向量)
     Map<String, Map<String, double>> playerAbilityVectors = 
         await calculatePlayerAbilityVectors(filteredRecords);
-    print('计算得到玩家能力向量: ${playerAbilityVectors.keys.toList()}');
+    debugPrint('计算得到玩家能力向量: ${playerAbilityVectors.keys.toList()}');
 
     // 获取玩家的过往版本中的Best55和当前版本中的Best15
     List<RecordItem> best55 = 
         await getBestNRecords(userPlayDataRecords, 55, false);
-    print('获取到 ${best55.length} 条Best55记录');
+    debugPrint('获取到 ${best55.length} 条Best55记录');
 
     List<RecordItem> best15 = 
         await getBestNRecords(userPlayDataRecords, 15, true);
-    print('获取到 ${best15.length} 条Best15记录');
+    debugPrint('获取到 ${best15.length} 条Best15记录');
 
     // 计算过往版本中的Best35用于判断Best55推荐结果是否能够增长总Rating
     List<RecordItem> best35 = 
         await getBestNRecords(userPlayDataRecords, 35, false);
-    print('获取到 ${best35.length} 条Best35记录');
+    debugPrint('获取到 ${best35.length} 条Best35记录');
 
     // 获取Rating范围
     int best55minRating = 0;
     int best55maxRating = 0;
     (best55minRating, best55maxRating) = getRaRange(best55);
-    print('Best55 Rating范围: $best55minRating - $best55maxRating');
+    debugPrint('Best55 Rating范围: $best55minRating - $best55maxRating');
 
     int best15minRating = 0;
     int best15maxRating = 0;
     (best15minRating, best15maxRating) = getRaRange(best15);
-    print('Best15 Rating范围: $best15minRating - $best15maxRating');
+    debugPrint('Best15 Rating范围: $best15minRating - $best15maxRating');
 
     int best35minRating = 0;
     int best35maxRating = 0;
     (best35minRating, best35maxRating) = getRaRange(best35);
-    print('Best35 Rating范围: $best35minRating - $best35maxRating');
+    debugPrint('Best35 Rating范围: $best35minRating - $best35maxRating');
 
     // 获取定数范围
     double best55minDs = 0.0;
     double best55maxDs = 0.0;
     (best55minDs, best55maxDs) = 
         getDifficultyRange(best55minRating, best55maxRating);
-    print('Best55 定数范围: $best55minDs - $best55maxDs');
+    debugPrint('Best55 定数范围: $best55minDs - $best55maxDs');
 
     double best15minDs = 0.0;
     double best15maxDs = 0.0;
     (best15minDs, best15maxDs) = 
         getDifficultyRange(best15minRating, best15maxRating);
-    print('Best15 定数范围: $best15minDs - $best15maxDs');
+    debugPrint('Best15 定数范围: $best15minDs - $best15maxDs');
 
     // 并行计算推荐结果，提高性能
     final Future<List<RecommendationResult>> best55Future = 
@@ -922,11 +923,11 @@ Future<Map<String, List<RecommendationResult>>> recommendSongs() async {
 
     // 等待两个计算完成
     final best55Recommendations = await best55Future;
-    print('计算得到 ${best55Recommendations.length} 条Best55推荐结果');
+    debugPrint('计算得到 ${best55Recommendations.length} 条Best55推荐结果');
     best55Recommendations.sort((a, b) => b.similarity.compareTo(a.similarity));
 
     final best15Recommendations = await best15Future;
-    print('计算得到 ${best15Recommendations.length} 条Best15推荐结果');
+    debugPrint('计算得到 ${best15Recommendations.length} 条Best15推荐结果');
     best15Recommendations.sort((a, b) => b.similarity.compareTo(a.similarity));
 
     // 保存推荐结果到缓存
@@ -938,9 +939,9 @@ Future<Map<String, List<RecommendationResult>>> recommendSongs() async {
       };
       final resultJson = json.encode(resultMap);
       await prefs.setString(CacheKeyConstant.recommendationResults, resultJson);
-      print('推荐结果已保存到缓存');
+      debugPrint('推荐结果已保存到缓存');
     } catch (e) {
-      print('保存推荐结果到缓存失败: $e');
+      debugPrint('保存推荐结果到缓存失败: $e');
     }
 
     // 返回推荐结果
@@ -950,8 +951,8 @@ Future<Map<String, List<RecommendationResult>>> recommendSongs() async {
     };
   } catch (e, stackTrace) {
     // 全局异常捕获，打印详细错误信息便于排查
-    print('推荐算法执行异常: $e');
-    print('异常堆栈信息: $stackTrace');
+    debugPrint('推荐算法执行异常: $e');
+    debugPrint('异常堆栈信息: $stackTrace');
     // 异常时返回空的推荐结果，避免崩溃
     return defaultResult;
   }

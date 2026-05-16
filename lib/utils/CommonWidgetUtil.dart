@@ -81,7 +81,7 @@ class CommonWidgetUtil {
       left: 10,
       child: GestureDetector(
         onTap: () {
-          print('返回按钮被点击');
+          debugPrint('返回按钮被点击');
           Navigator.pop(context); // 返回到主页
         },
         child: Container(

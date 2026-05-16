@@ -95,7 +95,7 @@ class GuessChartByAliaService {
         return maiTagsEntity;
       }
     } catch (e) {
-      print('加载标签数据失败: $e');
+      debugPrint('加载标签数据失败: $e');
       return null;
     }
   }
@@ -110,7 +110,7 @@ class GuessChartByAliaService {
       }
       return {};
     } catch (e) {
-      print('构建谱面标识到标签ID列表的映射失败: $e');
+      debugPrint('构建谱面标识到标签ID列表的映射失败: $e');
       return {};
     }
   }
@@ -128,7 +128,7 @@ class GuessChartByAliaService {
       }
       return {};
     } catch (e) {
-      print('构建标签ID到名称映射失败: $e');
+      debugPrint('构建标签ID到名称映射失败: $e');
       return {};
     }
   }
@@ -148,7 +148,7 @@ class GuessChartByAliaService {
       final List<Song> songs = jsonList.map((json) => Song.fromJson(json)).toList();
       return songs;
     } catch (e) {
-      print('加载歌曲数据失败: $e');
+      debugPrint('加载歌曲数据失败: $e');
       return [];
     }
   }
@@ -203,14 +203,14 @@ class GuessChartByAliaService {
       final randomIndex = DateTime.now().millisecondsSinceEpoch % filteredSongs.length;
       return filteredSongs[randomIndex];
     } catch (e) {
-      print('随机选择歌曲失败: $e');
+      debugPrint('随机选择歌曲失败: $e');
       return null;
     }
   }
 
   // 获取随机别名
   static String getRandomAlias(Song song) {
-    final aliases = SongAliasManager.instance.aliases[song.id] ?? [];
+    final aliases = SongAliasManager.instance.aliases[song.title] ?? [];
     if (aliases.isEmpty) {
       return '无别名';
     }
@@ -257,7 +257,7 @@ class GuessChartByAliaService {
         masterTags: masterTags,
       );
     } catch (e) {
-      print('构建GuessSong实体失败: $e');
+      debugPrint('构建GuessSong实体失败: $e');
       // 返回默认值
       return GuessSong(
         songId: int.parse(song.id),
@@ -400,7 +400,7 @@ class GuessChartByAliaService {
 
       return guessedSong;
     } catch (e) {
-      print('计算猜测结果失败: $e');
+      debugPrint('计算猜测结果失败: $e');
       return guessedSong;
     }
   }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../entity/Song.dart';
 
 class MaidataDecodeUtil {
@@ -252,7 +253,7 @@ class MaidataDecodeUtil {
     if (_patternBracket.hasMatch(note)) {
       return NoteType.SLIDE;
     }
-    //print("[DEBUG] Unknown type: '$note'");
+    //debugPrint("[DEBUG] Unknown type: '$note'");
     return NoteType.SLIDE;
   }
 
@@ -277,19 +278,19 @@ class MaidataDecodeUtil {
   static void debugPrintGroups(List<String> notes) {
     List<List<String>> groups = collectByType(notes);
     List<NoteType> types = NoteType.values;
-    print('===== 各类型字符组集合 =====');
+    debugPrint('===== 各类型字符组集合 =====');
     for (int i = 0; i < types.length; i++) {
       List<String> group = groups[i];
-      print('${types[i]}: 共 ${group.length} 个');
+      debugPrint('${types[i]}: 共 ${group.length} 个');
       int batchSize = 30;
       for (int j = 0; j < group.length; j += batchSize) {
         int end = j + batchSize;
         if (end > group.length) end = group.length;
         List<String> batch = group.sublist(j, end);
-        print('  [${j+1}-$end]: ${batch.join(', ')}');
+        debugPrint('  [${j+1}-$end]: ${batch.join(', ')}');
       }
       if (i < types.length - 1) {
-        print('----------------------------');
+        debugPrint('----------------------------');
       }
     }
   }

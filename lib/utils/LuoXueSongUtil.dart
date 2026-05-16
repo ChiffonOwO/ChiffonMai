@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:just_audio/just_audio.dart';
 import '../constant/CacheTimestampConstant.dart';
@@ -35,7 +36,7 @@ class LuoXueSongUtil {
       final fileInfo = await _cacheManager.getFileFromCache(url);
       return fileInfo != null;
     } catch (e) {
-      print('Error checking if music is cached: $e');
+      debugPrint('Error checking if music is cached: $e');
       return false;
     }
   }
@@ -47,7 +48,7 @@ class LuoXueSongUtil {
       final file = await _cacheManager.downloadFile(url);
       return file.file;
     } catch (e) {
-      print('Error downloading music: $e');
+      debugPrint('Error downloading music: $e');
       return null;
     }
   }
@@ -66,7 +67,7 @@ class LuoXueSongUtil {
         return file.file;
       }
     } catch (e) {
-      print('Error getting music file: $e');
+      debugPrint('Error getting music file: $e');
       return null;
     }
   }
@@ -76,7 +77,7 @@ class LuoXueSongUtil {
     try {
       await _cacheManager.emptyCache();
     } catch (e) {
-      print('Error clearing music cache: $e');
+      debugPrint('Error clearing music cache: $e');
     }
   }
 
@@ -85,7 +86,7 @@ class LuoXueSongUtil {
     try {
       return 0;
     } catch (e) {
-      print('Error calculating cache size: $e');
+      debugPrint('Error calculating cache size: $e');
       return 0;
     }
   }
@@ -113,7 +114,7 @@ class LuoXueSongUtil {
       await player.dispose();
       return duration;
     } catch (e) {
-      print('Error getting song duration: $e');
+      debugPrint('Error getting song duration: $e');
       return null;
     }
   }

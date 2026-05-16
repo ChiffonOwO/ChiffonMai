@@ -55,7 +55,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
         _songs = songs;
       });
     } catch (e) {
-      print('加载数据时出错: $e');
+      debugPrint('加载数据时出错: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -267,14 +267,22 @@ class _RankDetailPageState extends State<RankDetailPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            song?.title ?? '曲目 ${index + 1}',
-                            style: TextStyle(
-                              fontSize: _textSizeM,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          Row(
+                            children: [
+                              _buildSongTypeTag(song?.type),
+                              SizedBox(width: _paddingXS),
+                              Expanded(
+                                child: Text(
+                                  song?.title ?? '曲目 ${index + 1}',
+                                  style: TextStyle(
+                                    fontSize: _textSizeM,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                           SizedBox(height: 2),
                           Row(
@@ -418,5 +426,33 @@ class _RankDetailPageState extends State<RankDetailPage> {
       case 4: return Colors.purple.shade200;
       default: return Colors.grey;
     }
+  }
+
+  Widget _buildSongTypeTag(String? type) {
+    String tagText = '';
+    Color tagColor = Colors.grey;
+    
+    if (type != null) {
+      if (type.toLowerCase() == 'dx') {
+        tagText = 'DX';
+        tagColor = Colors.orange;
+      } else if (type.toLowerCase() == 'sd') {
+        tagText = 'ST';
+        tagColor = Colors.blue.shade300;
+      }
+    }
+    
+    if (tagText.isEmpty) {
+      return SizedBox.shrink();
+    }
+    
+    return Text(
+      tagText,
+      style: TextStyle(
+        fontSize: _textSizeM,
+        fontWeight: FontWeight.bold,
+        color: tagColor,
+      ),
+    );
   }
 }

@@ -118,7 +118,7 @@ class GuessChartBySongExcerptService {
 
       return songMap;
     } catch (e) {
-      print('加载歌曲数据失败: $e');
+      debugPrint('加载歌曲数据失败: $e');
       return null;
     }
   }
@@ -178,7 +178,7 @@ class GuessChartBySongExcerptService {
       
       return {entry.key: entry.value};
     } catch (e) {
-      print('随机选择歌曲失败: $e');
+      debugPrint('随机选择歌曲失败: $e');
       return null;
     }
   }
@@ -187,7 +187,7 @@ class GuessChartBySongExcerptService {
   Future<void> playSongExcerpt(String luoXueId) async {
     // 此方法已移至 GuessChartBySongExcerptPage 中实现
     // 保留此方法以保持兼容性
-    print('playSongExcerpt called for song $luoXueId');
+    debugPrint('playSongExcerpt called for song $luoXueId');
   }
 
   // 从缓存中尝试加载出标签数据并解析
@@ -208,7 +208,7 @@ class GuessChartBySongExcerptService {
         return maiTagsEntity;
       }
     } catch (e) {
-      print('加载标签数据失败: $e');
+      debugPrint('加载标签数据失败: $e');
       return null;
     }
   }
@@ -223,7 +223,7 @@ class GuessChartBySongExcerptService {
       }
       return {};
     } catch (e) {
-      print('构建谱面标识到标签ID列表的映射失败: $e');
+      debugPrint('构建谱面标识到标签ID列表的映射失败: $e');
       return {};
     }
   }
@@ -241,7 +241,7 @@ class GuessChartBySongExcerptService {
       }
       return {};
     } catch (e) {
-      print('构建标签ID到名称映射失败: $e');
+      debugPrint('构建标签ID到名称映射失败: $e');
       return {};
     }
   }
@@ -274,7 +274,7 @@ class GuessChartBySongExcerptService {
         masterTags: masterTags,
       );
     } catch (e) {
-      print('构建GuessSong实体失败: $e');
+      debugPrint('构建GuessSong实体失败: $e');
       // 返回默认值
       return GuessSong(
         songId: song.id.isNotEmpty ? int.tryParse(song.id) ?? 0 : 0,
@@ -404,7 +404,7 @@ class GuessChartBySongExcerptService {
 
       return guessedSong;
     } catch (e) {
-      print('计算猜测结果失败: $e');
+      debugPrint('计算猜测结果失败: $e');
       return guessedSong;
     }
   }

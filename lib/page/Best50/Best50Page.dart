@@ -11,6 +11,7 @@ import '../../manager/UserBest50Manager.dart';
 import '../../manager/MaimaiMusicDataManager.dart';
 import '../SongInfoPage.dart';
 import '../../utils/CoverUtil.dart';
+import '../../utils/TextStyleUtil.dart';
 
 class B50Page extends StatefulWidget {
   // 接收外部传入的B50数据
@@ -112,7 +113,7 @@ class _B50PageState extends State<B50Page> {
         }
       }
     } catch (e) {
-      print('Error loading data: $e');
+      debugPrint('Error loading data: $e');
       setState(() {
         _isLoading = false;
       });
@@ -253,7 +254,7 @@ class _B50PageState extends State<B50Page> {
               left: 10,
               child: GestureDetector(
                 onTap: () {
-                  print('返回按钮被点击');
+                  debugPrint('返回按钮被点击');
                   Navigator.pop(context); // 返回到主页
                 },
                 child: Container(
@@ -457,21 +458,19 @@ class _B50PageState extends State<B50Page> {
                 RichText(
                   text: TextSpan(
                     children: [
-                      TextSpan(
-                        text: rating.toString(),
-                        style: TextStyle(
+                      TextStyleUtil.span(
+                        rating.toString(),
+                        TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.04,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
-                          fontFamily: "Source Han Sans",
                         ),
                       ),
-                      TextSpan(
-                        text: '(平均${ratingAverage.toStringAsFixed(1)})',
-                        style: TextStyle(
+                      TextStyleUtil.span(
+                        '(平均${ratingAverage.toStringAsFixed(1)})',
+                        TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.03,
                           color: Colors.black,
-                          fontFamily: "Source Han Sans",
                         ),
                       ),
                     ],
@@ -489,21 +488,19 @@ class _B50PageState extends State<B50Page> {
                 RichText(
                   text: TextSpan(
                     children: [
-                      TextSpan(
-                        text: best35Sum.toString(),
-                        style: TextStyle(
+                      TextStyleUtil.span(
+                        best35Sum.toString(),
+                        TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.04,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
-                          fontFamily: "Source Han Sans",
                         ),
                       ),
-                      TextSpan(
-                        text: '(平均${best35Average.toStringAsFixed(1)})',
-                        style: TextStyle(
+                      TextStyleUtil.span(
+                        '(平均${best35Average.toStringAsFixed(1)})',
+                        TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.03,
                           color: Colors.black,
-                          fontFamily: "Source Han Sans",
                         ),
                       ),
                     ],
@@ -516,27 +513,25 @@ class _B50PageState extends State<B50Page> {
                     fontSize: MediaQuery.of(context).size.width * 0.04,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
-                    fontFamily: "Source Han Sans",
+                    
                   ),
                 ),
                 RichText(
                   text: TextSpan(
                     children: [
-                      TextSpan(
-                        text: best15Sum.toString(),
-                        style: TextStyle(
+                      TextStyleUtil.span(
+                        best15Sum.toString(),
+                        TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.04,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
-                          fontFamily: "Source Han Sans",
                         ),
                       ),
-                      TextSpan(
-                        text: '(平均${best15Average.toStringAsFixed(1)})',
-                        style: TextStyle(
+                      TextStyleUtil.span(
+                        '(平均${best15Average.toStringAsFixed(1)})',
+                        TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.03,
                           color: Colors.black,
-                          fontFamily: "Source Han Sans",
                         ),
                       ),
                     ],
@@ -574,7 +569,7 @@ class _B50PageState extends State<B50Page> {
                     best35AchievementAverage, best35ScoreRateAverage * 100),
                 SizedBox(height: 8.0),
                 Text(
-                  'Best 15平均达成率/DX分达成率',
+                  'Best 15 平均达成率/DX分达成率',
                   style: TextStyle(
                     fontSize: MediaQuery.of(context).size.width * 0.035,
                     fontWeight: FontWeight.bold,
@@ -719,7 +714,7 @@ class _B50PageState extends State<B50Page> {
                           fontSize: decimalMainFontSize * 0.9,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
-                          fontFamily: "Source Han Sans",
+                          
                         ),
                           ),
                           if (difficulty.toString().split('.').length > 1)
@@ -729,7 +724,7 @@ class _B50PageState extends State<B50Page> {
                                 fontSize: decimalSmallFontSize * 0.9,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
-                                fontFamily: "Source Han Sans",
+                                
                               ),
                             ),
                         ],
@@ -849,9 +844,9 @@ class _B50PageState extends State<B50Page> {
           integerPart,
           style: TextStyle(
             fontSize: MediaQuery.of(context).size.width * 0.04,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w800,
             color: color,
-            fontFamily: "Source Han Sans",
+            
           ),
         ),
         // 小数部分和百分号
@@ -859,9 +854,9 @@ class _B50PageState extends State<B50Page> {
           '$decimalPart$percentageSymbol',
           style: TextStyle(
             fontSize: MediaQuery.of(context).size.width * 0.03,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w800,
             color: color,
-            fontFamily: "Source Han Sans",
+            
           ),
         ),
       ],
@@ -888,7 +883,7 @@ class _B50PageState extends State<B50Page> {
                 fontSize: fontSize,
                 fontWeight: FontWeight.bold,
                 color: color,
-                fontFamily: "Source Han Sans",
+                
               ),
             ),
             _buildDecimalText(value2, context,

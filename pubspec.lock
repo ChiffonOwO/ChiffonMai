@@ -335,7 +335,7 @@ packages:
     source: hosted
     version: "5.9.3"
   flutter_soloud:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: flutter_soloud
       sha256: d275ff1fcaca64eab81189f260613b42787655d213013ab316ecd31bb52a5913
@@ -380,10 +380,10 @@ packages:
     dependency: "direct main"
     description:
       name: google_fonts
-      sha256: "2776c66b3e97c6cdd58d1bd3281548b074b64f1fd5c8f82391f7456e38849567"
+      sha256: ba03d03bcaa2f6cb7bd920e3b5027181db75ab524f8891c8bc3aa603885b8055
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "4.0.5"
+    version: "6.3.3"
   highlight:
     dependency: transitive
     description:

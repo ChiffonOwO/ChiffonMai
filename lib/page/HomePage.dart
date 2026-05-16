@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/page/Multiplayer/MultiplayerLobbyPage.dart';
 import 'package:my_first_flutter_app/page/PersonalizedChartPlayConfigure.dart';
 import 'package:my_first_flutter_app/page/RankListPage.dart';
@@ -121,7 +122,7 @@ class _HomePageState extends State<HomePage> {
   
   // 自动检查更新
   Future<void> _autoCheckUpdate() async {
-    print("首页加载时自动检查更新");
+    debugPrint("首页加载时自动检查更新");
     final updateManager = LZYCheckUpdateManager();
     try {
       // 检查是否应该显示更新提示
@@ -132,7 +133,7 @@ class _HomePageState extends State<HomePage> {
         }
       }
     } catch (e) {
-      print("自动检查更新失败：$e");
+      debugPrint("自动检查更新失败：$e");
     }
   }
   
@@ -172,7 +173,7 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.score, title: '成绩查询', subtitle: '查看游玩数据'),
     ButtonItem(icon: Icons.wysiwyg_rounded, title: '牌子进度', subtitle: '真代没有真将哦'),
     ButtonItem(icon: Icons.grading_rounded, title: '个性化成绩查询', subtitle: '目前支持等级/谱师的牌子查询'),
-    ButtonItem(icon: Icons.collections_bookmark, title: '收藏品查询', subtitle: '查看收藏品查询'),
+    ButtonItem(icon: Icons.collections_bookmark, title: '收藏品查询', subtitle: '查看收藏品详细信息'),
     ButtonItem(icon: Icons.bookmark_add, title: '舞萌百科', subtitle: '到底什么是错位?'),
     ButtonItem(icon: Icons.leaderboard, title: 'Best50查询', subtitle: '我去,龙币!'),
     ButtonItem(icon: Icons.analytics, title: '拟合Best50查询', subtitle: '我w55怎么拟合才w52?!'),
@@ -533,9 +534,9 @@ class _HomePageState extends State<HomePage> {
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove(CacheKeyConstant.recommendationResults);
-        print('推荐结果缓存已清除');
+        debugPrint('推荐结果缓存已清除');
       } catch (e) {
-        print('清除推荐结果缓存失败: $e');
+        debugPrint('清除推荐结果缓存失败: $e');
       }
       
       // 使用智能刷新：初次拉取获取全量maidata，后续只获取追加歌曲的maidata
@@ -547,13 +548,16 @@ class _HomePageState extends State<HomePage> {
       // 刷新标签数据
       await RecommendByTagsService.initializeTags();
       
+      // 刷新别名数据
+      await SongAliasManager.instance.refresh();
+      
       // 从API获取并更新用户游玩数据
       final userPlayDataManager = UserPlayDataManager();
       final userPlayData = await userPlayDataManager.fetchUserPlayData(qq);
       
       final best50Manager = UserBest50Manager();
       final best50Data = await best50Manager.getUserBest50(qq);
-      print(best50Data);
+      debugPrint(best50Data.toString());
       
       // 更新用户昵称
       if (userPlayData != null && userPlayData.containsKey('nickname')) {
@@ -623,9 +627,9 @@ class _HomePageState extends State<HomePage> {
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove(CacheKeyConstant.recommendationResults);
-        print('推荐结果缓存已清除');
+        debugPrint('推荐结果缓存已清除');
       } catch (e) {
-        print('清除推荐结果缓存失败: $e');
+        debugPrint('清除推荐结果缓存失败: $e');
       }
       
       // 使用智能刷新：初次拉取获取全量maidata，后续只获取追加歌曲的maidata
@@ -637,13 +641,16 @@ class _HomePageState extends State<HomePage> {
       // 刷新标签数据
       await RecommendByTagsService.initializeTags();
       
+      // 刷新别名数据
+      await SongAliasManager.instance.refresh();
+      
       // 从API获取并更新用户游玩数据
       final userPlayDataManager = UserPlayDataManager();
       final userPlayData = await userPlayDataManager.fetchUserPlayData(qq);
       
       final best50Manager = UserBest50Manager();
       final best50Data = await best50Manager.getUserBest50(qq);
-      print(best50Data);
+      debugPrint(best50Data.toString());
       
       // 更新用户昵称
       if (userPlayData != null && userPlayData.containsKey('nickname')) {
@@ -1019,7 +1026,7 @@ class _HomePageState extends State<HomePage> {
                         style: TextStyle(
                           color: AppConstants.textPrimaryColor.withOpacity(0.8),
                           fontSize: screenWidth * 0.025,
-                          fontWeight: FontWeight.normal,
+                          fontWeight: FontWeight.w300,
                         ),
                         textAlign: TextAlign.center,
                         softWrap: true,

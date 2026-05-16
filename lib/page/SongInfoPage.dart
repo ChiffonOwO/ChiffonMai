@@ -13,6 +13,7 @@ import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/MaidataDecodeUtil.dart';
+import 'package:my_first_flutter_app/utils/TextStyleUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'CollectionInfoPage.dart';
 import 'SongPlayPage.dart';
@@ -122,7 +123,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
       // 从MaidataManager获取并解析物量统计
       await _loadMaidataNoteCounts();
     } catch (e) {
-      print('加载数据失败: $e');
+      debugPrint('加载数据失败: $e');
     } finally {
       // 调整_currentDiffIndex，确保不超过实际难度数量
       if (_songData != null) {
@@ -165,7 +166,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
         _relatedCollectionsCount = relatedCollections.length;
       });
     } catch (e) {
-      print('获取相关收藏品数量时出错: $e');
+      debugPrint('获取相关收藏品数量时出错: $e');
       setState(() {
         _relatedCollectionsCount = 0;
       });
@@ -218,7 +219,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
         _alternativeSongId = null;
       }
     } catch (e) {
-      print('检测另一种谱面时出错: $e');
+      debugPrint('检测另一种谱面时出错: $e');
       _alternativeSongId = null;
     }
   }
@@ -1159,7 +1160,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                               Text(
                                                 basicInfo['title'],
                                                       style: TextStyle(
-                                                      fontFamily: "Source Han Sans",
+                                                      
                                                   fontSize: 20,
                                                   fontWeight: FontWeight.bold,
                                                   color: accentColor,
@@ -1612,30 +1613,26 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                             RichText(
                                               text: TextSpan(
                                                 children: [
-                                                  TextSpan(
-                                                    text:
-                                                        'DX分数: ${userRecord['dxScore']} / ${_calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex)}  ',
-                                                    style: TextStyle(
+                                                  TextStyleUtil.span(
+                                                    'DX分数: ${userRecord['dxScore']} / ${_calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex)}  ',
+                                                    TextStyle(
                                                       fontSize:
                                                           MediaQuery.of(context)
                                                                   .size
                                                                   .width *
                                                               0.042,
                                                       color: Colors.grey,
-                                                      fontFamily: "Source Han Sans",
                                                     ),
                                                   ),
-                                                  TextSpan(
-                                                    text:
-                                                        '(MAX -${_calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex) - userRecord['dxScore']})',
-                                                    style: TextStyle(
+                                                  TextStyleUtil.span(
+                                                    '(MAX -${_calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex) - userRecord['dxScore']})',
+                                                    TextStyle(
                                                       fontSize:
                                                           MediaQuery.of(context)
                                                                   .size
                                                                   .width *
                                                               0.042,
                                                       color: Colors.grey,
-                                                      fontFamily: "Source Han Sans",
                                                     ),
                                                   ),
                                                 ],
@@ -1647,24 +1644,22 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                 RichText(
                                                   text: TextSpan(
                                                     children: [
-                                                      TextSpan(
-                                                        text: 'DX分数达成率: ',
-                                                        style: TextStyle(
+                                                      TextStyleUtil.span(
+                                                        'DX分数达成率: ',
+                                                        TextStyle(
                                                           fontSize: MediaQuery.of(context).size.width * 0.042,
                                                           color: Colors.grey,
-                                                          fontFamily: "Source Han Sans",
                                                         ),
                                                       ),
-                                                      TextSpan(
-                                                        text: '${(userRecord['dxScore'] / _calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex) * 100).toStringAsFixed(2)}%  ',
-                                                        style: TextStyle(
+                                                      TextStyleUtil.span(
+                                                        '${(userRecord['dxScore'] / _calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex) * 100).toStringAsFixed(2)}%  ',
+                                                        TextStyle(
                                                           fontSize: MediaQuery.of(context).size.width * 0.042,
                                                           color: _getStarsColor(
                                                               _calculateStars(
                                                                   int.parse(widget.songId),
                                                                   _currentDiffIndex,
                                                                   userRecord['dxScore'])),
-                                                          fontFamily: "Source Han Sans",
                                                         ),
                                                       ),
                                                     ],
@@ -1687,7 +1682,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                               int.parse(widget.songId),
                                                               _currentDiffIndex,
                                                               userRecord['dxScore'])),
-                                                      fontFamily: "Source Han Sans",
+                                                      
                                                     ),
                                                   ),
                                                 ),
@@ -2926,7 +2921,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
       // 显示相关收藏品
       _showRelatedCollectionsDialog(songTitle, relatedCollections);
     } catch (e) {
-      print('获取相关收藏品时出错: $e');
+      debugPrint('获取相关收藏品时出错: $e');
       // 关闭加载对话框
       Navigator.of(context).pop();
       // 显示错误信息
@@ -3323,7 +3318,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
   // 构建别名区域
   Widget _buildAliasSection(String songTitle) {
     // 从 SongAliasManager 获取别名数据
-    final aliases = SongAliasManager.instance.aliases[widget.songId] ?? [];
+    final aliases = SongAliasManager.instance.aliases[songTitle] ?? [];
 
     if (aliases.isEmpty) {
       return Container(

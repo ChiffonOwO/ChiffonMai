@@ -90,11 +90,11 @@ class SongMaidataPageService {
         String originalTitle = songTitle;
         String sanitizedTitle = _sanitizeTitle(originalTitle);
         
-        print('[DEBUG][Maidata] 原始歌曲名: "$originalTitle"');
-        print('[DEBUG][Maidata] 处理后歌曲名: "$sanitizedTitle"');
+        debugPrint('[DEBUG][Maidata] 原始歌曲名: "$originalTitle"');
+        debugPrint('[DEBUG][Maidata] 处理后歌曲名: "$sanitizedTitle"');
         
         // 策略1: 使用sanitizeTitle精确匹配
-        print('[DEBUG][Maidata] 执行策略1: sanitizeTitle精确匹配');
+        debugPrint('[DEBUG][Maidata] 执行策略1: sanitizeTitle精确匹配');
         for (var entry in indexData.entries) {
           String id = entry.key;
           dynamic title = entry.value;
@@ -103,19 +103,19 @@ class SongMaidataPageService {
             if (!addedIds.contains(match.key)) {
               allMatches.add(match);
               addedIds.add(match.key);
-              print('[DEBUG][Maidata] 策略1匹配: ID=$id, 标题="$title"');
+              debugPrint('[DEBUG][Maidata] 策略1匹配: ID=$id, 标题="$title"');
             }
           }
         }
         
         // 策略2: 使用jp_transliterate将中文汉字转为日语音读
-        print('[DEBUG][Maidata] 执行策略2: jp_transliterate日语音读');
+        debugPrint('[DEBUG][Maidata] 执行策略2: jp_transliterate日语音读');
         try {
           if (JpTransliterate.isKanji(input: originalTitle)) {
             final transliterationData = await JpTransliterate.transliterate(kanji: originalTitle);
             String katakanaResult = transliterationData.katakana;
             
-            print('[DEBUG][Maidata] jp_transliterate结果: "$originalTitle" -> "$katakanaResult"');
+            debugPrint('[DEBUG][Maidata] jp_transliterate结果: "$originalTitle" -> "$katakanaResult"');
             
             if (katakanaResult.isNotEmpty && katakanaResult != originalTitle) {
               String sanitizedResult = _sanitizeTitle(katakanaResult);
@@ -132,7 +132,7 @@ class SongMaidataPageService {
                   if (!addedIds.contains(newMatch.key)) {
                     allMatches.add(newMatch);
                     addedIds.add(newMatch.key);
-                    print('[DEBUG][Maidata] 策略2匹配: 使用策略1的ID=${strategy1Match.id}(同位数), 使用片假名标题="$katakanaResult"');
+                    debugPrint('[DEBUG][Maidata] 策略2匹配: 使用策略1的ID=${strategy1Match.id}(同位数), 使用片假名标题="$katakanaResult"');
                   }
                 }
               }
@@ -158,7 +158,7 @@ class SongMaidataPageService {
                 for (var match in tempMatches) {
                   allMatches.add(match);
                   addedIds.add(match.key);
-                  print('[DEBUG][Maidata] 策略2匹配: ID=${match.id}, 使用片假名标题="$katakanaResult"');
+                  debugPrint('[DEBUG][Maidata] 策略2匹配: ID=${match.id}, 使用片假名标题="$katakanaResult"');
                 }
               }
               
@@ -166,24 +166,24 @@ class SongMaidataPageService {
               if (!hasAnyMatch) {
                 MatchResult newMatch = MatchResult(songId, katakanaResult, katakanaResult);
                 if (!addedIds.contains(newMatch.key)) {
-                  print('[DEBUG][Maidata] 策略2: 未找到同位数匹配，直接使用片假名构建URL');
+                  debugPrint('[DEBUG][Maidata] 策略2: 未找到同位数匹配，直接使用片假名构建URL');
                   allMatches.add(newMatch);
                   addedIds.add(newMatch.key);
                 }
               }
             } else {
-              print('[DEBUG][Maidata] 策略2: 未产生有效片假名');
+              debugPrint('[DEBUG][Maidata] 策略2: 未产生有效片假名');
             }
           } else {
-            print('[DEBUG][Maidata] 策略2: 输入不包含汉字，跳过');
+            debugPrint('[DEBUG][Maidata] 策略2: 输入不包含汉字，跳过');
           }
         } catch (e) {
-          print('[DEBUG][Maidata] 策略2: jp_transliterate异常: $e');
+          debugPrint('[DEBUG][Maidata] 策略2: jp_transliterate异常: $e');
         }
         
         if (allMatches.length > 1) {
           int originalIdLength = songId.length;
-          print('[DEBUG][Maidata] 原ID位数: $originalIdLength');
+          debugPrint('[DEBUG][Maidata] 原ID位数: $originalIdLength');
           
           allMatches.sort((a, b) {
             int aScore = a.id.length == originalIdLength ? 1 : 0;
@@ -194,11 +194,11 @@ class SongMaidataPageService {
             return a.id.length.compareTo(b.id.length);
           });
           
-          print('[DEBUG][Maidata] 排序后的匹配结果: ${allMatches.map((m) => m.id).toList()}');
+          debugPrint('[DEBUG][Maidata] 排序后的匹配结果: ${allMatches.map((m) => m.id).toList()}');
         }
       }
     } catch (e) {
-      print('[DEBUG][Maidata] 获取index.json失败: $e');
+      debugPrint('[DEBUG][Maidata] 获取index.json失败: $e');
     }
     
     return allMatches;
@@ -231,7 +231,7 @@ class SongMaidataPageService {
     if (MaidataManager().isCacheReady) {
       String? fullCacheContent = MaidataManager().getMaidata(songId);
       if (fullCacheContent != null) {
-        print('[DEBUG][Maidata] 使用全量缓存内容');
+        debugPrint('[DEBUG][Maidata] 使用全量缓存内容');
         List<String> inoteList = _parseInoteList(fullCacheContent);
         onInoteParsed(inoteList);
         return fullCacheContent;
@@ -241,7 +241,7 @@ class SongMaidataPageService {
     // 其次检查独立缓存
     String? cachedContent = await getCachedMaidata(onInoteParsed: onInoteParsed);
     if (cachedContent != null) {
-      print('[DEBUG][Maidata] 使用独立缓存内容');
+      debugPrint('[DEBUG][Maidata] 使用独立缓存内容');
       return cachedContent;
     }
     
@@ -251,7 +251,7 @@ class SongMaidataPageService {
       return null;
     }
     
-    print('[DEBUG][Maidata] 找到 ${matches.length} 个匹配结果');
+    debugPrint('[DEBUG][Maidata] 找到 ${matches.length} 个匹配结果');
     
     String? serverTitle;
     for (int i = 0; i < matches.length; i++) {
@@ -259,7 +259,7 @@ class SongMaidataPageService {
       serverTitle = match.title;
       
       String url = _buildMaidataUrl(match.id, customTitle: match.customUrlTitle, serverTitle: serverTitle);
-      print('[DEBUG][Maidata] 尝试第 ${i + 1}/${matches.length} 个匹配: $url');
+      debugPrint('[DEBUG][Maidata] 尝试第 ${i + 1}/${matches.length} 个匹配: $url');
       
       final response = await http.get(Uri.parse(url));
       
@@ -270,17 +270,17 @@ class SongMaidataPageService {
         List<String> inoteList = _parseInoteList(content);
         onInoteParsed(inoteList);
         
-        print('[DEBUG][Maidata] 请求成功！');
+        debugPrint('[DEBUG][Maidata] 请求成功！');
         return content;
       } else if (response.statusCode == 404) {
-        print('[DEBUG][Maidata] 404 - 尝试下一个匹配...');
+        debugPrint('[DEBUG][Maidata] 404 - 尝试下一个匹配...');
         continue;
       } else {
         return null;
       }
     }
     
-    print('[DEBUG][Maidata] 所有匹配均失败，尝试后备机制...');
+    debugPrint('[DEBUG][Maidata] 所有匹配均失败，尝试后备机制...');
     return await tryFallbackSearch(onInoteParsed: onInoteParsed);
   }
 
@@ -300,17 +300,17 @@ class SongMaidataPageService {
         int now = DateTime.now().millisecondsSinceEpoch;
         
         if (now - timestamp < CacheTimestampConstant.songMaidataCacheMillis) {
-          print('[DEBUG][Maidata] 缓存有效，时间戳: $timestamp');
+          debugPrint('[DEBUG][Maidata] 缓存有效，时间戳: $timestamp');
           List<String> inoteList = _parseInoteList(content);
           onInoteParsed(inoteList);
           return content;
         } else {
-          print('[DEBUG][Maidata] 缓存已过期，删除旧缓存');
+          debugPrint('[DEBUG][Maidata] 缓存已过期，删除旧缓存');
           await prefs.remove(cacheKey);
         }
       }
     } catch (e) {
-      print('[DEBUG][Maidata] 获取缓存失败: $e');
+      debugPrint('[DEBUG][Maidata] 获取缓存失败: $e');
     }
     return null;
   }
@@ -326,9 +326,9 @@ class SongMaidataPageService {
       };
       
       await prefs.setString(cacheKey, json.encode(data));
-      print('[DEBUG][Maidata] 已缓存maidata内容');
+      debugPrint('[DEBUG][Maidata] 已缓存maidata内容');
     } catch (e) {
-      print('[DEBUG][Maidata] 缓存失败: $e');
+      debugPrint('[DEBUG][Maidata] 缓存失败: $e');
     }
   }
 
@@ -345,7 +345,7 @@ class SongMaidataPageService {
     }
     
     inoteList.sort((a, b) => int.parse(a).compareTo(int.parse(b)));
-    print('[DEBUG][Maidata] 解析到 ${inoteList.length} 个inote: $inoteList');
+    debugPrint('[DEBUG][Maidata] 解析到 ${inoteList.length} 个inote: $inoteList');
     return inoteList;
   }
 
@@ -355,44 +355,44 @@ class SongMaidataPageService {
     try {
       String utf8String = utf8.decode(bytes);
       if (!utf8String.contains('\uFFFD')) {
-        print('[DEBUG][Maidata] 使用UTF-8编码');
+        debugPrint('[DEBUG][Maidata] 使用UTF-8编码');
         return utf8String;
       }
     } catch (e) {
-      print('[DEBUG][Maidata] UTF-8解码失败: $e');
+      debugPrint('[DEBUG][Maidata] UTF-8解码失败: $e');
     }
     
     try {
       String shiftJisString = _decodeShiftJis(bytes);
       if (shiftJisString.isNotEmpty && !shiftJisString.contains('\uFFFD')) {
-        print('[DEBUG][Maidata] 使用Shift-JIS编码');
+        debugPrint('[DEBUG][Maidata] 使用Shift-JIS编码');
         return shiftJisString;
       }
     } catch (e) {
-      print('[DEBUG][Maidata] Shift-JIS解码失败: $e');
+      debugPrint('[DEBUG][Maidata] Shift-JIS解码失败: $e');
     }
     
     try {
       String gbkString = _decodeGbk(bytes);
       if (gbkString.isNotEmpty && !gbkString.contains('\uFFFD')) {
-        print('[DEBUG][Maidata] 使用GBK编码');
+        debugPrint('[DEBUG][Maidata] 使用GBK编码');
         return gbkString;
       }
     } catch (e) {
-      print('[DEBUG][Maidata] GBK解码失败: $e');
+      debugPrint('[DEBUG][Maidata] GBK解码失败: $e');
     }
     
     try {
       String eucJpString = _decodeEucJp(bytes);
       if (eucJpString.isNotEmpty && !eucJpString.contains('\uFFFD')) {
-        print('[DEBUG][Maidata] 使用EUC-JP编码');
+        debugPrint('[DEBUG][Maidata] 使用EUC-JP编码');
         return eucJpString;
       }
     } catch (e) {
-      print('[DEBUG][Maidata] EUC-JP解码失败: $e');
+      debugPrint('[DEBUG][Maidata] EUC-JP解码失败: $e');
     }
     
-    print('[DEBUG][Maidata] 使用默认ISO-8859-1编码');
+    debugPrint('[DEBUG][Maidata] 使用默认ISO-8859-1编码');
     return response.body;
   }
 
@@ -562,34 +562,34 @@ class SongMaidataPageService {
   Future<String?> tryFallbackSearch({
     required void Function(List<String>) onInoteParsed,
   }) async {
-    print('[DEBUG][Maidata] 开始后备搜索...');
+    debugPrint('[DEBUG][Maidata] 开始后备搜索...');
     
     try {
       String mappedGenre = _genreMapping[genre] ?? genre;
-      print('[DEBUG][Maidata] 搜索流派: $mappedGenre');
+      debugPrint('[DEBUG][Maidata] 搜索流派: $mappedGenre');
       
       String genreUrl = '${ApiUrls.MaidataServerPortUrl}/$mappedGenre/';
-      print('[DEBUG][Maidata] 尝试获取文件夹列表: $genreUrl');
+      debugPrint('[DEBUG][Maidata] 尝试获取文件夹列表: $genreUrl');
       
       final response = await http.get(Uri.parse(genreUrl));
       if (response.statusCode != 200) {
-        print('[DEBUG][Maidata] 无法获取文件夹列表: ${response.statusCode}');
+        debugPrint('[DEBUG][Maidata] 无法获取文件夹列表: ${response.statusCode}');
         return null;
       }
       
       List<String> folders = _parseFolderList(response.body);
-      print('[DEBUG][Maidata] 找到 ${folders.length} 个文件夹');
+      debugPrint('[DEBUG][Maidata] 找到 ${folders.length} 个文件夹');
       
       if (folders.isEmpty) {
         return null;
       }
       
       List<String> candidateIds = await _getCandidateIds();
-      print('[DEBUG][Maidata] 候选ID列表: $candidateIds');
+      debugPrint('[DEBUG][Maidata] 候选ID列表: $candidateIds');
       
       for (String folder in folders) {
         String maidataUrl = '$genreUrl$folder/maidata.txt';
-        print('[DEBUG][Maidata] 检查: $maidataUrl');
+        debugPrint('[DEBUG][Maidata] 检查: $maidataUrl');
         
         try {
           final maidataResponse = await http.get(Uri.parse(maidataUrl));
@@ -599,7 +599,7 @@ class SongMaidataPageService {
             
             for (String id in candidateIds) {
               if (content.contains('&shortid=$id')) {
-                print('[DEBUG][Maidata] 找到匹配的maidata.txt! shortid=$id');
+                debugPrint('[DEBUG][Maidata] 找到匹配的maidata.txt! shortid=$id');
                 
                 await cacheMaidata(content);
                 
@@ -611,7 +611,7 @@ class SongMaidataPageService {
             }
           }
         } catch (e) {
-          print('[DEBUG][Maidata] 检查文件夹 $folder 时出错: $e');
+          debugPrint('[DEBUG][Maidata] 检查文件夹 $folder 时出错: $e');
           continue;
         }
       }
@@ -619,7 +619,7 @@ class SongMaidataPageService {
       return null;
       
     } catch (e) {
-      print('[DEBUG][Maidata] 后备搜索失败: $e');
+      debugPrint('[DEBUG][Maidata] 后备搜索失败: $e');
       return null;
     }
   }
@@ -667,7 +667,7 @@ class SongMaidataPageService {
         }
       }
     } catch (e) {
-      print('[DEBUG][Maidata] 获取候选ID失败: $e');
+      debugPrint('[DEBUG][Maidata] 获取候选ID失败: $e');
     }
     
     candidateIds.add(songId);
@@ -688,7 +688,7 @@ class SongMaidataPageService {
         }
       }
     } catch (e) {
-      print('[DEBUG][Maidata] 获取定数失败: $e');
+      debugPrint('[DEBUG][Maidata] 获取定数失败: $e');
     }
 
     if (dsList.isEmpty) {

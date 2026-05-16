@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
@@ -72,8 +73,11 @@ class PersonalizedScoreService {
     final result = <Map<String, dynamic>>[];
     
     for (final song in songs) {
-      // 排除id为6位数的谱面
+      // 排除id为6位数的谱面和从maidata追加的歌曲（cids全为0）
       if (song.id.length == 6 && int.tryParse(song.id) != null) {
+        continue;
+      }
+      if (_isMaidataSong(song)) {
         continue;
       }
 
@@ -190,8 +194,11 @@ class PersonalizedScoreService {
 
     final Set<String> levels = {};
     for (final song in songs) {
-      // 排除id为6位数的谱面
+      // 排除id为6位数的谱面和从maidata追加的歌曲（cids全为0）
       if (song.id.length == 6 && int.tryParse(song.id) != null) {
+        continue;
+      }
+      if (_isMaidataSong(song)) {
         continue;
       }
       if (difficulty < song.ds.length) {
@@ -229,8 +236,11 @@ class PersonalizedScoreService {
 
     final Set<String> levels = {};
     for (final song in songs) {
-      // 排除id为6位数的谱面
+      // 排除id为6位数的谱面和从maidata追加的歌曲（cids全为0）
       if (song.id.length == 6 && int.tryParse(song.id) != null) {
+        continue;
+      }
+      if (_isMaidataSong(song)) {
         continue;
       }
       // 遍历所有难度
@@ -277,8 +287,11 @@ class PersonalizedScoreService {
 
       Map<String, int> charterCounts = {};
       for (final song in songs) {
-        // 排除id为6位数的谱面
+        // 排除id为6位数的谱面和从maidata追加的歌曲（cids全为0）
         if (song.id.length == 6 && int.tryParse(song.id) != null) {
+          continue;
+        }
+        if (_isMaidataSong(song)) {
           continue;
         }
         for (final chart in song.charts) {
@@ -291,7 +304,7 @@ class PersonalizedScoreService {
 
       return charterCounts;
     } catch (e) {
-      print('获取谱师列表时出错: $e');
+      debugPrint('获取谱师列表时出错: $e');
       return {};
     }
   }
@@ -312,8 +325,11 @@ class PersonalizedScoreService {
     final result = <Map<String, dynamic>>[];
     
     for (final song in songs) {
-      // 排除id为6位数的谱面
+      // 排除id为6位数的谱面和从maidata追加的歌曲（cids全为0）
       if (song.id.length == 6 && int.tryParse(song.id) != null) {
+        continue;
+      }
+      if (_isMaidataSong(song)) {
         continue;
       }
 
@@ -408,5 +424,11 @@ class PersonalizedScoreService {
       'mode': prefs.getString(_keyMode) ?? 'level',
       'charter': prefs.getString(_keyCharter) ?? '',
     };
+  }
+
+  // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析）
+  bool _isMaidataSong(Song song) {
+    if (song.cids.isEmpty) return false;
+    return song.cids.every((cid) => cid == 0);
   }
 }

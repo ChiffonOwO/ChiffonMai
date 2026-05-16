@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
@@ -68,7 +69,7 @@ class GuessSongByOpenLettersService {
       // 返回指定数量的歌曲
       return filteredSongs.take(count).toList();
     } catch (e) {
-      print('随机选择歌曲失败: $e');
+      debugPrint('随机选择歌曲失败: $e');
       return [];
     }
   }
@@ -127,7 +128,7 @@ class GuessSongByOpenLettersService {
       }
       
       // 检查别名
-      final aliases = SongAliasManager.instance.aliases[song.id] ?? [];
+      final aliases = SongAliasManager.instance.aliases[song.title] ?? [];
       if (aliases.contains(answer)) {
         return true;
       }
@@ -153,8 +154,8 @@ class GuessSongByOpenLettersService {
     for (var song in allSongs) {
       if (!results.contains(song)) {
         // 检查别名
-        final songId = song.id;
-        final aliases = SongAliasManager.instance.aliases[songId];
+        final songTitle = song.title;
+        final aliases = SongAliasManager.instance.aliases[songTitle];
         if (aliases != null &&
             aliases.any((alias) => alias.toLowerCase().contains(query))) {
           results.add(song);
@@ -205,7 +206,7 @@ class GuessSongByOpenLettersService {
       final List<Song> songs = jsonList.map((json) => Song.fromJson(json)).toList();
       return songs;
     } catch (e) {
-      print('加载歌曲数据失败: $e');
+      debugPrint('加载歌曲数据失败: $e');
       return [];
     }
   }

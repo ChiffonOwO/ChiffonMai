@@ -11,6 +11,7 @@ import '../../service/Best50/DiffBest50ConvertToImgService.dart';
 import '../../manager/MaimaiMusicDataManager.dart';
 import '../SongInfoPage.dart';
 import '../../utils/CoverUtil.dart';
+import '../../utils/TextStyleUtil.dart';
 
 class DiffBest50Page extends StatefulWidget {
   const DiffBest50Page({super.key});
@@ -100,7 +101,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading data: $e');
+      debugPrint('Error loading data: $e');
       setState(() {
         _isLoading = false;
       });
@@ -431,28 +432,26 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                     fontSize: MediaQuery.of(context).size.width * 0.045,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
-                    fontFamily: "Source Han Sans",
+                    
                   ),
                 ),
                 SizedBox(height: 4.0),
                 RichText(
                   text: TextSpan(
                     children: [
-                      TextSpan(
-                        text: diffRatingSum.toString(),
-                        style: TextStyle(
+                      TextStyleUtil.span(
+                        diffRatingSum.toString(),
+                        TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.045,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
-                          fontFamily: "Source Han Sans",
                         ),
                       ),
-                      TextSpan(
-                        text: '(平均${diffRatingAverage.toStringAsFixed(1)})',
-                        style: TextStyle(
+                      TextStyleUtil.span(
+                        '(平均${diffRatingAverage.toStringAsFixed(1)})',
+                        TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.03,
                           color: Colors.black,
-                          fontFamily: "Source Han Sans",
                         ),
                       ),
                     ],
@@ -465,7 +464,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                     fontSize: MediaQuery.of(context).size.width * 0.045,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
-                    fontFamily: "Source Han Sans",
+                    
                   ),
                 ),
                 Text(
@@ -474,7 +473,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                     fontSize: MediaQuery.of(context).size.width * 0.045,
                     color: best50Diff >= 0 ? Colors.green : Colors.red,
                     fontWeight: FontWeight.bold,
-                    fontFamily: "Source Han Sans",
+                    
                   ),
                 ),
                 // 显示暂无拟合定数的歌曲数量
@@ -486,7 +485,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                     style: TextStyle(
                       fontSize: MediaQuery.of(context).size.width * 0.035,
                       color: Colors.orange,
-                      fontFamily: "Source Han Sans",
+                      
                     ),
                   ),
               ],
@@ -504,7 +503,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                     fontSize: MediaQuery.of(context).size.width * 0.04,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
-                    fontFamily: "Source Han Sans",
+                    
                   ),
                 ),
                 _buildDualDecimalText(
@@ -520,7 +519,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                   style: TextStyle(
                     fontSize: MediaQuery.of(context).size.width * 0.028,
                     color: Colors.grey[600],
-                    fontFamily: "Source Han Sans",
+                    
                   ),
                 ),
               ],
@@ -791,9 +790,9 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
           integerPart,
           style: TextStyle(
             fontSize: MediaQuery.of(context).size.width * 0.045,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w800,
             color: color,
-            fontFamily: "Source Han Sans",
+            
           ),
         ),
         // 小数部分和百分号
@@ -801,9 +800,9 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
           '$decimalPart$percentageSymbol',
           style: TextStyle(
             fontSize: MediaQuery.of(context).size.width * 0.03,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w800,
             color: color,
-            fontFamily: "Source Han Sans",
+            
           ),
         ),
       ],

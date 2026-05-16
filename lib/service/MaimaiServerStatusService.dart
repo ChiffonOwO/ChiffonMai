@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/entity/MaimaiServerStatusEntity.dart';
@@ -39,12 +40,12 @@ class MaimaiServerStatusService {
         
         return status;
       } else {
-        print('获取服务器状态失败: ${response.statusCode}');
+        debugPrint('获取服务器状态失败: ${response.statusCode}');
         // 如果API失败，返回缓存数据（如果有）
         return _cachedStatus;
       }
     } catch (e) {
-      print('获取服务器状态异常: $e');
+      debugPrint('获取服务器状态异常: $e');
       // 如果网络异常，返回缓存数据（如果有）
       return _cachedStatus;
     }
@@ -74,12 +75,12 @@ class MaimaiServerStatusService {
         
         return titleStatus;
       } else {
-        print('获取服务器状态标题失败: ${response.statusCode}');
+        debugPrint('获取服务器状态标题失败: ${response.statusCode}');
         // 如果API失败，返回缓存数据（如果有）
         return _cachedTitleStatus;
       }
     } catch (e) {
-      print('获取服务器状态标题异常: $e');
+      debugPrint('获取服务器状态标题异常: $e');
       // 如果网络异常，返回缓存数据（如果有）
       return _cachedTitleStatus;
     }
@@ -94,7 +95,7 @@ class MaimaiServerStatusService {
       }
       return titleStatus.getServerIdToNameMap();
     } catch (e) {
-      print('获取服务器ID到名称映射失败: $e');
+      debugPrint('获取服务器ID到名称映射失败: $e');
       return {};
     }
   }
@@ -105,7 +106,7 @@ class MaimaiServerStatusService {
       final map = await getServerIdToNameMap();
       return map[serverId] ?? '服务器 $serverId';
     } catch (e) {
-      print('获取服务器名称失败: $e');
+      debugPrint('获取服务器名称失败: $e');
       return '服务器 $serverId';
     }
   }
@@ -121,7 +122,7 @@ class MaimaiServerStatusService {
       final latestHeartbeat = status.heartbeatList.getLatestHeartbeat(serverId);
       return latestHeartbeat?.status == 1;
     } catch (e) {
-      print('检查服务器状态异常: $e');
+      debugPrint('检查服务器状态异常: $e');
       return false;
     }
   }
@@ -135,7 +136,7 @@ class MaimaiServerStatusService {
       }
       return status.heartbeatList.getServerIds();
     } catch (e) {
-      print('获取服务器ID列表失败: $e');
+      debugPrint('获取服务器ID列表失败: $e');
       return [];
     }
   }

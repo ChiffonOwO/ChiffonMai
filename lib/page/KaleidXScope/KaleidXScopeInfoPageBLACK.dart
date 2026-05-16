@@ -120,7 +120,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
 
       await _loadSpecialSongs();
     } catch (e) {
-      print('加载歌曲失败: $e');
+      debugPrint('加载歌曲失败: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -169,7 +169,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
         });
       }
     } catch (e) {
-      print('加载完成歌曲失败: $e');
+      debugPrint('加载完成歌曲失败: $e');
     }
   }
 

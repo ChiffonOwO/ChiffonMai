@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../../manager/UserPlayDataManager.dart';
 import '../../manager/DiffMusicDataManager.dart';
 import '../../manager/UserBest50Manager.dart';
@@ -59,7 +61,7 @@ class DiffBest50Service {
       }
       return {};
     } catch (e) {
-      print('加载歌曲难度数据失败: $e');
+      debugPrint('加载歌曲难度数据失败: $e');
       return {};
     }
   }
@@ -70,7 +72,7 @@ class DiffBest50Service {
       final userPlayDataManager = UserPlayDataManager();
       return await userPlayDataManager.getCachedUserPlayData();
     } catch (e) {
-      print('获取用户游玩数据失败: $e');
+      debugPrint('获取用户游玩数据失败: $e');
       return null;
     }
   }
@@ -185,7 +187,7 @@ class DiffBest50Service {
         'best50Diff': best50Diff,
       };
     } catch (e) {
-      print('计算DiffBest50数据失败: $e');
+      debugPrint('计算DiffBest50数据失败: $e');
       return {'diffRatingSum': 0, 'diffBest50': [], 'best50Diff': 0};
     }
   }
@@ -262,7 +264,7 @@ class DiffBest50Service {
         'best50Diff': best50Diff,
       };
     } catch (e) {
-      print('计算DiffBest50数据失败: $e');
+      debugPrint('计算DiffBest50数据失败: $e');
       return {'diffRatingSum': 0, 'diffBest50': [], 'diffSdSongs': [], 'diffDxSongs': [], 'best50Diff': 0};
     }
   }
@@ -383,7 +385,7 @@ class DiffBest50Service {
         'best50Diff': best50Diff,
       };
     } catch (e) {
-      print('计算DiffBest50数据失败: $e');
+      debugPrint('计算DiffBest50数据失败: $e');
       return {'diffRatingSum': 0, 'diffBest50': [], 'diffSdSongs': [], 'diffDxSongs': [], 'best50Diff': 0};
     }
   }

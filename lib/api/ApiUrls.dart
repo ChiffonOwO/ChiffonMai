@@ -5,6 +5,7 @@ class ApiUrls {
   static const String MusicDataApi = 'https://www.diving-fish.com/api/maimaidxprober/music_data';
   static const String TagDataApi = 'https://miruku.dxrating.net/api/v1/tags';
   static const String SongAliasApi = 'https://www.yuzuchan.moe/api/maimaidx/maimaidxalias';
+  static const String DXRatingSongAliasApi = 'https://miruku.dxrating.net/api/v1/aliases';
   static const String UserBest50Api = 'https://www.diving-fish.com/api/maimaidxprober/query/player';
   static const String UserPlayDataApi = 'https://www.diving-fish.com/api/maimaidxprober/dev/player/records';
   static const String TrophiesCollectionApi = 'https://maimai.lxns.net/api/v0/maimai/trophy/list';
@@ -19,7 +20,7 @@ class ApiUrls {
   
   // 多人游戏服务器地址
   static const String MultiplayerServerUrl = 'ws://152.136.125.98:3000';
-  static const String MultiplayerGameServerUrl = 'ws://152.136.125.98';
+  static const String MultiplayerGameServerUrl = 'ws://152.136.125.98:3000';
   
   // Maidata 服务器地址
   static const String MaidataServerBaseUrl = 'http://152.136.125.98';

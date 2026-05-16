@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../manager/CollectionsManager.dart';
 import '../entity/Collection.dart';
 
@@ -69,7 +70,7 @@ class CollectionSearchService {
           continue;
         }
       } catch (e) {
-        print('搜索名称时出错: $e');
+        debugPrint('搜索名称时出错: $e');
       }
 
       // 搜索描述
@@ -79,7 +80,7 @@ class CollectionSearchService {
           continue;
         }
       } catch (e) {
-        print('搜索描述时出错: $e');
+        debugPrint('搜索描述时出错: $e');
       }
 
       // 搜索达成条件
@@ -92,7 +93,7 @@ class CollectionSearchService {
               break;
             }
           } catch (e) {
-            print('搜索评级类型时出错: $e');
+            debugPrint('搜索评级类型时出错: $e');
           }
 
           // 搜索 FC 类型
@@ -102,7 +103,7 @@ class CollectionSearchService {
               break;
             }
           } catch (e) {
-            print('搜索 FC 类型时出错: $e');
+            debugPrint('搜索 FC 类型时出错: $e');
           }
 
           // 搜索 FS 类型
@@ -112,7 +113,7 @@ class CollectionSearchService {
               break;
             }
           } catch (e) {
-            print('搜索 FS 类型时出错: $e');
+            debugPrint('搜索 FS 类型时出错: $e');
           }
 
           // 搜索曲目
@@ -126,7 +127,7 @@ class CollectionSearchService {
               }
             }
           } catch (e) {
-            print('搜索曲目时出错: $e');
+            debugPrint('搜索曲目时出错: $e');
           }
         }
       }
@@ -137,9 +138,9 @@ class CollectionSearchService {
     final List<Collection> finalResults = uniqueResults.toList();
     
     // 打印搜索结果的名称，检查是否有乱码
-    print('搜索结果数量: ${finalResults.length}');
+    debugPrint('搜索结果数量: ${finalResults.length}');
     for (int i = 0; i < finalResults.length && i < 5; i++) {
-      print('搜索结果 $i: ${finalResults[i].name}');
+      debugPrint('搜索结果 $i: ${finalResults[i].name}');
     }
     
     return finalResults;

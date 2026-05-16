@@ -57,13 +57,13 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
         _isFetchingFullCache = true;
       });
       
-      print('[DEBUG][SongMaidataPage] 全量缓存不存在，开始拉取...');
+      debugPrint('[DEBUG][SongMaidataPage] 全量缓存不存在，开始拉取...');
       
       try {
         await MaidataManager().fetchAndCacheFullMaidata();
-        print('[DEBUG][SongMaidataPage] 全量缓存拉取成功');
+        debugPrint('[DEBUG][SongMaidataPage] 全量缓存拉取成功');
       } catch (e) {
-        print('[DEBUG][SongMaidataPage] 全量缓存拉取失败，将使用独立缓存或网络请求: $e');
+        debugPrint('[DEBUG][SongMaidataPage] 全量缓存拉取失败，将使用独立缓存或网络请求: $e');
       } finally {
         setState(() {
           _isFetchingFullCache = false;

@@ -83,7 +83,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
         _allGenres = genres.toList();
       }
     } catch (e) {
-      print('[ERROR][RoomCreatePage] 加载歌曲数据失败: $e');
+      debugPrint('[ERROR][RoomCreatePage] 加载歌曲数据失败: $e');
     } finally {
       setState(() => _isLoading = false);
     }

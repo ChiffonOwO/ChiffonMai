@@ -1,6 +1,7 @@
 /**
  * 收藏品详情服务
  * */
+import 'package:flutter/foundation.dart';
 import 'package:my_first_flutter_app/manager/CollectionsManager.dart';
 import 'package:my_first_flutter_app/entity/Collection.dart';
 
@@ -58,7 +59,7 @@ class CollectionInfoService {
       
       return null;
     } catch (e) {
-      print('获取收藏品详情时出错: $e');
+      debugPrint('获取收藏品详情时出错: $e');
       return null;
     }
   }

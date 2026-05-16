@@ -62,7 +62,7 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
       // 获取缓存的歌曲数据
       _cachedSongs = await _musicManager.getCachedSongs();
     } catch (e) {
-      print('加载缓存歌曲数据失败: $e');
+      debugPrint('加载缓存歌曲数据失败: $e');
     }
   }
 
@@ -78,7 +78,7 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
             .toList();
       }
     } catch (e) {
-      print('加载用户游玩数据失败: $e');
+      debugPrint('加载用户游玩数据失败: $e');
     }
   }
 
@@ -419,7 +419,7 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
                                                   LinkConfig(
                                                     onTap: (url) {
                                                       // 处理链接点击
-                                                      print(
+                                                      debugPrint(
                                                           'Link tapped: $url');
                                                     },
                                                   ),
@@ -508,7 +508,7 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
                                                       );
                                                       achievementRate = recordItem.achievements.toDouble();
                                                                                                         } catch (e) {
-                                                      print('解析歌曲ID失败: $e');
+                                                      debugPrint('解析歌曲ID失败: $e');
                                                     }
                                                   }
                                                   

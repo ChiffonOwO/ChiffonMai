@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:convert' show utf8;
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/entity/Collection.dart';
@@ -71,10 +72,10 @@ class CollectionsManager {
       final int platesCount = mergedData.plates?.length ?? 0;
       final int framesCount = mergedData.frames?.length ?? 0;
       
-      print('成功从 API 获取收藏品数据: 称号 $trophiesCount 个, 头像 $iconsCount 个, 姓名框 $platesCount 个, 背景 $framesCount 个');
+      debugPrint('成功从 API 获取收藏品数据: 称号 $trophiesCount 个, 头像 $iconsCount 个, 姓名框 $platesCount 个, 背景 $framesCount 个');
       return mergedData;
     } catch (e) {
-      print('获取收藏品数据时出错: $e');
+      debugPrint('获取收藏品数据时出错: $e');
       // 尝试从缓存获取
       return await _getCachedCollections(cacheKey);
     }
@@ -93,7 +94,7 @@ class CollectionsManager {
       
       if (response.statusCode == 200) {
         // 打印响应头，查看 Content-Type
-        print('API 响应头: ${response.headers}');
+        debugPrint('API 响应头: ${response.headers}');
         
         // 尝试使用 UTF-8 编码解析响应
         String responseBody;
@@ -101,12 +102,12 @@ class CollectionsManager {
           responseBody = utf8.decode(response.bodyBytes);
         } catch (e) {
           // 如果 UTF-8 解析失败，尝试使用 Latin1 编码
-          print('UTF-8 解析失败，尝试使用 Latin1 编码: $e');
+          debugPrint('UTF-8 解析失败，尝试使用 Latin1 编码: $e');
           responseBody = response.body;
         }
         
         // 打印响应体的前 200 个字符，检查是否有乱码
-        print('API 响应体前 200 个字符: ${responseBody.substring(0, responseBody.length > 200 ? 200 : responseBody.length)}');
+        debugPrint('API 响应体前 200 个字符: ${responseBody.substring(0, responseBody.length > 200 ? 200 : responseBody.length)}');
         
         // 解析 JSON 数据
         final dynamic jsonData = json.decode(responseBody);
@@ -116,25 +117,25 @@ class CollectionsManager {
         
         // 打印解析后的数据，检查是否有乱码
         if (collectionData.trophies != null && collectionData.trophies!.isNotEmpty) {
-          print('解析后的数据 - 第一个奖杯名称: ${collectionData.trophies![0].name}');
+          debugPrint('解析后的数据 - 第一个奖杯名称: ${collectionData.trophies![0].name}');
         }
         if (collectionData.icons != null && collectionData.icons!.isNotEmpty) {
-          print('解析后的数据 - 第一个图标名称: ${collectionData.icons![0].name}');
+          debugPrint('解析后的数据 - 第一个图标名称: ${collectionData.icons![0].name}');
         }
         if (collectionData.plates != null && collectionData.plates!.isNotEmpty) {
-          print('解析后的数据 - 第一个姓名框名称: ${collectionData.plates![0].name}');
+          debugPrint('解析后的数据 - 第一个姓名框名称: ${collectionData.plates![0].name}');
         }
         if (collectionData.frames != null && collectionData.frames!.isNotEmpty) {
-          print('解析后的数据 - 第一个背景名称: ${collectionData.frames![0].name}');
+          debugPrint('解析后的数据 - 第一个背景名称: ${collectionData.frames![0].name}');
         }
         
         return collectionData;
       } else {
-        print('API 请求失败，状态码: ${response.statusCode}, required=$required');
+        debugPrint('API 请求失败，状态码: ${response.statusCode}, required=$required');
         return null;
       }
     } catch (e) {
-      print('获取收藏品数据时出错 (required=$required): $e');
+      debugPrint('获取收藏品数据时出错 (required=$required): $e');
       return null;
     }
   }
@@ -197,7 +198,7 @@ class CollectionsManager {
       
       return now - lastUpdateTime > oneDay;
     } catch (e) {
-      print('检查缓存过期时出错: $e');
+      debugPrint('检查缓存过期时出错: $e');
       return true; // 出错时视为过期
     }
   }
@@ -221,7 +222,7 @@ class CollectionsManager {
             final int iconsCount = collections.icons?.length ?? 0;
             final int platesCount = collections.plates?.length ?? 0;
             final int framesCount = collections.frames?.length ?? 0;
-            print('从缓存获取收藏品数据 (Map格式): 称号 $trophiesCount 个, 头像 $iconsCount 个, 姓名框 $platesCount 个, 背景 $framesCount 个');
+            debugPrint('从缓存获取收藏品数据 (Map格式): 称号 $trophiesCount 个, 头像 $iconsCount 个, 姓名框 $platesCount 个, 背景 $framesCount 个');
             return collections;
           } else if (jsonData is List) {
             // 旧格式：是Collection的List
@@ -258,35 +259,35 @@ class CollectionsManager {
                 collections = CollectionData(trophies: []);
             }
             
-            print('从缓存获取收藏品数据 (List格式，已转换)');
+            debugPrint('从缓存获取收藏品数据 (List格式，已转换)');
             return collections;
           } else {
-            print('缓存数据格式不正确');
+            debugPrint('缓存数据格式不正确');
             return null;
           }
         } catch (jsonError) {
-          print('解析缓存数据时出错: $jsonError');
+          debugPrint('解析缓存数据时出错: $jsonError');
           // 清除损坏的缓存数据
           try {
             final prefs = await SharedPreferences.getInstance();
             await prefs.remove(cacheKey);
-            print('已清除损坏的缓存数据');
+            debugPrint('已清除损坏的缓存数据');
           } catch (clearError) {
-            print('清除损坏缓存时出错: $clearError');
+            debugPrint('清除损坏缓存时出错: $clearError');
           }
           return null;
         }
       }
       return null;
     } catch (e) {
-      print('从缓存获取收藏品数据时出错: $e');
+      debugPrint('从缓存获取收藏品数据时出错: $e');
       // 尝试清除旧的缓存数据
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove(cacheKey);
-        print('已清除旧的缓存数据');
+        debugPrint('已清除旧的缓存数据');
       } catch (clearError) {
-        print('清除旧缓存时出错: $clearError');
+        debugPrint('清除旧缓存时出错: $clearError');
       }
       return null;
     }
@@ -300,7 +301,7 @@ class CollectionsManager {
       await prefs.setString(cacheKey, jsonString);
       await prefs.setInt(lastUpdateKey, DateTime.now().millisecondsSinceEpoch);
     } catch (e) {
-      print('保存收藏品数据到缓存时出错: $e');
+      debugPrint('保存收藏品数据到缓存时出错: $e');
     }
   }
 
@@ -317,7 +318,7 @@ class CollectionsManager {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getInt(lastUpdateKey);
     } catch (e) {
-      print('获取最后更新时间时出错: $e');
+      debugPrint('获取最后更新时间时出错: $e');
       return null;
     }
   }
@@ -329,7 +330,7 @@ class CollectionsManager {
       await prefs.remove(cacheKey);
       await prefs.remove(lastUpdateKey);
     } catch (e) {
-      print('清除收藏品数据缓存时出错: $e');
+      debugPrint('清除收藏品数据缓存时出错: $e');
     }
   }
 

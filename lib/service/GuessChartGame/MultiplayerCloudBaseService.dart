@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
+
 import '../WebSocketBroadcastService.dart';
 import 'MultiplayerGameService.dart';
 import '../../entity/Multiplayer/RoomEntity.dart';
@@ -35,37 +37,37 @@ class MultiplayerCloudBaseService {
     required String envId,
     String? nickname,
   }) async {
-    print('[DEBUG][CloudService] initialize 方法被调用');
-    print('[DEBUG][CloudService] 当前 currentPlayerId: $currentPlayerId');
-    print('[DEBUG][CloudService] 当前 WebSocket 连接状态: ${_wsBroadcast.isConnected}');
+    debugPrint('[DEBUG][CloudService] initialize 方法被调用');
+    debugPrint('[DEBUG][CloudService] 当前 currentPlayerId: $currentPlayerId');
+    debugPrint('[DEBUG][CloudService] 当前 WebSocket 连接状态: ${_wsBroadcast.isConnected}');
     
     // 保存 envId 以便后续使用
     _envId = envId;
     
-    print('[DEBUG][CloudService] 开始初始化流程...');
+    debugPrint('[DEBUG][CloudService] 开始初始化流程...');
     
     try {
       String cachedNickname = await PlayerEntity.getCachedNickname();
-      print('[DEBUG][CloudService] 缓存中的昵称: "$cachedNickname"');
+      debugPrint('[DEBUG][CloudService] 缓存中的昵称: "$cachedNickname"');
       
       String? finalNickname = nickname ?? (cachedNickname.isEmpty || cachedNickname == '玩家' ? null : cachedNickname);
       currentNickname = finalNickname;
       
       await _wsBroadcast.initialize(host: envId);
-      print('[DEBUG][CloudService] WebSocket 连接成功');
+      debugPrint('[DEBUG][CloudService] WebSocket 连接成功');
       
       _setupMessageHandler();
       
       // 无论之前是否连接，都需要重新发送初始化消息
       // WebSocket重连后服务器会分配新的玩家ID，必须重新初始化
-      print('[DEBUG][CloudService] 发送初始化消息获取玩家ID...');
+      debugPrint('[DEBUG][CloudService] 发送初始化消息获取玩家ID...');
       await _wsBroadcast.sendInitialize(finalNickname);
-      print('[DEBUG][CloudService] 等待初始化响应...');
+      debugPrint('[DEBUG][CloudService] 等待初始化响应...');
       await _waitForInitialization();
       
     } catch (e, stackTrace) {
-      print('[DEBUG][CloudService] 初始化失败 $e');
-      print('[DEBUG][CloudService] 堆栈跟踪: $stackTrace');
+      debugPrint('[DEBUG][CloudService] 初始化失败 $e');
+      debugPrint('[DEBUG][CloudService] 堆栈跟踪: $stackTrace');
       _controller.add(MultiplayerEvent.connectionError(error: e));
     }
   }
@@ -76,7 +78,7 @@ class MultiplayerCloudBaseService {
     
     subscription = events.listen((event) {
       if (event.type == MultiplayerEventType.initialized) {
-        print('[DEBUG][CloudService] 收到初始化响应，playerId: $currentPlayerId');
+        debugPrint('[DEBUG][CloudService] 收到初始化响应，playerId: $currentPlayerId');
         completer.complete();
         subscription?.cancel();
       } else if (event.type == MultiplayerEventType.error) {
@@ -105,7 +107,7 @@ class MultiplayerCloudBaseService {
       try {
         String action = data['action'] ?? '';
         
-        print('[DEBUG][CloudService] 收到服务器消息: $action');
+        debugPrint('[DEBUG][CloudService] 收到服务器消息: $action');
         
         switch (action) {
           case 'initialized':
@@ -178,10 +180,10 @@ class MultiplayerCloudBaseService {
             _handleSongCountResponse(data['payload']);
             break;
           default:
-            print('[DEBUG][CloudService] 未知消息类型: $action');
+            debugPrint('[DEBUG][CloudService] 未知消息类型: $action');
         }
       } catch (e) {
-        print('[DEBUG][CloudService] 消息处理错误: $e');
+        debugPrint('[DEBUG][CloudService] 消息处理错误: $e');
       }
     });
   }
@@ -198,8 +200,8 @@ class MultiplayerCloudBaseService {
     currentPlayerId = payload['playerId'];
     currentNickname = payload['nickname'] ?? currentNickname;
     
-    print('[DEBUG][CloudService] 初始化完成，玩家ID: $currentPlayerId');
-    print('[DEBUG][CloudService] 当前玩家昵称: $currentNickname');
+    debugPrint('[DEBUG][CloudService] 初始化完成，玩家ID: $currentPlayerId');
+    debugPrint('[DEBUG][CloudService] 当前玩家昵称: $currentNickname');
     
     _controller.add(MultiplayerEvent.initialized());
   }
@@ -209,38 +211,38 @@ class MultiplayerCloudBaseService {
     String? previousRoomId = currentRoomId;
     currentRoomId = room.roomId;
     
-    print('[DEBUG][CloudService] ====== 房间创建 ======');
-    print('[DEBUG][CloudService] 房间ID: ${room.roomId}');
-    print('[DEBUG][CloudService] 房间码: ${room.roomCode}');
-    print('[DEBUG][CloudService] 之前的房间ID: $previousRoomId');
-    print('[DEBUG][CloudService] 房间创建者ID: ${room.creatorId}');
-    print('[DEBUG][CloudService] 当前玩家ID: $currentPlayerId');
+    debugPrint('[DEBUG][CloudService] ====== 房间创建 ======');
+    debugPrint('[DEBUG][CloudService] 房间ID: ${room.roomId}');
+    debugPrint('[DEBUG][CloudService] 房间码: ${room.roomCode}');
+    debugPrint('[DEBUG][CloudService] 之前的房间ID: $previousRoomId');
+    debugPrint('[DEBUG][CloudService] 房间创建者ID: ${room.creatorId}');
+    debugPrint('[DEBUG][CloudService] 当前玩家ID: $currentPlayerId');
     
     // 当前玩家发起创建房间请求，就应该是房主
     // 即使服务器返回的creatorId与当前玩家ID不匹配（例如WebSocket重连后分配了新ID）
     // 也应该将当前玩家标记为房主
     bool shouldBeHost = currentPlayerId != null;
     
-    print('[DEBUG][CloudService] 当前玩家是否应该是房主: $shouldBeHost');
+    debugPrint('[DEBUG][CloudService] 当前玩家是否应该是房主: $shouldBeHost');
     
     if (shouldBeHost) {
-      print('[DEBUG][CloudService] 玩家列表: ${room.players.map((p) => '${p.nickname} (${p.playerId}, isHost=${p.isHost})').join(', ')}');
+      debugPrint('[DEBUG][CloudService] 玩家列表: ${room.players.map((p) => '${p.nickname} (${p.playerId}, isHost=${p.isHost})').join(', ')}');
       
       List<PlayerEntity> updatedPlayers = [];
       bool needsUpdate = false;
       bool foundCurrentPlayer = false;
       
       for (var player in room.players) {
-        print('[DEBUG][CloudService] 检查玩家 ${player.nickname}, playerId=${player.playerId}, currentPlayerId=$currentPlayerId, isHost=${player.isHost}');
+        debugPrint('[DEBUG][CloudService] 检查玩家 ${player.nickname}, playerId=${player.playerId}, currentPlayerId=$currentPlayerId, isHost=${player.isHost}');
         
         if (player.playerId == currentPlayerId) {
           foundCurrentPlayer = true;
           if (!player.isHost) {
-            print('[DEBUG][CloudService] 修正创建者的房主状态 ${player.nickname}');
+            debugPrint('[DEBUG][CloudService] 修正创建者的房主状态 ${player.nickname}');
             updatedPlayers.add(player.copyWith(isHost: true));
             needsUpdate = true;
           } else {
-            print('[DEBUG][CloudService] 玩家已是房主，无需修改: ${player.nickname}');
+            debugPrint('[DEBUG][CloudService] 玩家已是房主，无需修改: ${player.nickname}');
             updatedPlayers.add(player);
           }
         } else {
@@ -251,13 +253,13 @@ class MultiplayerCloudBaseService {
       
       // 如果玩家列表中没有当前玩家，替换第一个非房主玩家为当前玩家并设为房主
       if (!foundCurrentPlayer && currentPlayerId != null) {
-        print('[DEBUG][CloudService] 玩家列表中未找到当前玩家，替换僵尸玩家');
+        debugPrint('[DEBUG][CloudService] 玩家列表中未找到当前玩家，替换僵尸玩家');
         
         // 查找并替换第一个非房主玩家
         bool replaced = false;
         for (int i = 0; i < updatedPlayers.length; i++) {
           if (!updatedPlayers[i].isHost) {
-            print('[DEBUG][CloudService] 替换僵尸玩家: ${updatedPlayers[i].nickname} (${updatedPlayers[i].playerId})');
+            debugPrint('[DEBUG][CloudService] 替换僵尸玩家: ${updatedPlayers[i].nickname} (${updatedPlayers[i].playerId})');
             updatedPlayers[i] = PlayerEntity(
               playerId: currentPlayerId!,
               nickname: currentNickname ?? '玩家',
@@ -271,7 +273,7 @@ class MultiplayerCloudBaseService {
         
         // 如果没有找到可替换的玩家，添加新玩家
         if (!replaced) {
-          print('[DEBUG][CloudService] 没有找到可替换的玩家，添加当前玩家');
+          debugPrint('[DEBUG][CloudService] 没有找到可替换的玩家，添加当前玩家');
           updatedPlayers.add(PlayerEntity(
             playerId: currentPlayerId!,
             nickname: currentNickname ?? '玩家',
@@ -285,15 +287,15 @@ class MultiplayerCloudBaseService {
       
       if (needsUpdate) {
         room = room.copyWith(players: updatedPlayers);
-        print('[DEBUG][CloudService] 已更新房主状态');
+        debugPrint('[DEBUG][CloudService] 已更新房主状态');
       } else {
-        print('[DEBUG][CloudService] 无需更新房主状态');
+        debugPrint('[DEBUG][CloudService] 无需更新房主状态');
       }
     }
     
     // 将房间保存到缓存
     _rooms[room.roomId] = room;
-    print('[DEBUG][CloudService] 房间已保存到缓存: ${room.roomId}');
+    debugPrint('[DEBUG][CloudService] 房间已保存到缓存: ${room.roomId}');
     
     _controller.add(MultiplayerEvent.roomCreated(room: room));
   }
@@ -304,48 +306,48 @@ class MultiplayerCloudBaseService {
     String? previousRoomId = currentRoomId;
     currentRoomId = room.roomId;
     
-    print('[DEBUG][CloudService] ====== 加入房间 ======');
-    print('[DEBUG][CloudService] 房间ID: ${room.roomId}');
-    print('[DEBUG][CloudService] 房间码: ${room.roomCode}');
-    print('[DEBUG][CloudService] 之前的房间ID: $previousRoomId');
-    print('[DEBUG][CloudService] 当前玩家ID: ${player.playerId}');
-    print('[DEBUG][CloudService] 当前玩家昵称: ${player.nickname}');
+    debugPrint('[DEBUG][CloudService] ====== 加入房间 ======');
+    debugPrint('[DEBUG][CloudService] 房间ID: ${room.roomId}');
+    debugPrint('[DEBUG][CloudService] 房间码: ${room.roomCode}');
+    debugPrint('[DEBUG][CloudService] 之前的房间ID: $previousRoomId');
+    debugPrint('[DEBUG][CloudService] 当前玩家ID: ${player.playerId}');
+    debugPrint('[DEBUG][CloudService] 当前玩家昵称: ${player.nickname}');
     
     _controller.add(MultiplayerEvent.roomJoined(room: room, player: player));
   }
 
   void _handleJoinFailed(Map<String, dynamic> payload) {
     String reason = payload['reason'] ?? 'unknown';
-    print('[DEBUG][CloudService] 加入房间失败: $reason');
+    debugPrint('[DEBUG][CloudService] 加入房间失败: $reason');
     _controller.add(MultiplayerEvent.joinFailed(reason: reason));
   }
 
   void _handleRoomUpdated(Map<String, dynamic> payload) {
     RoomEntity room = RoomEntity.fromJson(payload['room']);
     
-    print('[DEBUG][CloudService] ====== 房间更新 ======');
-    print('[DEBUG][CloudService] 收到更新的房间ID: ${room.roomId}');
-    print('[DEBUG][CloudService] 当前房间ID: $currentRoomId');
-    print('[DEBUG][CloudService] 房间码: ${room.roomCode}');
+    debugPrint('[DEBUG][CloudService] ====== 房间更新 ======');
+    debugPrint('[DEBUG][CloudService] 收到更新的房间ID: ${room.roomId}');
+    debugPrint('[DEBUG][CloudService] 当前房间ID: $currentRoomId');
+    debugPrint('[DEBUG][CloudService] 房间码: ${room.roomCode}');
     
     // 验证房间ID是否有效且与当前房间匹配
     if (room.roomId.isEmpty) {
-      print('[DEBUG][CloudService] 房间更新失败：房间ID为空');
+      debugPrint('[DEBUG][CloudService] 房间更新失败：房间ID为空');
       return;
     }
     
     // 如果当前有房间，验证更新的房间是否匹配
     if (currentRoomId != null && room.roomId != currentRoomId) {
-      print('[DEBUG][CloudService] 房间更新失败：房间ID不匹配，当前房间: $currentRoomId，更新房间: ${room.roomId}');
+      debugPrint('[DEBUG][CloudService] 房间更新失败：房间ID不匹配，当前房间: $currentRoomId，更新房间: ${room.roomId}');
       return;
     }
     
     // 更新缓存中的房间数据
     _rooms[room.roomId] = room;
-    print('[DEBUG][CloudService] 缓存已更新房间: ${room.roomId}');
+    debugPrint('[DEBUG][CloudService] 缓存已更新房间: ${room.roomId}');
     // 打印玩家准备状态信息
     String playerStatus = room.players.map((p) => '${p.nickname}: isReady=${p.isReady}, isHost=${p.isHost}, isSurrendered=${p.isSurrendered}').join(', ');
-    print('[DEBUG][CloudService] 房间玩家状态: $playerStatus');
+    debugPrint('[DEBUG][CloudService] 房间玩家状态: $playerStatus');
     _controller.add(MultiplayerEvent.roomUpdated(room: room));
   }
 
@@ -366,7 +368,7 @@ class MultiplayerCloudBaseService {
       if (updatedPlayers.length != room.players.length) {
         RoomEntity updatedRoom = room.copyWith(players: updatedPlayers);
         _rooms[currentRoomId!] = updatedRoom;
-        print('[DEBUG][CloudService] 玩家离开，更新房间玩家列表: ${updatedRoom.players.map((p) => p.nickname).join(', ')}');
+        debugPrint('[DEBUG][CloudService] 玩家离开，更新房间玩家列表: ${updatedRoom.players.map((p) => p.nickname).join(', ')}');
         _controller.add(MultiplayerEvent.roomUpdated(room: updatedRoom));
       }
     }
@@ -415,11 +417,11 @@ class MultiplayerCloudBaseService {
     List<String> selectedGenres = const [],
   }) async {
     try {
-      print('[DEBUG][CloudService] 开始创建房间...');
+      debugPrint('[DEBUG][CloudService] 开始创建房间...');
       
       // 如果当前没有玩家ID或WebSocket刚重连，需要重新初始化获取新的玩家ID
       if (currentPlayerId == null || !_wsBroadcast.isConnected) {
-        print('[DEBUG][CloudService] 当前没有玩家ID或连接断开，尝试重新初始化...');
+        debugPrint('[DEBUG][CloudService] 当前没有玩家ID或连接断开，尝试重新初始化...');
         if (_envId == null) {
           _controller.add(MultiplayerEvent.error(message: '创建房间失败: 环境ID未设置'));
           return;
@@ -461,7 +463,7 @@ class MultiplayerCloudBaseService {
       
       // 判断是否6位数字房间码
       if (roomId.length == 6 && RegExp(r'^\d{6}$').hasMatch(roomId)) {
-        print('[DEBUG][CloudService] 收到房间码 $roomId，正在查询房间列表');
+        debugPrint('[DEBUG][CloudService] 收到房间码 $roomId，正在查询房间列表');
         
         // 使用 Completer 等待房间列表响应
         Completer<void> completer = Completer<void>();
@@ -499,7 +501,7 @@ class MultiplayerCloudBaseService {
         for (var room in _rooms.values) {
           if (room.roomCode == roomId) {
             actualRoomId = room.roomId;
-            print('[DEBUG][CloudService] 找到匹配的房间 ${room.roomId}');
+            debugPrint('[DEBUG][CloudService] 找到匹配的房间 ${room.roomId}');
             break;
           }
         }
@@ -507,7 +509,7 @@ class MultiplayerCloudBaseService {
         if (actualRoomId != null) {
           await _wsBroadcast.sendJoinRoom(actualRoomId, currentNickname);
         } else {
-          print('[DEBUG][CloudService] 未找到匹配房间码的房间');
+          debugPrint('[DEBUG][CloudService] 未找到匹配房间码的房间');
           _controller.add(MultiplayerEvent.joinFailed(reason: '房间不存在'));
         }
       } else {
@@ -592,7 +594,7 @@ class MultiplayerCloudBaseService {
   }
 
   void startListeningToRoom(String roomId) {
-    print('[DEBUG][CloudService] 开始监听房间: $roomId');
+    debugPrint('[DEBUG][CloudService] 开始监听房间: $roomId');
   }
 
   StreamSubscription listen(void Function(MultiplayerEvent) onEvent) {
@@ -643,7 +645,7 @@ class MultiplayerCloudBaseService {
     RoomEntity room = RoomEntity.fromJson(payload['room']);
     
     if (room.roomId.isEmpty) {
-      print('[DEBUG][CloudService] 房间信息更新失败：房间ID为空');
+      debugPrint('[DEBUG][CloudService] 房间信息更新失败：房间ID为空');
       return;
     }
     
@@ -652,19 +654,19 @@ class MultiplayerCloudBaseService {
   }
   
   void _handleHeartbeat(Map<String, dynamic> payload) {
-    print('[DEBUG][CloudService] 收到心跳响应');
+    debugPrint('[DEBUG][CloudService] 收到心跳响应');
   }
   
   void _handleUploadSongsResponse(Map<String, dynamic> payload) {
     bool success = payload['success'] ?? false;
     String message = payload['message'] ?? '';
     int totalSongs = payload['totalSongs'] ?? 0;
-    print('[DEBUG][CloudService] 歌曲上传响应: success=$success, message=$message, totalSongs=$totalSongs');
+    debugPrint('[DEBUG][CloudService] 歌曲上传响应: success=$success, message=$message, totalSongs=$totalSongs');
   }
   
   void _handleSongCountResponse(Map<String, dynamic> payload) {
     int count = payload['count'] ?? 0;
-    print('[DEBUG][CloudService] 服务器歌曲数量: $count');
+    debugPrint('[DEBUG][CloudService] 服务器歌曲数量: $count');
   }
   
   Future<void> surrender() async {
@@ -682,7 +684,7 @@ class MultiplayerCloudBaseService {
   Future<void> uploadSongs(List<Map<String, dynamic>> songs) async {
     try {
       await _wsBroadcast.sendUploadSongs(songs);
-      print('[DEBUG][CloudService] 已发送上传歌曲请求，数量: ${songs.length}');
+      debugPrint('[DEBUG][CloudService] 已发送上传歌曲请求，数量: ${songs.length}');
     } catch (e) {
       _controller.add(MultiplayerEvent.error(message: '上传歌曲失败: $e'));
     }

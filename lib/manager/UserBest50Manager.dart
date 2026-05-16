@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -45,7 +46,7 @@ class UserBest50Manager {
         throw Exception('Failed to load best50 data: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching best50 data: $e');
+      debugPrint('Error fetching best50 data: $e');
       throw e;
     }
   }
@@ -59,7 +60,7 @@ class UserBest50Manager {
       // 缓存最后使用的qq号
       await prefs.setString('last_used_qq', qq);
     } catch (e) {
-      print('Error caching best50 data: $e');
+      debugPrint('Error caching best50 data: $e');
     }
   }
   
@@ -78,7 +79,7 @@ class UserBest50Manager {
       }
       return null;
     } catch (e) {
-      print('Error getting cached best50 data: $e');
+      debugPrint('Error getting cached best50 data: $e');
       return null;
     }
   }

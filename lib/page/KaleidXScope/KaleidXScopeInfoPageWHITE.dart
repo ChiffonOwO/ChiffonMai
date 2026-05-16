@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
+import 'package:my_first_flutter_app/utils/TextStyleUtil.dart';
 import 'package:my_first_flutter_app/service/KaleidXScope/KaleidXScopeInfoServiceWHITE.dart'
     as whiteService;
 import 'package:my_first_flutter_app/service/KaleidXScope/KaleidXScopeSelectService.dart';
@@ -120,7 +121,7 @@ class _KaleidXScopeInfoPageWHITEState extends State<KaleidXScopeInfoPageWHITE> {
 
       await _loadSpecialSongs();
     } catch (e) {
-      print('加载歌曲失败: $e');
+      debugPrint('加载歌曲失败: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -167,7 +168,7 @@ class _KaleidXScopeInfoPageWHITEState extends State<KaleidXScopeInfoPageWHITE> {
         });
       }
     } catch (e) {
-      print('加载完成歌曲失败: $e');
+      debugPrint('加载完成歌曲失败: $e');
     }
   }
 
@@ -226,17 +227,13 @@ class _KaleidXScopeInfoPageWHITEState extends State<KaleidXScopeInfoPageWHITE> {
               ),
               RichText(
                 text: TextSpan(
-                  style: TextStyle(
-                    fontSize: _textSizeS,
-                    color: Colors.grey[600],
-                  ),
                   children: [
-                    TextSpan(text: '完成'),
-                    TextSpan(
-                      text: '天界区域8',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                    TextStyleUtil.span('完成', TextStyle(fontSize: _textSizeS, color: Colors.grey[600])),
+                    TextStyleUtil.span(
+                      '天界区域8',
+                      TextStyle(fontSize: _textSizeS, color: Colors.grey[600], fontWeight: FontWeight.bold),
                     ),
-                    TextSpan(text: '（门扉必要条件）'),
+                    TextStyleUtil.span('（门扉必要条件）', TextStyle(fontSize: _textSizeS, color: Colors.grey[600])),
                   ],
                 ),
               ),

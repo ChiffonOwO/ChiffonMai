@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:my_first_flutter_app/page/HomePage.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
@@ -62,13 +63,13 @@ class _MyAppState extends State<MyApp> {
       
       // 如果缓存未就绪或过期，获取全量maidata
       if (!maidataManager.isCacheReady) {
-        print('Maidata缓存未就绪，开始获取全量maidata...');
+        debugPrint('Maidata缓存未就绪，开始获取全量maidata...');
         await maidataManager.fetchAndCacheFullMaidata();
       }
       
       // 获取maidata文本列表用于追加
       List<String> maidataTexts = maidataManager.getAllMaidataTexts();
-      print('已获取 ${maidataTexts.length} 首歌曲的maidata');
+      debugPrint('已获取 ${maidataTexts.length} 首歌曲的maidata');
       
       // 从API获取并更新音乐数据（包含maidata追加）
       await MaimaiMusicDataManager().fetchAndUpdateMusicData(maidataTexts: maidataTexts);
@@ -97,7 +98,7 @@ class _MyAppState extends State<MyApp> {
       // 初始化知识数据
       await KnowledgeManager().getKnowledgeData();
     } catch (e) {
-      print('初始化失败: $e');
+      debugPrint('初始化失败: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -122,29 +123,56 @@ class _MyAppState extends State<MyApp> {
         debugShowCheckedModeBanner: false, // 隐藏右上角调试横幅
         home: _isInitialized ? const HomePage() : _buildLoadingScreen(), // 应用首页为HomePage组件
         theme: ThemeData(
-          // 全局默认字体
-          fontFamily: "Source Han Sans",
+          // 全局默认字体：使用 Google Fonts 的 Noto Sans SC（思源黑体替代）
+          fontFamily: GoogleFonts.notoSansSc(fontWeight: FontWeight.w400).fontFamily,
           textTheme: TextTheme(
-            bodyLarge: TextStyle(fontFamily: "Source Han Sans"),
-            bodyMedium: TextStyle(fontFamily: "Source Han Sans"),
-            bodySmall: TextStyle(fontFamily: "Source Han Sans"),
-            displayLarge: TextStyle(fontFamily: "Source Han Sans"),
-            displayMedium: TextStyle(fontFamily: "Source Han Sans"),
-            displaySmall: TextStyle(fontFamily: "Source Han Sans"),
-            headlineLarge: TextStyle(fontFamily: "Source Han Sans"),
-            headlineMedium: TextStyle(fontFamily: "Source Han Sans"),
-            headlineSmall: TextStyle(fontFamily: "Source Han Sans"),
-            titleLarge: TextStyle(fontFamily: "Source Han Sans"),
-            titleMedium: TextStyle(fontFamily: "Source Han Sans"),
-            titleSmall: TextStyle(fontFamily: "Source Han Sans"),
+            // 大标题 - 粗体 (w700)
+            displayLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
+            displayMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
+            displaySmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
+            headlineLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
+            headlineMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
+            headlineSmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
+            // 标题 - 半粗体 (w600)
+            titleLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
+            titleMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
+            titleSmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
+            // 正文 - 常规 (w400)
+            bodyLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w400),
+            bodyMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w400),
+            bodySmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w400),
+            // 标签
+            labelLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
+            labelMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w500),
+            labelSmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w500),
+          ),
+          primaryTextTheme: TextTheme(
+            displayLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
+            displayMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
+            displaySmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
+            headlineLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
+            headlineMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
+            headlineSmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
+            titleLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
+            titleMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
+            titleSmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
+            bodyLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w400),
+            bodyMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w400),
+            bodySmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w400),
+            labelLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
+            labelMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w500),
+            labelSmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w500),
           ),
         ),
 
         builder: (context, child) {
-          // 强制文字不跟随系统缩放
+          // 强制文字不跟随系统缩放，并设置全局默认字体
           return MediaQuery(
             data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
-            child: child!,
+            child: DefaultTextStyle(
+              style: GoogleFonts.notoSansSc(),
+              child: child!,
+            ),
           );
         },
       ),

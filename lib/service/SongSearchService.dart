@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
@@ -21,7 +22,7 @@ class SongSearchService {
       final List<Song> songs = jsonList.map((json) => Song.fromJson(json)).toList();
       return songs;
     } catch (e) {
-      print('加载歌曲数据失败: $e');
+      debugPrint('加载歌曲数据失败: $e');
       return [];
     }
   }
@@ -67,7 +68,7 @@ class SongSearchService {
         return true;
       }
       // 检查别名
-      final aliases = SongAliasManager.instance.aliases[song.id] ?? [];
+      final aliases = SongAliasManager.instance.aliases[song.title] ?? [];
       if (aliases.any((alias) => alias.toLowerCase().contains(lowerQuery))) {
         return true;
       }

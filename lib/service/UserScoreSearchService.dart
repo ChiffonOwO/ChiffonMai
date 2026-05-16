@@ -79,16 +79,16 @@ class UserScoreSearchService {
       final manager = MaimaiMusicDataManager();
       if (await manager.hasCachedData()) {
         _cachedSongs = await manager.getCachedSongs();
-        print('缓存初始化成功，共 ${_cachedSongs?.length ?? 0} 首歌曲');
+        debugPrint('缓存初始化成功，共 ${_cachedSongs?.length ?? 0} 首歌曲');
       } else {
-        print('无缓存数据，尝试从API获取...');
+        debugPrint('无缓存数据，尝试从API获取...');
         // 尝试从API获取数据
         bool success = await manager.fetchAndUpdateMusicData();
         if (success) {
           _cachedSongs = await manager.getCachedSongs();
-          print('从API获取数据成功，共 ${_cachedSongs?.length ?? 0} 首歌曲');
+          debugPrint('从API获取数据成功，共 ${_cachedSongs?.length ?? 0} 首歌曲');
         } else {
-          print('从API获取数据失败');
+          debugPrint('从API获取数据失败');
         }
       }
     }
@@ -149,18 +149,18 @@ class UserScoreSearchService {
             maxScore = notesSum * 3;
                     }
         } else {
-          print('未找到歌曲: $songId');
+          debugPrint('未找到歌曲: $songId');
         }
       } else {
-        print('缓存未初始化或为空');
+        debugPrint('缓存未初始化或为空');
       }
     } catch (e) {
-      print('从缓存获取notes信息时出错: $e');
+      debugPrint('从缓存获取notes信息时出错: $e');
     }
     // 计算DX分达成率
     double rate = maxScore > 0 ? dxScore / maxScore : 0.0;
     // 仅在调试模式下打印
-    // print('计算DX分达成率: songId=$songId, levelIndex=$levelIndex, dxScore=$dxScore, maxScore=$maxScore, rate=$rate');
+    // debugPrint('计算DX分达成率: songId=$songId, levelIndex=$levelIndex, dxScore=$dxScore, maxScore=$maxScore, rate=$rate');
     return rate;
   }
   
@@ -217,17 +217,17 @@ class UserScoreSearchService {
             maxScore = notesSum * 3;
                     }
         } else {
-          print('未找到歌曲: $songId');
+          debugPrint('未找到歌曲: $songId');
         }
       } else {
-        print('缓存未初始化或为空');
+        debugPrint('缓存未初始化或为空');
       }
     } catch (e) {
-      print('从缓存获取notes信息时出错: $e');
+      debugPrint('从缓存获取notes信息时出错: $e');
     }
     // 计算DX分达成率
     double rate = maxScore > 0 ? dxScore / maxScore : 0.0;
-    //print('计算DX分达成率: songId=$songId, levelIndex=$levelIndex, dxScore=$dxScore, maxScore=$maxScore, rate=$rate');
+    //debugPrint('计算DX分达成率: songId=$songId, levelIndex=$levelIndex, dxScore=$dxScore, maxScore=$maxScore, rate=$rate');
     return rate;
   }
 

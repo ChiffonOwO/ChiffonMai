@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../api/ApiUrls.dart';
 import '../entity/Song.dart';
@@ -36,14 +37,14 @@ class MaimaiMusicDataManager {
         
         // 如果提供了 maidata 列表，解析并追加缺失的歌曲
         if (maidataTexts != null && maidataTexts.isNotEmpty) {
-          print('开始解析 maidata 并追加缺失歌曲...');
+          debugPrint('开始解析 maidata 并追加缺失歌曲...');
           
           // 获取缓存的追加歌曲ID列表
           List<String>? cachedAddedSongIds = await _getCachedAddedSongIds();
           bool useCachedList = cachedAddedSongIds != null && await _isAddedSongsCacheValid();
           
           if (useCachedList) {
-            print('使用缓存的追加歌曲列表（共 ${cachedAddedSongIds.length} 首）');
+            debugPrint('使用缓存的追加歌曲列表（共 ${cachedAddedSongIds.length} 首）');
           }
           
           int addedCount = 0;
@@ -74,23 +75,23 @@ class MaimaiMusicDataManager {
                 songs.add(newSong);
                 addedCount++;
                 newlyAddedSongIds.add(songId);
-                print('  追加歌曲: ${newSong.title}');
+                //debugPrint('  追加歌曲: ${newSong.title}');
               }
             } catch (e) {
-              print('  解析 maidata 失败: $e');
+              debugPrint('  解析 maidata 失败: $e');
             }
           }
           
           // 如果是初次拉取（没有缓存），保存新追加的歌曲列表
           if (!useCachedList && newlyAddedSongIds.isNotEmpty) {
             await _saveAddedSongIds(newlyAddedSongIds);
-            print('已保存追加歌曲列表到缓存（有效期 ${CacheTimestampConstant.maidataAddedSongsCacheDays} 天）');
+            debugPrint('已保存追加歌曲列表到缓存（有效期 ${CacheTimestampConstant.maidataAddedSongsCacheDays} 天）');
           }
           
           if (addedCount > 0) {
-            print('成功从 maidata 追加 $addedCount 首歌曲');
+            debugPrint('成功从 maidata 追加 $addedCount 首歌曲');
           } else {
-            print('maidata 中没有缺失的歌曲');
+            debugPrint('maidata 中没有缺失的歌曲');
           }
         }
         
@@ -99,14 +100,14 @@ class MaimaiMusicDataManager {
         final songsJson = json.encode(songs.map((song) => song.toJson()).toList());
         await prefs.setString(CacheKeyConstant.cachedSongs, songsJson);
         
-        print('成功从 API 获取并更新音乐数据，共 ${songs.length} 首歌曲');
+        debugPrint('成功从 API 获取并更新音乐数据，共 ${songs.length} 首歌曲');
         return true;
       } else {
-        print('API 请求失败，状态码: ${response.statusCode}');
+        debugPrint('API 请求失败，状态码: ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      print('获取音乐数据时出错: $e');
+      debugPrint('获取音乐数据时出错: $e');
       return false;
     }
   }
@@ -120,14 +121,14 @@ class MaimaiMusicDataManager {
       // 使用缓存的追加歌曲列表，只获取这些歌曲的maidata
       List<String>? addedSongIds = await getAddedSongIds();
       if (addedSongIds != null && addedSongIds.isNotEmpty) {
-        print('使用智能刷新：只获取 ${addedSongIds.length} 首追加歌曲的maidata');
+        debugPrint('使用智能刷新：只获取 ${addedSongIds.length} 首追加歌曲的maidata');
         List<String> maidataTexts = await maidataManager.fetchMaidataForSongIds(addedSongIds);
         return await fetchAndUpdateMusicData(maidataTexts: maidataTexts);
       }
     }
     
     // 初次拉取或缓存失效，获取全量maidata
-    print('执行全量maidata获取...');
+    debugPrint('执行全量maidata获取...');
     await maidataManager.fetchAndCacheFullMaidata();
     List<String> maidataTexts = maidataManager.getAllMaidataTexts();
     return await fetchAndUpdateMusicData(maidataTexts: maidataTexts);
@@ -154,7 +155,7 @@ class MaimaiMusicDataManager {
         return songs;
       }
     } catch (e) {
-      print('读取本地缓存时出错: $e');
+      debugPrint('读取本地缓存时出错: $e');
     }
     
     return null;
@@ -168,7 +169,7 @@ class MaimaiMusicDataManager {
         return songs.firstWhere((song) => song.id == songId);
       }
     } catch (e) {
-      print('根据ID获取缓存歌曲数据时出错: $e');
+      debugPrint('根据ID获取缓存歌曲数据时出错: $e');
     }
     
     return null;
@@ -185,7 +186,7 @@ class MaimaiMusicDataManager {
       // 获取本地缓存的歌曲数据
       final songs = await getCachedSongs();
       if (songs == null || songs.isEmpty) {
-        print('没有缓存的歌曲数据可上传');
+        debugPrint('没有缓存的歌曲数据可上传');
         return false;
       }
       
@@ -194,10 +195,10 @@ class MaimaiMusicDataManager {
       
       // 上传到服务器
       await _cloudService.uploadSongs(songMaps);
-      print('成功将 ${songs.length} 首歌曲上传到服务器');
+      debugPrint('成功将 ${songs.length} 首歌曲上传到服务器');
       return true;
     } catch (e) {
-      print('上传歌曲数据到服务器时出错: $e');
+      debugPrint('上传歌曲数据到服务器时出错: $e');
       return false;
     }
   }
@@ -207,7 +208,7 @@ class MaimaiMusicDataManager {
     try {
       await _cloudService.getSongCount();
     } catch (e) {
-      print('获取服务器歌曲数量时出错: $e');
+      debugPrint('获取服务器歌曲数量时出错: $e');
     }
   }
 
@@ -226,13 +227,13 @@ class MaimaiMusicDataManager {
       MaidataData maidata = MaidataDecodeUtil.decode(maidataText);
       
       if (maidata.title.isEmpty) {
-        print('Maidata 解析失败：标题为空');
+        debugPrint('Maidata 解析失败：标题为空');
         return 0;
       }
 
       Song? newSong = _maidataToSong(maidata);
       if (newSong == null) {
-        print('Maidata 转换为 Song 失败');
+        debugPrint('Maidata 转换为 Song 失败');
         return 0;
       }
 
@@ -244,7 +245,7 @@ class MaimaiMusicDataManager {
       );
 
       if (exists) {
-        print('歌曲 "${newSong.title}" 已存在于缓存中，跳过');
+        debugPrint('歌曲 "${newSong.title}" 已存在于缓存中，跳过');
         return 0;
       }
 
@@ -254,10 +255,10 @@ class MaimaiMusicDataManager {
       final songsJson = json.encode(existingSongs.map((song) => song.toJson()).toList());
       await prefs.setString(CacheKeyConstant.cachedSongs, songsJson);
       
-      print('成功追加歌曲 "${newSong.title}" 到缓存');
+      debugPrint('成功追加歌曲 "${newSong.title}" 到缓存');
       return 1;
     } catch (e) {
-      print('解析并追加 Maidata 时出错: $e');
+      debugPrint('解析并追加 Maidata 时出错: $e');
       return 0;
     }
   }
@@ -268,7 +269,7 @@ class MaimaiMusicDataManager {
     for (String text in maidataTexts) {
       count += await parseAndAppendMaidata(text);
     }
-    print('批量追加完成，共新增 $count 首歌曲');
+    debugPrint('批量追加完成，共新增 $count 首歌曲');
     return count;
   }
 
@@ -294,7 +295,7 @@ class MaimaiMusicDataManager {
           missingIds.add(songId);
         }
       } catch (e) {
-        print('解析 Maidata 时出错: $e');
+        debugPrint('解析 Maidata 时出错: $e');
       }
     }
     
@@ -310,7 +311,7 @@ class MaimaiMusicDataManager {
         return List<String>.from(json.decode(cachedData));
       }
     } catch (e) {
-      print('获取缓存的追加歌曲列表失败: $e');
+      debugPrint('获取缓存的追加歌曲列表失败: $e');
     }
     return null;
   }
@@ -322,7 +323,7 @@ class MaimaiMusicDataManager {
       await prefs.setString(CacheKeyConstant.maidataAddedSongs, json.encode(songIds));
       await prefs.setInt(CacheKeyConstant.maidataAddedSongsTimestamp, DateTime.now().millisecondsSinceEpoch);
     } catch (e) {
-      print('保存追加歌曲列表失败: $e');
+      debugPrint('保存追加歌曲列表失败: $e');
     }
   }
   
@@ -336,7 +337,7 @@ class MaimaiMusicDataManager {
         return now - timestamp < CacheTimestampConstant.maidataAddedSongsCacheMillis;
       }
     } catch (e) {
-      print('检查追加歌曲缓存有效性失败: $e');
+      debugPrint('检查追加歌曲缓存有效性失败: $e');
     }
     return false;
   }
@@ -347,9 +348,9 @@ class MaimaiMusicDataManager {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(CacheKeyConstant.maidataAddedSongs);
       await prefs.remove(CacheKeyConstant.maidataAddedSongsTimestamp);
-      print('追加歌曲缓存已清除');
+      debugPrint('追加歌曲缓存已清除');
     } catch (e) {
-      print('清除追加歌曲缓存失败: $e');
+      debugPrint('清除追加歌曲缓存失败: $e');
     }
   }
   

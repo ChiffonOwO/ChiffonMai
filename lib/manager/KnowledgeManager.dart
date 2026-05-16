@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api/ApiUrls.dart';
@@ -27,7 +28,7 @@ class KnowledgeManager {
       await _saveToCache(knowledgeData);
       return knowledgeData;
     } catch (e) {
-      print('获取知识数据失败: $e');
+      debugPrint('获取知识数据失败: $e');
       return null;
     }
   }
@@ -57,7 +58,7 @@ class KnowledgeManager {
           final jsonData = json.decode(cachedData);
           return KnowledgeEntity.fromJson(jsonData);
         } catch (e) {
-          print('解析缓存数据失败: $e');
+          debugPrint('解析缓存数据失败: $e');
           return null;
         }
       }

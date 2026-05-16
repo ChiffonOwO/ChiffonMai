@@ -128,7 +128,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
       // 加载歌曲完成状态数据
       await _loadSongsWithStatus();
     } catch (e) {
-      print('初始化数据时出错: $e');
+      debugPrint('初始化数据时出错: $e');
     } finally {
       setState(() {
         _isLoading = false;

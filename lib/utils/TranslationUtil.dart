@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/DeveloperToken.dart';
@@ -84,7 +85,7 @@ class TranslateService {
       
       return translatedSegments.join('');
     } catch (e) {
-      print("混合语言翻译失败: $e");
+      debugPrint("混合语言翻译失败: $e");
       return null;
     }
   }
@@ -111,7 +112,7 @@ class TranslateService {
       final uri = Uri.https(host, "/");
 
       // 确保语言代码正确
-      print("翻译请求: 文本='$text', 源语言='$from', 目标语言='$to'");
+      debugPrint("翻译请求: 文本='$text', 源语言='$from', 目标语言='$to'");
       
       final body = jsonEncode({
         "SourceText": text,
@@ -119,7 +120,7 @@ class TranslateService {
         "Target": to,
         "ProjectId": 0,
       });
-      print("请求体: $body");
+      debugPrint("请求体: $body");
 
       final headers = {
         "Content-Type": "application/json; charset=utf-8",
@@ -135,32 +136,32 @@ class TranslateService {
       final res = await http.post(uri, headers: headers, body: body);
       
       // 打印响应信息以便调试
-      print("响应状态码: ${res.statusCode}");
-      print("响应头部: ${res.headers}");
-      print("响应体: ${res.body}");
+      debugPrint("响应状态码: ${res.statusCode}");
+      debugPrint("响应头部: ${res.headers}");
+      debugPrint("响应体: ${res.body}");
       
       // 尝试不同的解码方式处理乱码
       String responseBody = res.body;
       try {
         // 尝试UTF-8解码
         responseBody = utf8.decode(res.bodyBytes);
-        print("UTF-8解码后: $responseBody");
+        debugPrint("UTF-8解码后: $responseBody");
       } catch (e) {
-        print("UTF-8解码失败: $e");
+        debugPrint("UTF-8解码失败: $e");
       }
       
       final data = jsonDecode(responseBody);
 
       if (data["Response"]?.containsKey("Error") == true) {
-        print("腾讯云API错误: ${data["Response"]["Error"]}");
+        debugPrint("腾讯云API错误: ${data["Response"]["Error"]}");
         return null;
       }
 
       final targetText = data["Response"]["TargetText"];
-      print("翻译结果: $targetText");
+      debugPrint("翻译结果: $targetText");
       return targetText;
     } catch (e) {
-      print("翻译失败: $e");
+      debugPrint("翻译失败: $e");
       return null;
     }
   }

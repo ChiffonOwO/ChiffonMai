@@ -1072,7 +1072,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
           .add({'type': '版本', 'value': _formatVersion(song.basicInfo.from)});
     }
     // 检查别名匹配
-    final aliases = SongAliasManager.instance.aliases[song.id] ?? [];
+    final aliases = SongAliasManager.instance.aliases[song.title] ?? [];
     final matchingAliases =
         aliases.where((alias) => alias.toLowerCase().contains(query)).toList();
     if (matchingAliases.isNotEmpty) {

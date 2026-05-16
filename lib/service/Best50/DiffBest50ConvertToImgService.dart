@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:media_scanner/media_scanner.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
+import 'package:my_first_flutter_app/utils/TextStyleUtil.dart';
 
 class DiffBest50ConvertToImg {
   // 全局Key，用于获取widget的渲染对象
@@ -58,7 +59,7 @@ class DiffBest50ConvertToImg {
       // 创建一个RenderRepaintBoundary
       final RenderRepaintBoundary? boundary = globalKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) {
-        print('Error: RenderRepaintBoundary not found');
+        debugPrint('Error: RenderRepaintBoundary not found');
         overlayEntry.remove();
         return null;
       }
@@ -67,7 +68,7 @@ class DiffBest50ConvertToImg {
       ui.Image image = await boundary.toImage(pixelRatio: 2.0); // 降低像素比，减少内存使用
       ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) {
-        print('Error: ByteData is null');
+        debugPrint('Error: ByteData is null');
         overlayEntry.remove();
         return null;
       }
@@ -80,38 +81,38 @@ class DiffBest50ConvertToImg {
       
       // 对于 Android 13+，使用 photos 权限
       if (Platform.isAndroid) {
-        print('Android platform detected, using photos permission');
+        debugPrint('Android platform detected, using photos permission');
         status = await Permission.photos.status;
-        print('Initial photos permission status: $status');
+        debugPrint('Initial photos permission status: $status');
         
         if (!status.isGranted) {
-          print('Requesting photos permission...');
+          debugPrint('Requesting photos permission...');
           status = await Permission.photos.request();
-          print('Photos permission request result: $status');
+          debugPrint('Photos permission request result: $status');
         }
       } else {
         // 对于其他平台，使用 storage 权限
-        print('Non-Android platform detected, using storage permission');
+        debugPrint('Non-Android platform detected, using storage permission');
         status = await Permission.storage.status;
-        print('Initial storage permission status: $status');
+        debugPrint('Initial storage permission status: $status');
         
         if (!status.isGranted) {
-          print('Requesting storage permission...');
+          debugPrint('Requesting storage permission...');
           status = await Permission.storage.request();
-          print('Storage permission request result: $status');
+          debugPrint('Storage permission request result: $status');
         }
       }
       
       if (status.isGranted) {
-        print('Permission granted');
+        debugPrint('Permission granted');
       } else if (status.isDenied) {
-        print('Permission denied');
+        debugPrint('Permission denied');
       } else if (status.isPermanentlyDenied) {
-        print('Permission permanently denied');
+        debugPrint('Permission permanently denied');
       } else if (status.isRestricted) {
-        print('Permission restricted');
+        debugPrint('Permission restricted');
       } else if (status.isLimited) {
-        print('Permission limited');
+        debugPrint('Permission limited');
       }
       
       // 优先使用相册目录（需要存储权限）
@@ -121,32 +122,32 @@ class DiffBest50ConvertToImg {
           // 直接使用标准的相册目录路径
           String picturesPath = '/storage/emulated/0/Pictures';
           directory = Directory(picturesPath);
-          print('Using pictures directory: $picturesPath');
+          debugPrint('Using pictures directory: $picturesPath');
           
           // 确保相册目录存在
           if (!directory.existsSync()) {
             directory.createSync(recursive: true);
-            print('Created pictures directory: $picturesPath');
+            debugPrint('Created pictures directory: $picturesPath');
           }
         } catch (e) {
-          print('Error getting pictures directory: $e');
+          debugPrint('Error getting pictures directory: $e');
         }
       }
       
       // 如果相册目录获取失败或没有权限，使用应用文档目录
       if (directory == null) {
-        print('Using app documents directory');
+        debugPrint('Using app documents directory');
         try {
           directory = await getApplicationDocumentsDirectory();
         } catch (e) {
-          print('Error getting application documents directory: $e');
+          debugPrint('Error getting application documents directory: $e');
           // 备选方案：使用外部存储目录
           directory = await getExternalStorageDirectory();
         }
       }
       
       if (directory == null) {
-        print('Error: No storage directory found');
+        debugPrint('Error: No storage directory found');
         overlayEntry.remove();
         return null;
       }
@@ -158,12 +159,12 @@ class DiffBest50ConvertToImg {
 
       final file = File('${directory.path}/diff_b50_export_${DateTime.now().millisecondsSinceEpoch}.png');
       await file.writeAsBytes(pngBytes);
-      print('Image saved to: ${file.path}');
+      debugPrint('Image saved to: ${file.path}');
 
       // 调用媒体扫描器，通知系统有新文件
       if (Platform.isAndroid) {
         await MediaScanner.loadMedia(path: file.path);
-        print('Media scanner called for: ${file.path}');
+        debugPrint('Media scanner called for: ${file.path}');
       }
 
       // 移除OverlayEntry
@@ -171,7 +172,7 @@ class DiffBest50ConvertToImg {
 
       return file;
     } catch (e) {
-      print('Error converting to image: $e');
+      debugPrint('Error converting to image: $e');
       return null;
     }
   }
@@ -272,21 +273,19 @@ class DiffBest50ConvertToImg {
                 RichText(
                   text: TextSpan(
                     children: [
-                      TextSpan(
-                        text: diffRatingSum.toString(),
-                        style: TextStyle(
+                      TextStyleUtil.span(
+                        diffRatingSum.toString(),
+                        TextStyle(
                           fontSize: mainFontSize,
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
-                          fontFamily: "Source Han Sans",
                         ),
                       ),
-                      TextSpan(
-                        text: '(平均${diffRatingAverage.toStringAsFixed(1)})',
-                        style: TextStyle(
+                      TextStyleUtil.span(
+                        '(平均${diffRatingAverage.toStringAsFixed(1)})',
+                        TextStyle(
                           fontSize: subFontSize,
                           color: Colors.black,
-                          fontFamily: "Source Han Sans",
                         ),
                       ),
                     ],
@@ -307,7 +306,7 @@ class DiffBest50ConvertToImg {
                     fontSize: mainFontSize,
                     color: best50Diff >= 0 ? Colors.green : Colors.red,
                     fontWeight: FontWeight.bold,
-                    fontFamily: "Source Han Sans",
+                    
                   ),
                 ),
               ],
@@ -489,7 +488,7 @@ class DiffBest50ConvertToImg {
                               fontSize: decimalMainFontSize * 0.9,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
-                              fontFamily: "Source Han Sans",
+                              
                             ),
                           ),
                           Text(
@@ -498,7 +497,7 @@ class DiffBest50ConvertToImg {
                               fontSize: decimalSmallFontSize * 0.9,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
-                              fontFamily: "Source Han Sans",
+                              
                             ),
                           ),
                         ],
@@ -541,7 +540,7 @@ class DiffBest50ConvertToImg {
                             fontSize: decimalMainFontSize,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
-                            fontFamily: "Source Han Sans",
+                            
                           ),
                         ),
                         Text(
@@ -550,7 +549,7 @@ class DiffBest50ConvertToImg {
                             fontSize: decimalSmallFontSize,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
-                            fontFamily: "Source Han Sans",
+                            
                           ),
                         ),
                       ],
@@ -565,7 +564,7 @@ class DiffBest50ConvertToImg {
                             fontSize: otherFontSize,
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
-                            fontFamily: "Source Han Sans",
+                            
                           ),
                         ),
                         Text(
@@ -574,7 +573,7 @@ class DiffBest50ConvertToImg {
                             fontSize: otherFontSize,
                             color: starsColor,
                             fontWeight: FontWeight.bold,
-                            fontFamily: "Source Han Sans",
+                            
                           ),
                         ),
                       ],
@@ -587,7 +586,7 @@ class DiffBest50ConvertToImg {
                         fontSize: gradeFontSize,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
-                        fontFamily: "Source Han Sans",
+                        
                       ),
                     ),
                   ],
@@ -633,7 +632,7 @@ class DiffBest50ConvertToImg {
             fontSize: mainFontSize,
             fontWeight: FontWeight.bold,
             color: color,
-            fontFamily: "Source Han Sans",
+            
           ),
         ),
         // 小数部分和百分号
@@ -643,7 +642,7 @@ class DiffBest50ConvertToImg {
             fontSize: subFontSize,
             fontWeight: FontWeight.bold,
             color: color,
-            fontFamily: "Source Han Sans",
+            
           ),
         ),
       ],
@@ -673,7 +672,7 @@ class DiffBest50ConvertToImg {
                 fontSize: fontSize,
                 fontWeight: FontWeight.bold,
                 color: color,
-                fontFamily: "Source Han Sans",
+                
               ),
         ),
         _buildDecimalText(context, value2,
@@ -855,7 +854,7 @@ class DiffBest50ConvertToImg {
       // 计算scoreRate
       return maxScore > 0 ? score / maxScore : 0.0;
     } catch (e) {
-      print('Error calculating score rate: $e');
+      debugPrint('Error calculating score rate: $e');
       return 0.0;
     }
   }

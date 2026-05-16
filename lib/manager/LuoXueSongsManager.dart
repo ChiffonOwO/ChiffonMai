@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:convert' show utf8;
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api/ApiUrls.dart';
@@ -34,7 +35,7 @@ class LuoXueSongsManager {
           responseBody = utf8.decode(response.bodyBytes);
         } catch (e) {
           // 如果 UTF-8 解析失败，尝试使用 Latin1 编码
-          print('UTF-8 解析失败，尝试使用 Latin1 编码: $e');
+          debugPrint('UTF-8 解析失败，尝试使用 Latin1 编码: $e');
           responseBody = response.body;
         }
         final jsonData = json.decode(responseBody);
@@ -44,11 +45,11 @@ class LuoXueSongsManager {
         await _saveToCache(_luoXueSongEntity!);
         return _luoXueSongEntity;
       } else {
-        print('Failed to fetch LuoXue songs: ${response.statusCode}');
+        debugPrint('Failed to fetch LuoXue songs: ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      print('Error fetching LuoXue songs: $e');
+      debugPrint('Error fetching LuoXue songs: $e');
       return null;
     }
   }
@@ -127,7 +128,7 @@ class LuoXueSongsManager {
       }
       return null;
     } catch (e) {
-      print('Error loading from cache: $e');
+      debugPrint('Error loading from cache: $e');
       return null;
     }
   }
@@ -139,7 +140,7 @@ class LuoXueSongsManager {
       final jsonData = _entityToJson(entity);
       await prefs.setString(CacheKeyConstant.luoxueSongsCache, json.encode(jsonData));
     } catch (e) {
-      print('Error saving to cache: $e');
+      debugPrint('Error saving to cache: $e');
     }
   }
 
@@ -247,7 +248,7 @@ class LuoXueSongsManager {
       await prefs.remove(CacheKeyConstant.luoxueSongsCache);
       _luoXueSongEntity = null;
     } catch (e) {
-      print('Error clearing cache: $e');
+      debugPrint('Error clearing cache: $e');
     }
   }
 }

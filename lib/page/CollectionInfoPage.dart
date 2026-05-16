@@ -75,7 +75,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
         _loadSongInfo(collection);
       }
     } catch (e) {
-      print('加载收藏品详情时出错: $e');
+      debugPrint('加载收藏品详情时出错: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -127,7 +127,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
         });
       }
     } catch (e) {
-      print('翻译名称失败: $e');
+      debugPrint('翻译名称失败: $e');
     } finally {
       setState(() {
         _isTranslatingName = false;
@@ -151,7 +151,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
         });
       }
     } catch (e) {
-      print('翻译描述失败: $e');
+      debugPrint('翻译描述失败: $e');
     } finally {
       setState(() {
         _isTranslatingDescription = false;
@@ -171,7 +171,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
         _songMap = songMap;
       });
     } catch (e) {
-      print('加载歌曲信息时出错: $e');
+      debugPrint('加载歌曲信息时出错: $e');
     } finally {
       setState(() {
         _isLoadingSongs = false;

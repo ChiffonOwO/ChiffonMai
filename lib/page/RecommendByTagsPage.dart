@@ -81,11 +81,11 @@ class _RecommendByTagsState extends State<RecommendByTags> {
             _isLoading = false;
             _errorMessage = null;
           });
-          print('从缓存读取推荐结果成功');
+          debugPrint('从缓存读取推荐结果成功');
           return;
         }
       } catch (e) {
-        print('从缓存读取推荐结果失败: $e');
+        debugPrint('从缓存读取推荐结果失败: $e');
       }
       
       // 记录开始时间

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/manager/DiffMusicDataManager.dart';
@@ -114,7 +113,7 @@ class SongInfoService {
         }).toList();
       }
     } catch (e) {
-      print('加载数据失败: $e');
+      debugPrint('加载数据失败: $e');
     }
 
     return result;
@@ -455,7 +454,7 @@ class SongInfoService {
         framesData,
       );
     } catch (e) {
-      print('获取相关收藏品时出错: $e');
+      debugPrint('获取相关收藏品时出错: $e');
       return [];
     }
   }

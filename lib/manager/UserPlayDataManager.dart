@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/api/DeveloperToken.dart';
@@ -38,14 +39,14 @@ class UserPlayDataManager {
         // 保存到缓存
         await _saveToCache(data);
         
-        print('成功从 API 获取用户游玩数据');
+        debugPrint('成功从 API 获取用户游玩数据');
         return data;
       } else {
-        print('API 请求失败，状态码: ${response.statusCode}');
+        debugPrint('API 请求失败，状态码: ${response.statusCode}');
         return null;
       }
     } catch (e) {
-      print('获取用户游玩数据时出错: $e');
+      debugPrint('获取用户游玩数据时出错: $e');
       return null;
     }
   }
@@ -61,7 +62,7 @@ class UserPlayDataManager {
       }
       return null;
     } catch (e) {
-      print('从缓存获取用户游玩数据时出错: $e');
+      debugPrint('从缓存获取用户游玩数据时出错: $e');
       return null;
     }
   }
@@ -73,7 +74,7 @@ class UserPlayDataManager {
       await prefs.setString(CacheKeyConstant.userPlayData, json.encode(data));
       await prefs.setInt(_lastUpdateKey, DateTime.now().millisecondsSinceEpoch);
     } catch (e) {
-      print('保存用户游玩数据到缓存时出错: $e');
+      debugPrint('保存用户游玩数据到缓存时出错: $e');
     }
   }
 
@@ -84,7 +85,7 @@ class UserPlayDataManager {
       await prefs.remove(CacheKeyConstant.userPlayData);
       await prefs.remove(_lastUpdateKey);
     } catch (e) {
-      print('清除用户游玩数据缓存时出错: $e');
+      debugPrint('清除用户游玩数据缓存时出错: $e');
     }
   }
 
@@ -94,7 +95,7 @@ class UserPlayDataManager {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getInt(_lastUpdateKey);
     } catch (e) {
-      print('获取最后更新时间时出错: $e');
+      debugPrint('获取最后更新时间时出错: $e');
       return null;
     }
   }

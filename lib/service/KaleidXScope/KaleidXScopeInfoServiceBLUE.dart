@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 
@@ -69,7 +70,7 @@ class KaleidXScopeInfoServiceBLUE {
         result.add(song);
       } catch (e) {
         // 未找到对应歌曲，跳过
-        print('未找到歌曲ID: $id');
+        debugPrint('未找到歌曲ID: $id');
       }
     }
 
@@ -132,7 +133,7 @@ class KaleidXScopeInfoServiceBLUE {
           .cast<Song>()
           .toList();
     } catch (e) {
-      print('加载Track歌曲失败: $e');
+      debugPrint('加载Track歌曲失败: $e');
     }
 
     return result;

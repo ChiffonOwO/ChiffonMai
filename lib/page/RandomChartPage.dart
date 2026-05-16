@@ -85,7 +85,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
         }
       });
     } catch (e) {
-      print('抽奖失败: $e');
+      debugPrint('抽奖失败: $e');
     } finally {
       setState(() {
         _isDrawing = false;

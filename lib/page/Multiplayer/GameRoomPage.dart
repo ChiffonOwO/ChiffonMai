@@ -209,13 +209,13 @@ class _GameRoomPageState extends State<GameRoomPage> {
     _manager.startListeningToRoom(widget.room.roomId);
     
     _roomSubscription = _manager.roomStream.listen((room) {
-      print('[DEBUG][GameRoomPage] 收到 roomStream 更新: ${room?.roomId}');
+      debugPrint('[DEBUG][GameRoomPage] 收到 roomStream 更新: ${room?.roomId}');
       if (!mounted) return;
       
       // 打印玩家投降状态（调试）
       if (room != null) {
         room.players.forEach((p) {
-          print('[DEBUG][GameRoomPage] 玩家 ${p.nickname} - 投降: ${p.isSurrendered}');
+          debugPrint('[DEBUG][GameRoomPage] 玩家 ${p.nickname} - 投降: ${p.isSurrendered}');
         });
       }
       
@@ -285,10 +285,10 @@ class _GameRoomPageState extends State<GameRoomPage> {
           
           if (isNewRound) {
             // 调试信息
-            print('[DEBUG][GameRoomPage] 新回合开始:');
-            print('  - 当前回合: ${state.currentRound}/${state.totalRounds}');
-            print('  - 共享猜测次数: ${state.currentGuesses}/${state.maxGuesses}');
-            print('  - 本地投降状态已重置: _hasSurrendered=$_hasSurrendered');
+            debugPrint('[DEBUG][GameRoomPage] 新回合开始:');
+            debugPrint('  - 当前回合: ${state.currentRound}/${state.totalRounds}');
+            debugPrint('  - 共享猜测次数: ${state.currentGuesses}/${state.maxGuesses}');
+            debugPrint('  - 本地投降状态已重置: _hasSurrendered=$_hasSurrendered');
             
             _remainingTime = state.timeRemaining;
             // 重置投降状态
@@ -330,12 +330,12 @@ class _GameRoomPageState extends State<GameRoomPage> {
             }
             
             // 调试信息
-            print('[DEBUG][GameRoomPage] 游戏状态更新:');
-            print('  - 当前回合: ${state.currentRound}');
-            print('  - 服务器猜测次数: ${state.currentGuesses}');
-            print('  - 本地猜测次数: ${_gameState!.currentGuesses}');
-            print('  - 最大猜测次数: ${state.maxGuesses}');
-            print('  - 剩余猜测次数: ${state.maxGuesses - _gameState!.currentGuesses}');
+            debugPrint('[DEBUG][GameRoomPage] 游戏状态更新:');
+            debugPrint('  - 当前回合: ${state.currentRound}');
+            debugPrint('  - 服务器猜测次数: ${state.currentGuesses}');
+            debugPrint('  - 本地猜测次数: ${_gameState!.currentGuesses}');
+            debugPrint('  - 最大猜测次数: ${state.maxGuesses}');
+            debugPrint('  - 剩余猜测次数: ${state.maxGuesses - _gameState!.currentGuesses}');
           }
           
           // 如果回合已经结束（无论是因为投降还是答对），保持结束状态
@@ -394,12 +394,12 @@ class _GameRoomPageState extends State<GameRoomPage> {
       } else if (targetSongData is Map) {
         targetSongId = targetSongData['id']?.toString() ?? '';
       } else {
-        print('[DEBUG][GameRoom] 无法解析目标歌曲数据');
+        debugPrint('[DEBUG][GameRoom] 无法解析目标歌曲数据');
         return;
       }
       
       if (targetSongId.isEmpty) {
-        print('[DEBUG][GameRoom] 目标歌曲ID为空');
+        debugPrint('[DEBUG][GameRoom] 目标歌曲ID为空');
         return;
       }
       
@@ -411,23 +411,23 @@ class _GameRoomPageState extends State<GameRoomPage> {
       
       // 添加调试日志
       if (_targetSong != null) {
-        print('[DEBUG][GameRoom] 加载到目标歌曲:');
-        print('[DEBUG][GameRoom]   歌曲ID: ${_targetSong!.id}');
-        print('[DEBUG][GameRoom]   歌曲名: ${_targetSong!.basicInfo.title}');
-        print('[DEBUG][GameRoom]   艺术家: ${_targetSong!.basicInfo.artist}');
-        print('[DEBUG][GameRoom]   BPM: ${_targetSong!.basicInfo.bpm}');
-        print('[DEBUG][GameRoom]   类型: ${_targetSong!.type}');
-        print('[DEBUG][GameRoom]   Master定数: ${_targetSong!.ds.length > 0 ? _targetSong!.ds[0] : "-"}');
-        print('[DEBUG][GameRoom]   版本: ${_targetSong!.basicInfo.from}');
+        debugPrint('[DEBUG][GameRoom] 加载到目标歌曲:');
+        debugPrint('[DEBUG][GameRoom]   歌曲ID: ${_targetSong!.id}');
+        debugPrint('[DEBUG][GameRoom]   歌曲名: ${_targetSong!.basicInfo.title}');
+        debugPrint('[DEBUG][GameRoom]   艺术家: ${_targetSong!.basicInfo.artist}');
+        debugPrint('[DEBUG][GameRoom]   BPM: ${_targetSong!.basicInfo.bpm}');
+        debugPrint('[DEBUG][GameRoom]   类型: ${_targetSong!.type}');
+        debugPrint('[DEBUG][GameRoom]   Master定数: ${_targetSong!.ds.length > 0 ? _targetSong!.ds[0] : "-"}');
+        debugPrint('[DEBUG][GameRoom]   版本: ${_targetSong!.basicInfo.from}');
       }
     } catch (e) {
-      print('[DEBUG][GameRoom] 加载目标歌曲失败: $e');
+      debugPrint('[DEBUG][GameRoom] 加载目标歌曲失败: $e');
     }
   }
 
   @override
   void dispose() {
-    print('[DEBUG][GameRoomPage] dispose - 用户离开页面，取消所有订阅');
+    debugPrint('[DEBUG][GameRoomPage] dispose - 用户离开页面，取消所有订阅');
     
     // 取消搜索控制器和定时器
     _searchController.dispose();
@@ -484,9 +484,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
     _manager.updatePlayerSurrendered(true);
     
     // 调试信息
-    print('[DEBUG][GameRoomPage] 玩家发起投降:');
-    print('  - 当前回合: ${_gameState?.currentRound}');
-    print('  - 投降前状态: _hasSurrendered=$_hasSurrendered');
+    debugPrint('[DEBUG][GameRoomPage] 玩家发起投降:');
+    debugPrint('  - 当前回合: ${_gameState?.currentRound}');
+    debugPrint('  - 投降前状态: _hasSurrendered=$_hasSurrendered');
     
     setState(() {
       // 投降后不结束回合，只标记投降状态
@@ -494,7 +494,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
     });
     
     // 调试信息
-    print('  - 投降后状态: _hasSurrendered=$_hasSurrendered');
+    debugPrint('  - 投降后状态: _hasSurrendered=$_hasSurrendered');
   }
   
   // 显示规则说明对话框
@@ -575,15 +575,17 @@ class _GameRoomPageState extends State<GameRoomPage> {
     List<Song> results = [];
     query = query.toLowerCase();
 
+    // 过滤掉从maidata追加的歌曲（cids全为0表示从maidata解析）
+    var filteredSongs = songs.where((song) => !_isMaidataSong(song)).toList();
+
     // 搜索原曲名
-    results.addAll(songs
+    results.addAll(filteredSongs
         .where((song) => song.basicInfo.title.toLowerCase().contains(query)));
 
     // 搜索别名
-    for (var song in songs) {
+    for (var song in filteredSongs) {
       if (!results.contains(song)) {
-        final songId = song.id;
-        final aliases = _songAliasManager.aliases[songId];
+        final aliases = _songAliasManager.aliases[song.title];
         if (aliases != null &&
             aliases.any((alias) => alias.toLowerCase().contains(query))) {
           results.add(song);
@@ -592,6 +594,12 @@ class _GameRoomPageState extends State<GameRoomPage> {
     }
 
     return results.take(20).toList();
+  }
+
+  // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析）
+  bool _isMaidataSong(Song song) {
+    if (song.cids.isEmpty) return false;
+    return song.cids.every((cid) => cid == 0);
   }
 
   // 处理猜测
@@ -685,7 +693,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
     setState(() {
       _isGameSettled = true;
     });
-    print('[DEBUG][GameRoom] 游戏已结算');
+    debugPrint('[DEBUG][GameRoom] 游戏已结算');
   }
 
   void _showLeaveRoomConfirmDialog() {
@@ -1074,7 +1082,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
   }
 
   Widget _buildSearchResultItem(Song song) {
-    final aliases = _songAliasManager.aliases[song.id] ?? [];
+    final aliases = _songAliasManager.aliases[song.title] ?? [];
     String aliasText = aliases.isNotEmpty ? aliases.join('、') : '';
 
     return GestureDetector(

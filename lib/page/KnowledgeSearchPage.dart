@@ -86,7 +86,7 @@ class _KnowledgeSearchPageState extends State<KnowledgeSearchPage> {
         SnackBar(content: Text('缓存已清除，数据已重新加载')),
       );
     } catch (e) {
-      print('清除缓存时出错: $e');
+      debugPrint('清除缓存时出错: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('清除缓存失败')),
       );

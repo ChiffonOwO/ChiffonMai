@@ -311,7 +311,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
           } catch (e) {
             // 如果标题不匹配，尝试通过别名匹配
             for (var song in allSongs) {
-              final aliases = SongAliasManager.instance.aliases[song.id] ?? [];
+              final aliases = SongAliasManager.instance.aliases[song.title] ?? [];
               if (aliases.contains(answer)) {
                 guessedSong = song;
                 break;
@@ -320,7 +320,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
           }
         }
       } catch (e) {
-        print('查找猜错的歌曲失败: $e');
+        debugPrint('查找猜错的歌曲失败: $e');
       }
       
       // 将猜错的歌曲添加到猜测历史
@@ -376,6 +376,10 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
 
   // 构建搜索结果项
   Widget _buildSearchResultItem(Song song) {
+    // 获取别名
+    final aliases = SongAliasManager.instance.aliases[song.title] ?? [];
+    String aliasText = aliases.isNotEmpty ? aliases.join('、') : '';
+
     return GestureDetector(
       onTap: () {
         _selectSongFromSearch(song);
@@ -438,6 +442,14 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  // 别名
+                  if (aliasText.isNotEmpty)
+                    Text(
+                      aliasText,
+                      style: TextStyle(fontSize: 14, color: Colors.blue),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                 ],
               ),
             ),
@@ -912,23 +924,25 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                 
                 if (testSongs.isEmpty) {
                   // 没有找到符合条件的乐曲，显示错误提示
-                  showDialog(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return AlertDialog(
-                        title: const Text('提示'),
-                        content: const Text('没有找到符合条件的乐曲！请检查设置！'),
-                        actions: [
-                          TextButton(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                            },
-                            child: const Text('确定'),
-                          ),
-                        ],
-                      );
-                    },
-                  );
+                  if (mounted) {
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          title: const Text('提示'),
+                          content: const Text('没有找到符合条件的乐曲！请检查设置！'),
+                          actions: [
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                              },
+                              child: const Text('确定'),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  }
                   return;
                 }
                 

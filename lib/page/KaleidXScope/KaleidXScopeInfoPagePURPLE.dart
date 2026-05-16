@@ -113,7 +113,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
 
       await _loadSpecialSongs();
     } catch (e) {
-      print('加载歌曲失败: $e');
+      debugPrint('加载歌曲失败: $e');
     } finally {
       setState(() {
         _isLoading = false;

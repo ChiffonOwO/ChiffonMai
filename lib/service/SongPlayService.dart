@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:my_first_flutter_app/entity/Song.dart';
 import 'package:my_first_flutter_app/manager/LuoXueSongsManager.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
@@ -100,7 +101,7 @@ class SongPlayService {
 
       return songMap;
     } catch (e) {
-      print('加载歌曲数据失败: $e');
+      debugPrint('加载歌曲数据失败: $e');
       return null;
     }
   }
@@ -124,7 +125,7 @@ class SongPlayService {
 
       return null;
     } catch (e) {
-      print('查找落雪歌曲ID失败: $e');
+      debugPrint('查找落雪歌曲ID失败: $e');
       return null;
     }
   }
@@ -167,7 +168,7 @@ class SongPlayService {
         'maimaiSong': matchedSong,
       };
     } catch (e) {
-      print('获取歌曲信息失败: $e');
+      debugPrint('获取歌曲信息失败: $e');
       return null;
     }
   }

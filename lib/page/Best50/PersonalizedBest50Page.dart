@@ -123,7 +123,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
       // 加载个性化数据
       await _fetchPersonalizedData();
     } catch (e) {
-      print('Error loading data: $e');
+      debugPrint('Error loading data: $e');
       setState(() {
         _isLoading = false;
       });
@@ -226,7 +226,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
         });
       }
     } catch (e) {
-      print('Error fetching personalized data: $e');
+      debugPrint('Error fetching personalized data: $e');
       setState(() {
         _personalizedSongs = [];
         _isLoading = false;

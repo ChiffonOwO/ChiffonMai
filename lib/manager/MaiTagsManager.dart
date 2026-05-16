@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -52,15 +53,15 @@ class MaiTagsManager {
           await prefs.setString(CacheKeyConstant.maiTagsCache, mainTagString);
           await prefs.setInt(CacheKeyConstant.maiTagsCacheTimestamp, DateTime.now().millisecondsSinceEpoch);
           
-          print('从网络加载标签数据并更新缓存');
+          debugPrint('从网络加载标签数据并更新缓存');
         } else {
-          print('标签数据初始化失败，状态码: ${response.statusCode}');
+          debugPrint('标签数据初始化失败，状态码: ${response.statusCode}');
         }
       } else {
-        print('本地缓存有效，无需更新');
+        debugPrint('本地缓存有效，无需更新');
       }
     } catch (e) {
-      print('标签数据初始化错误: $e');
+      debugPrint('标签数据初始化错误: $e');
     }
   }
 
@@ -89,7 +90,7 @@ class MaiTagsManager {
       
       return null;
     } catch (e) {
-      print('获取标签数据错误: $e');
+      debugPrint('获取标签数据错误: $e');
       return null;
     }
   }
@@ -192,12 +193,12 @@ class MaiTagsManager {
         await prefs.setString(CacheKeyConstant.maiTagsCache, mainTagString);
         await prefs.setInt(CacheKeyConstant.maiTagsCacheTimestamp, DateTime.now().millisecondsSinceEpoch);
         
-        print('手动刷新标签数据缓存成功');
+        debugPrint('手动刷新标签数据缓存成功');
       } else {
-        print('手动刷新标签数据缓存失败，状态码: ${response.statusCode}');
+        debugPrint('手动刷新标签数据缓存失败，状态码: ${response.statusCode}');
       }
     } catch (e) {
-      print('手动刷新标签数据缓存错误: $e');
+      debugPrint('手动刷新标签数据缓存错误: $e');
     }
   }
 

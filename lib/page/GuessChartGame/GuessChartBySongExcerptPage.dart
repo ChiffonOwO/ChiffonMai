@@ -320,16 +320,18 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
     List<Song> results = [];
     query = query.toLowerCase();
 
+    // 过滤掉从maidata追加的歌曲（cids全为0表示从maidata解析）
+    var filteredSongs = songs.where((song) => !_isMaidataSong(song)).toList();
+
     // 搜索原曲名
-    results.addAll(songs
+    results.addAll(filteredSongs
         .where((song) => song.basicInfo.title.toLowerCase().contains(query)));
 
     // 搜索别名
-    for (var song in songs) {
+    for (var song in filteredSongs) {
       if (!results.contains(song)) {
         // 检查别名
-        final songId = song.id;
-        final aliases = _songAliasManager.aliases[songId];
+        final aliases = _songAliasManager.aliases[song.title];
         if (aliases != null &&
             aliases.any((alias) => alias.toLowerCase().contains(query))) {
           results.add(song);
@@ -339,6 +341,12 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
 
     // 限制结果数量
     return results.take(20).toList();
+  }
+
+  // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析）
+  bool _isMaidataSong(Song song) {
+    if (song.cids.isEmpty) return false;
+    return song.cids.every((cid) => cid == 0);
   }
 
   // 处理猜测
@@ -418,7 +426,7 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
   // 构建搜索结果项
   Widget _buildSearchResultItem(Song song) {
     // 获取别名
-    final aliases = _songAliasManager.aliases[song.id] ?? [];
+    final aliases = _songAliasManager.aliases[song.title] ?? [];
     String aliasText = aliases.isNotEmpty ? aliases.join('、') : '';
 
     return GestureDetector(
@@ -1264,7 +1272,7 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
           return;
         }
       } catch (e) {
-        print('播放歌曲失败: $e');
+        debugPrint('播放歌曲失败: $e');
         _handlePlaybackComplete();
       }
     }

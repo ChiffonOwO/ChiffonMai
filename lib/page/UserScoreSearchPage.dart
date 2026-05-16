@@ -162,7 +162,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
         _stats = await _calculateStats();
       }
     } catch (e) {
-      print('加载数据出错: $e');
+      debugPrint('加载数据出错: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -1912,7 +1912,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                             fontSize: decimalMainFontSize * 0.9,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
-                            fontFamily: "Source Han Sans",
+                            
                           ),
                         ),
                         if (difficulty.toString().split('.').length > 1)
@@ -1922,7 +1922,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                               fontSize: decimalSmallFontSize * 0.9,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
-                              fontFamily: "Source Han Sans",
+                              
                             ),
                           ),
                       ],

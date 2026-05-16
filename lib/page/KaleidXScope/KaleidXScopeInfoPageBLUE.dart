@@ -131,7 +131,7 @@ class _KaleidXScopeInfoPageBLUEState extends State<KaleidXScopeInfoPageBLUE> {
       // 加载特殊歌曲（只在初始化时加载一次）
       await _loadSpecialSongs();
     } catch (e) {
-      print('加载歌曲失败: $e');
+      debugPrint('加载歌曲失败: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -181,7 +181,7 @@ class _KaleidXScopeInfoPageBLUEState extends State<KaleidXScopeInfoPageBLUE> {
         });
       }
     } catch (e) {
-      print('加载完成歌曲失败: $e');
+      debugPrint('加载完成歌曲失败: $e');
     }
   }
 

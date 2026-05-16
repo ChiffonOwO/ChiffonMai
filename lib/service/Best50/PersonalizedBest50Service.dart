@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
 
@@ -40,7 +41,7 @@ class PersonalizedBest50Service {
         'type': 'ap_plus_50'
       };
     } catch (e) {
-      print('获取AP+50数据时出错: $e');
+      debugPrint('获取AP+50数据时出错: $e');
       return null;
     }
   }
@@ -84,7 +85,7 @@ class PersonalizedBest50Service {
         'type': 'ap_50'
       };
     } catch (e) {
-      print('获取AP50数据时出错: $e');
+      debugPrint('获取AP50数据时出错: $e');
       return null;
     }
   }
@@ -128,7 +129,7 @@ class PersonalizedBest50Service {
         'type': 'fc_50'
       };
     } catch (e) {
-      print('获取FC50数据时出错: $e');
+      debugPrint('获取FC50数据时出错: $e');
       return null;
     }
   }
@@ -172,7 +173,7 @@ class PersonalizedBest50Service {
         'type': 'fc_plus_50'
       };
     } catch (e) {
-      print('获取FC+50数据时出错: $e');
+      debugPrint('获取FC+50数据时出错: $e');
       return null;
     }
   }
@@ -218,7 +219,7 @@ class PersonalizedBest50Service {
         'type': 'cun_50'
       };
     } catch (e) {
-      print('获取寸50数据时出错: $e');
+      debugPrint('获取寸50数据时出错: $e');
       return null;
     }
   }
@@ -264,7 +265,7 @@ class PersonalizedBest50Service {
         'type': 'mingdao_50'
       };
     } catch (e) {
-      print('获取名刀50/锁血50数据时出错: $e');
+      debugPrint('获取名刀50/锁血50数据时出错: $e');
       return null;
     }
   }
@@ -309,7 +310,7 @@ class PersonalizedBest50Service {
         'type': 'cuniao_plus_50'
       };
     } catch (e) {
-      print('获取寸鸟加50数据时出错: $e');
+      debugPrint('获取寸鸟加50数据时出错: $e');
       return null;
     }
   }
@@ -354,7 +355,7 @@ class PersonalizedBest50Service {
         'type': 'suoxue_plus_50'
       };
     } catch (e) {
-      print('获取锁血鸟加50数据时出错: $e');
+      debugPrint('获取锁血鸟加50数据时出错: $e');
       return null;
     }
   }
@@ -399,7 +400,7 @@ class PersonalizedBest50Service {
         'type': 'cuniao_50'
       };
     } catch (e) {
-      print('获取寸鸟50数据时出错: $e');
+      debugPrint('获取寸鸟50数据时出错: $e');
       return null;
     }
   }
@@ -444,7 +445,7 @@ class PersonalizedBest50Service {
         'type': 'suoxue_50'
       };
     } catch (e) {
-      print('获取锁血鸟50数据时出错: $e');
+      debugPrint('获取锁血鸟50数据时出错: $e');
       return null;
     }
   }
@@ -492,7 +493,7 @@ class PersonalizedBest50Service {
       }
       return result;
     } catch (e) {
-      print('为记录添加歌曲信息时出错: $e');
+      debugPrint('为记录添加歌曲信息时出错: $e');
       return [];
     }
   }
@@ -518,7 +519,7 @@ class PersonalizedBest50Service {
       // 返回所有charter，不再按谱面数量筛选
       return charterCounts;
     } catch (e) {
-      print('获取charter出现次数时出错: $e');
+      debugPrint('获取charter出现次数时出错: $e');
       return {};
     }
   }
@@ -576,7 +577,7 @@ class PersonalizedBest50Service {
         'charter': charter
       };
     } catch (e) {
-      print('获取charter50数据时出错: $e');
+      debugPrint('获取charter50数据时出错: $e');
       return null;
     }
   }
@@ -597,7 +598,7 @@ class PersonalizedBest50Service {
 
       return versionCounts;
     } catch (e) {
-      print('获取版本出现次数时出错: $e');
+      debugPrint('获取版本出现次数时出错: $e');
       return {};
     }
   }
@@ -654,7 +655,7 @@ class PersonalizedBest50Service {
         'version': version
       };
     } catch (e) {
-      print('获取version50数据时出错: $e');
+      debugPrint('获取version50数据时出错: $e');
       return null;
     }
   }
@@ -710,7 +711,7 @@ class PersonalizedBest50Service {
         'type': 'dx_50'
       };
     } catch (e) {
-      print('获取DX50数据时出错: $e');
+      debugPrint('获取DX50数据时出错: $e');
       return null;
     }
   }
@@ -766,7 +767,7 @@ class PersonalizedBest50Service {
         'type': 'st_50'
       };
     } catch (e) {
-      print('获取ST50数据时出错: $e');
+      debugPrint('获取ST50数据时出错: $e');
       return null;
     }
   }
@@ -810,7 +811,7 @@ class PersonalizedBest50Service {
         'type': 'fs_50'
       };
     } catch (e) {
-      print('获取FS50数据时出错: $e');
+      debugPrint('获取FS50数据时出错: $e');
       return null;
     }
   }
@@ -854,7 +855,7 @@ class PersonalizedBest50Service {
         'type': 'fs_plus_50'
       };
     } catch (e) {
-      print('获取FS+50数据时出错: $e');
+      debugPrint('获取FS+50数据时出错: $e');
       return null;
     }
   }
@@ -898,7 +899,7 @@ class PersonalizedBest50Service {
         'type': 'fsd_50'
       };
     } catch (e) {
-      print('获取FDX50数据时出错: $e');
+      debugPrint('获取FDX50数据时出错: $e');
       return null;
     }
   }
@@ -942,7 +943,7 @@ class PersonalizedBest50Service {
         'type': 'fsdp_50'
       };
     } catch (e) {
-      print('获取FDX+50数据时出错: $e');
+      debugPrint('获取FDX+50数据时出错: $e');
       return null;
     }
   }
@@ -965,7 +966,7 @@ class PersonalizedBest50Service {
 
       return genreCounts;
     } catch (e) {
-      print('获取流派出现次数时出错: $e');
+      debugPrint('获取流派出现次数时出错: $e');
       return {};
     }
   }
@@ -1070,7 +1071,7 @@ class PersonalizedBest50Service {
         'star': starLabel
       };
     } catch (e) {
-      print('获取星数50数据时出错: $e');
+      debugPrint('获取星数50数据时出错: $e');
       return null;
     }
   }
@@ -1174,7 +1175,7 @@ class PersonalizedBest50Service {
         'genre': genre
       };
     } catch (e) {
-      print('获取genre50数据时出错: $e');
+      debugPrint('获取genre50数据时出错: $e');
       return null;
     }
   }
