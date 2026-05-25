@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
-import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
-import 'package:my_first_flutter_app/entity/Song.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 
 class PersonalizedScoreService {
   // 单例模式

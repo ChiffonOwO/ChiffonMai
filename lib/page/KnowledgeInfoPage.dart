@@ -5,10 +5,10 @@ import '../entity/KnowledgeEntity.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/ColorUtil.dart';
 import '../utils/CoverUtil.dart';
-import '../manager/MaimaiMusicDataManager.dart';
-import '../manager/UserPlayDataManager.dart';
-import '../entity/Song.dart';
-import '../entity/RecordItem.dart';
+import '../manager/DivingFish/MaimaiMusicDataManager.dart';
+import '../manager/DivingFish/UserPlayDataManager.dart';
+import '../entity/DivingFish/Song.dart';
+import '../entity/DivingFish/RecordItem.dart';
 import 'SongInfoPage.dart';
 
 class KnowledgeInfoPage extends StatefulWidget {

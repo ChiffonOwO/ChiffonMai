@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../service/CollectionSearchService.dart';
-import '../entity/Collection.dart';
-import '../manager/CollectionsManager.dart';
+import '../entity/LuoXue/Collection.dart';
+import '../manager/LuoXue/CollectionsManager.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/CollectionsImageUtil.dart';
 import 'CollectionInfoPage.dart';

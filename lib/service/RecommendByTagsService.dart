@@ -5,12 +5,12 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:my_first_flutter_app/entity/Song.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/entity/RecommendationResult.dart';
-import 'package:my_first_flutter_app/entity/RecordItem.dart';
-import 'package:my_first_flutter_app/entity/UserPlayDataEntity.dart';
-import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
-import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/RecordItem.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/UserPlayDataEntity.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constant/CacheKeyConstant.dart';

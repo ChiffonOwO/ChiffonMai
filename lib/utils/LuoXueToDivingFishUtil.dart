@@ -1,9 +1,12 @@
 /**
- * 落雪id → 水鱼数据工具类
+ * 落雪数据 → 水鱼数据工具类
  * */
-import 'package:my_first_flutter_app/entity/Collection.dart';
-import 'package:my_first_flutter_app/entity/Song.dart';
-import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
+import 'package:flutter/foundation.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/RecordItem.dart';
+import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
+import 'package:my_first_flutter_app/entity/LuoXue/LuoXueScore.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 
 
 class LuoXueToDivingFishUtil {
@@ -87,5 +90,114 @@ class LuoXueToDivingFishUtil {
     final songMap = await getSongsFromCache(collection);
     final matchedList = songMap.values.where((song) => song != null).cast<Song>().toList();
     return matchedList;
+  }
+
+
+  // 根据 levelIndex 获取对应的难度标签
+  static String _getLevelLabel(int levelIndex) {
+    switch (levelIndex) {
+      case 0:
+        return 'Basic';
+      case 1:
+        return 'Advanced';
+      case 2:
+        return 'Expert';
+      case 3:
+        return 'Master';
+      case 4:
+        return 'Re:MASTER';
+      default:
+        return '';
+    }
+  }
+  
+  // 根据类型字符串获取标准化的类型标签
+  static String _getTypeLabel(String type) {
+    switch (type.toLowerCase()) {
+      case 'standard':
+        return 'SD';
+      case 'dx':
+        return 'DX';
+      case 'utage':
+        return 'UTAGE';
+      default:
+        return type;
+    }
+  }
+  
+  // 转换 LuoXueScore 到 RecordItem 对象（同步版本，需要提前获取歌曲缓存）
+  static RecordItem toRecordItem(LuoXueScore score, {Song? song}) {
+    // 根据 levelIndex 生成难度标签
+    String levelLabel = _getLevelLabel(score.levelIndex.toInt());
+    
+    // 根据 levelIndex 获取对应的 ds 值
+    double ds = 0.0;
+    if (song != null) {
+      int index = score.levelIndex.toInt();
+      if (index >= 0 && index < song.ds.length) {
+        ds = song.ds[index];
+      }
+    }
+    
+    // 获取 songId：优先使用缓存中歌曲的 id，否则使用原始 score.id
+    int songId = score.id.toInt();
+    if (song != null && song.id.isNotEmpty) {
+      int? parsedId = int.tryParse(song.id);
+      if (parsedId != null) {
+        songId = parsedId;
+      }
+    }
+    
+    return RecordItem(
+      achievements: score.achievements,
+      ds: ds,
+      dxScore: score.dxScore.toInt(),
+      fc: score.fc ?? '',
+      fs: score.fs ?? '',
+      level: score.level,
+      levelIndex: score.levelIndex.toInt(),
+      levelLabel: levelLabel,
+      ra: score.dxRating.toInt(),
+      rate: score.rate,
+      songId: songId,
+      title: decodeUnicode(score.songName),
+      type: _getTypeLabel(score.type),
+    );
+  }
+  
+  // 转换 LuoXueScore 到 RecordItem 对象（异步版本，自动从缓存查找歌曲）
+  static Future<RecordItem> toRecordItemAsync(LuoXueScore score) async {
+    // 从缓存中查找对应的歌曲
+    Song? song;
+    try {
+      final songs = await MaimaiMusicDataManager().getCachedSongs();
+      if (songs != null && songs.isNotEmpty) {
+        song = songs.firstWhere(
+          (s) => s.id == score.id.toString(),
+          orElse: () => Song(
+            id: '',
+            title: '',
+            type: '',
+            ds: [],
+            level: [],
+            cids: [],
+            charts: [],
+            basicInfo: BasicInfo(
+              title: '',
+              artist: '',
+              genre: '',
+              bpm: 0,
+              releaseDate: '',
+              from: '',
+              isNew: false,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('查找歌曲失败: $e');
+    }
+    
+    return toRecordItem(score, song: song);
   }
 }

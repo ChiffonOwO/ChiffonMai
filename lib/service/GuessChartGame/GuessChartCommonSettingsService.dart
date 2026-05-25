@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:my_first_flutter_app/constant/CacheKeyConstant.dart';
 
 class GuessChartCommonSettingsService {
   // 单例模式
@@ -30,20 +31,20 @@ class GuessChartCommonSettingsService {
     int? nonEnglishCharThreshold,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('guessChart_selectedVersions', selectedVersions);
-    await prefs.setDouble('guessChart_masterMinDx', masterMinDx);
-    await prefs.setDouble('guessChart_masterMaxDx', masterMaxDx);
-    await prefs.setStringList('guessChart_selectedGenres', selectedGenres);
-    await prefs.setInt('guessChart_maxGuesses', maxGuesses);
-    await prefs.setInt('guessChart_timeLimit', timeLimit);
+    await prefs.setStringList(CacheKeyConstant.guessChartSelectedVersions, selectedVersions);
+    await prefs.setDouble(CacheKeyConstant.guessChartMasterMinDx, masterMinDx);
+    await prefs.setDouble(CacheKeyConstant.guessChartMasterMaxDx, masterMaxDx);
+    await prefs.setStringList(CacheKeyConstant.guessChartSelectedGenres, selectedGenres);
+    await prefs.setInt(CacheKeyConstant.guessChartMaxGuesses, maxGuesses);
+    await prefs.setInt(CacheKeyConstant.guessChartTimeLimit, timeLimit);
     if (blurLevel != null) {
-      await prefs.setInt('guessChart_blurLevel', blurLevel);
+      await prefs.setInt(CacheKeyConstant.guessChartBlurLevel, blurLevel);
     }
     if (songCount != null) {
-      await prefs.setInt('guessChart_songCount', songCount);
+      await prefs.setInt(CacheKeyConstant.guessChartSongCount, songCount);
     }
     if (nonEnglishCharThreshold != null) {
-      await prefs.setInt('guessChart_nonEnglishCharThreshold', nonEnglishCharThreshold);
+      await prefs.setInt(CacheKeyConstant.guessChartNonEnglishCharThreshold, nonEnglishCharThreshold);
     }
   }
 
@@ -51,15 +52,15 @@ class GuessChartCommonSettingsService {
   Future<Map<String, dynamic>> loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     return {
-      'selectedVersions': prefs.getStringList('guessChart_selectedVersions') ?? defaultSelectedVersions,
-      'masterMinDx': prefs.getDouble('guessChart_masterMinDx') ?? defaultMasterMinDx,
-      'masterMaxDx': prefs.getDouble('guessChart_masterMaxDx') ?? defaultMasterMaxDx,
-      'selectedGenres': prefs.getStringList('guessChart_selectedGenres') ?? defaultSelectedGenres,
-      'maxGuesses': prefs.getInt('guessChart_maxGuesses') ?? defaultMaxGuesses,
-      'timeLimit': prefs.getInt('guessChart_timeLimit') ?? defaultTimeLimit,
-      'blurLevel': prefs.getInt('guessChart_blurLevel') ?? defaultBlurLevel,
-      'songCount': prefs.getInt('guessChart_songCount') ?? defaultSongCount,
-      'nonEnglishCharThreshold': prefs.getInt('guessChart_nonEnglishCharThreshold') ?? defaultNonEnglishCharThreshold,
+      'selectedVersions': prefs.getStringList(CacheKeyConstant.guessChartSelectedVersions) ?? defaultSelectedVersions,
+      'masterMinDx': prefs.getDouble(CacheKeyConstant.guessChartMasterMinDx) ?? defaultMasterMinDx,
+      'masterMaxDx': prefs.getDouble(CacheKeyConstant.guessChartMasterMaxDx) ?? defaultMasterMaxDx,
+      'selectedGenres': prefs.getStringList(CacheKeyConstant.guessChartSelectedGenres) ?? defaultSelectedGenres,
+      'maxGuesses': prefs.getInt(CacheKeyConstant.guessChartMaxGuesses) ?? defaultMaxGuesses,
+      'timeLimit': prefs.getInt(CacheKeyConstant.guessChartTimeLimit) ?? defaultTimeLimit,
+      'blurLevel': prefs.getInt(CacheKeyConstant.guessChartBlurLevel) ?? defaultBlurLevel,
+      'songCount': prefs.getInt(CacheKeyConstant.guessChartSongCount) ?? defaultSongCount,
+      'nonEnglishCharThreshold': prefs.getInt(CacheKeyConstant.guessChartNonEnglishCharThreshold) ?? defaultNonEnglishCharThreshold,
     };
   }
 

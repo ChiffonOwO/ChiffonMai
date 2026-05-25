@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../service/CollectionInfoService.dart';
-import '../entity/Collection.dart';
+import '../entity/LuoXue/Collection.dart';
 import '../utils/LuoXueToDivingFishUtil.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/CollectionsImageUtil.dart';

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/service/SongSearchService.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
-import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
-import 'package:my_first_flutter_app/manager/DiffMusicDataManager.dart';
-import 'package:my_first_flutter_app/manager/CollectionsManager.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/DiffMusicDataManager.dart';
+import 'package:my_first_flutter_app/manager/LuoXue/CollectionsManager.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
-import 'package:my_first_flutter_app/entity/Collection.dart';
+import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SongInfoService {

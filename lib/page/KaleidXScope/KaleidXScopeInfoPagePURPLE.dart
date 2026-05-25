@@ -5,8 +5,8 @@ import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/service/KaleidXScope/KaleidXScopeInfoServicePURPLE.dart'
     as purpleService;
 import 'package:my_first_flutter_app/service/KaleidXScope/KaleidXScopeSelectService.dart';
-import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
-import 'package:my_first_flutter_app/entity/Song.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 
 class KaleidXScopeInfoPagePURPLE extends StatefulWidget {

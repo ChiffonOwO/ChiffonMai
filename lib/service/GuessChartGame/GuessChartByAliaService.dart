@@ -2,11 +2,11 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:my_first_flutter_app/entity/GuessSong.dart';
-import 'package:my_first_flutter_app/entity/MaiTagsEntity.dart';
-import 'package:my_first_flutter_app/entity/Song.dart';
+import 'package:my_first_flutter_app/entity/GuessChartGame/GuessSong.dart';
+import 'package:my_first_flutter_app/entity/DXRating/MaiTagsEntity.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
-import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 
 class GuessChartByAliaService {

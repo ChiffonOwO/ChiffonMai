@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/service/RankListService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
-import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
-import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
-import 'package:my_first_flutter_app/entity/Song.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 
 class RankDetailPage extends StatefulWidget {

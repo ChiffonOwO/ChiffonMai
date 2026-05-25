@@ -3,9 +3,9 @@ import 'dart:convert' show utf8;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
-import 'package:my_first_flutter_app/entity/Collection.dart';
+import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../constant/CacheKeyConstant.dart';
+import '../../constant/CacheKeyConstant.dart';
 
 class CollectionsManager {
   // 单例模式

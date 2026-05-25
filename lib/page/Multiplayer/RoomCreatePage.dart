@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/entity/GameType.dart';
+import 'package:my_first_flutter_app/entity/Multiplayer/GameType.dart';
 import 'package:my_first_flutter_app/manager/MultiplayerManager.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartByInfoService.dart';
+import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
 
 class RoomCreatePage extends StatefulWidget {
   const RoomCreatePage({super.key});
@@ -45,36 +46,23 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
         Set<String> versions = {};
         Set<String> genres = {};
         
-        for (var song in allSongs) {
+        // 过滤掉从maidata追加的歌曲（cids全为0表示从maidata解析）
+        final validSongs = allSongs.where((song) => 
+          song.cids.isNotEmpty && !song.cids.every((cid) => cid == 0)
+        ).toList();
+        
+        for (var song in validSongs) {
           versions.add(song.basicInfo.from);
           genres.add(song.basicInfo.genre);
         }
         
+        // 过滤掉maidata中的版本，只保留标准版本
+        versions = versions.where((v) => VersionListConstant.standardVersions.contains(v)).toSet();
+        
         // 按照游戏发布顺序排序版本
         _allVersions = versions.toList()..sort((a, b) {
-          final Map<String, int> versionOrder = {
-            'maimai': 1,
-            'maimai PLUS': 2,
-            'maimai GreeN': 3,
-            'maimai GreeN PLUS': 4,
-            'maimai ORANGE': 5,
-            'maimai ORANGE PLUS': 6,
-            'maimai PiNK': 7,
-            'maimai PiNK PLUS': 8,
-            'maimai MURASAKi': 9,
-            'maimai MURASAKi PLUS': 10,
-            'maimai MiLK': 11,
-            'MiLK PLUS': 12,
-            'maimai FiNALE': 13,
-            'maimai でらっくす': 14,
-            'maimai でらっくす Splash': 15,
-            'maimai でらっくす UNiVERSE': 16,
-            'maimai でらっくす FESTiVAL': 17,
-            'maimai でらっくす BUDDiES': 18,
-            'maimai でらっくす PRiSM': 19,
-          };
-          int orderA = versionOrder[a] ?? 999;
-          int orderB = versionOrder[b] ?? 999;
+          int orderA = VersionListConstant.versionOrderMap[a] ?? 999;
+          int orderB = VersionListConstant.versionOrderMap[b] ?? 999;
           return orderA.compareTo(orderB);
         });
         

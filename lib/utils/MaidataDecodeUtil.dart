@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import '../entity/Song.dart';
+import '../entity/DivingFish/Song.dart';
 
 class MaidataDecodeUtil {
   // 正则：匹配 {数字} 或 (数字)

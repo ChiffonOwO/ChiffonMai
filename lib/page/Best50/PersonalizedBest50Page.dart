@@ -7,9 +7,10 @@ import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import '../../service/Best50/PersonalizedBest50Service.dart';
-import '../../manager/MaimaiMusicDataManager.dart';
+import '../../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../SongInfoPage.dart';
 import '../../utils/CoverUtil.dart';
+import '../../constant/VersionListConstant.dart';
 
 class PersonalizedBest50Page extends StatefulWidget {
   const PersonalizedBest50Page({super.key});
@@ -442,34 +443,11 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
       return;
     }
 
-    // 定义版本顺序
-    final List<String> versionOrder = [
-      'maimai',
-      'maimai PLUS',
-      'maimai GreeN',
-      'maimai GreeN PLUS',
-      'maimai ORANGE',
-      'maimai ORANGE PLUS',
-      'maimai PiNK',
-      'maimai PiNK PLUS',
-      'maimai MURASAKi',
-      'maimai MURASAKi PLUS',
-      'maimai MiLK',
-      'MiLK PLUS',
-      'maimai FiNALE',
-      'maimai でらっくす',
-      'maimai でらっくす Splash',
-      'maimai でらっくす UNiVERSE',
-      'maimai でらっくす FESTiVAL',
-      'maimai でらっくす BUDDiES',
-      'maimai でらっくす PRiSM',
-    ];
-
     // 按版本顺序排序
     List<MapEntry<String, int>> sortedVersions = _versionCounts!.entries.toList()
       ..sort((a, b) {
-        int indexA = versionOrder.indexOf(a.key);
-        int indexB = versionOrder.indexOf(b.key);
+        int indexA = VersionListConstant.versionOrderList.indexOf(a.key);
+        int indexB = VersionListConstant.versionOrderList.indexOf(b.key);
         if (indexA != -1 && indexB != -1) {
           return indexA.compareTo(indexB);
         } else if (indexA != -1) {

@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:jp_transliterate/jp_transliterate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api/ApiUrls.dart';
-import '../manager/MaimaiMusicDataManager.dart';
+import '../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../manager/MaidataManager.dart';
 import '../constant/CacheKeyConstant.dart';
 import '../constant/CacheTimestampConstant.dart';

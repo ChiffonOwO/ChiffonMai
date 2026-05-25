@@ -1,17 +1,17 @@
 class RecordItem {
-    final num achievements;
-    final double ds;
-    final int dxScore;
-    final String fc;
-    final String fs;
-    final String level;
-    final int levelIndex;
-    final String levelLabel;
-    final int ra;
-    final String rate;
-    final int songId;
-    final String title;
-    final String type;
+    final num achievements; // 达成率
+    final double ds; // 定数（14.9）
+    final int dxScore; // DX分数
+    final String fc; // 连击
+    final String fs; // 同步
+    final String level; // 难度标级（14+）
+    final int levelIndex; // 难度索引
+    final String levelLabel; // 难度（Master）
+    final int ra; // Rating
+    final String rate; // 评级类型
+    final int songId; // 曲目id
+    final String title; // 曲目名称
+    final String type; // 音乐类型（SD/DX）
     
     RecordItem({
       required this.achievements,

@@ -8,7 +8,7 @@ import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import '../../service/Best50/DiffBest50Service.dart';
 import '../../service/Best50/DiffBest50ConvertToImgService.dart';
-import '../../manager/MaimaiMusicDataManager.dart';
+import '../../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../SongInfoPage.dart';
 import '../../utils/CoverUtil.dart';
 import '../../utils/TextStyleUtil.dart';

@@ -18,6 +18,12 @@ class WebSocketBroadcastService {
   bool _isConnected = false;
   String? _currentPlayerId;
   
+  // 重连成功回调
+  void Function()? onReconnected;
+  
+  // 是否正在主动断开连接（用于区分主动断开和被动断开）
+  bool _isDisconnecting = false;
+  
   // 心跳相关
   Timer? _heartbeatTimer;
   Timer? _reconnectTimer;
@@ -40,17 +46,22 @@ class WebSocketBroadcastService {
     String appkey = '',
     String? username,
   }) async {
+    // 重置主动断开标志，允许重连
+    _isDisconnecting = false;
+    
     // 保存连接信息用于重连
     _host = host;
     _appkey = appkey;
     _username = username;
     
-    if (_isConnected) {
-      debugPrint('[WebSocket] 已连接，跳过初始化');
-      return;
-    }
-
     try {
+      // 如果已连接且连接正常，直接返回，不重新连接
+      // 只有在连接断开或未连接时才建立新连接
+      if (_isConnected && _channel != null) {
+        debugPrint('[WebSocket] 已连接，跳过初始化');
+        return;
+      }
+
       // 构建 WebSocket URL
       // 如果是 http/https URL，转换为 ws/wss
       String wsUrl = host;
@@ -75,16 +86,25 @@ class WebSocketBroadcastService {
           debugPrint('[WebSocket] 错误: $error');
           _isConnected = false;
           _stopHeartbeat();
-          _scheduleReconnect();
+          // 如果不是主动断开，才触发重连
+          if (!_isDisconnecting) {
+            _scheduleReconnect();
+          }
         },
         onDone: () {
           debugPrint('[WebSocket] 连接关闭');
           _isConnected = false;
           _stopHeartbeat();
-          _scheduleReconnect();
+          // 如果不是主动断开，才触发重连
+          if (!_isDisconnecting) {
+            _scheduleReconnect();
+          }
         },
       );
 
+      // 等待连接真正建立
+      await Future.delayed(const Duration(milliseconds: 500));
+      
       _isConnected = true;
       _reconnectAttempts = 0;
       debugPrint('[WebSocket] 连接成功');
@@ -184,6 +204,12 @@ class WebSocketBroadcastService {
           username: _username,
         );
         debugPrint('[WebSocket] 重连成功');
+        
+        // 调用重连成功回调
+        if (onReconnected != null) {
+          debugPrint('[WebSocket] 触发重连成功回调');
+          onReconnected!();
+        }
       } else {
         debugPrint('[WebSocket] 无法重连：没有保存连接信息');
       }
@@ -207,8 +233,9 @@ class WebSocketBroadcastService {
           'nickname': nickname,
         },
       });
+      debugPrint('[WebSocket] 准备发送初始化消息: $data');
       _channel!.sink.add(data);
-      debugPrint('[WebSocket] 发送初始化消息');
+      debugPrint('[WebSocket] 初始化消息已发送');
     } catch (e) {
       debugPrint('[WebSocket] 发送初始化消息失败: $e');
     }
@@ -492,15 +519,20 @@ class WebSocketBroadcastService {
 
   void _handleMessage(dynamic message) {
     try {
-      debugPrint('[WebSocket] 收到消息: ${message.toString().substring(0, message.toString().length > 200 ? 200 : message.toString().length)}');
+      debugPrint('[WebSocket] ====== 收到消息 ======');
+      debugPrint('[WebSocket] 原始消息: ${message.toString().substring(0, message.toString().length > 500 ? 500 : message.toString().length)}');
       
       final Map<String, dynamic> data = json.decode(message.toString());
+      debugPrint('[WebSocket] 解析后的消息: $data');
+      
       final String action = data['action'] ?? '';
+      debugPrint('[WebSocket] 消息 action: "$action"');
       
       // 如果是初始化响应，保存玩家ID
       if (action == 'initialized') {
         _currentPlayerId = data['payload']?['playerId'];
         debugPrint('[WebSocket] 收到初始化响应，playerId: $_currentPlayerId');
+        debugPrint('[WebSocket] 响应 payload: ${data['payload']}');
       }
       
       // 处理心跳响应，更新最后收到心跳的时间
@@ -537,14 +569,22 @@ class WebSocketBroadcastService {
   }
 
   void disconnect() {
+    // 标记为主动断开，防止触发重连
+    _isDisconnecting = true;
+    debugPrint('[WebSocket] 开始主动断开连接');
+    
     // 停止所有定时器
     _stopHeartbeat();
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     
+    // 关闭连接
     _channel?.sink.close(status.normalClosure);
+    _channel = null;
+    
     _isConnected = false;
     _listeners.clear();
+    
     debugPrint('[WebSocket] 已断开连接');
   }
 

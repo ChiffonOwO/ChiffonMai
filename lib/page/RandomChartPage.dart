@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/service/RandomChartService.dart';
-import 'package:my_first_flutter_app/entity/Song.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';

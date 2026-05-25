@@ -8,7 +8,7 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const PORT = process.env.PORT || 80;
+const PORT = process.env.PORT || 3000;
 
 // 与 Flutter 前端相同的音乐数据 API
 const MUSIC_DATA_API = 'https://www.diving-fish.com/api/maimaidxprober/music_data';
@@ -303,7 +303,7 @@ let songCache = [];
 // 从 API 获取全量歌曲数据（与 Flutter 前端 MaimaiMusicDataManager.dart 相同的逻辑）
 async function fetchMusicDataFromApi() {
   return new Promise((resolve, reject) => {
-    console.log(`[Music API] 正在从 ${MUSIC_DATA_API} 获取歌曲数据...`);
+    //console.log(`[Music API] 正在从 ${MUSIC_DATA_API} 获取歌曲数据...`);
     
     https.get(MUSIC_DATA_API, (res) => {
       let data = '';
@@ -316,7 +316,7 @@ async function fetchMusicDataFromApi() {
         try {
           const songs = JSON.parse(data);
           if (Array.isArray(songs)) {
-            console.log(`[Music API] 成功获取 ${songs.length} 首歌曲`);
+            //console.log(`[Music API] 成功获取 ${songs.length} 首歌曲`);
             resolve(songs);
           } else {
             reject(new Error('API 返回的数据不是数组'));
@@ -336,7 +336,7 @@ async function initializeSongCache() {
   try {
     const songs = await fetchMusicDataFromApi();
     updateSongCache(songs);
-    console.log(`[Music API] 歌曲缓存初始化完成，共 ${songCache.length} 首歌曲`);
+    //console.log(`[Music API] 歌曲缓存初始化完成，共 ${songCache.length} 首歌曲`);
   } catch (error) {
     console.error(`[Music API] 初始化歌曲缓存失败: ${error.message}`);
     console.log('[Music API] 将使用默认歌曲数据');
@@ -462,7 +462,7 @@ function updateSongCache(songs) {
   // 直接替换整个缓存，保留完整的 Song 结构
   songCache = songs.filter(song => song.id && song.title);
   
-  console.log(`歌曲缓存已替换，当前共 ${songCache.length} 首歌曲`);
+  //console.log(`歌曲缓存已替换，当前共 ${songCache.length} 首歌曲`);
 }
 
 // 获取歌曲缓存数量
@@ -575,12 +575,31 @@ function broadcast(roomId, message, excludePlayerId = null) {
 // 发送消息给单个玩家
 function sendToPlayer(playerId, message) {
   const player = players.get(playerId);
-  if (player && player.socket && player.socket.readyState === WebSocket.OPEN) {
-    try {
-      player.socket.send(JSON.stringify(message));
-    } catch (error) {
-      console.error('Send to player error:', error);
-    }
+  const timestamp = new Date().toISOString();
+  
+  if (!player) {
+    console.error(`[${timestamp}] [ERROR] Player not found: ${playerId}`);
+    return;
+  }
+  
+  if (!player.socket) {
+    console.error(`[${timestamp}] [ERROR] Socket not found for player: ${playerId}`);
+    return;
+  }
+  
+  if (player.socket.readyState !== WebSocket.OPEN) {
+    console.error(`[${timestamp}] [ERROR] Socket not open for player: ${playerId}, readyState: ${player.socket.readyState}`);
+    console.error(`[${timestamp}] [ERROR] ReadyState values: OPEN=1, CLOSING=2, CLOSED=3, CONNECTING=0`);
+    return;
+  }
+  
+  try {
+    const messageStr = JSON.stringify(message);
+    console.log(`[${timestamp}] [DEBUG] Sending message to ${playerId}: ${messageStr}`);
+    player.socket.send(messageStr);
+    console.log(`[${timestamp}] [DEBUG] Message sent successfully to ${playerId}`);
+  } catch (error) {
+    console.error(`[${timestamp}] [ERROR] Send to player ${playerId} error:`, error);
   }
 }
 
@@ -593,21 +612,45 @@ wss.on('connection', (ws) => {
   
   console.log(`Player connected: ${playerId}`);
 
+  // 添加连接状态日志
+  console.log(`[${new Date().toISOString()}] [DEBUG] New WebSocket connection from: ${ws.upgradeReq?.connection?.remoteAddress || 'unknown'}`);
+
+  ws.on('open', () => {
+    console.log(`[${new Date().toISOString()}] [DEBUG] WebSocket connection opened for player: ${playerId}`);
+  });
+
+  ws.on('close', (code, reason) => {
+    console.log(`[${new Date().toISOString()}] [DEBUG] WebSocket connection closed for player: ${playerId}, code: ${code}, reason: ${reason.toString()}`);
+  });
+
+  ws.on('error', (error) => {
+    console.error(`[${new Date().toISOString()}] [ERROR] WebSocket error for player: ${playerId}, error: ${error}`);
+  });
+
   ws.on('message', (data) => {
     try {
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}] [DEBUG] Received raw message from ${playerId}: ${data.toString()}`);
+      
       const message = JSON.parse(data);
       const { action, payload } = message;
       
-      console.log(`Received action: ${action} from player: ${playerId}`);
+      console.log(`[${timestamp}] [DEBUG] Parsed action: ${action}, payload: ${JSON.stringify(payload)}`);
       
       switch (action) {
         // 初始化连接
         case 'initialize': {
           player.nickname = payload?.nickname || `Player_${playerId.slice(0, 8)}`;
-          sendToPlayer(playerId, {
+          console.log(`[${timestamp}] [DEBUG] Initializing player ${playerId} with nickname: ${player.nickname}`);
+          
+          const response = {
             action: 'initialized',
             payload: { playerId, nickname: player.nickname }
-          });
+          };
+          console.log(`[${timestamp}] [DEBUG] Sending initialized response to ${playerId}: ${JSON.stringify(response)}`);
+          
+          sendToPlayer(playerId, response);
+          console.log(`[${timestamp}] [DEBUG] Initialized response sent successfully to ${playerId}`);
           break;
         }
 
@@ -1397,7 +1440,7 @@ async function startServer() {
   // 启动 WebSocket 服务器
   server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    console.log(`当前歌曲缓存: ${songCache.length} 首歌曲`);
+    //console.log(`当前歌曲缓存: ${songCache.length} 首歌曲`);
   });
 }
 

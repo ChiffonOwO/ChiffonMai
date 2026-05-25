@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/service/SongPlayService.dart';
-import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:io';

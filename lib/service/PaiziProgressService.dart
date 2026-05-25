@@ -1,8 +1,8 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:my_first_flutter_app/manager/CollectionsManager.dart';
-import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
-import 'package:my_first_flutter_app/entity/Collection.dart';
-import 'package:my_first_flutter_app/entity/Song.dart';
+import 'package:my_first_flutter_app/manager/LuoXue/CollectionsManager.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
+import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/utils/LuoXueToDivingFishUtil.dart';
 
 class PaiziProgressService {

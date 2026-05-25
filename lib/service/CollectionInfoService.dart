@@ -2,8 +2,8 @@
  * 收藏品详情服务
  * */
 import 'package:flutter/foundation.dart';
-import 'package:my_first_flutter_app/manager/CollectionsManager.dart';
-import 'package:my_first_flutter_app/entity/Collection.dart';
+import 'package:my_first_flutter_app/manager/LuoXue/CollectionsManager.dart';
+import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
 
 class CollectionInfoService {
   // 获取收藏品详情

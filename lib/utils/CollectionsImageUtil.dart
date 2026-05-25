@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:my_first_flutter_app/entity/Collection.dart';
+import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
 
 /**
  * 收藏品图片工具类

@@ -3,8 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:my_first_flutter_app/entity/DiffSong.dart';
-import '../constant/CacheKeyConstant.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/DiffSong.dart';
+import '../../constant/CacheKeyConstant.dart';
 
 class DiffMusicDataManager {
   // 单例模式

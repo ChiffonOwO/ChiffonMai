@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:my_first_flutter_app/entity/Song.dart';
-import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 
 class KaleidXScopeInfoServiceWHITE {
   // 单例模式

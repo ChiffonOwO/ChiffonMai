@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/service/PaiziProgressService.dart';
-import 'package:my_first_flutter_app/entity/Collection.dart';
-import 'package:my_first_flutter_app/entity/Song.dart';
+import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CollectionsImageUtil.dart';

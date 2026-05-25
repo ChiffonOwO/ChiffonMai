@@ -25,4 +25,14 @@ class ApiUrls {
   // Maidata 服务器地址
   static const String MaidataServerBaseUrl = 'http://152.136.125.98';
   static const String MaidataServerPortUrl = 'http://152.136.125.98:8888';
+  
+  // 落雪 OAuth 相关地址
+  static const String LuoXueBaseUrl = 'https://maimai.lxns.net';
+  static const String LuoXueApiBaseUrl = 'https://maimai.lxns.net/api/v0';
+  static const String LuoXueOAuthTokenUrl = 'https://maimai.lxns.net/api/v0/oauth/token';
+  static const String LuoXueOAuthAuthorizeUrl = 'https://maimai.lxns.net/oauth/authorize';
+  
+  // 落雪玩家数据 API
+  static const String LuoXuePlayerApi = 'https://maimai.lxns.net/api/v0/user/maimai/player';
+  static const String LuoXuePlayerScoresApi = 'https://maimai.lxns.net/api/v0/user/maimai/player/scores';
 }

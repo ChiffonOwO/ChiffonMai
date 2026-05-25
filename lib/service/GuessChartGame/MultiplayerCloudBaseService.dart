@@ -7,7 +7,7 @@ import '../../entity/Multiplayer/RoomEntity.dart';
 import '../../entity/Multiplayer/PlayerEntity.dart';
 import '../../entity/Multiplayer/GameStateEntity.dart';
 import '../../entity/Multiplayer/GuessRecord.dart';
-import '../../entity/GameType.dart';
+import '../../entity/Multiplayer/GameType.dart';
 
 class MultiplayerCloudBaseService {
   static final MultiplayerCloudBaseService _instance = MultiplayerCloudBaseService._internal();
@@ -33,11 +33,29 @@ class MultiplayerCloudBaseService {
 
   Stream<MultiplayerEvent> get events => _controller.stream;
 
+  // 初始化连接（带超时等待）
   Future<void> initialize({
     required String envId,
     String? nickname,
   }) async {
-    debugPrint('[DEBUG][CloudService] initialize 方法被调用');
+    await _initializeConnection(envId, nickname, waitForResponse: true);
+  }
+  
+  // 初始化连接（不带超时等待，用于页面进入时快速建立连接）
+  Future<void> initializeConnectionOnly({
+    required String envId,
+    String? nickname,
+  }) async {
+    await _initializeConnection(envId, nickname, waitForResponse: false);
+  }
+  
+  // 内部初始化方法
+  Future<void> _initializeConnection(
+    String envId,
+    String? nickname, {
+    bool waitForResponse = true,
+  }) async {
+    debugPrint('[DEBUG][CloudService] _initializeConnection 方法被调用, waitForResponse=$waitForResponse');
     debugPrint('[DEBUG][CloudService] 当前 currentPlayerId: $currentPlayerId');
     debugPrint('[DEBUG][CloudService] 当前 WebSocket 连接状态: ${_wsBroadcast.isConnected}');
     
@@ -53,17 +71,27 @@ class MultiplayerCloudBaseService {
       String? finalNickname = nickname ?? (cachedNickname.isEmpty || cachedNickname == '玩家' ? null : cachedNickname);
       currentNickname = finalNickname;
       
+      // 设置重连回调，用于重连后恢复状态
+      _setupReconnectCallback();
+      debugPrint('[DEBUG][CloudService] 重连回调已设置');
+      
+      // 先设置消息处理器，确保不会丢失服务器的响应
+      _setupMessageHandler();
+      debugPrint('[DEBUG][CloudService] 消息处理器已设置');
+      
       await _wsBroadcast.initialize(host: envId);
       debugPrint('[DEBUG][CloudService] WebSocket 连接成功');
       
-      _setupMessageHandler();
-      
-      // 无论之前是否连接，都需要重新发送初始化消息
-      // WebSocket重连后服务器会分配新的玩家ID，必须重新初始化
+      // 发送初始化消息获取玩家ID
       debugPrint('[DEBUG][CloudService] 发送初始化消息获取玩家ID...');
       await _wsBroadcast.sendInitialize(finalNickname);
-      debugPrint('[DEBUG][CloudService] 等待初始化响应...');
-      await _waitForInitialization();
+      
+      if (waitForResponse) {
+        debugPrint('[DEBUG][CloudService] 等待初始化响应...');
+        await _waitForInitialization();
+      } else {
+        debugPrint('[DEBUG][CloudService] 不等待响应，连接已建立');
+      }
       
     } catch (e, stackTrace) {
       debugPrint('[DEBUG][CloudService] 初始化失败 $e');
@@ -102,6 +130,14 @@ class MultiplayerCloudBaseService {
     await completer.future;
   }
 
+  void _setupReconnectCallback() {
+    _wsBroadcast.onReconnected = () {
+      debugPrint('[DEBUG][CloudService] 收到重连成功回调');
+      // 重连后自动恢复状态
+      restoreStateAfterReconnect();
+    };
+  }
+  
   void _setupMessageHandler() {
     _wsBroadcast.subscribe(channel: 'global', onMessage: (Map<String, dynamic> data) {
       try {
@@ -527,25 +563,85 @@ class MultiplayerCloudBaseService {
       if (currentRoomId == null) return;
       
       await _wsBroadcast.sendLeaveRoom();
-      // 清除房间相关状态
+      // 清除房间相关状态，但保留玩家ID以便后续使用
       _rooms.remove(currentRoomId);
       currentRoomId = null;
-      // 清除玩家ID，确保下次创建房间时重新初始化
-      currentPlayerId = null;
+      // 保留玩家ID，不清除，以便重连后保持身份
+      // currentPlayerId 会在重连时由服务器重新分配
       
     } catch (e) {
       _controller.add(MultiplayerEvent.error(message: '离开房间失败: $e'));
     }
   }
+  
+  // 重连后恢复状态
+  Future<void> restoreStateAfterReconnect() async {
+    debugPrint('[DEBUG][CloudService] 重连后尝试恢复状态');
+    
+    if (currentRoomId != null && _rooms.containsKey(currentRoomId)) {
+      String roomId = currentRoomId!;
+      debugPrint('[DEBUG][CloudService] 尝试重新加入房间: $roomId');
+      try {
+        await joinRoom(roomId);
+      } catch (e) {
+        debugPrint('[DEBUG][CloudService] 重新加入房间失败: $e');
+        // 如果重新加入失败，清除房间状态
+        currentRoomId = null;
+        _rooms.remove(roomId);
+      }
+    }
+  }
+
+  /// 重新加入房间并重试操作
+  Future<void> _rejoinAndRetry(Future<void> Function() operation) async {
+    try {
+      if (currentRoomId == null) {
+        debugPrint('[DEBUG][CloudService] _rejoinAndRetry: 当前房间ID为空');
+        return;
+      }
+      
+      debugPrint('[DEBUG][CloudService] _rejoinAndRetry: 尝试重新加入房间 $currentRoomId');
+      
+      // 等待短暂时间确保WebSocket连接稳定
+      await Future.delayed(const Duration(milliseconds: 300));
+      
+      // 重新加入房间
+      await joinRoom(currentRoomId!);
+      
+      // 等待短暂时间确保加入成功
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // 重试原始操作
+      debugPrint('[DEBUG][CloudService] _rejoinAndRetry: 重新加入成功，重试操作');
+      await operation();
+      
+    } catch (e) {
+      debugPrint('[DEBUG][CloudService] _rejoinAndRetry 失败: $e');
+      _controller.add(MultiplayerEvent.error(message: '重新加入房间失败: $e'));
+      // 清除房间状态
+      currentRoomId = null;
+    }
+  }
 
   Future<void> setReady(bool ready) async {
     try {
-      if (currentRoomId == null) return;
+      // 如果不在房间中，先检查是否需要重新加入
+      if (currentRoomId == null) {
+        debugPrint('[DEBUG][CloudService] setReady: 当前不在房间中');
+        return;
+      }
       
       await _wsBroadcast.sendUpdateReady(ready);
       
     } catch (e) {
-      _controller.add(MultiplayerEvent.error(message: '设置准备状态失败: $e'));
+      debugPrint('[DEBUG][CloudService] 设置准备状态失败: $e');
+      // 如果是"不在房间中"的错误，尝试重新加入房间
+      if (e.toString().contains('您不在任何房间中') || e.toString().contains('不在房间中') || e.toString().contains('not in room')) {
+        debugPrint('[DEBUG][CloudService] 检测到不在房间中，尝试重新加入');
+        await _rejoinAndRetry(() => setReady(ready));
+      } else {
+        _controller.add(MultiplayerEvent.error(message: '设置准备状态失败: $e'));
+      }
     }
   }
 
@@ -567,7 +663,14 @@ class MultiplayerCloudBaseService {
       await _wsBroadcast.sendStartGame();
       
     } catch (e) {
-      _controller.add(MultiplayerEvent.error(message: '开始游戏失败: $e'));
+      debugPrint('[DEBUG][CloudService] 开始游戏失败: $e');
+      // 如果是"不在房间中"的错误，尝试重新加入房间
+      if (e.toString().contains('您不在任何房间中') || e.toString().contains('不在房间中') || e.toString().contains('not in room')) {
+        debugPrint('[DEBUG][CloudService] 检测到不在房间中，尝试重新加入');
+        await _rejoinAndRetry(() => startGame());
+      } else {
+        _controller.add(MultiplayerEvent.error(message: '开始游戏失败: $e'));
+      }
     }
   }
 

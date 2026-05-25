@@ -7,9 +7,9 @@ import 'package:my_first_flutter_app/utils/TextStyleUtil.dart';
 import 'package:my_first_flutter_app/service/KaleidXScope/KaleidXScopeInfoServiceWHITE.dart'
     as whiteService;
 import 'package:my_first_flutter_app/service/KaleidXScope/KaleidXScopeSelectService.dart';
-import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
-import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
-import 'package:my_first_flutter_app/entity/Song.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/page/CollectionInfoPage.dart';
 

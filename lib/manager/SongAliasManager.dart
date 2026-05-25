@@ -2,7 +2,7 @@ import 'dart:convert' show utf8, jsonDecode, jsonEncode;
 import 'package:flutter/foundation.dart';
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/entity/SongAliasModel.dart';
-import 'package:my_first_flutter_app/entity/DXRatingSongAliasModel.dart';
+import 'package:my_first_flutter_app/entity/DXRating/DXRatingSongAliasModel.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 

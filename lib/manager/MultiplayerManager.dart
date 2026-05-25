@@ -4,7 +4,7 @@ import 'package:my_first_flutter_app/entity/Multiplayer/RoomEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/PlayerEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/GameStateEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/GuessRecord.dart';
-import 'package:my_first_flutter_app/entity/GameType.dart';
+import 'package:my_first_flutter_app/entity/Multiplayer/GameType.dart';
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/MultiplayerCloudBaseService.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/MultiplayerGameService.dart';

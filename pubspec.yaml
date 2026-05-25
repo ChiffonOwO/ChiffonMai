@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.8.2+19
+version: 1.8.5+22
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -68,9 +68,12 @@ dependencies:
   kana_kit: ^2.1.1
   jp_transliterate: ^1.0.5
   simai_flutter: ^0.2.5
+
   # flutter_soloud: ^3.4.10
   fluttertoast: ^8.2.4
   file_picker: ^11.0.2
+  dio: ^5.9.2
+  webview_flutter: ^4.4.0
 
 dev_dependencies:
   flutter_test:
@@ -136,6 +139,6 @@ flutter:
 flutter_launcher_icons:
   android: true  # 开启Android图标生成
   ios: true      # 开启iOS图标生成
-  image_path: "assets/chiffonIcon2.png"  # 基础图标路径（1024×1024px）
+  image_path: "assets/chiffonIcon.png"  # 基础图标路径（1024×1024px）
   adaptive_icon_background: "#FFFFFF"      # Android 自适应图标背景色（可选）
-  adaptive_icon_foreground: "assets/chiffonIcon2.png"  # Android 自适应图标前景（可选）
+  adaptive_icon_foreground: "assets/chiffonIcon.png"  # Android 自适应图标前景（可选）

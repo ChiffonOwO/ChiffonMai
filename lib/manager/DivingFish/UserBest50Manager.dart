@@ -3,8 +3,8 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:my_first_flutter_app/entity/UserBest50Entity.dart';
-import 'package:my_first_flutter_app/entity/RecordItem.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/UserBest50Entity.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/RecordItem.dart';
 
 class UserBest50Manager {
   // API端点

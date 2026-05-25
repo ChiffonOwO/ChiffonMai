@@ -1,5 +1,5 @@
 import 'package:my_first_flutter_app/entity/Multiplayer/PlayerEntity.dart';
-import 'package:my_first_flutter_app/entity/GameType.dart';
+import 'package:my_first_flutter_app/entity/Multiplayer/GameType.dart';
 
 /// 房间实体类
 class RoomEntity {

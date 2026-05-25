@@ -1,42 +1,43 @@
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
-import 'package:my_first_flutter_app/page/Multiplayer/MultiplayerLobbyPage.dart';
-import 'package:my_first_flutter_app/page/PersonalizedChartPlayConfigure.dart';
-import 'package:my_first_flutter_app/page/RankListPage.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:my_first_flutter_app/page/Best50/Best50Page.dart';
-import 'package:my_first_flutter_app/page/CollectionSearchPage.dart';
-import 'package:my_first_flutter_app/page/Best50/DiffBest50Page.dart';
-import 'package:my_first_flutter_app/page/GuessChartGame/GuessChartByAliaPage.dart';
-import 'package:my_first_flutter_app/page/GuessChartGame/GuessChartByBlurredCoverPage.dart';
-//import 'package:my_first_flutter_app/page/GuessChartByChartExcerptPage.dart';
-import 'package:my_first_flutter_app/page/GuessChartGame/GuessChartByCoverPage.dart';
-import 'package:my_first_flutter_app/page/GuessChartGame/GuessChartByInfoPage.dart';
-import 'package:my_first_flutter_app/page/GuessChartGame/GuessChartBySongExcerptPage.dart';
-import 'package:my_first_flutter_app/page/GuessChartGame/GuessSongByOpenLettersPage.dart';
-import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeSelectPage.dart';
-import 'package:my_first_flutter_app/page/KnowledgeSearchPage.dart';
-import 'package:my_first_flutter_app/page/PersonalizedScorePage.dart';
-import 'package:my_first_flutter_app/page/MaimaiServerStatusPage.dart';
-import 'package:my_first_flutter_app/page/PaiziProgressPage.dart';
-import 'package:my_first_flutter_app/page/Best50/PersonalizedBest50Page.dart';
-import 'package:my_first_flutter_app/page/RandomChartPage.dart';
-import 'package:my_first_flutter_app/page/RecommendByTagsPage.dart';
-import 'package:my_first_flutter_app/page/SingleRatingCalculatorPage.dart';
-import 'package:my_first_flutter_app/page/SongSearchPage.dart';
-import 'package:my_first_flutter_app/manager/UserBest50Manager.dart';
-import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
-import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
-import 'package:my_first_flutter_app/manager/DiffMusicDataManager.dart';
-import 'package:my_first_flutter_app/manager/LZYCheckUpdateManager.dart';
-import 'package:my_first_flutter_app/page/UserScoreSearchPage.dart';
-import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constant/CacheKeyConstant.dart';
+import '../service/HomeService.dart';
+import '../service/RecommendByTagsService.dart';
+import '../utils/CommonWidgetUtil.dart';
+import '../manager/LZYCheckUpdateManager.dart';
+import '../manager/DivingFish/UserPlayDataManager.dart';
+import '../manager/DivingFish/MaimaiMusicDataManager.dart';
+import '../manager/DivingFish/DiffMusicDataManager.dart';
+import '../manager/SongAliasManager.dart';
+import '../manager/DivingFish/UserBest50Manager.dart';
+import '../manager/LuoXue/LuoXueUserPlayDataManager.dart';
 import 'AchievementFullReverseCalculatorPage.dart';
-import 'VersionViewPage.dart';
 import 'AchievementRateCalculatorPage.dart';
+import 'VersionViewPage.dart';
+import 'Best50/Best50Page.dart';
+import 'Best50/DiffBest50Page.dart';
+import 'Best50/PersonalizedBest50Page.dart';
+import 'CollectionSearchPage.dart';
+import 'GuessChartGame/GuessChartByAliaPage.dart';
+import 'GuessChartGame/GuessChartByBlurredCoverPage.dart';
+import 'GuessChartGame/GuessChartByCoverPage.dart';
+import 'GuessChartGame/GuessChartByInfoPage.dart';
+import 'GuessChartGame/GuessChartBySongExcerptPage.dart';
+import 'GuessChartGame/GuessSongByOpenLettersPage.dart';
+import 'KaleidXScope/KaleidXScopeSelectPage.dart';
+import 'KnowledgeSearchPage.dart';
+import 'MaimaiServerStatusPage.dart';
+import 'Multiplayer/MultiplayerLobbyPage.dart';
+import 'PaiziProgressPage.dart';
+import 'PersonalizedChartPlayConfigure.dart';
+import 'PersonalizedScorePage.dart';
+import 'RankListPage.dart';
+import 'RandomChartPage.dart';
+import 'RecommendByTagsPage.dart';
+import 'SingleRatingCalculatorPage.dart';
+import 'SongSearchPage.dart';
+import 'UserScoreSearchPage.dart';
 
 // 应用常量类：集中管理所有硬编码的配置值
 class AppConstants {
@@ -92,16 +93,29 @@ class ButtonItem {
 
 /// 首页组件：有状态组件，包含所有页面元素和业务数据
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final VoidCallback? onFirstFrameRendered;
+
+  const HomePage({super.key, this.onFirstFrameRendered});
 
   @override
   State<HomePage> createState() => _HomePageState();
+}
+
+/// 数据源枚举
+enum DataSource {
+  shuiyu,  // 水鱼
+  luoxue,  // 落雪
 }
 
 /// 首页状态类：处理页面状态、存储数据、实现布局构建
 class _HomePageState extends State<HomePage> {
   // 加载状态
   bool _isLoading = false;
+  
+  // 后台初始化状态
+  bool _isBackgroundInitializing = false;
+  bool _isInitializationCompleted = false;
+  String _initializationProgress = '';
   
   // 用户数据
   String _userNickname = "U+5E78";
@@ -112,12 +126,21 @@ class _HomePageState extends State<HomePage> {
   // 缓存的QQ号
   String _cachedQQ = "";
   
+  // 当前数据源
+  DataSource _currentDataSource = DataSource.shuiyu;
+  
   // 初始化方法，用于从本地存储加载数据
   @override
   void initState() {
     super.initState();
     _loadUserData();
     _autoCheckUpdate();
+    _initializeDataInBackground();
+    
+    // 在第一帧渲染完成后触发字体加载
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.onFirstFrameRendered?.call();
+    });
   }
   
   // 自动检查更新
@@ -147,6 +170,49 @@ class _HomePageState extends State<HomePage> {
       _best15TotalRA = prefs.getInt('best15TotalRA') ?? 4379;
       _cachedQQ = prefs.getString('cachedQQ') ?? "";
     });
+  }
+  
+  // 更新初始化进度
+  void _updateProgress(String message) {
+    if (mounted) {
+      setState(() => _initializationProgress = message);
+    }
+  }
+  
+  // 后台初始化数据 - 使用 HomeService
+  Future<void> _initializeDataInBackground() async {
+    if (mounted) {
+      setState(() {
+        _isBackgroundInitializing = true;
+        _initializationProgress = '正在初始化应用数据，请稍候...';
+      });
+    }
+    
+    final result = await HomeService().initializeDataInBackground(
+      onProgress: _updateProgress,
+    );
+    
+    if (mounted) {
+      setState(() {
+        _isBackgroundInitializing = false;
+        if (result.success) {
+          _isInitializationCompleted = true;
+          _initializationProgress = '数据初始化完成！总耗时 ${result.durationStr}';
+          
+          // 4秒后隐藏完成提示
+          Future.delayed(const Duration(seconds: 4), () {
+            if (mounted) {
+              setState(() {
+                _isInitializationCompleted = false;
+                _initializationProgress = '';
+              });
+            }
+          });
+        } else {
+          _initializationProgress = '初始化失败: ${result.errorMessage}\n建议检查网络连接后重启应用';
+        }
+      });
+    }
   }
   
   // 保存用户数据到本地存储
@@ -197,7 +263,7 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.network_check, title: '服务器状态', subtitle: '查看舞萌服务器状态'),
     ButtonItem(icon: Icons.update, title: '检查更新', subtitle: '检查应用是否有新版本'),
     ButtonItem(icon: Icons.poll_outlined, title: '问卷调查', subtitle: '助力ChiffonMai更上一层楼!'),
-    ButtonItem(icon: Icons.play_arrow, title: '自定义谱面播放', subtitle: '播放你自己本地的谱面'),
+    ButtonItem(icon: Icons.play_arrow, title: '自定义谱面播放', subtitle: '播放你自己本地的谱面')
   ];
 
   @override
@@ -295,7 +361,7 @@ class _HomePageState extends State<HomePage> {
             height: screenHeight * 0.55, // 根据屏幕高度调整
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
                 boxShadow: const [AppConstants.defaultShadow],
               ),
@@ -339,10 +405,55 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           
+          // 后台初始化状态提示
+          if (_isBackgroundInitializing || _isInitializationCompleted)
+            Positioned(
+              bottom: screenHeight * 0.06,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  constraints: BoxConstraints(maxWidth: screenWidth * 0.8),
+                  padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05, vertical: screenHeight * 0.015),
+                  decoration: BoxDecoration(
+                    color: _isInitializationCompleted ? Colors.green.withValues(alpha: 0.85) : Colors.black.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      if (!_isInitializationCompleted)
+                        SizedBox(
+                          width: screenWidth * 0.04,
+                          height: screenWidth * 0.04,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        ),
+                      SizedBox(width: screenWidth * 0.02),
+                      Text(
+                        _initializationProgress,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: screenWidth * 0.03,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          
           // 加载中提示
           if (_isLoading)
             Container(
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withValues(alpha: 0.5),
               child: Center(
                 child: Container(
                   padding: EdgeInsets.all(20),
@@ -421,20 +532,17 @@ class _HomePageState extends State<HomePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            // 移除固定宽度限制，让文本根据内容自动调整宽度
-            child: Text(
-              _userNickname,
-              style: TextStyle(
-                color: AppConstants.textPrimaryColor,
-                fontSize: screenWidth * 0.07,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1,
-                height: 0.6,
-              ),
-              overflow: TextOverflow.ellipsis, // 超出显示省略号
-              maxLines: 1, // 只显示一行
+          Text(
+            _userNickname,
+            style: TextStyle(
+              color: AppConstants.textPrimaryColor,
+              fontSize: screenWidth * 0.07,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1,
+              height: 0.6,
             ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
           SizedBox(height: screenHeight * 0.005), // 在玩家名和Rating中间添加SizedBox
           Text(
@@ -468,10 +576,21 @@ class _HomePageState extends State<HomePage> {
     
     // 包装成可点击的Widget
     return GestureDetector(
-      onTap: () {
-        if (_cachedQQ.isNotEmpty) {
-          // 如果有缓存的QQ号，直接执行刷新操作
-          _refreshDataWithoutNavigation(_cachedQQ);
+      onTap: () async {
+        // 获取上次更新使用的数据源
+        final lastDataSource = await _getLastDataSource();
+        
+        if (lastDataSource == 'shuiyu' && _cachedQQ.isNotEmpty) {
+          // 如果上次是水鱼数据源且有缓存的QQ号，直接执行刷新操作
+          await _refreshDataWithoutNavigation(_cachedQQ);
+          await _saveLastDataSource('shuiyu');
+        } else if (lastDataSource == 'luoxue') {
+          // 如果上次是落雪数据源，显示对话框引导用户完成授权
+          _showRefreshDataDialog(context);
+        } else if (_currentDataSource == DataSource.shuiyu && _cachedQQ.isNotEmpty) {
+          // 当前选择水鱼且有缓存
+          await _refreshDataWithoutNavigation(_cachedQQ);
+          await _saveLastDataSource('shuiyu');
         } else {
           // 否则显示刷新数据对话框
           _showRefreshDataDialog(context);
@@ -480,47 +599,210 @@ class _HomePageState extends State<HomePage> {
       child: userInfoContent,
     );
   }
+  
+  // 获取上次更新使用的数据源
+  Future<String?> _getLastDataSource() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(CacheKeyConstant.lastDataSource);
+    } catch (e) {
+      debugPrint('获取上次数据源失败: $e');
+      return null;
+    }
+  }
+  
+  // 保存上次更新使用的数据源
+  Future<void> _saveLastDataSource(String dataSource) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(CacheKeyConstant.lastDataSource, dataSource);
+    } catch (e) {
+      debugPrint('保存上次数据源失败: $e');
+    }
+  }
 
   // 显示刷新数据对话框
   void _showRefreshDataDialog(BuildContext context) {
     final TextEditingController qqController = TextEditingController(text: _cachedQQ);
+    final TextEditingController authCodeController = TextEditingController();
     
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('刷新数据'),
-          content: SingleChildScrollView(
-            child: TextField(
-              controller: qqController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: '请输入QQ号',
-                hintText: '例如:1919810',
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('刷新数据'),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 数据源切换
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('当前数据源：'),
+                        SizedBox(width: 8),
+                        ToggleButtons(
+                          constraints: BoxConstraints(minHeight: 28, minWidth: 50),
+                          isSelected: [
+                            _currentDataSource == DataSource.shuiyu,
+                            _currentDataSource == DataSource.luoxue,
+                          ],
+                          onPressed: (index) {
+                            setState(() {
+                              _currentDataSource = index == 0 ? DataSource.shuiyu : DataSource.luoxue;
+                              authCodeController.clear();
+                            });
+                          },
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                              child: Text('水鱼'),
+                            ),
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                              child: Text('落雪'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 12),
+                    
+                    // 水鱼数据源：QQ号输入
+                    if (_currentDataSource == DataSource.shuiyu)
+                      TextField(
+                        controller: qqController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: '请输入QQ号',
+                          hintText: '例如:1919810',
+                        ),
+                      ),
+                    
+                    // 落雪数据源：授权相关
+                    if (_currentDataSource == DataSource.luoxue)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () async {
+                              final url = LuoXueUserPlayDataManager().getAuthorizationUrl();
+                              if (await canLaunchUrl(Uri.parse(url))) {
+                                await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                              }
+                            },
+                            child: Text('点击授权'),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            '授权后复制页面上显示的授权码，粘贴到下方输入框',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          SizedBox(height: 8),
+                          TextField(
+                            controller: authCodeController,
+                            decoration: InputDecoration(
+                              labelText: '请输入授权码',
+                              hintText: '粘贴授权码',
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text('取消'),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                if (qqController.text.isNotEmpty) {
-                  await _saveQQ(qqController.text);
-                  await _refreshBest50Data(qqController.text);
-                }
-              },
-              child: Text('确认'),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('取消'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    
+                    if (_currentDataSource == DataSource.shuiyu) {
+                      // 水鱼数据源
+                      if (qqController.text.isNotEmpty) {
+                        await _saveQQ(qqController.text);
+                        await _refreshBest50Data(qqController.text);
+                      }
+                    } else {
+                      // 落雪数据源
+                      if (authCodeController.text.isNotEmpty) {
+                        await _handleLuoXueAuth(authCodeController.text);
+                      }
+                    }
+                  },
+                  child: Text('确认'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
+  }
+  
+  // 处理落雪授权
+  Future<void> _handleLuoXueAuth(String authCode) async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      // 使用授权码换取令牌
+      final success = await LuoXueUserPlayDataManager().exchangeCodeForToken(authCode);
+      
+      if (success) {
+        // 授权成功，保存数据源为落雪
+        await _saveLastDataSource('luoxue');
+        
+        // 授权成功，获取玩家信息
+        final playerInfo = await LuoXueUserPlayDataManager().getPlayerInfo();
+        
+        if (playerInfo != null) {
+          setState(() {
+            _userNickname = playerInfo.name.isNotEmpty ? playerInfo.name : '未知玩家';
+          });
+          await _saveUserData();
+        }
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('落雪授权成功!'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('授权失败，请检查授权码是否正确'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('授权异常：$e'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
   
   // 刷新数据（不跳转）
@@ -1024,7 +1306,7 @@ class _HomePageState extends State<HomePage> {
                       Text(
                         item.subtitle,
                         style: TextStyle(
-                          color: AppConstants.textPrimaryColor.withOpacity(0.8),
+                          color: AppConstants.textPrimaryColor.withValues(alpha: 0.8),
                           fontSize: screenWidth * 0.025,
                           fontWeight: FontWeight.w300,
                         ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/service/MaimaiServerStatusService.dart';
-import 'package:my_first_flutter_app/entity/MaimaiServerStatusEntity.dart';
+import 'package:my_first_flutter_app/entity/AWMC/MaimaiServerStatusEntity.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 
 // 服务器状态页面

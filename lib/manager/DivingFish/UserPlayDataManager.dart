@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/api/DeveloperToken.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../constant/CacheKeyConstant.dart';
+import '../../constant/CacheKeyConstant.dart';
 
 class UserPlayDataManager {
   // 单例模式

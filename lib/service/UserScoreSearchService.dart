@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
-import '../manager/UserPlayDataManager.dart';
-import '../entity/Song.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
+import '../manager/DivingFish/UserPlayDataManager.dart';
+import '../entity/DivingFish/Song.dart';
 
 class UserScoreSearchService {
   // 单例模式

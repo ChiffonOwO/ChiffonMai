@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
 
-import '../../manager/UserPlayDataManager.dart';
-import '../../manager/DiffMusicDataManager.dart';
-import '../../manager/UserBest50Manager.dart';
-import '../../manager/MaimaiMusicDataManager.dart';
+import '../../manager/DivingFish/UserPlayDataManager.dart';
+import '../../manager/DivingFish/DiffMusicDataManager.dart';
+import '../../manager/DivingFish/UserBest50Manager.dart';
+import '../../manager/DivingFish/MaimaiMusicDataManager.dart';
 
 class DiffBest50Service {
   // 单例模式

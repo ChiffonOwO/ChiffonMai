@@ -7,7 +7,7 @@ import 'package:my_first_flutter_app/entity/Multiplayer/RoomEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/PlayerEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/GameStateEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/GuessRecord.dart';
-import 'package:my_first_flutter_app/entity/GameType.dart';
+import 'package:my_first_flutter_app/entity/Multiplayer/GameType.dart';
 
 enum MultiplayerEventType {
   connected,

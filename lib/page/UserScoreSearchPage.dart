@@ -3,7 +3,7 @@ import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import '../service/UserScoreSearchService.dart';
-import '../manager/MaimaiMusicDataManager.dart';
+import '../manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'HomePage.dart';
 import 'SongInfoPage.dart';
 import '../utils/CoverUtil.dart';

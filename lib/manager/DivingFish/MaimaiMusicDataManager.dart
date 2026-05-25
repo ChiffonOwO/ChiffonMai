@@ -1,14 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import '../api/ApiUrls.dart';
-import '../entity/Song.dart';
-import '../service/GuessChartGame/MultiplayerCloudBaseService.dart';
-import '../utils/MaidataDecodeUtil.dart';
-import '../constant/CacheKeyConstant.dart';
-import '../constant/CacheTimestampConstant.dart';
+import '../../api/ApiUrls.dart';
+import '../../entity/DivingFish/Song.dart';
+import '../../service/GuessChartGame/MultiplayerCloudBaseService.dart';
+import '../../utils/MaidataDecodeUtil.dart';
+import '../../constant/CacheKeyConstant.dart';
+import '../../constant/CacheTimestampConstant.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'MaidataManager.dart';
+import '../MaidataManager.dart';
 
 class MaimaiMusicDataManager {
   // 单例模式

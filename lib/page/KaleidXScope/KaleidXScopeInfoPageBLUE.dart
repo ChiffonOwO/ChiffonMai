@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/service/KaleidXScope/KaleidXScopeInfoServiceBLUE.dart'
     as blueService;
 import 'package:my_first_flutter_app/service/KaleidXScope/KaleidXScopeSelectService.dart';
-import 'package:my_first_flutter_app/manager/UserPlayDataManager.dart';
-import 'package:my_first_flutter_app/manager/MaimaiMusicDataManager.dart';
-import 'package:my_first_flutter_app/entity/Song.dart';
+import 'package:my_first_flutter_app/constant/CacheKeyConstant.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 
 class KaleidXScopeInfoPageBLUE extends StatefulWidget {
@@ -23,14 +24,13 @@ class KaleidXScopeInfoPageBLUE extends StatefulWidget {
 class _KaleidXScopeInfoPageBLUEState extends State<KaleidXScopeInfoPageBLUE> {
   final blueService.KaleidXScopeInfoServiceBLUE _service =
       blueService.KaleidXScopeInfoServiceBLUE();
-  final UserPlayDataManager _playDataManager = UserPlayDataManager();
   List<Song> _songs = [];
   List<Song> _track1Songs = [];
   List<Song> _track2Songs = [];
   List<Song> _track3Songs = [];
   bool _isLoading = true;
-  bool _showCompleted = false;
-  Set<String> _completedSongIds = {};
+  bool _isMarkMode = false; // 标记模式
+  Set<String> _manualMarkedIds = {}; // 手动标记的歌曲ID
 
   // 特殊歌曲缓存（只在页面初始化时加载一次）
   Song? _specialSong11739;
@@ -104,6 +104,7 @@ class _KaleidXScopeInfoPageBLUEState extends State<KaleidXScopeInfoPageBLUE> {
   void initState() {
     super.initState();
     _loadSongs();
+    _loadMarkedSongsFromPrefs();
   }
 
   Future<void> _loadSongs() async {
@@ -116,9 +117,6 @@ class _KaleidXScopeInfoPageBLUEState extends State<KaleidXScopeInfoPageBLUE> {
       setState(() {
         _songs = songs;
       });
-
-      // 加载完成歌曲ID
-      await _loadCompletedSongs();
 
       // 加载Track歌曲
       final trackSongs = await _service.loadTrackSongs();
@@ -136,6 +134,34 @@ class _KaleidXScopeInfoPageBLUEState extends State<KaleidXScopeInfoPageBLUE> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  // 从prefs加载标记的歌曲
+  Future<void> _loadMarkedSongsFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedMarkedSongs = prefs.getString(CacheKeyConstant.kaleidXBlueGateMarkedSongs);
+      if (cachedMarkedSongs != null && cachedMarkedSongs.isNotEmpty) {
+        setState(() {
+          _manualMarkedIds = Set.from(cachedMarkedSongs.split(','));
+        });
+      }
+    } catch (e) {
+      debugPrint('加载标记歌曲缓存失败: $e');
+    }
+  }
+
+  // 保存标记的歌曲到prefs
+  Future<void> _saveMarkedSongsToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        CacheKeyConstant.kaleidXBlueGateMarkedSongs,
+        _manualMarkedIds.join(','),
+      );
+    } catch (e) {
+      debugPrint('保存标记歌曲缓存失败: $e');
     }
   }
 
@@ -159,35 +185,6 @@ class _KaleidXScopeInfoPageBLUEState extends State<KaleidXScopeInfoPageBLUE> {
     } catch (e) {
       _specialSong11740 = null;
     }
-  }
-
-  // 加载已完成歌曲ID
-  Future<void> _loadCompletedSongs() async {
-    try {
-      final userPlayData = await _playDataManager.getCachedUserPlayData();
-      if (userPlayData != null && userPlayData['records'] is List) {
-        final records = userPlayData['records'] as List;
-        final Set<String> completedIds = {};
-        for (final record in records) {
-          if (record is Map<String, dynamic>) {
-            final songId = record['song_id']?.toString();
-            if (songId != null) {
-              completedIds.add(songId);
-            }
-          }
-        }
-        setState(() {
-          _completedSongIds = completedIds;
-        });
-      }
-    } catch (e) {
-      debugPrint('加载完成歌曲失败: $e');
-    }
-  }
-
-  // 检查歌曲是否已完成
-  bool _isSongCompleted(String songId) {
-    return _completedSongIds.contains(songId);
   }
 
   // 获取类型显示
@@ -585,30 +582,60 @@ class _KaleidXScopeInfoPageBLUEState extends State<KaleidXScopeInfoPageBLUE> {
         ),
         SizedBox(height: _paddingS),
 
-        // 显示完成情况勾选框
+        // 模式切换按钮
         Padding(
           padding: EdgeInsets.symmetric(horizontal: _paddingS),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          child: Column(
             children: [
-              Checkbox(
-                value: _showCompleted,
-                onChanged: (value) {
-                  setState(() {
-                    _showCompleted = value ?? false;
-                  });
-                },
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _isMarkMode = !_isMarkMode;
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isMarkMode ? Colors.green : Colors.grey[300],
+                      foregroundColor: _isMarkMode ? Colors.white : Colors.black,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: _paddingM,
+                        vertical: _paddingXS,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(
+                      _isMarkMode ? '标记模式' : '仅查看',
+                      style: TextStyle(fontSize: _textSizeS),
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                '显示完成情况',
-                style: TextStyle(
-                  fontSize: _textSizeM,
-                  color: Colors.grey[600],
+              if (_isMarkMode)
+                Padding(
+                  padding: EdgeInsets.only(top: _paddingXS),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.info, size: _textSizeS, color: Colors.green),
+                      SizedBox(width: _paddingXS),
+                      Text(
+                        '切换到标记模式，点击卡片可切换显示完成状态',
+                        style: TextStyle(
+                          fontSize: _textSizeXS,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),
+        SizedBox(height: _paddingS),
         // 歌曲卡片网格
         GridView.builder(
           shrinkWrap: true,
@@ -623,28 +650,41 @@ class _KaleidXScopeInfoPageBLUEState extends State<KaleidXScopeInfoPageBLUE> {
           itemCount: _songs.length,
           itemBuilder: (context, index) {
             final song = _songs[index];
+            final bool isMarked = _manualMarkedIds.contains(song.id.toString());
+            
             return GestureDetector(
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => SongInfoPage(
-                      songId: song.id,
-                      initialLevelIndex: 3, // MASTER 难度
+                if (_isMarkMode) {
+                  // 标记模式：切换标记状态
+                  setState(() {
+                    final songIdStr = song.id.toString();
+                    if (_manualMarkedIds.contains(songIdStr)) {
+                      _manualMarkedIds.remove(songIdStr);
+                    } else {
+                      _manualMarkedIds.add(songIdStr);
+                    }
+                  });
+                  // 保存到prefs缓存
+                  _saveMarkedSongsToPrefs();
+                } else {
+                  // 仅查看模式：跳转到歌曲详情
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SongInfoPage(
+                        songId: song.id,
+                        initialLevelIndex: 3, // MASTER 难度
+                      ),
                     ),
-                  ),
-                );
+                  );
+                }
               },
               child: Container(
                 decoration: BoxDecoration(
-                  color: _showCompleted && _isSongCompleted(song.id)
-                      ? Colors.lightGreen[100]
-                      : Colors.grey[100],
+                  color: isMarked ? Colors.lightGreen[100] : Colors.grey[100],
                   borderRadius: BorderRadius.circular(_borderRadiusSmall),
                   border: Border.all(
-                    color: _showCompleted && _isSongCompleted(song.id)
-                        ? Colors.green
-                        : Colors.grey,
+                    color: isMarked ? Colors.green : Colors.grey,
                     width: 1,
                   ),
                 ),

@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
-import 'package:my_first_flutter_app/entity/MaimaiServerStatusEntity.dart';
-import 'package:my_first_flutter_app/entity/MaimaiServerStatusTitleEntity.dart';
+import 'package:my_first_flutter_app/entity/AWMC/MaimaiServerStatusEntity.dart';
+import 'package:my_first_flutter_app/entity/AWMC/MaimaiServerStatusTitleEntity.dart';
 import '../constant/CacheTimestampConstant.dart';
 
 // 服务器状态服务

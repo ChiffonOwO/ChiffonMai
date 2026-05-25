@@ -1,4 +1,4 @@
-import 'package:my_first_flutter_app/entity/RecordItem.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/RecordItem.dart';
 
 class UserBest50Entity {
   final int additionalRating;

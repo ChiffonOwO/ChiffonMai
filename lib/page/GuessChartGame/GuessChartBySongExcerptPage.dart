@@ -4,8 +4,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:flutter/services.dart';
-import 'package:my_first_flutter_app/entity/GuessSong.dart';
-import 'package:my_first_flutter_app/entity/Song.dart';
+import 'package:my_first_flutter_app/entity/GuessChartGame/GuessSong.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartBySongExcerptService.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartCommonSettingsService.dart';
@@ -17,6 +17,7 @@ import 'package:my_first_flutter_app/utils/CommonCacheUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import '../../constant/LoadingTipsConstant.dart';
+import '../../constant/VersionListConstant.dart';
 
 class GuessChartBySongExcerptPage extends StatefulWidget {
   const GuessChartBySongExcerptPage({super.key});
@@ -920,33 +921,13 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
       }
     }
     
+    // 过滤掉maidata中的版本，只保留标准版本
+    versions = versions.where((v) => VersionListConstant.standardVersions.contains(v)).toSet();
+    
     // 按照游戏发布顺序排序版本
     List<String> allVersions = versions.toList()..sort((a, b) {
-      // 定义版本顺序映射
-      final Map<String, int> versionOrder = {
-        'maimai': 1,
-        'maimai PLUS': 2,
-        'maimai GreeN': 3,
-        'maimai GreeN PLUS': 4,
-        'maimai ORANGE': 5,
-        'maimai ORANGE PLUS': 6,
-        'maimai PiNK': 7,
-        'maimai PiNK PLUS': 8,
-        'maimai MURASAKi': 9,
-        'maimai MURASAKi PLUS': 10,
-        'maimai MiLK': 11,
-        'MiLK PLUS': 12,
-        'maimai FiNALE': 13,
-        'maimai でらっくす': 14,
-        'maimai でらっくす Splash': 15,
-        'maimai でらっくす UNiVERSE': 16,
-        'maimai でらっくす FESTiVAL': 17,
-        'maimai でらっくす BUDDiES': 18,
-        'maimai でらっくす PRiSM': 19,
-      };
-      
-      int orderA = versionOrder[a] ?? 999;
-      int orderB = versionOrder[b] ?? 999;
+      int orderA = VersionListConstant.versionOrderMap[a] ?? 999;
+      int orderB = VersionListConstant.versionOrderMap[b] ?? 999;
       return orderA.compareTo(orderB);
     });
     // 移除宴会场选项

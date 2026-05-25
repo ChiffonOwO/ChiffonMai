@@ -22,4 +22,9 @@ class CacheTimestampConstant {
   static const Duration maimaiServerStatusDuration = Duration(minutes: maimaiServerStatusCacheMinutes);
   static const Duration maimaiServerTitleDuration = Duration(days: maimaiServerStatusCacheDays);
   static const Duration luoxueSongDuration = Duration(days: luoxueSongCacheDays);
+  
+  // KaleidXScope 标记歌曲缓存时间（365天）
+  static const int kaleidXMarkedSongsCacheDays = 365;
+  static const int kaleidXMarkedSongsCacheMillis = kaleidXMarkedSongsCacheDays * 24 * 60 * 60 * 1000;
+  static const Duration kaleidXMarkedSongsDuration = Duration(days: kaleidXMarkedSongsCacheDays);
 }

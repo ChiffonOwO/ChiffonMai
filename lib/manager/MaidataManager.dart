@@ -299,13 +299,13 @@ class MaidataManager {
     debugPrint('[DEBUG][MaidataManager] 开始获取指定歌曲ID的maidata（共 ${songIds.length} 首）');
     
     List<String> result = [];
-    List<String> remainingIds = List.from(songIds);
+    Set<String> remainingIds = Set.from(songIds);
     
-    // 先检查本地缓存中是否已有
+    // 先检查本地缓存中是否已有 - O(n) 复杂度
     for (String songId in songIds) {
       if (_cachedMaidata.containsKey(songId)) {
         result.add(_cleanMaidataContent(_cachedMaidata[songId]!));
-        remainingIds.remove(songId);
+        remainingIds.remove(songId);  // Set.remove() 是 O(1)
       }
     }
     
@@ -338,10 +338,10 @@ class MaidataManager {
                 String content = _decodeContent(response.bodyBytes);
                 String? songId = _extractSongId(content);
                 
-                if (songId != null && remainingIds.contains(songId)) {
+                if (songId != null && remainingIds.contains(songId)) {  // Set.contains() 是 O(1)
                   _cachedMaidata[songId] = content;
                   result.add(_cleanMaidataContent(content));
-                  remainingIds.remove(songId);
+                  remainingIds.remove(songId);  // Set.remove() 是 O(1)
                   debugPrint('[DEBUG][MaidataManager] 获取到指定歌曲: $songId');
                 }
               }
