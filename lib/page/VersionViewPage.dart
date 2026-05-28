@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:media_scanner/media_scanner.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 
@@ -47,16 +48,57 @@ class ImagePreviewDialog extends StatelessWidget {
     required this.versionName,
   });
 
+  // 请求存储权限（参考 DiffBest50Page 的实现）
+  Future<bool> _requestStoragePermission() async {
+    if (Platform.isAndroid) {
+      PermissionStatus storageStatus = await Permission.storage.status;
+      PermissionStatus photosStatus = await Permission.photos.status;
+      PermissionStatus videosStatus = await Permission.videos.status;
+
+      // 如果任何一个权限已授予，直接返回成功
+      if (storageStatus.isGranted || photosStatus.isGranted || videosStatus.isGranted) {
+        return true;
+      }
+
+      // 请求权限：同时请求 storage、photos 和 videos
+      Map<Permission, PermissionStatus> statuses = await [
+        Permission.storage,
+        Permission.photos,
+        Permission.videos,
+      ].request();
+
+      bool storageGranted = statuses[Permission.storage]?.isGranted ?? false;
+      bool photosGranted = statuses[Permission.photos]?.isGranted ?? false;
+      bool videosGranted = statuses[Permission.videos]?.isGranted ?? false;
+
+      return storageGranted || photosGranted || videosGranted;
+    } else {
+      // 非 Android 平台
+      PermissionStatus status = await Permission.storage.request();
+      return status.isGranted;
+    }
+  }
+
   // 保存图片到本地
   Future<void> _saveImage(BuildContext context) async {
     try {
       // 请求存储权限
-      if (Platform.isAndroid) {
-        final status = await Permission.storage.request();
-        if (status != PermissionStatus.granted) {
-          _showSnackBar(context, '需要存储权限才能保存图片');
-          return;
-        }
+      bool hasPermission = await _requestStoragePermission();
+      if (!hasPermission) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('权限不足'),
+            content: const Text('需要存储权限才能导出图片到相册，请在设置中开启权限'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('确定'),
+              ),
+            ],
+          ),
+        );
+        return;
       }
 
       // 加载图片
@@ -64,12 +106,29 @@ class ImagePreviewDialog extends StatelessWidget {
       final Uint8List bytes = imageData.buffer.asUint8List();
 
       // 获取保存目录
-      final Directory directory = await getApplicationDocumentsDirectory();
-      final String fileName = 'maimai_${versionName.replaceAll(' ', '_')}.png';
+      Directory? directory;
+      if (Platform.isAndroid) {
+        // 使用相册目录
+        String picturesPath = '/storage/emulated/0/Pictures';
+        directory = Directory(picturesPath);
+        if (!directory.existsSync()) {
+          directory.createSync(recursive: true);
+        }
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      // 生成文件名
+      final String fileName = 'maimai_${versionName.replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.png';
       final File file = File('${directory.path}/$fileName');
 
       // 写入文件
       await file.writeAsBytes(bytes);
+
+      // 通知系统刷新相册
+      if (Platform.isAndroid) {
+        await MediaScanner.loadMedia(path: file.path);
+      }
 
       _showSnackBar(context, '图片已保存到相册');
     } catch (e) {
@@ -209,7 +268,8 @@ class _VersionViewState extends State<VersionView> {
     VersionData(name: "maimai でらっくす UNiVERSE", imagePath: "assets/version/maimai_2022.webp", code: "宙/星"),
     VersionData(name: "maimai でらっくす FESTiVAL", imagePath: "assets/version/maimai_2023.webp", code: "祭/祝"),
     VersionData(name: "maimai でらっくす BUDDiES", imagePath: "assets/version/maimai_2024.webp", code: "双/宴"),
-    VersionData(name: "maimai でらっくす PRiSM", imagePath: "assets/version/maimai_2025.webp", code: "镜/彩"),
+    VersionData(name: "maimai でらっくす PRiSM", imagePath: "assets/version/maimai_2025.webp", code: "镜"),
+    VersionData(name: "maimai でらっくす PRiSM PLUS", imagePath: "assets/version/maimai_2026.webp", code: "彩"),
   ];
   
   // 切换版本

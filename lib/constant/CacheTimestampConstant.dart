@@ -1,5 +1,8 @@
 /// 缓存过期时间常量统一管理
 class CacheTimestampConstant {
+  // 单位：分钟
+  static const int rankingsCacheMinutes = 10;
+  
   // 单位：天
   static const int knowledgeCacheDays = 1;
   static const int maidataFullCacheDays = 7;

@@ -35,21 +35,21 @@ class LuoXueScore {
 
   factory LuoXueScore.fromJson(Map<String, dynamic> json) {
     return LuoXueScore(
-      id: json['id'] as num,
-      songName: json['song_name'] as String,
-      level: json['level'] as String,
-      levelIndex: json['level_index'] as num,
-      achievements: json['achievements'] as num,
+      id: json['id'] as num? ?? 0,
+      songName: json['song_name'] as String? ?? '',
+      level: json['level'] as String? ?? '',
+      levelIndex: json['level_index'] as num? ?? 0,
+      achievements: json['achievements'] as num? ?? 0,
       fc: json['fc'] as String?,
       fs: json['fs'] as String?,
-      dxScore: json['dx_score'] as num,
-      dxStar: json['dx_star'] as num,
-      dxRating: json['dx_rating'] as num,
-      rate: json['rate'] as String,
-      type: json['type'] as String,
-      playTime: json['play_time'] as String,
+      dxScore: json['dx_score'] as num? ?? 0,
+      dxStar: json['dx_star'] as num? ?? 0,
+      dxRating: json['dx_rating'] as num? ?? 0,
+      rate: json['rate'] as String? ?? '',
+      type: json['type'] as String? ?? '',
+      playTime: json['play_time'] as String? ?? '',
       uploadTime: json['upload_time'] as String?,
-      lastPlayedTime: json['last_played_time'] as String,
+      lastPlayedTime: json['last_played_time'] as String? ?? '',
     );
   }
 

@@ -18,6 +18,8 @@ class MaidataDecodeUtil {
   static final RegExp _patternModifiers = RegExp(r'(?=[-<>^vpszwVpq]|pp|qq)');
   // 正则：匹配中括号
   static final RegExp _patternBracket = RegExp(r'.*\[.*\].*');
+  // 正则：匹配星星音符模式，如 1?<4[8:1]
+  static final RegExp _patternStarNote = RegExp(r'^\d+\?[-<>^vpszwVpq]+(\d+\[.*\])?$');
 
   static MaidataData decode(String content) {
     Map<String, String> data = {};
@@ -127,8 +129,13 @@ class MaidataDecodeUtil {
       }
       
       NoteStats? stats;
+      BreakStats? breakStats;
+      Map<String, List<String>>? breakDetails;
       if (inote != null && inote.isNotEmpty) {
         stats = parseInote(inote);
+        List<String> validSegments = extractValidSegments(inote);
+        breakStats = countBreakTypes(validSegments);
+        breakDetails = collectBreakDetails(validSegments);
       }
       
       if (level != null || charter != null || inote != null) {
@@ -138,6 +145,8 @@ class MaidataDecodeUtil {
           charter: charter ?? '',
           inote: inote ?? '',
           stats: stats,
+          breakStats: breakStats,
+          breakDetails: breakDetails,
         ));
       }
     }
@@ -225,6 +234,12 @@ class MaidataDecodeUtil {
   }
 
   static void _processSegment(String segment, List<String> result) {
+    // 星星音符模式，如 1?<4[8:1]，直接添加，不拆分
+    if (_patternStarNote.hasMatch(segment)) {
+      result.add(segment);
+      return;
+    }
+    
     bool hasModifier = segment.contains(RegExp(r'[-<>^vpqszwV]')) ||
         segment.contains("pp") ||
         segment.contains("qq");
@@ -247,6 +262,10 @@ class MaidataDecodeUtil {
     if (_patternTouch.hasMatch(note)) {
       return NoteType.TOUCH;
     }
+    // 星星音符模式，如 1?<4[8:1]，直接归为 SLIDE
+    if (_patternStarNote.hasMatch(note)) {
+      return NoteType.SLIDE;
+    }
     if (_patternTap.hasMatch(note)) {
       return NoteType.TAP;
     }
@@ -264,6 +283,93 @@ class MaidataDecodeUtil {
       counts[type.index]++;
     }
     return counts;
+  }
+
+  static BreakType classifyBreak(String note) {
+    // 保护套绝赞：带有x的
+    if (note.contains('x')) {
+      return BreakType.PROTECTED;
+    }
+    // 真绝赞TAP：形如1b的break
+    RegExp trueZettaiTapPattern = RegExp(r'^\d+b$');
+    if (trueZettaiTapPattern.hasMatch(note)) {
+      return BreakType.TRUE_ZETTAI_TAP;
+    }
+    // 真绝赞HOLD：形如1bh，1hb,1bh[xxx],1hb[xxx]的break
+    RegExp trueZettaiHoldPattern = RegExp(r'^\d+b(h(\[.*\])?)?$|^\d+hb(\[.*\])?$');
+    if (trueZettaiHoldPattern.hasMatch(note)) {
+      return BreakType.TRUE_ZETTAI_HOLD;
+    }
+    // 绝赞星星：不属于以上两种的
+    return BreakType.STAR;
+  }
+
+  static BreakStats countBreakTypes(List<String> notes) {
+    int trueZettaiTap = 0;
+    int trueZettaiHold = 0;
+    int protectedZettai = 0;
+    int star = 0;
+    
+    for (String note in notes) {
+      if (note.contains('b')) {
+        BreakType type = classifyBreak(note);
+        switch (type) {
+          case BreakType.TRUE_ZETTAI_TAP:
+            trueZettaiTap++;
+            break;
+          case BreakType.TRUE_ZETTAI_HOLD:
+            trueZettaiHold++;
+            break;
+          case BreakType.PROTECTED:
+            protectedZettai++;
+            break;
+          case BreakType.STAR:
+            star++;
+            break;
+        }
+      }
+    }
+    
+    return BreakStats(
+      trueZettaiTap: trueZettaiTap,
+      trueZettaiHold: trueZettaiHold,
+      protectedZettai: protectedZettai,
+      star: star,
+    );
+  }
+
+  static Map<String, List<String>> collectBreakDetails(List<String> notes) {
+    List<String> trueZettaiTapList = [];
+    List<String> trueZettaiHoldList = [];
+    List<String> protectedList = [];
+    List<String> starList = [];
+    
+    for (String note in notes) {
+      if (note.contains('b')) {
+        BreakType type = classifyBreak(note);
+        switch (type) {
+          case BreakType.TRUE_ZETTAI_TAP:
+            trueZettaiTapList.add(note);
+            break;
+          case BreakType.TRUE_ZETTAI_HOLD:
+            trueZettaiHoldList.add(note);
+            break;
+          case BreakType.PROTECTED:
+            protectedList.add(note);
+            break;
+          case BreakType.STAR:
+            starList.add(note);
+            break;
+        }
+      }
+    }
+    
+    return {
+      'trueZettaiTap': trueZettaiTapList,
+      'trueZettaiHold': trueZettaiHoldList,
+      'protected': protectedList,
+      'star': starList,
+    };
   }
 
   static List<List<String>> collectByType(List<String> notes) {
@@ -462,6 +568,32 @@ enum NoteType {
   TOUCH,
 }
 
+enum BreakType {
+  TRUE_ZETTAI_TAP,  // 真绝赞TAP：形如1b的break
+  TRUE_ZETTAI_HOLD, // 真绝赞HOLD：形如1bh，1hb,1bh[xxx],1hb[xxx]的break
+  PROTECTED,        // 保护套绝赞：带有x的
+  STAR,             // 绝赞星星：不属于以上两种的
+}
+
+class BreakStats {
+  final int trueZettaiTap;
+  final int trueZettaiHold;
+  final int protectedZettai;
+  final int star;
+
+  BreakStats({
+    required this.trueZettaiTap,
+    required this.trueZettaiHold,
+    required this.protectedZettai,
+    required this.star,
+  });
+
+  @override
+  String toString() {
+    return 'BreakStats{trueZettaiTap: $trueZettaiTap, trueZettaiHold: $trueZettaiHold, protectedZettai: $protectedZettai, star: $star}';
+  }
+}
+
 class NoteStats {
   final int total;
   final int tap;
@@ -491,6 +623,8 @@ class ChartData {
   final String charter;
   final String inote;
   final NoteStats? stats;
+  final BreakStats? breakStats;
+  final Map<String, List<String>>? breakDetails;
 
   ChartData({
     required this.difficultyIndex,
@@ -498,6 +632,8 @@ class ChartData {
     required this.charter,
     required this.inote,
     this.stats,
+    this.breakStats,
+    this.breakDetails,
   });
 
   String get difficultyName {

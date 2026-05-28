@@ -16,6 +16,12 @@ class CacheKeyConstant {
   // 落雪歌曲相关
   static const String luoxueSongsCache = 'luoxue_songs_cache';
   
+  // 落雪OAuth相关
+  static const String luoxueAccessToken = 'luoxue_access_token';
+  static const String luoxueRefreshToken = 'luoxue_refresh_token';
+  static const String luoxueExpiresAt = 'luoxue_expires_at';
+  static const String luoxueTokenType = 'luoxue_token_type';
+  
   // 收藏数据相关
   static const String trophiesCollectionsCacheData = 'trophies_collections_cache_data';
   static const String iconsCollectionsCacheData = 'icons_collections_cache_data';
@@ -59,4 +65,16 @@ class CacheKeyConstant {
   
   // 上次更新使用的数据源
   static const String lastDataSource = 'last_data_source';
+  
+  // 排行榜相关设置
+  static const String participateRankings = 'participate_rankings';
+  static const String showNickname = 'show_nickname';
+  
+  // 排行榜缓存相关
+  static const String totalRankingsCache = 'total_rankings_cache';
+  static const String totalRankingsCacheTimestamp = 'total_rankings_cache_timestamp';
+  static const String shuiyuRankingsCache = 'shuiyu_rankings_cache';
+  static const String shuiyuRankingsCacheTimestamp = 'shuiyu_rankings_cache_timestamp';
+  static const String luoxueRankingsCache = 'luoxue_rankings_cache';
+  static const String luoxueRankingsCacheTimestamp = 'luoxue_rankings_cache_timestamp';
 }

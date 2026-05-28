@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:media_scanner/media_scanner.dart';
 import '../service/CollectionInfoService.dart';
 import '../entity/LuoXue/Collection.dart';
 import '../utils/LuoXueToDivingFishUtil.dart';
@@ -34,6 +41,149 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
   String? _translatedDescription;
   bool _isTranslatingName = false;
   bool _isTranslatingDescription = false;
+  bool _isSavingImage = false;
+
+  // 获取图片URL
+  String? _getImageUrl() {
+    if (_collection == null) return null;
+    const String imageBaseUrl = 'https://assets2.lxns.net/maimai';
+    switch (widget.collectionType) {
+      case 'icons':
+        return '$imageBaseUrl/icon/${_collection!.id}.png';
+      case 'plates':
+        return '$imageBaseUrl/plate/${_collection!.id}.png';
+      case 'frames':
+        return '$imageBaseUrl/frame/${_collection!.id}.png';
+      default:
+        return null;
+    }
+  }
+
+  // 请求存储权限
+  Future<bool> _requestStoragePermission() async {
+    if (Platform.isAndroid) {
+      PermissionStatus storageStatus = await Permission.storage.status;
+      PermissionStatus photosStatus = await Permission.photos.status;
+      PermissionStatus videosStatus = await Permission.videos.status;
+
+      if (storageStatus.isGranted || photosStatus.isGranted || videosStatus.isGranted) {
+        return true;
+      }
+
+      Map<Permission, PermissionStatus> statuses = await [
+        Permission.storage,
+        Permission.photos,
+        Permission.videos,
+      ].request();
+
+      bool storageGranted = statuses[Permission.storage]?.isGranted ?? false;
+      bool photosGranted = statuses[Permission.photos]?.isGranted ?? false;
+      bool videosGranted = statuses[Permission.videos]?.isGranted ?? false;
+
+      return storageGranted || photosGranted || videosGranted;
+    } else {
+      PermissionStatus status = await Permission.storage.request();
+      return status.isGranted;
+    }
+  }
+
+  // 保存图片到相册
+  Future<void> _saveImageToGallery() async {
+    String? imageUrl = _getImageUrl();
+    if (imageUrl == null) {
+      _showToast('该收藏品没有图片');
+      return;
+    }
+
+    setState(() {
+      _isSavingImage = true;
+    });
+
+    try {
+      bool hasPermission = await _requestStoragePermission();
+      if (!hasPermission) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('权限不足'),
+            content: Text('需要存储权限才能保存图片到相册，请在设置中开启权限'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('确定'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      // 下载图片
+      final response = await http.get(Uri.parse(imageUrl));
+      if (response.statusCode != 200) {
+        _showToast('图片下载失败');
+        return;
+      }
+
+      Uint8List imageBytes = response.bodyBytes;
+
+      // 保存到相册
+      Directory? directory;
+      if (Platform.isAndroid) {
+        String picturesPath = '/storage/emulated/0/Pictures';
+        directory = Directory(picturesPath);
+        if (!directory.existsSync()) {
+          directory.createSync(recursive: true);
+        }
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      final file = File('${directory.path}/collection_${_collection!.id}_${DateTime.now().millisecondsSinceEpoch}.png');
+      await file.writeAsBytes(imageBytes);
+
+      // 通知系统刷新相册
+      if (Platform.isAndroid) {
+        await MediaScanner.loadMedia(path: file.path);
+      }
+
+      _showToast('图片已保存到相册');
+    } catch (e) {
+      debugPrint('保存图片失败: $e');
+      _showToast('保存图片失败: $e');
+    } finally {
+      setState(() {
+        _isSavingImage = false;
+      });
+    }
+  }
+
+  // 显示Toast提示
+  void _showToast(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // 复制图片链接到剪贴板
+  Future<void> _copyImageUrl() async {
+    String? imageUrl = _getImageUrl();
+    if (imageUrl == null) {
+      _showToast('该收藏品没有图片链接');
+      return;
+    }
+
+    try {
+      await Clipboard.setData(ClipboardData(text: imageUrl));
+      _showToast('链接已复制到剪贴板');
+    } catch (e) {
+      debugPrint('复制链接失败: $e');
+      _showToast('复制链接失败');
+    }
+  }
 
   // 自定义常量
   final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
@@ -822,22 +972,178 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                 children: [
                                   // 收藏品图片
                                   if (widget.collectionType == 'icons')
-                                    Container(
-                                      width: double.infinity,
-                                      height: 200,
-                                      child: CollectionsImageUtil.getIconImageURL(_collection!),
+                                    Column(
+                                      children: [
+                                        Container(
+                                          width: double.infinity,
+                                          height: 200,
+                                          child: CollectionsImageUtil.getIconImageURL(_collection!),
+                                        ),
+                                        SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: ElevatedButton(
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: themeColor,
+                                                  foregroundColor: Colors.white,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                ),
+                                                onPressed: _isSavingImage ? null : _saveImageToGallery,
+                                                child: _isSavingImage
+                                                    ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white))
+                                                    : Row(
+                                                        mainAxisAlignment: MainAxisAlignment.center,
+                                                        children: [
+                                                          Icon(Icons.save_alt, size: 16),
+                                                          SizedBox(width: 4),
+                                                          Text('保存到相册'),
+                                                        ],
+                                                      ),
+                                              ),
+                                            ),
+                                            SizedBox(width: 8),
+                                            Expanded(
+                                              child: ElevatedButton(
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.grey[700]!,
+                                                  foregroundColor: Colors.white,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                ),
+                                                onPressed: _copyImageUrl,
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(Icons.link, size: 16),
+                                                    SizedBox(width: 4),
+                                                    Text('复制链接'),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
                                   if (widget.collectionType == 'plates')
-                                    Container(
-                                      width: double.infinity,
-                                      height: 150,
-                                      child: CollectionsImageUtil.getPlateImageURL(_collection!),
+                                    Column(
+                                      children: [
+                                        Container(
+                                          width: double.infinity,
+                                          height: 150,
+                                          child: CollectionsImageUtil.getPlateImageURL(_collection!),
+                                        ),
+                                        SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: ElevatedButton(
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: themeColor,
+                                                  foregroundColor: Colors.white,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                ),
+                                                onPressed: _isSavingImage ? null : _saveImageToGallery,
+                                                child: _isSavingImage
+                                                    ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white))
+                                                    : Row(
+                                                        mainAxisAlignment: MainAxisAlignment.center,
+                                                        children: [
+                                                          Icon(Icons.save_alt, size: 16),
+                                                          SizedBox(width: 4),
+                                                          Text('保存到相册'),
+                                                        ],
+                                                      ),
+                                              ),
+                                            ),
+                                            SizedBox(width: 8),
+                                            Expanded(
+                                              child: ElevatedButton(
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.grey[700]!,
+                                                  foregroundColor: Colors.white,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                ),
+                                                onPressed: _copyImageUrl,
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(Icons.link, size: 16),
+                                                    SizedBox(width: 4),
+                                                    Text('复制链接'),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
                                   if (widget.collectionType == 'frames')
-                                    Container(
-                                      width: double.infinity,
-                                      height: 200,
-                                      child: CollectionsImageUtil.getFrameImageURL(_collection!),
+                                    Column(
+                                      children: [
+                                        Container(
+                                          width: double.infinity,
+                                          height: 200,
+                                          child: CollectionsImageUtil.getFrameImageURL(_collection!),
+                                        ),
+                                        SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: ElevatedButton(
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: themeColor,
+                                                  foregroundColor: Colors.white,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                ),
+                                                onPressed: _isSavingImage ? null : _saveImageToGallery,
+                                                child: _isSavingImage
+                                                    ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white))
+                                                    : Row(
+                                                        mainAxisAlignment: MainAxisAlignment.center,
+                                                        children: [
+                                                          Icon(Icons.save_alt, size: 16),
+                                                          SizedBox(width: 4),
+                                                          Text('保存到相册'),
+                                                        ],
+                                                      ),
+                                              ),
+                                            ),
+                                            SizedBox(width: 8),
+                                            Expanded(
+                                              child: ElevatedButton(
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.grey[700]!,
+                                                  foregroundColor: Colors.white,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                ),
+                                                onPressed: _copyImageUrl,
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(Icons.link, size: 16),
+                                                    SizedBox(width: 4),
+                                                    Text('复制链接'),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
                                   if (widget.collectionType == 'trophies')
                                     SizedBox(height: 0),

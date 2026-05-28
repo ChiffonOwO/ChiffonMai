@@ -11,6 +11,7 @@ import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonCacheUtil.dart';
 import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
+import '../SongInfoPage.dart';
 
 class GuessSongByOpenLettersPage extends StatefulWidget {
   const GuessSongByOpenLettersPage({super.key});
@@ -467,56 +468,63 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
       children: _targetSongs.map((song) {
         bool isGuessed = _guessedSongs.contains(song.id);
         
-        return Container(
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isGuessed ? Colors.green[50] : Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 4,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 曲绘和曲名
-              Row(
-                children: [
-                  // 方形曲绘（投降后或猜中后显示）
-                  if (_isGameOver || isGuessed)
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(4),
+        return GestureDetector(
+          // 游戏结束后或猜中后可点击跳转到歌曲详情
+          onTap: (_isGameOver || isGuessed) ? () => _navigateToSongInfo(song.id) : null,
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isGuessed ? Colors.green[50] : Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 曲绘和曲名
+                Row(
+                  children: [
+                    // 方形曲绘（投降后或猜中后显示）
+                    if (_isGameOver || isGuessed)
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: CoverUtil.buildCoverWidgetWithContext(context, song.id, 60),
+                        ),
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: CoverUtil.buildCoverWidgetWithContext(context, song.id, 60),
+                    if (_isGameOver || isGuessed)
+                      const SizedBox(width: 12),
+                    // 曲名掩码
+                    Expanded(
+                      child: Text(
+                        _maskedTitles[song.id] ?? '',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: isGuessed ? FontWeight.bold : FontWeight.normal,
+                          color: isGuessed ? Colors.green : Colors.black,
+                        ),
+                        textAlign: _isGameOver || isGuessed ? TextAlign.left : TextAlign.center,
                       ),
                     ),
-                  if (_isGameOver || isGuessed)
-                    const SizedBox(width: 12),
-                  // 曲名掩码
-                  Expanded(
-                    child: Text(
-                      _maskedTitles[song.id] ?? '',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: isGuessed ? FontWeight.bold : FontWeight.normal,
-                        color: isGuessed ? Colors.green : Colors.black,
-                      ),
-                      textAlign: _isGameOver || isGuessed ? TextAlign.left : TextAlign.center,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                    // 显示可点击指示
+                    if (_isGameOver || isGuessed)
+                      const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       }).toList(),
@@ -527,104 +535,121 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
   Widget _buildGuessHistoryItem(Song song, int originalIndex) {
     final screenWidth = MediaQuery.of(context).size.width;
     
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '猜测 #${originalIndex + 1}',
-            style: TextStyle(
-              fontSize: screenWidth * 0.035,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
+    return GestureDetector(
+      onTap: () => _navigateToSongInfo(song.id),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: Offset(0, 2),
             ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              // 曲绘
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: CoverUtil.buildCoverWidgetWithContext(context, song.id, 60),
-                ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '猜测 #${originalIndex + 1}',
+              style: TextStyle(
+                fontSize: screenWidth * 0.035,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 第一行：类型 曲名
-                    Row(
-                      children: [
-                        Text(
-                          song.type == 'SD' ? 'ST' : song.type,
-                          style: TextStyle(
-                            fontSize: screenWidth * 0.035,
-                            fontWeight: FontWeight.bold,
-                            color: song.type == 'SD' ? Colors.blue : Colors.orange,
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            song.basicInfo.title,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                // 曲绘
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: CoverUtil.buildCoverWidgetWithContext(context, song.id, 60),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 第一行：类型 曲名
+                      Row(
+                        children: [
+                          Text(
+                            song.type == 'SD' ? 'ST' : song.type,
                             style: TextStyle(
                               fontSize: screenWidth * 0.035,
                               fontWeight: FontWeight.bold,
+                              color: song.type == 'SD' ? Colors.blue : Colors.orange,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              song.basicInfo.title,
+                              style: TextStyle(
+                                fontSize: screenWidth * 0.035,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      // 第二行：曲师 | 流派
+                      Text(
+                        '${song.basicInfo.artist} | ${song.basicInfo.genre}',
+                        style: TextStyle(
+                          fontSize: screenWidth * 0.03,
+                          color: Colors.grey,
                         ),
-                      ],
-                    ),
-                    // 第二行：曲师 | 流派
-                    Text(
-                      '${song.basicInfo.artist} | ${song.basicInfo.genre}',
-                      style: TextStyle(
-                        fontSize: screenWidth * 0.03,
-                        color: Colors.grey,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    // 第三行：masterDs | remasterDs | version
-                    Text(
-                      '${song.ds.length > 3 ? song.ds[3].toString() : '-'} | ${song.ds.length > 4 ? song.ds[4].toString() : '-'} | ${StringUtil.formatVersion2(song.basicInfo.from)}',
-                      style: TextStyle(
-                        fontSize: screenWidth * 0.03,
-                        color: Colors.grey,
+                      // 第三行：masterDs | remasterDs | version
+                      Text(
+                        '${song.ds.length > 3 ? song.ds[3].toString() : '-'} | ${song.ds.length > 4 ? song.ds[4].toString() : '-'} | ${StringUtil.formatVersion2(song.basicInfo.from)}',
+                        style: TextStyle(
+                          fontSize: screenWidth * 0.03,
+                          color: Colors.grey,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+                // 可点击指示
+                const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
 
+
+  // 跳转到歌曲详情页面
+  void _navigateToSongInfo(String songId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SongInfoPage(
+          songId: songId,
+        ),
+      ),
+    );
+  }
 
   // 显示规则说明对话框
   void _showRulesDialog() {

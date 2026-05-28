@@ -3,12 +3,70 @@ const http = require('http');
 const https = require('https');
 const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
+const mysql = require('mysql2/promise');
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 3000;
+
+// MySQL 数据库配置
+const dbConfig = {
+  host: 'localhost',
+  port: 3306,
+  user: 'root',
+  password: 'Maozedong001',
+  database: 'user_maimai_rankings',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+};
+
+// 创建数据库连接池
+let db;
+
+async function connectDB() {
+  try {
+    db = mysql.createPool(dbConfig);
+    
+    // 验证连接池是否正常工作
+    const connection = await db.getConnection();
+    await connection.execute('SELECT 1');
+    connection.release();
+    
+    console.log('MySQL 数据库连接成功');
+    await initializeRankingsTable();
+  } catch (err) {
+    console.error('数据库连接失败:', err.message);
+    process.exit(1);
+  }
+}
+
+// 初始化排行榜表
+async function initializeRankingsTable() {
+  const createTableSQL = `
+    CREATE TABLE IF NOT EXISTS user_maimai_rankings (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id VARCHAR(100) UNIQUE NOT NULL,  -- 唯一标识符：数据源:用户ID
+      data_source VARCHAR(20) NOT NULL,     -- shuiyu 或 luoxue
+      original_id VARCHAR(50) NOT NULL,     -- 原始用户ID（QQ号或落雪friendCode）
+      nickname VARCHAR(100),                 -- 用户昵称
+      total_rating INT NOT NULL DEFAULT 0,  -- Best50总Rating
+      best35_rating INT DEFAULT 0,          -- Best35 Rating
+      best15_rating INT DEFAULT 0,          -- Best15 Rating
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `;
+  
+  try {
+    await db.execute(createTableSQL);
+    console.log('排行榜表初始化成功');
+  } catch (err) {
+    console.error('创建表失败:', err.message);
+  }
+}
 
 // 与 Flutter 前端相同的音乐数据 API
 const MUSIC_DATA_API = 'https://www.diving-fish.com/api/maimaidxprober/music_data';
@@ -1429,18 +1487,315 @@ function endRoundHandler(roomId) {
   console.log(`Round ${room.currentRound} ended in room: ${roomId}, waiting for host to start next round`);
 }
 
-// 启动服务器
+// Express 中间件配置
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// 生成唯一用户ID
+function generateUserId(dataSource, originalId) {
+  return `${dataSource}:${originalId}`;
+}
+
+// 排行榜 API
+
+// 更新或创建用户排行榜数据
+app.post('/api/rankings/update', async (req, res) => {
+  const { dataSource, originalId, nickname, totalRating, best35Rating, best15Rating } = req.body;
+  
+  // 验证参数
+  if (!dataSource || !originalId || totalRating === undefined) {
+    return res.status(400).json({ success: false, error: '参数无效' });
+  }
+  
+  if (dataSource !== 'shuiyu' && dataSource !== 'luoxue') {
+    return res.status(400).json({ success: false, error: '数据源类型无效' });
+  }
+  
+  // 确保数值类型正确
+  const safeTotalRating = parseInt(totalRating);
+  const safeBest35Rating = best35Rating !== undefined ? parseInt(best35Rating) : 0;
+  const safeBest15Rating = best15Rating !== undefined ? parseInt(best15Rating) : 0;
+  
+  if (isNaN(safeTotalRating) || !Number.isInteger(safeTotalRating)) {
+    return res.status(400).json({ success: false, error: 'totalRating 必须是整数' });
+  }
+  
+  const userId = generateUserId(dataSource, originalId);
+  
+  try {
+    if (!db) {
+      throw new Error('数据库连接未初始化');
+    }
+    
+    // 使用 INSERT ... ON DUPLICATE KEY UPDATE 实现 upsert
+    const sql = `
+      INSERT INTO user_maimai_rankings (
+        user_id, data_source, original_id, nickname, total_rating, best35_rating, best15_rating, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON DUPLICATE KEY UPDATE 
+        nickname = VALUES(nickname), 
+        total_rating = VALUES(total_rating), 
+        best35_rating = VALUES(best35_rating), 
+        best15_rating = VALUES(best15_rating), 
+        updated_at = CURRENT_TIMESTAMP
+    `;
+    
+    console.log(`[DEBUG] 更新排行榜数据, userId: ${userId}, totalRating: ${safeTotalRating}, type: ${typeof safeTotalRating}`);
+    
+    const [result] = await db.execute(sql, [userId, dataSource, originalId, nickname || null, safeTotalRating, safeBest35Rating, safeBest15Rating]);
+    
+    res.json({ 
+      success: true, 
+      message: '数据更新成功',
+      userId: userId,
+      affectedRows: result.affectedRows 
+    });
+  } catch (err) {
+    console.error('更新排行榜数据失败:', err.message);
+    return res.status(500).json({ success: false, error: '更新失败' });
+  }
+});
+
+// 获取总排行榜（按总Rating降序，相同则按创建时间升序）
+app.get('/api/rankings/total', async (req, res) => {
+  const limit = parseInt(req.query.limit);
+  const validLimit = !isNaN(limit) && Number.isInteger(limit) && limit > 0 ? limit : 100;
+  
+  try {
+    if (!db) {
+      throw new Error('数据库连接未初始化');
+    }
+    
+    const sql = `
+      SELECT * FROM user_maimai_rankings 
+      ORDER BY total_rating DESC, created_at ASC 
+      LIMIT ${validLimit}
+    `;
+    
+    console.log(`[DEBUG] 查询总排行榜, limit: ${validLimit}, type: ${typeof validLimit}`);
+    console.log(`[DEBUG] SQL: ${sql}`);
+    
+    const [rows] = await db.query(sql);
+    
+    // 添加排名
+    const result = rows.map((row, index) => ({
+      rank: index + 1,
+      userId: row.user_id,
+      dataSource: row.data_source,
+      originalId: row.original_id,
+      nickname: row.nickname,
+      totalRating: row.total_rating,
+      best35Rating: row.best35_rating,
+      best15Rating: row.best15_rating,
+      updatedAt: row.updated_at
+    }));
+    
+    res.json({ 
+      success: true, 
+      data: result,
+      total: result.length 
+    });
+  } catch (err) {
+    console.error('获取排行榜失败:', err.message);
+    return res.status(500).json({ success: false, error: '获取失败' });
+  }
+});
+
+// 获取指定用户的排名
+app.get('/api/rankings/user/:userId', async (req, res) => {
+  const userId = req.params.userId;
+  
+  try {
+    // 先获取用户的总Rating
+    const [userRows] = await db.execute('SELECT total_rating FROM user_maimai_rankings WHERE user_id = ?', [userId]);
+    
+    if (userRows.length === 0) {
+      return res.json({ success: true, rank: null, message: '用户未上榜' });
+    }
+    
+    const user = userRows[0];
+    
+    // 计算排名（统计总Rating大于当前用户的人数 + 1）
+    const sql = `
+      SELECT COUNT(*) as rank 
+      FROM user_maimai_rankings 
+      WHERE total_rating > ? OR (total_rating = ? AND created_at < (SELECT created_at FROM user_maimai_rankings WHERE user_id = ?))
+    `;
+    
+    const [resultRows] = await db.execute(sql, [user.total_rating, user.total_rating, userId]);
+    const result = resultRows[0];
+    
+    const rank = (result?.rank || 0) + 1;
+    
+    res.json({ 
+      success: true, 
+      rank: rank,
+      totalRating: user.total_rating 
+    });
+  } catch (err) {
+    console.error('查询用户失败:', err.message);
+    return res.status(500).json({ success: false, error: '查询失败' });
+  }
+});
+
+// 获取指定用户的详细信息
+app.get('/api/rankings/user/detail/:userId', async (req, res) => {
+  const userId = req.params.userId;
+  
+  try {
+    const [rows] = await db.execute('SELECT * FROM user_maimai_rankings WHERE user_id = ?', [userId]);
+    
+    if (rows.length === 0) {
+      return res.json({ success: false, error: '用户不存在' });
+    }
+    
+    const row = rows[0];
+    
+    res.json({ 
+      success: true, 
+      data: {
+        userId: row.user_id,
+        dataSource: row.data_source,
+        originalId: row.original_id,
+        nickname: row.nickname,
+        totalRating: row.total_rating,
+        best35Rating: row.best35_rating,
+        best15Rating: row.best15_rating,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }
+    });
+  } catch (err) {
+    console.error('查询用户详情失败:', err.message);
+    return res.status(500).json({ success: false, error: '查询失败' });
+  }
+});
+
+// 获取水鱼数据源排行榜
+app.get('/api/rankings/shuiyu', async (req, res) => {
+  const limit = parseInt(req.query.limit);
+  const validLimit = !isNaN(limit) && Number.isInteger(limit) && limit > 0 ? limit : 100;
+  
+  try {
+    if (!db) {
+      throw new Error('数据库连接未初始化');
+    }
+    
+    const sql = `
+      SELECT * FROM user_maimai_rankings 
+      WHERE data_source = 'shuiyu'
+      ORDER BY total_rating DESC, created_at ASC 
+      LIMIT ${validLimit}
+    `;
+    
+    console.log(`[DEBUG] 查询水鱼排行榜, limit: ${validLimit}, type: ${typeof validLimit}`);
+    
+    const [rows] = await db.query(sql);
+    
+    const result = rows.map((row, index) => ({
+      rank: index + 1,
+      userId: row.user_id,
+      dataSource: row.data_source,
+      originalId: row.original_id,
+      nickname: row.nickname,
+      totalRating: row.total_rating,
+      best35Rating: row.best35_rating,
+      best15Rating: row.best15_rating,
+      updatedAt: row.updated_at
+    }));
+    
+    res.json({ 
+      success: true, 
+      data: result,
+      total: result.length 
+    });
+  } catch (err) {
+    console.error('获取水鱼排行榜失败:', err.message);
+    return res.status(500).json({ success: false, error: '获取失败' });
+  }
+});
+
+// 获取落雪数据源排行榜
+app.get('/api/rankings/luoxue', async (req, res) => {
+  const limit = parseInt(req.query.limit);
+  const validLimit = !isNaN(limit) && Number.isInteger(limit) && limit > 0 ? limit : 100;
+  
+  try {
+    if (!db) {
+      throw new Error('数据库连接未初始化');
+    }
+    
+    const sql = `
+      SELECT * FROM user_maimai_rankings 
+      WHERE data_source = 'luoxue'
+      ORDER BY total_rating DESC, created_at ASC 
+      LIMIT ${validLimit}
+    `;
+    
+    console.log(`[DEBUG] 查询落雪排行榜, limit: ${validLimit}, type: ${typeof validLimit}`);
+    
+    const [rows] = await db.query(sql);
+    
+    const result = rows.map((row, index) => ({
+      rank: index + 1,
+      userId: row.user_id,
+      dataSource: row.data_source,
+      originalId: row.original_id,
+      nickname: row.nickname,
+      totalRating: row.total_rating,
+      best35Rating: row.best35_rating,
+      best15Rating: row.best15_rating,
+      updatedAt: row.updated_at
+    }));
+    
+    res.json({ 
+      success: true, 
+      data: result,
+      total: result.length 
+    });
+  } catch (err) {
+    console.error('获取落雪排行榜失败:', err.message);
+    return res.status(500).json({ success: false, error: '获取失败' });
+  }
+});
+
+// 删除指定用户数据（管理员接口）
+app.delete('/api/rankings/user/:userId', async (req, res) => {
+  const userId = req.params.userId;
+  
+  try {
+    const [result] = await db.execute('DELETE FROM user_maimai_rankings WHERE user_id = ?', [userId]);
+    
+    res.json({ 
+      success: true, 
+      message: '删除成功',
+      affectedRows: result.affectedRows 
+    });
+  } catch (err) {
+    console.error('删除用户数据失败:', err.message);
+    return res.status(500).json({ success: false, error: '删除失败' });
+  }
+});
+
+// 健康检查
+app.get('/api/health', (req, res) => {
+  res.json({ success: true, message: 'Server is running' });
+});
+
 async function startServer() {
+  // 连接数据库
+  await connectDB();
+  
   // 初始化歌曲缓存（从 API 获取全量歌曲数据）
   await initializeSongCache();
   
   // 设置定时刷新歌曲缓存（每小时）
   setupSongCacheRefresh();
   
-  // 启动 WebSocket 服务器
+  // 启动 HTTP 服务器（包含 WebSocket）
   server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    //console.log(`当前歌曲缓存: ${songCache.length} 首歌曲`);
+    console.log(`排行榜 API 已启用`);
   });
 }
 

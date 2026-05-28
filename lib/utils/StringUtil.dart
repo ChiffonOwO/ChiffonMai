@@ -106,6 +106,9 @@ class StringUtil {
     if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM') {
       return 'DX 2025 镜';
     }
+    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM PLUS') {
+      return 'DX 2026 彩';
+    }
     if (version == 'maimai DX PRiSM PLUS') {
       return 'PRiSM+';
     }
@@ -241,5 +244,37 @@ class StringUtil {
       return 'ST';
     }
     return type;
+  }
+
+  /**
+   * 将全角字符转换为半角字符
+   * @param input 输入字符串
+   * @return 转换后的半角字符串
+   * 
+   * 全角字符范围：U+FF00-U+FFEF
+   * 转换规则：全角字符的 Unicode 值减去 0xFEE0 得到对应的半角字符
+   */
+  static String toHalfWidth(String input) {
+    if (input.isEmpty) {
+      return input;
+    }
+    
+    StringBuffer result = StringBuffer();
+    for (int i = 0; i < input.length; i++) {
+      int charCode = input.codeUnitAt(i);
+      // 全角空格特殊处理（U+3000 -> U+0020）
+      if (charCode == 0x3000) {
+        result.writeCharCode(0x0020);
+      }
+      // 其他全角字符（U+FF01-U+FF5E）转换为半角
+      else if (charCode >= 0xFF01 && charCode <= 0xFF5E) {
+        result.writeCharCode(charCode - 0xFEE0);
+      }
+      // 保持其他字符不变
+      else {
+        result.writeCharCode(charCode);
+      }
+    }
+    return result.toString();
   }
 }

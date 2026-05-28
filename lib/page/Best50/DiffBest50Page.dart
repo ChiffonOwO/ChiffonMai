@@ -1,8 +1,10 @@
 // ignore: file_names
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
@@ -125,139 +127,6 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
     cardPadding = screenWidth * 0.02;
     fontSizeBase = screenWidth * 0.035;
 
-    if (_isLoading) {
-      return Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    // 如果没有数据，显示空状态
-    if (_diffBest50Data == null || _diffSongs.isEmpty) {
-      return Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Stack(
-          children: [
-            // 层级1：基础背景图 - 占满整个屏幕，作为页面最底层背景
-            Container(
-              width: double.infinity,
-              height: double.infinity,
-              decoration: const BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage('assets/background.png'), // 背景图资源
-                  fit: BoxFit.cover, // 覆盖整个容器，拉伸/裁剪适配
-                  opacity: 1.0, // 不透明
-                ),
-              ),
-            ),
-
-            // 层级2：第一张虚化装饰图 - 居中显示，轻微向上偏移
-            Center(
-              child: Transform.translate(
-                offset: const Offset(0, -20), // 垂直向上偏移20px
-                child: Transform.scale(
-                  scale: 1, // 不缩放
-                  child: Image.asset(
-                    'assets/chiffon2.png',
-                    fit: BoxFit.cover,
-                    opacity: const AlwaysStoppedAnimation(1), // 固定不透明
-                  ),
-                ),
-              ),
-            ),
-
-            // 浅白色背景区域
-            Positioned(
-              top: MediaQuery.of(context).size.height * 0.12,
-              left: MediaQuery.of(context).size.width * 0.02,
-              right: MediaQuery.of(context).size.width * 0.02,
-              bottom: MediaQuery.of(context).size.height * 0.03,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(12.0),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 8.0,
-                      offset: Offset(2.0, 2.0),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.refresh,
-                        size: 64,
-                        color: Colors.grey,
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        '暂无拟合Best50数据',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        '请返回首页点击"刷新数据"按钮获取',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // 标题栏 - 与有数据时保持一致的布局
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Color.fromARGB(255, 84, 97, 97)),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '拟合Best50查询',
-                          style: TextStyle(
-                            color: Color.fromARGB(255, 84, 97, 97),
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 占位，保持标题居中
-                    SizedBox(width: 48),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     // 自定义常量
     final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
     final double borderRadiusSmall = 8.0;
@@ -270,7 +139,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false, // 防止键盘弹出时调整布局
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           // 背景
@@ -280,7 +149,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
           // 页面内容
           Column(
             children: [
-              // 标题栏
+              // 标题栏（始终显示）
               Container(
                 padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
                 child: Row(
@@ -305,7 +174,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                         ),
                       ),
                     ),
-                    // 模式切换按钮
+                    // 模式切换按钮（始终显示）
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.grey[200]!,
@@ -317,68 +186,135 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                       ),
                       onPressed: _toggleMode,
                       child: Text(
-                        _currentMode == 0 ? '模式A' : (_currentMode == 1 ? '模式B' : '模式C'),
-                        style: TextStyle(fontSize: screenWidth * 0.03),
+                        '模式${['A', 'B', 'C'][_currentMode]}',
+                        style: TextStyle(fontSize: 12),
                       ),
                     ),
                   ],
                 ),
               ),
 
-              // 主内容区域
+              // 内容区域
               Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
-                  ),
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.03),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // 评分区域
-                        _buildRatingSection(),
-                        SizedBox(height: 12.0),
-
-                        // 导出按钮
-                        _buildExportButton(),
-                        SizedBox(height: 12.0),
-
-                        // 根据模式显示不同内容
-                        _currentMode == 0 ?
-                        // 模式A：不分SD/DX，统一显示
-                        Column(
-                          children: [
-                            _buildSectionTitle('基于拟合难度的Best50', context),
-                            SizedBox(height: MediaQuery.of(context).size.height * 0.015),
-                            _buildDataCardGrid(_diffSongs, 1.75),
-                          ],
-                        ) :
-                        // 模式B/C：分离显示Best35和Best15
-                        Column(
-                          children: [
-                            // Best35 标题区域
-                            _buildSectionTitle(_currentMode == 1 ? 'Best35 | 非当前版本最好成绩' : '非当前版本前35 | 拟合Rating排名', context),
-                            SizedBox(height: MediaQuery.of(context).size.height * 0.015),
-                            _buildDataCardGrid(_diffSdSongs, 1.75),
-                            SizedBox(height: MediaQuery.of(context).size.height * 0.02),
-                            // Best15 标题区域
-                            _buildSectionTitle(_currentMode == 1 ? 'Best15 | 当前版本最好成绩' : '当前版本前15 | 拟合Rating排名', context),
-                            SizedBox(height: 12.0),
-                            _buildDataCardGrid(_diffDxSongs, 1.75),
-                          ],
+                child: Stack(
+                  children: [
+                    // 加载中状态（覆盖层）
+                    if (_isLoading)
+                      Container(
+                        color: Colors.white.withOpacity(0.8),
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 16),
+                              Text(
+                                '正在计算拟合Best50...',
+                                style: TextStyle(
+                                  color: textPrimaryColor,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+
+                    // 内容
+                    if (!_isLoading)
+                      _buildContent(textPrimaryColor, borderRadiusSmall, defaultShadow),
+                  ],
                 ),
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  // 构建内容区域
+  Widget _buildContent(Color textPrimaryColor, double borderRadiusSmall, BoxShadow defaultShadow) {
+    // 如果没有数据，显示空状态
+    if (_diffBest50Data == null || _diffSongs.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.refresh,
+              size: 64,
+              color: Colors.grey,
+            ),
+            SizedBox(height: 16),
+            Text(
+              '暂无拟合Best50数据',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              '请返回首页点击"刷新数据"按钮获取',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 主内容区域
+    return Container(
+      margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(borderRadiusSmall),
+        boxShadow: [defaultShadow],
+      ),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.03),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 评分区域
+            _buildRatingSection(),
+            SizedBox(height: 12.0),
+
+            // 导出按钮
+            _buildExportButton(),
+            SizedBox(height: 12.0),
+
+            // 根据模式显示不同内容
+            _currentMode == 0 ?
+            // 模式A：不分SD/DX，统一显示
+            Column(
+              children: [
+                _buildSectionTitle('基于拟合难度的Best50', context),
+                SizedBox(height: MediaQuery.of(context).size.height * 0.015),
+                _buildDataCardGrid(_diffSongs, 1.75),
+              ],
+            ) :
+            // 模式B/C：分离显示Best35和Best15
+            Column(
+              children: [
+                // Best35 标题区域
+                _buildSectionTitle(_currentMode == 1 ? 'Best35 | 非当前版本最好成绩' : '非当前版本前35 | 拟合Rating排名', context),
+                SizedBox(height: MediaQuery.of(context).size.height * 0.015),
+                _buildDataCardGrid(_diffSdSongs, 1.75),
+                SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+                // Best15 标题区域
+                _buildSectionTitle(_currentMode == 1 ? 'Best15 | 当前版本最好成绩' : '当前版本前15 | 拟合Rating排名', context),
+                SizedBox(height: 12.0),
+                _buildDataCardGrid(_diffDxSongs, 1.75),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1037,7 +973,14 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
   // 构建导出按钮
   Widget _buildExportButton() {
     return ElevatedButton(
-      onPressed: _exportToImage,
+      onPressed: () async {
+        debugPrint('=== DIFF EXPORT BUTTON CLICKED ===');
+        try {
+          await _exportToImage();
+        } catch (e) {
+          debugPrint('Error in diff export: $e');
+        }
+      },
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.blue,
         padding: EdgeInsets.symmetric(vertical: 12.0),
@@ -1063,9 +1006,81 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
     );
   }
 
+  // 请求存储权限
+  Future<bool> _requestStoragePermission() async {
+    debugPrint('Page: _requestStoragePermission called');
+    debugPrint('Page: Platform.isAndroid = ${Platform.isAndroid}');
+    
+    if (Platform.isAndroid) {
+      debugPrint('Page: Running on Android');
+      
+      // 策略：同时请求 storage、photos 和 videos 权限，确保覆盖所有 Android 版本
+      // Android 13+ 需要 photos/videos 权限
+      // Android 12 及以下需要 storage 权限
+      
+      // 先检查已有权限状态
+      debugPrint('Page: Checking existing permissions...');
+      PermissionStatus storageStatus = await Permission.storage.status;
+      PermissionStatus photosStatus = await Permission.photos.status;
+      PermissionStatus videosStatus = await Permission.videos.status;
+      
+      debugPrint('Page: Storage status = $storageStatus');
+      debugPrint('Page: Photos status = $photosStatus');
+      debugPrint('Page: Videos status = $videosStatus');
+      
+      // 如果任何一个权限已授予，直接返回成功
+      if (storageStatus.isGranted || photosStatus.isGranted || videosStatus.isGranted) {
+        debugPrint('Page: At least one permission already granted');
+        return true;
+      }
+      
+      // 请求权限：同时请求 storage、photos 和 videos
+      debugPrint('Page: Requesting storage, photos and videos permissions...');
+      Map<Permission, PermissionStatus> statuses = await [
+        Permission.storage,
+        Permission.photos,
+        Permission.videos,
+      ].request();
+      
+      bool storageGranted = statuses[Permission.storage]?.isGranted ?? false;
+      bool photosGranted = statuses[Permission.photos]?.isGranted ?? false;
+      bool videosGranted = statuses[Permission.videos]?.isGranted ?? false;
+      
+      debugPrint('Page: Storage granted = $storageGranted');
+      debugPrint('Page: Photos granted = $photosGranted');
+      debugPrint('Page: Videos granted = $videosGranted');
+      
+      return storageGranted || photosGranted || videosGranted;
+    } else {
+      // 非 Android 平台
+      debugPrint('Page: Non-Android platform');
+      PermissionStatus status = await Permission.storage.request();
+      return status.isGranted;
+    }
+  }
+
   // 导出为图片
   Future<void> _exportToImage() async {
     try {
+      // 先请求存储权限
+      bool hasPermission = await _requestStoragePermission();
+      if (!hasPermission) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('权限不足'),
+            content: Text('需要存储权限才能导出图片到相册，请在设置中开启权限'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('确定'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
       // 显示加载指示器
       showDialog(
         context: context,
@@ -1088,6 +1103,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
         _diffBest50Data,
         _diffSongs,
         _maimaiMusicData,
+        currentMode: _currentMode,
       );
 
       // 关闭加载指示器
@@ -1101,6 +1117,15 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
             title: Text('导出成功'),
             content: Text('图片已保存到：\n${file.path}'),
             actions: [
+              TextButton(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: file.path));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('路径已复制到剪贴板')),
+                  );
+                },
+                child: Text('复制路径'),
+              ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: Text('确定'),

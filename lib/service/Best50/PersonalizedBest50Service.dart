@@ -582,18 +582,21 @@ class PersonalizedBest50Service {
     }
   }
 
-  // 获取版本列表
+  // 获取版本列表（过滤掉只包含maidata追加歌曲的版本）
   Future<Map<String, int>> getVersionCounts() async {
     try {
       // 获取所有歌曲数据
       final allSongs = await MaimaiMusicDataManager().getCachedSongs();
       if (allSongs == null) return {};
 
-      // 统计版本出现次数
+      // 统计版本出现次数（只统计非maidata歌曲）
       Map<String, int> versionCounts = {};
       for (var song in allSongs) {
-        String version = song.basicInfo.from;
-        versionCounts[version] = (versionCounts[version] ?? 0) + 1;
+        // 过滤掉从maidata追加的歌曲
+        if (!_isMaidataSong(song)) {
+          String version = song.basicInfo.from;
+          versionCounts[version] = (versionCounts[version] ?? 0) + 1;
+        }
       }
 
       return versionCounts;
@@ -621,14 +624,14 @@ class PersonalizedBest50Service {
       // 构建歌曲ID到歌曲信息的映射
       final songMap = { for (var song in allSongs) song.id: song };
 
-      // 过滤出该版本的歌曲的记录
+      // 过滤出该版本的歌曲的记录（排除从maidata追加的歌曲）
       final versionRecords = records.where((record) {
         if (record is Map<String, dynamic>) {
           final songId = record['song_id'];
           final song = songMap[songId.toString()];
           
           if (song != null) {
-            return song.basicInfo.from == version;
+            return song.basicInfo.from == version && !_isMaidataSong(song);
           }
         }
         return false;
@@ -1178,5 +1181,11 @@ class PersonalizedBest50Service {
       debugPrint('获取genre50数据时出错: $e');
       return null;
     }
+  }
+
+  // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析）
+  bool _isMaidataSong(dynamic song) {
+    if (song == null || song.cids == null || song.cids.isEmpty) return false;
+    return song.cids.every((cid) => cid == 0);
   }
 }

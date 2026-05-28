@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../api/ApiUrls.dart';
 import '../../api/DeveloperToken.dart';
+import '../../constant/CacheKeyConstant.dart';
 
 /// 落雪OAuth鉴权管理器
 /// 实现OAuth 2.0授权码流程（authorization_code + oob模式）
@@ -19,11 +20,11 @@ class LuoXueOAuthManager {
   static const String _redirectUri = 'urn:ietf:wg:oauth:2.0:oob';
   static const String _scope = 'read_user_profile write_player read_player';
   
-  // 缓存键
-  static const String _accessTokenKey = 'luoxue_access_token';
-  static const String _refreshTokenKey = 'luoxue_refresh_token';
-  static const String _expiresAtKey = 'luoxue_expires_at';
-  static const String _tokenTypeKey = 'luoxue_token_type';
+  // 缓存键（使用常量类统一管理）
+  static const String _accessTokenKey = CacheKeyConstant.luoxueAccessToken;
+  static const String _refreshTokenKey = CacheKeyConstant.luoxueRefreshToken;
+  static const String _expiresAtKey = CacheKeyConstant.luoxueExpiresAt;
+  static const String _tokenTypeKey = CacheKeyConstant.luoxueTokenType;
   
   /// 获取授权URL
   /// 用户访问此URL进行授权，授权后会获得授权码（显示在页面上）

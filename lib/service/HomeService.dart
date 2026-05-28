@@ -74,7 +74,7 @@ class HomeService {
       ]);
       
       // 第三阶段：并行初始化其他数据
-      onProgress('正在加载收集物数据（奖杯/头像/牌面/边框）...');
+      onProgress('正在加载收藏品数据...');
       final collectionsManager = CollectionsManager();
       final luoXueSongsManager = LuoXueSongsManager();
       

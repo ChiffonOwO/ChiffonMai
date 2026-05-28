@@ -1,6 +1,13 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:marquee/marquee.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:media_scanner/media_scanner.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/MaidataManager.dart';
@@ -41,6 +48,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
   
   // Maidata解析的物量统计（优先使用）
   Map<int, List<int>> _maidataNoteCounts = {}; // key: 难度索引(0-4), value: [tap, hold, slide, touch, break]
+  // Maidata解析的break统计
+  Map<int, List<int>> _maidataBreakCounts = {}; // key: 难度索引(0-4), value: [trueZettaiTap, trueZettaiHold, protectedZettai, star]
   
   // 舞萌DX 完成度-评级-乘数对照表
   final List<Map<String, dynamic>> maimaiRatingMultiplier = [
@@ -231,14 +240,38 @@ class _SongInfoPageState extends State<SongInfoPage> {
       
       String? maidataContent = MaidataManager().getMaidata(widget.songId);
       
+      // 日志：输出当前歌曲ID
+      debugPrint('[MaidataDecode] 正在解析歌曲ID: ${widget.songId}');
+      
       if (maidataContent != null && maidataContent.isNotEmpty) {
+        // 日志：输出原始maidata内容长度
+        debugPrint('[MaidataDecode] maidata内容长度: ${maidataContent.length}');
+        
         MaidataData maidata = MaidataDecodeUtil.decode(maidataContent);
         
+        // 日志：输出解析后的chart数量
+        debugPrint('[MaidataDecode] 解析出 ${maidata.charts.length} 个chart');
+        
         Map<int, List<int>> newNoteCounts = {};
+        Map<int, List<int>> newBreakCounts = {};
         for (ChartData chart in maidata.charts) {
           // 难度索引转换：maidata的difficultyIndex是1-6，对应界面显示的0-4（跳过EASY）
           int index = chart.difficultyIndex - 2; // 转换为0-4
-          if (index >= 0 && index <= 4 && chart.stats != null) {
+          
+          // 日志：输出每个chart的详细信息
+          debugPrint('[MaidataDecode] chart[$index] difficultyIndex=${chart.difficultyIndex}, stats=${chart.stats}, breakStats=${chart.breakStats}');
+          
+          if (chart.stats != null) {
+            NoteStats stats = chart.stats!;
+            debugPrint('[MaidataDecode] chart[$index] tap=${stats.tap}, hold=${stats.hold}, slide=${stats.slide}, touch=${stats.touch}, break=${stats.breakNote}');
+          }
+          
+          if (chart.breakStats != null) {
+            BreakStats breakStats = chart.breakStats!;
+            debugPrint('[MaidataDecode] chart[$index] trueZettaiTap=${breakStats.trueZettaiTap}, trueZettaiHold=${breakStats.trueZettaiHold}, protectedZettai=${breakStats.protectedZettai}, star=${breakStats.star}');
+          }
+          
+          if (index >= 0 && index <= 5 && chart.stats != null) {
             NoteStats stats = chart.stats!;
             newNoteCounts[index] = [
               stats.tap,
@@ -247,6 +280,34 @@ class _SongInfoPageState extends State<SongInfoPage> {
               stats.touch,
               stats.breakNote,
             ];
+            // 特殊处理6位数ID的UTAGE歌曲：只有一个难度(index=0)，但maidata中是index=5
+            if (widget.songId.length == 6 && index == 5) {
+              newNoteCounts[0] = [
+                stats.tap,
+                stats.hold,
+                stats.slide,
+                stats.touch,
+                stats.breakNote,
+              ];
+            }
+          }
+          if (index >= 0 && index <= 5 && chart.breakStats != null) {
+            BreakStats breakStats = chart.breakStats!;
+            newBreakCounts[index] = [
+              breakStats.trueZettaiTap,
+              breakStats.trueZettaiHold,
+              breakStats.protectedZettai,
+              breakStats.star,
+            ];
+            // 特殊处理6位数ID的UTAGE歌曲：只有一个难度(index=0)，但maidata中是index=5
+            if (widget.songId.length == 6 && index == 5) {
+              newBreakCounts[0] = [
+                breakStats.trueZettaiTap,
+                breakStats.trueZettaiHold,
+                breakStats.protectedZettai,
+                breakStats.star,
+              ];
+            }
           }
         }
         
@@ -256,19 +317,41 @@ class _SongInfoPageState extends State<SongInfoPage> {
             _maidataNoteCounts = newNoteCounts;
           });
         }
+        if (newBreakCounts.isNotEmpty) {
+          setState(() {
+            _maidataBreakCounts = newBreakCounts;
+          });
+        }
       } else {
         // 尝试使用shortId查询
+        debugPrint('[MaidataDecode] 主ID查询失败，尝试使用shortId查询');
         if (_songData != null) {
           dynamic shortId = _songData!['basic_info']['short_id'] ?? _songData!['shortId'];
+          debugPrint('[MaidataDecode] shortId: $shortId');
           if (shortId != null) {
             String shortIdStr = shortId.toString();
             String? maidataByShortId = MaidataManager().getMaidata(shortIdStr);
             if (maidataByShortId != null && maidataByShortId.isNotEmpty) {
+              debugPrint('[MaidataDecode] 通过shortId找到maidata，长度: ${maidataByShortId.length}');
               MaidataData maidata = MaidataDecodeUtil.decode(maidataByShortId);
+              debugPrint('[MaidataDecode] shortId解析出 ${maidata.charts.length} 个chart');
               Map<int, List<int>> newNoteCounts = {};
+              Map<int, List<int>> newBreakCounts = {};
               for (ChartData chart in maidata.charts) {
                 int index = chart.difficultyIndex - 2;
-                if (index >= 0 && index <= 4 && chart.stats != null) {
+                debugPrint('[MaidataDecode][shortId] chart[$index] difficultyIndex=${chart.difficultyIndex}, stats=${chart.stats}, breakStats=${chart.breakStats}');
+                
+                if (chart.stats != null) {
+                  NoteStats stats = chart.stats!;
+                  debugPrint('[MaidataDecode][shortId] chart[$index] tap=${stats.tap}, hold=${stats.hold}, slide=${stats.slide}, touch=${stats.touch}, break=${stats.breakNote}');
+                }
+                
+                if (chart.breakStats != null) {
+                  BreakStats breakStats = chart.breakStats!;
+                  debugPrint('[MaidataDecode][shortId] chart[$index] trueZettaiTap=${breakStats.trueZettaiTap}, trueZettaiHold=${breakStats.trueZettaiHold}, protectedZettai=${breakStats.protectedZettai}, star=${breakStats.star}');
+                }
+                
+                if (index >= 0 && index <= 5 && chart.stats != null) {
                   NoteStats stats = chart.stats!;
                   newNoteCounts[index] = [
                     stats.tap,
@@ -277,6 +360,34 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     stats.touch,
                     stats.breakNote,
                   ];
+                  // 特殊处理6位数ID的UTAGE歌曲：只有一个难度(index=0)，但maidata中是index=5
+                  if (widget.songId.length == 6 && index == 5) {
+                    newNoteCounts[0] = [
+                      stats.tap,
+                      stats.hold,
+                      stats.slide,
+                      stats.touch,
+                      stats.breakNote,
+                    ];
+                  }
+                }
+                if (index >= 0 && index <= 5 && chart.breakStats != null) {
+                  BreakStats breakStats = chart.breakStats!;
+                  newBreakCounts[index] = [
+                    breakStats.trueZettaiTap,
+                    breakStats.trueZettaiHold,
+                    breakStats.protectedZettai,
+                    breakStats.star,
+                  ];
+                  // 特殊处理6位数ID的UTAGE歌曲：只有一个难度(index=0)，但maidata中是index=5
+                  if (widget.songId.length == 6 && index == 5) {
+                    newBreakCounts[0] = [
+                      breakStats.trueZettaiTap,
+                      breakStats.trueZettaiHold,
+                      breakStats.protectedZettai,
+                      breakStats.star,
+                    ];
+                  }
                 }
               }
               
@@ -284,6 +395,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
               if (newNoteCounts.isNotEmpty) {
                 setState(() {
                   _maidataNoteCounts = newNoteCounts;
+                });
+              }
+              if (newBreakCounts.isNotEmpty) {
+                setState(() {
+                  _maidataBreakCounts = newBreakCounts;
                 });
               }
             }
@@ -1179,18 +1295,16 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                               Row(
                                                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                                 children: [
-                                                  // ElevatedButton(
-                                                  //   onPressed: () {
-                                                  //     // 保存到本地相册
-                                                  //     // 这里需要实现保存图片的逻辑 
-                                                  //     Navigator.of(context).pop();
-                                                  //   },
-                                                  //   child: Text('保存到相册'),
-                                                  //   style: ElevatedButton.styleFrom(
-                                                  //     backgroundColor: accentColor,
-                                                  //     foregroundColor: Colors.white,
-                                                  //   ),
-                                                  // ),
+                                                  ElevatedButton(
+                                                    onPressed: () async {
+                                                      await _saveCoverToGallery(widget.songId.toString(), basicInfo['title']?.toString() ?? 'cover');
+                                                    },
+                                                    child: Text('保存到相册'),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: accentColor,
+                                                      foregroundColor: Colors.white,
+                                                    ),
+                                                  ),
                                                   ElevatedButton(
                                                     onPressed: () {
                                                       Navigator.of(context).pop();
@@ -1528,6 +1642,30 @@ class _SongInfoPageState extends State<SongInfoPage> {
                               Expanded(
                                   child: _buildNoteItem('TOUCH',
                                       _getNoteCounts(currentChart)[3].toString())),
+                            ],
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // Break统计区域
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                  child: _buildBreakItem('真绝赞TAP',
+                                      _getBreakCounts()[0].toString())),
+                              SizedBox(width: 4),
+                              Expanded(
+                                  child: _buildBreakItem('真绝赞HOLD',
+                                      _getBreakCounts()[1].toString())),
+                              SizedBox(width: 4),
+                              Expanded(
+                                  child: _buildBreakItem('保护套绝赞',
+                                      _getBreakCounts()[2].toString())),
+                              SizedBox(width: 4),
+                              Expanded(
+                                  child: _buildBreakItem('绝赞星星',
+                                      _getBreakCounts()[3].toString())),
                             ],
                           ),
 
@@ -2527,6 +2665,210 @@ class _SongInfoPageState extends State<SongInfoPage> {
         ],
       ),
     );
+  }
+
+  // 获取Break统计数量，优先使用Maidata解析的结果
+  List<int> _getBreakCounts() {
+    if (_maidataBreakCounts.containsKey(_currentDiffIndex)) {
+      List<int> counts = _maidataBreakCounts[_currentDiffIndex]!;
+      bool allZero = counts.every((count) => count == 0);
+      if (!allZero) {
+        return counts;
+      }
+    }
+    return [0, 0, 0, 0];
+  }
+
+  // 构建Break统计项
+  Widget _buildBreakItem(String type, String count) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    Color textColor;
+    switch (type) {
+      case '真绝赞TAP':
+        textColor = Colors.red;
+        break;
+      case '真绝赞HOLD':
+        textColor = Color(0xFFFF6B6B); // 浅红色
+        break;
+      case '保护套绝赞':
+        textColor = Colors.blue;
+        break;
+      case '绝赞星星':
+        textColor = Colors.yellow[700] ?? Colors.yellow;
+        break;
+      default:
+        textColor = Colors.black;
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      padding: const EdgeInsets.all(6),
+      child: Column(
+        children: [
+          Text(
+            type,
+            style: TextStyle(
+              fontSize: screenWidth * 0.022,
+              color: Colors.grey,
+            ),
+          ),
+          Text(
+            count,
+            style: TextStyle(
+              fontSize: screenWidth * 0.035,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 请求存储权限
+  Future<PermissionStatus> _requestStoragePermission() async {
+    if (Platform.isAndroid) {
+      PermissionStatus storageStatus = await Permission.storage.status;
+      PermissionStatus photosStatus = await Permission.photos.status;
+      PermissionStatus videosStatus = await Permission.videos.status;
+
+      if (storageStatus.isGranted || photosStatus.isGranted || videosStatus.isGranted) {
+        return PermissionStatus.granted;
+      }
+
+      Map<Permission, PermissionStatus> statuses = await [
+        Permission.storage,
+        Permission.photos,
+        Permission.videos,
+      ].request();
+
+      bool storageGranted = statuses[Permission.storage]?.isGranted ?? false;
+      bool photosGranted = statuses[Permission.photos]?.isGranted ?? false;
+      bool videosGranted = statuses[Permission.videos]?.isGranted ?? false;
+
+      return (storageGranted || photosGranted || videosGranted) 
+          ? PermissionStatus.granted 
+          : PermissionStatus.denied;
+    } else {
+      PermissionStatus status = await Permission.storage.request();
+      return status;
+    }
+  }
+
+  // 保存封面到相册
+  Future<void> _saveCoverToGallery(String songId, String title) async {
+    try {
+      // 请求存储权限
+      PermissionStatus status = await _requestStoragePermission();
+      if (!status.isGranted) {
+        Fluttertoast.showToast(
+          msg: '需要存储权限才能保存图片',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          timeInSecForIosWeb: 1,
+          backgroundColor: Colors.orange,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+        return;
+      }
+
+      // 获取封面图片数据
+      ByteData? byteData;
+      try {
+        // 尝试从assets加载
+        String coverPath = CoverUtil.buildCoverPath(songId);
+        byteData = await rootBundle.load(coverPath);
+      } catch (e) {
+        // 尝试其他路径
+        try {
+          String coverPath = CoverUtil.getLocalCoverPath(songId);
+          byteData = await rootBundle.load(coverPath);
+        } catch (e2) {
+          try {
+            String coverPath = CoverUtil.getLocalCoverPathRetry1(songId);
+            byteData = await rootBundle.load(coverPath);
+          } catch (e3) {
+            Fluttertoast.showToast(
+              msg: '无法加载封面图片',
+              toastLength: Toast.LENGTH_SHORT,
+              gravity: ToastGravity.BOTTOM,
+              timeInSecForIosWeb: 1,
+              backgroundColor: Colors.red,
+              textColor: Colors.white,
+              fontSize: 16.0,
+            );
+            return;
+          }
+        }
+      }
+
+      if (byteData == null) {
+        Fluttertoast.showToast(
+          msg: '无法加载封面图片',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          timeInSecForIosWeb: 1,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+        return;
+      }
+
+      Uint8List pngBytes = byteData.buffer.asUint8List();
+
+      // 保存到相册
+      Directory? directory;
+      if (status.isGranted) {
+        try {
+          String picturesPath = '/storage/emulated/0/Pictures';
+          directory = Directory(picturesPath);
+          if (!directory.existsSync()) {
+            directory.createSync(recursive: true);
+          }
+        } catch (e) {
+          directory = null;
+        }
+      }
+
+      if (directory == null) {
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      String fileName = '${title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')}_${DateTime.now().millisecondsSinceEpoch}.png';
+      final file = File('${directory.path}/$fileName');
+      await file.writeAsBytes(pngBytes);
+
+      // 通知系统相册
+      if (Platform.isAndroid) {
+        await MediaScanner.loadMedia(path: file.path);
+      }
+
+      Fluttertoast.showToast(
+        msg: '曲绘已保存到相册',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 1,
+        backgroundColor: Colors.green,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: '保存失败: $e',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 1,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+    }
   }
 
   // 构建占位符

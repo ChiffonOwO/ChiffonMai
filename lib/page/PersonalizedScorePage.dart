@@ -1021,6 +1021,28 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Text(
+                          '未完成',
+                          style: TextStyle(
+                            fontSize: _textSizeM,
+                            color: Colors.black,
+                          ),
+                        ),
+                        Text(
+                          '${totalCount - completedCount}',
+                          style: TextStyle(
+                            fontSize: _textSizeL,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
                           '完成率',
                           style: TextStyle(
                             fontSize: _textSizeM,

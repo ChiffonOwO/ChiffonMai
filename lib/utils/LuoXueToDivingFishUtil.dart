@@ -151,7 +151,7 @@ class LuoXueToDivingFishUtil {
     return RecordItem(
       achievements: score.achievements,
       ds: ds,
-      dxScore: score.dxScore.toInt(),
+      dxScore: score.dxScore.floor(),
       fc: score.fc ?? '',
       fs: score.fs ?? '',
       level: score.level,
@@ -173,7 +173,7 @@ class LuoXueToDivingFishUtil {
       final songs = await MaimaiMusicDataManager().getCachedSongs();
       if (songs != null && songs.isNotEmpty) {
         song = songs.firstWhere(
-          (s) => s.id == score.id.toString(),
+          (s) => s.basicInfo.title == score.songName && s.type == _getTypeLabel(score.type),
           orElse: () => Song(
             id: '',
             title: '',

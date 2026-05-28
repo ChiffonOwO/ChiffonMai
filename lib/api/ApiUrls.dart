@@ -35,4 +35,8 @@ class ApiUrls {
   // 落雪玩家数据 API
   static const String LuoXuePlayerApi = 'https://maimai.lxns.net/api/v0/user/maimai/player';
   static const String LuoXuePlayerScoresApi = 'https://maimai.lxns.net/api/v0/user/maimai/player/scores';
+  
+  // 排行榜 API 地址
+  static const String RankingsBaseUrl = 'http://152.136.125.98:3000/api/rankings';
+  static const String RankingsUpdateUrl = '$RankingsBaseUrl/update';
 }

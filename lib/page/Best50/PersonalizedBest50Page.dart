@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'dart:async';
@@ -11,6 +12,8 @@ import '../../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../SongInfoPage.dart';
 import '../../utils/CoverUtil.dart';
 import '../../constant/VersionListConstant.dart';
+import '../../service/Best50/PersonalizedBest50ConvertToImgService.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class PersonalizedBest50Page extends StatefulWidget {
   const PersonalizedBest50Page({super.key});
@@ -235,6 +238,193 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     }
   }
 
+  // 请求存储权限
+  Future<bool> _requestStoragePermission() async {
+    debugPrint('Page: _requestStoragePermission called');
+    debugPrint('Page: Platform.isAndroid = ${Platform.isAndroid}');
+    
+    if (Platform.isAndroid) {
+      debugPrint('Page: Running on Android');
+      
+      // 策略：同时请求 storage、photos 和 videos 权限，确保覆盖所有 Android 版本
+      // Android 13+ 需要 photos/videos 权限
+      // Android 12 及以下需要 storage 权限
+      
+      // 先检查已有权限状态
+      debugPrint('Page: Checking existing permissions...');
+      PermissionStatus storageStatus = await Permission.storage.status;
+      PermissionStatus photosStatus = await Permission.photos.status;
+      PermissionStatus videosStatus = await Permission.videos.status;
+      
+      debugPrint('Page: Storage status = $storageStatus');
+      debugPrint('Page: Photos status = $photosStatus');
+      debugPrint('Page: Videos status = $videosStatus');
+      
+      // 如果任何一个权限已授予，直接返回成功
+      if (storageStatus.isGranted || photosStatus.isGranted || videosStatus.isGranted) {
+        debugPrint('Page: At least one permission already granted');
+        return true;
+      }
+      
+      // 请求权限：同时请求 storage、photos 和 videos
+      debugPrint('Page: Requesting storage, photos and videos permissions...');
+      Map<Permission, PermissionStatus> statuses = await [
+        Permission.storage,
+        Permission.photos,
+        Permission.videos,
+      ].request();
+      
+      bool storageGranted = statuses[Permission.storage]?.isGranted ?? false;
+      bool photosGranted = statuses[Permission.photos]?.isGranted ?? false;
+      bool videosGranted = statuses[Permission.videos]?.isGranted ?? false;
+      
+      debugPrint('Page: Storage granted = $storageGranted');
+      debugPrint('Page: Photos granted = $photosGranted');
+      debugPrint('Page: Videos granted = $videosGranted');
+      
+      return storageGranted || photosGranted || videosGranted;
+    } else {
+      // 非 Android 平台
+      debugPrint('Page: Non-Android platform');
+      PermissionStatus status = await Permission.storage.request();
+      return status.isGranted;
+    }
+  }
+
+  // 导出为图片
+  Future<void> _exportToImage() async {
+    try {
+      if (_personalizedSongs.isEmpty) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('提示'),
+            content: Text('没有数据可导出'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('确定'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      bool hasPermission = await _requestStoragePermission();
+      if (!hasPermission) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('权限不足'),
+            content: Text('需要存储权限才能导出图片到相册，请在设置中开启权限'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('确定'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      // 显示加载指示器
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: Text('导出中'),
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16.0),
+              Text('正在生成图片...'),
+            ],
+          ),
+        ),
+      );
+
+      String title = _selectedType == 'charter_50' && _selectedCharter != null
+          ? '谱师50 - ${_selectedCharter!}'
+          : _selectedType == 'version_50' && _selectedVersion != null
+              ? '版本50 - ${StringUtil.formatVersion2(_selectedVersion!)}'
+              : _selectedType == 'genre_50' && _selectedGenre != null
+                  ? '流派50 - ${_selectedGenre!}'
+                  : _selectedType == 'star_50' && _selectedStar != null
+                      ? '星数50 - ${_selectedStar!}'
+                      : '个性化Best50 - ${_options.firstWhere((option) => option['value'] == _selectedType)['label']!}';
+
+      final file = await PersonalizedB50ConvertToImg.convertToImage(
+        context,
+        title,
+        _personalizedSongs,
+        _maimaiMusicData,
+      );
+
+      // 关闭加载指示器
+      Navigator.pop(context);
+
+      // 显示导出结果
+      if (file != null) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('导出成功'),
+            content: Text('图片已保存到：\n${file.path}'),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: file.path));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('路径已复制到剪贴板')),
+                  );
+                },
+                child: Text('复制路径'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('确定'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('导出失败'),
+            content: Text('图片导出失败，请重试'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('确定'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      // 关闭加载指示器
+      Navigator.pop(context);
+      
+      // 显示错误信息
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('导出失败'),
+          content: Text('导出过程中出现错误：\n$e'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('确定'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -344,6 +534,10 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
 
                         // 数据统计区域
                         _buildStatsSection(),
+                        SizedBox(height: 12.0),
+
+                        // 导出按钮
+                        _buildExportButton(),
                         SizedBox(height: 12.0),
 
                         // 歌曲列表
@@ -791,6 +985,41 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 构建导出按钮
+  Widget _buildExportButton() {
+    return ElevatedButton(
+      onPressed: () async {
+        try {
+          await _exportToImage();
+        } catch (e) {
+          debugPrint('Error in personalized export: $e');
+        }
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.blue,
+        padding: EdgeInsets.symmetric(vertical: 12.0),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8.0),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.image, color: Colors.white),
+          SizedBox(width: 8.0),
+          Text(
+            '导出为图片',
+            style: TextStyle(
+              fontSize: MediaQuery.of(context).size.width * 0.04,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),

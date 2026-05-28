@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:my_first_flutter_app/page/RatingRankListPage.dart';
+import 'dart:convert';
+import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../api/ApiUrls.dart';
 import '../constant/CacheKeyConstant.dart';
+import '../constant/LoadingTipsConstant.dart';
 import '../service/HomeService.dart';
 import '../service/RecommendByTagsService.dart';
 import '../utils/CommonWidgetUtil.dart';
@@ -12,6 +18,8 @@ import '../manager/DivingFish/DiffMusicDataManager.dart';
 import '../manager/SongAliasManager.dart';
 import '../manager/DivingFish/UserBest50Manager.dart';
 import '../manager/LuoXue/LuoXueUserPlayDataManager.dart';
+import '../entity/DivingFish/RecordItem.dart';
+import '../entity/DivingFish/Song.dart';
 import 'AchievementFullReverseCalculatorPage.dart';
 import 'AchievementRateCalculatorPage.dart';
 import 'VersionViewPage.dart';
@@ -32,12 +40,40 @@ import 'Multiplayer/MultiplayerLobbyPage.dart';
 import 'PaiziProgressPage.dart';
 import 'PersonalizedChartPlayConfigure.dart';
 import 'PersonalizedScorePage.dart';
-import 'RankListPage.dart';
+import 'RankTablePage.dart';
 import 'RandomChartPage.dart';
 import 'RecommendByTagsPage.dart';
 import 'SingleRatingCalculatorPage.dart';
 import 'SongSearchPage.dart';
 import 'UserScoreSearchPage.dart';
+
+// Rating上限数据类
+class RatingLimits {
+  final int best35Limit;
+  final int best15Limit;
+  final int best50Limit;
+
+  RatingLimits({
+    required this.best35Limit,
+    required this.best15Limit,
+    required this.best50Limit,
+  });
+}
+
+// ds值与歌曲对应关系数据类
+class DsSong {
+  final double ds;
+  final String songId;
+  final String songTitle;
+  final String level;
+
+  DsSong({
+    required this.ds,
+    required this.songId,
+    required this.songTitle,
+    required this.level,
+  });
+}
 
 // 应用常量类：集中管理所有硬编码的配置值
 class AppConstants {
@@ -259,6 +295,7 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.gamepad, title: '根据别名猜歌', subtitle: '舞萌笑传之猜猜呗5'),
     ButtonItem(icon: Icons.gamepad, title: '舞萌开字母', subtitle: '舞萌笑传之猜猜呗6'),
     ButtonItem(icon: Icons.gamepad, title: '多人猜歌游戏', subtitle: '什么叫你随便答了一个就对了?!'),
+    ButtonItem(icon: Icons.leaderboard, title: '排行榜(仅供参考)', subtitle: '总Rating排行榜'),
     ButtonItem(icon: Icons.file_upload_sharp, title: '刷新数据', subtitle: '刷新你的舞萌数据'),
     ButtonItem(icon: Icons.network_check, title: '服务器状态', subtitle: '查看舞萌服务器状态'),
     ButtonItem(icon: Icons.update, title: '检查更新', subtitle: '检查应用是否有新版本'),
@@ -625,12 +662,61 @@ class _HomePageState extends State<HomePage> {
   void _showRefreshDataDialog(BuildContext context) {
     final TextEditingController qqController = TextEditingController(text: _cachedQQ);
     final TextEditingController authCodeController = TextEditingController();
+    bool isRefreshing = false;
+    int progress = 0;
+    String progressText = '';
+    String currentLoadingTip = LoadingTipsConstant.getRandomLoadingTip();
+    bool isFirstBuild = true;
+    
+    // 排行榜相关选项
+    bool participateRankings = false;
+    bool showNickname = false;
+    
+    // 从缓存读取排行榜设置
+    Future<void> loadRankingSettings() async {
+      final prefs = await SharedPreferences.getInstance();
+      participateRankings = prefs.getBool(CacheKeyConstant.participateRankings) ?? false;
+      showNickname = prefs.getBool(CacheKeyConstant.showNickname) ?? false;
+      // 使用StatefulBuilder的setState更新UI
+      setState(() {});
+    }
+    
+    // 保存排行榜设置到缓存
+    Future<void> saveRankingSettings() async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(CacheKeyConstant.participateRankings, participateRankings);
+      await prefs.setBool(CacheKeyConstant.showNickname, showNickname);
+    }
+    
+    // 初始化时加载设置
+    loadRankingSettings();
     
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setState) {
+            // 只在第一次构建时初始化
+            if (isFirstBuild) {
+              isFirstBuild = false;
+              // 启动定时切换
+              LoadingTipsConstant.startAutoSwitch(3);
+              // 监听加载提示切换
+              LoadingTipsConstant.tipStream.listen((tip) {
+                if (isRefreshing) {
+                  // 使用StatefulBuilder的context来检查mounted状态
+                  try {
+                    setState(() {
+                      currentLoadingTip = tip;
+                    });
+                  } catch (_) {
+                    // 忽略已销毁状态的错误
+                  }
+                }
+              });
+            }
+            
             return AlertDialog(
               title: Text('刷新数据'),
               content: SingleChildScrollView(
@@ -638,40 +724,41 @@ class _HomePageState extends State<HomePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // 数据源切换
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('当前数据源：'),
-                        SizedBox(width: 8),
-                        ToggleButtons(
-                          constraints: BoxConstraints(minHeight: 28, minWidth: 50),
-                          isSelected: [
-                            _currentDataSource == DataSource.shuiyu,
-                            _currentDataSource == DataSource.luoxue,
-                          ],
-                          onPressed: (index) {
-                            setState(() {
-                              _currentDataSource = index == 0 ? DataSource.shuiyu : DataSource.luoxue;
-                              authCodeController.clear();
-                            });
-                          },
-                          children: [
-                            Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                              child: Text('水鱼'),
-                            ),
-                            Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                              child: Text('落雪'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 12),
+                    if (!isRefreshing)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('当前数据源：'),
+                          SizedBox(width: 8),
+                          ToggleButtons(
+                            constraints: BoxConstraints(minHeight: 28, minWidth: 50),
+                            isSelected: [
+                              _currentDataSource == DataSource.shuiyu,
+                              _currentDataSource == DataSource.luoxue,
+                            ],
+                            onPressed: (index) {
+                              setState(() {
+                                _currentDataSource = index == 0 ? DataSource.shuiyu : DataSource.luoxue;
+                                authCodeController.clear();
+                              });
+                            },
+                            children: [
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                                child: Text('水鱼'),
+                              ),
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                                child: Text('落雪'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    if (!isRefreshing) SizedBox(height: 12),
                     
                     // 水鱼数据源：QQ号输入
-                    if (_currentDataSource == DataSource.shuiyu)
+                    if (!isRefreshing && _currentDataSource == DataSource.shuiyu)
                       TextField(
                         controller: qqController,
                         keyboardType: TextInputType.number,
@@ -682,7 +769,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                     
                     // 落雪数据源：授权相关
-                    if (_currentDataSource == DataSource.luoxue)
+                    if (!isRefreshing && _currentDataSource == DataSource.luoxue)
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -710,35 +797,151 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ],
                       ),
+                    
+                    // 参与排行榜选项
+                    if (!isRefreshing)
+                      Column(
+                        children: [
+                          SizedBox(height: 16),
+                          CheckboxListTile(
+                            title: Text('参与排行榜'),
+                            value: participateRankings,
+                            onChanged: (value) {
+                              setState(() {
+                                participateRankings = value ?? false;
+                                if (!participateRankings) {
+                                  showNickname = false;
+                                }
+                              });
+                              saveRankingSettings();
+                            },
+                            controlAffinity: ListTileControlAffinity.leading,
+                          ),
+                          // 展示昵称选项（只有勾选参与排行榜时才显示）
+                          if (participateRankings)
+                            CheckboxListTile(
+                              title: Text('展示昵称（不勾选则显示为匿名用户）'),
+                              value: showNickname,
+                              onChanged: (value) {
+                                setState(() {
+                                  showNickname = value ?? false;
+                                });
+                                saveRankingSettings();
+                              },
+                              controlAffinity: ListTileControlAffinity.leading,
+                            ),
+                        ],
+                      ),
+                    
+                    // 刷新进度显示
+                    if (isRefreshing)
+                      Column(
+                        children: [
+                          SizedBox(height: 16),
+                          CircularProgressIndicator(),
+                          SizedBox(height: 12),
+                          LinearProgressIndicator(
+                            value: progress / 100,
+                            minHeight: 8,
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            progressText,
+                            style: TextStyle(fontSize: 14),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            '$progress%',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: 16),
+                          // 随机加载提示
+                          Text(
+                            currentLoadingTip,
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               ),
               actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: Text('取消'),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    Navigator.of(context).pop();
-                    
-                    if (_currentDataSource == DataSource.shuiyu) {
-                      // 水鱼数据源
-                      if (qqController.text.isNotEmpty) {
-                        await _saveQQ(qqController.text);
-                        await _refreshBest50Data(qqController.text);
+                if (!isRefreshing)
+                  TextButton(
+                    onPressed: () {
+                      LoadingTipsConstant.stopAutoSwitch();
+                      Navigator.of(context).pop();
+                    },
+                    child: Text('取消'),
+                  ),
+                if (!isRefreshing)
+                  TextButton(
+                    onPressed: () async {
+                      setState(() {
+                        isRefreshing = true;
+                        progress = 0;
+                        progressText = '开始刷新数据...';
+                      });
+                      
+                      try {
+                        if (_currentDataSource == DataSource.shuiyu) {
+                          // 水鱼数据源
+                          if (qqController.text.isNotEmpty) {
+                            await _saveQQ(qqController.text);
+                            await _refreshBest50DataWithProgress(
+                              qqController.text, 
+                              (p, t) {
+                                setState(() {
+                                  progress = p;
+                                  progressText = t;
+                                });
+                              },
+                              participateRankings,
+                              showNickname,
+                            );
+                          }
+                        } else {
+                          // 落雪数据源
+                          if (authCodeController.text.isNotEmpty) {
+                            await _handleLuoXueAuthWithProgress(
+                              authCodeController.text, 
+                              (p, t) {
+                                setState(() {
+                                  progress = p;
+                                  progressText = t;
+                                });
+                              },
+                              participateRankings,
+                              showNickname,
+                            );
+                          }
+                        }
+                        
+                        // 刷新成功，停止定时器并关闭对话框
+                        LoadingTipsConstant.stopAutoSwitch();
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('数据刷新成功!'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      } catch (e) {
+                        // 刷新失败，停止定时器并关闭对话框
+                        LoadingTipsConstant.stopAutoSwitch();
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('刷新数据失败：$e'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
                       }
-                    } else {
-                      // 落雪数据源
-                      if (authCodeController.text.isNotEmpty) {
-                        await _handleLuoXueAuth(authCodeController.text);
-                      }
-                    }
-                  },
-                  child: Text('确认'),
-                ),
+                    },
+                    child: Text('确认'),
+                  ),
               ],
             );
           },
@@ -747,62 +950,348 @@ class _HomePageState extends State<HomePage> {
     );
   }
   
-  // 处理落雪授权
-  Future<void> _handleLuoXueAuth(String authCode) async {
-    setState(() {
-      _isLoading = true;
-    });
-    
+  // 处理落雪授权（带进度回调）
+  Future<void> _handleLuoXueAuthWithProgress(
+    String authCode, 
+    Function(int, String) onProgress,
+    [bool participateRankings = false, 
+    bool showNickname = false]
+  ) async {
     try {
+      onProgress(5, '正在清除缓存...');
+      await Future.delayed(Duration(milliseconds: 100));
+      
+      // 清除推荐结果缓存
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(CacheKeyConstant.recommendationResults);
+        debugPrint('推荐结果缓存已清除');
+      } catch (e) {
+        debugPrint('清除推荐结果缓存失败: $e');
+      }
+      
+      onProgress(10, '正在换取访问令牌...');
+      await Future.delayed(Duration(milliseconds: 100));
+      
       // 使用授权码换取令牌
       final success = await LuoXueUserPlayDataManager().exchangeCodeForToken(authCode);
       
       if (success) {
+        onProgress(15, '授权成功，正在保存数据源...');
+        await Future.delayed(Duration(milliseconds: 100));
+        
         // 授权成功，保存数据源为落雪
         await _saveLastDataSource('luoxue');
+        
+        onProgress(20, '正在刷新歌曲数据...');
+        await Future.delayed(Duration(milliseconds: 100));
+        
+        // 使用智能刷新：初次拉取获取全量maidata，后续只获取追加歌曲的maidata
+        await MaimaiMusicDataManager().refreshDataWithSmartMaidata();
+        
+        onProgress(35, '正在刷新难度数据...');
+        await Future.delayed(Duration(milliseconds: 100));
+        
+        // 从API获取并更新难度数据
+        await DiffMusicDataManager().fetchAndUpdateDiffData();
+        
+        onProgress(50, '正在刷新标签数据...');
+        await Future.delayed(Duration(milliseconds: 100));
+        
+        // 刷新标签数据
+        await RecommendByTagsService.initializeTags();
+        
+        onProgress(60, '正在刷新别名数据...');
+        await Future.delayed(Duration(milliseconds: 100));
+        
+        // 刷新别名数据
+        await SongAliasManager.instance.refresh();
+        
+        onProgress(65, '正在获取玩家信息...');
+        await Future.delayed(Duration(milliseconds: 100));
         
         // 授权成功，获取玩家信息
         final playerInfo = await LuoXueUserPlayDataManager().getPlayerInfo();
         
         if (playerInfo != null) {
           setState(() {
-            _userNickname = playerInfo.name.isNotEmpty ? playerInfo.name : '未知玩家';
+            // 将全角字符转换为半角字符
+            final halfWidthName = StringUtil.toHalfWidth(playerInfo.name);
+            _userNickname = halfWidthName.isNotEmpty ? halfWidthName : '未知玩家';
           });
           await _saveUserData();
+          
+          // 保存落雪用户ID（格式：luoxue:friendCode）
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('luoxue_user_id', 'luoxue:${playerInfo.friendCode}');
         }
         
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('落雪授权成功!'),
-              duration: Duration(seconds: 2),
-            ),
-          );
+        onProgress(75, '正在获取玩家成绩...');
+        await Future.delayed(Duration(milliseconds: 100));
+        
+        // 获取玩家成绩并转换为 RecordItem（自动更新缓存）
+        final playerRecords = await LuoXueUserPlayDataManager().getPlayerRecordsAsRecordItems();
+        debugPrint('玩家成绩数量: ${playerRecords?.length ?? 0}');
+        
+        onProgress(85, '正在计算 Best50 数据...');
+        await Future.delayed(Duration(milliseconds: 100));
+        
+        // 从落雪数据计算并更新首页的 Best50 数据
+        if (playerRecords != null && playerRecords.isNotEmpty) {
+          await _calculateBest50FromLuoXueRecords(playerRecords);
+        }
+        
+        onProgress(95, '正在保存数据...');
+        await Future.delayed(Duration(milliseconds: 100));
+        
+        // 更新排行榜数据
+        String? rankingError;
+        if (playerInfo != null) {
+          final userId = 'luoxue:${playerInfo.friendCode}';
+          if (participateRankings) {
+            final displayNickname = showNickname ? _userNickname : '匿名用户';
+            rankingError = await _updateRankings(
+              dataSource: 'luoxue',
+              originalId: playerInfo.friendCode.toString(),
+              nickname: displayNickname,
+              totalRating: _best50TotalRA,
+              best35Rating: _best35TotalRA,
+              best15Rating: _best15TotalRA,
+            );
+          } else {
+            // 如果不参与排行榜且有记录，删除记录
+            await _deleteRankings(userId);
+          }
+        }
+        
+        onProgress(100, '完成');
+        
+        // 如果有排行榜数据异常，显示警告
+        if (rankingError != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text('警告'),
+                content: Text(rankingError!),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('确定'),
+                  ),
+                ],
+              ),
+            );
+          });
         }
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('授权失败，请检查授权码是否正确'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
+        throw Exception('授权失败，请检查授权码是否正确');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('授权异常：$e'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      throw e;
     }
+  }
+  
+  // 更新排行榜数据，返回异常信息（如果数据异常）
+  Future<String?> _updateRankings({
+    required String dataSource,
+    required String originalId,
+    required String nickname,
+    required int totalRating,
+    required int best35Rating,
+    required int best15Rating,
+  }) async {
+    try {
+      // 计算合法值上限
+      final ratingLimits = await _calculateRatingLimits();
+      
+      // 验证数据合法性，收集异常信息
+      List<String> errors = [];
+      if (totalRating > ratingLimits.best50Limit) {
+        errors.add('Best50 数据异常');
+      }
+      if (best35Rating > ratingLimits.best35Limit) {
+        errors.add('Best35 数据异常');
+      }
+      if (best15Rating > ratingLimits.best15Limit) {
+        errors.add('Best15 数据异常');
+      }
+      
+      // 如果有异常，返回错误信息，不更新排行榜
+      if (errors.isNotEmpty) {
+        final errorMsg = errors.join('、');
+        debugPrint('警告: $errorMsg，跳过排行榜更新');
+        return '$errorMsg，可能存在非法数据，请检查';
+      }
+      
+      final response = await http.post(
+        Uri.parse(ApiUrls.RankingsUpdateUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'dataSource': dataSource,
+          'originalId': originalId,
+          'nickname': nickname,
+          'totalRating': totalRating,
+          'best35Rating': best35Rating,
+          'best15Rating': best15Rating,
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        final result = json.decode(response.body);
+        if (result['success'] == true) {
+          debugPrint('排行榜数据更新成功: ${result['message']}');
+        } else {
+          debugPrint('排行榜数据更新失败: ${result['error']}');
+        }
+      } else {
+        debugPrint('排行榜数据更新失败，状态码: ${response.statusCode}');
+      }
+      return null;
+    } catch (e) {
+      debugPrint('更新排行榜数据时发生异常: $e');
+      return null;
+    }
+  }
+  
+  // 删除排行榜记录
+  Future<void> _deleteRankings(String userId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('${ApiUrls.RankingsBaseUrl}/user/$userId'),
+      );
+      
+      if (response.statusCode == 200) {
+        final result = json.decode(response.body);
+        if (result['success'] == true) {
+          debugPrint('排行榜记录删除成功: ${result['message']}');
+        } else {
+          debugPrint('排行榜记录删除失败: ${result['error']}');
+        }
+      } else {
+        debugPrint('排行榜记录删除失败，状态码: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('删除排行榜记录时发生异常: $e');
+    }
+  }
+  
+  // 计算Rating合法值上限
+  Future<RatingLimits> _calculateRatingLimits() async {
+    final musicManager = MaimaiMusicDataManager();
+    final songs = await musicManager.getCachedSongs();
+    
+    if (songs == null || songs.isEmpty) {
+      debugPrint('警告: 歌曲缓存为空，使用默认Rating上限');
+      return RatingLimits(best35Limit: 12000, best15Limit: 5000, best50Limit: 17000);
+    }
+    
+    // 获取从maidata追加的歌曲ID列表
+    final addedSongIds = await musicManager.getAddedSongIds() ?? [];
+    
+    // 过滤掉ID为6位数的歌曲和从maidata追加的歌曲
+    final filteredSongs = songs.where((song) {
+      // 过滤掉从maidata追加的歌曲
+      if (addedSongIds.contains(song.id)) {
+        return false;
+      }
+      // 过滤掉ID为6位数的歌曲
+      final id = song.id;
+      if (id.length == 6 && RegExp(r'^\d+$').hasMatch(id)) {
+        final numId = int.parse(id);
+        return numId < 100000 || numId > 999999;
+      }
+      return true;
+    }).toList();
+    
+    // 根据is_new分类
+    final best35Candidates = filteredSongs
+        .where((song) => song.basicInfo.isNew == false)
+        .toList();
+    final best15Candidates = filteredSongs
+        .where((song) => song.basicInfo.isNew == true)
+        .toList();
+    
+    // 提取所有ds值及对应的歌曲信息并排序
+    List<DsSong> best35DsSongs = [];
+    for (var song in best35Candidates) {
+      for (int i = 0; i < song.ds.length; i++) {
+        final ds = song.ds[i];
+        if (ds != null) {
+          final level = i < song.level.length ? song.level[i] : '';
+          best35DsSongs.add(DsSong(
+            ds: ds,
+            songId: song.id,
+            songTitle: song.title,
+            level: level,
+          ));
+        }
+      }
+    }
+    best35DsSongs.sort((a, b) => b.ds.compareTo(a.ds));
+    
+    List<DsSong> best15DsSongs = [];
+    for (var song in best15Candidates) {
+      for (int i = 0; i < song.ds.length; i++) {
+        final ds = song.ds[i];
+        if (ds != null) {
+          final level = i < song.level.length ? song.level[i] : '';
+          best15DsSongs.add(DsSong(
+            ds: ds,
+            songId: song.id,
+            songTitle: song.title,
+            level: level,
+          ));
+        }
+      }
+    }
+    best15DsSongs.sort((a, b) => b.ds.compareTo(a.ds));
+    
+    // 取前35和前15个最高值计算
+    final top35DsSongs = best35DsSongs.take(35).toList();
+    final top15DsSongs = best15DsSongs.take(15).toList();
+    
+    // 计算公式: ds * 0.224 * 100.5 并向下取整
+    int calculateRating(List<DsSong> dsSongs) {
+      return dsSongs.fold(0, (sum, dsSong) => sum + (dsSong.ds * 0.224 * 100.5).floor());
+    }
+    
+    final best35Limit = calculateRating(top35DsSongs);
+    final best15Limit = calculateRating(top15DsSongs);
+    final best50Limit = best35Limit + best15Limit;
+    
+    // 输出到控制台
+    debugPrint('=== Rating 合法值上限计算结果 ===');
+    debugPrint('Best35 歌曲数量: ${best35Candidates.length}');
+    debugPrint('Best15 歌曲数量: ${best15Candidates.length}');
+    
+    // 输出Best35最高35个ds值及对应歌曲
+    debugPrint('--- Best35 最高35个ds值及对应歌曲 ---');
+    for (int i = 0; i < top35DsSongs.length; i++) {
+      final dsSong = top35DsSongs[i];
+      final ra = (dsSong.ds * 0.224 * 100.5).floor();
+      debugPrint('${i + 1}. ds=${dsSong.ds}, ra=$ra, level=${dsSong.level}, title=${dsSong.songTitle}, id=${dsSong.songId}');
+    }
+    
+    // 输出Best15最高15个ds值及对应歌曲
+    debugPrint('--- Best15 最高15个ds值及对应歌曲 ---');
+    for (int i = 0; i < top15DsSongs.length; i++) {
+      final dsSong = top15DsSongs[i];
+      final ra = (dsSong.ds * 0.224 * 100.5).floor();
+      debugPrint('${i + 1}. ds=${dsSong.ds}, ra=$ra, level=${dsSong.level}, title=${dsSong.songTitle}, id=${dsSong.songId}');
+    }
+    
+    debugPrint('=== Rating 上限值 ===');
+    debugPrint('Best35 总Rating上限: $best35Limit');
+    debugPrint('Best15 总Rating上限: $best15Limit');
+    debugPrint('Best50 总Rating上限: $best50Limit');
+    debugPrint('==================================');
+    
+    return RatingLimits(
+      best35Limit: best35Limit,
+      best15Limit: best15Limit,
+      best50Limit: best50Limit,
+    );
   }
   
   // 刷新数据（不跳转）
@@ -898,13 +1387,17 @@ class _HomePageState extends State<HomePage> {
     }
   }
   
-  // 刷新Best50数据
-  Future<void> _refreshBest50Data(String qq) async {
-    setState(() {
-      _isLoading = true;
-    });
-    
+  // 刷新Best50数据（带进度回调）
+  Future<void> _refreshBest50DataWithProgress(
+    String qq, 
+    Function(int, String) onProgress,
+    [bool participateRankings = false,
+    bool showNickname = false]
+  ) async {
     try {
+      onProgress(5, '正在清除缓存...');
+      await Future.delayed(Duration(milliseconds: 100));
+      
       // 清除推荐结果缓存
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -914,21 +1407,39 @@ class _HomePageState extends State<HomePage> {
         debugPrint('清除推荐结果缓存失败: $e');
       }
       
+      onProgress(10, '正在刷新歌曲数据...');
+      await Future.delayed(Duration(milliseconds: 100));
+      
       // 使用智能刷新：初次拉取获取全量maidata，后续只获取追加歌曲的maidata
       await MaimaiMusicDataManager().refreshDataWithSmartMaidata();
+      
+      onProgress(30, '正在刷新难度数据...');
+      await Future.delayed(Duration(milliseconds: 100));
       
       // 从API获取并更新难度数据
       await DiffMusicDataManager().fetchAndUpdateDiffData();
       
+      onProgress(45, '正在刷新标签数据...');
+      await Future.delayed(Duration(milliseconds: 100));
+      
       // 刷新标签数据
       await RecommendByTagsService.initializeTags();
+      
+      onProgress(55, '正在刷新别名数据...');
+      await Future.delayed(Duration(milliseconds: 100));
       
       // 刷新别名数据
       await SongAliasManager.instance.refresh();
       
+      onProgress(65, '正在获取用户数据...');
+      await Future.delayed(Duration(milliseconds: 100));
+      
       // 从API获取并更新用户游玩数据
       final userPlayDataManager = UserPlayDataManager();
       final userPlayData = await userPlayDataManager.fetchUserPlayData(qq);
+      
+      onProgress(75, '正在获取Best50数据...');
+      await Future.delayed(Duration(milliseconds: 100));
       
       final best50Manager = UserBest50Manager();
       final best50Data = await best50Manager.getUserBest50(qq);
@@ -940,6 +1451,9 @@ class _HomePageState extends State<HomePage> {
           _userNickname = userPlayData['nickname'];
         });
       }
+      
+      onProgress(85, '正在计算Rating...');
+      await Future.delayed(Duration(milliseconds: 100));
       
       // 计算Best50、Best35、Best15总RA
       int totalRA = 0;
@@ -966,45 +1480,52 @@ class _HomePageState extends State<HomePage> {
         _best15TotalRA = best15RA;
       });
       
+      onProgress(95, '正在保存数据...');
+      await Future.delayed(Duration(milliseconds: 100));
+      
       // 保存数据到本地存储
       await _saveUserData();
       
-      // 转换数据格式为B50Page需要的格式
-      final b50DataMap = {
-        'additional_rating': best50Data.additionalRating,
-        'charts': {
-          'dx': best50Data.charts.dx.map((item) => item.toJson()).toList(),
-          'sd': best50Data.charts.sd.map((item) => item.toJson()).toList(),
-        },
-        'rating': best50Data.charts.dx.fold(0, (sum, item) => sum + item.ra) + 
-                  best50Data.charts.sd.fold(0, (sum, item) => sum + item.ra),
-      };
+      // 更新排行榜数据
+      String? rankingError;
+      final userId = 'shuiyu:$qq';
+      if (participateRankings) {
+        final displayNickname = showNickname ? _userNickname : '匿名用户';
+        rankingError = await _updateRankings(
+          dataSource: 'shuiyu',
+          originalId: qq,
+          nickname: displayNickname,
+          totalRating: _best50TotalRA,
+          best35Rating: _best35TotalRA,
+          best15Rating: _best15TotalRA,
+        );
+      } else {
+        // 如果不参与排行榜且有记录，删除记录
+        await _deleteRankings(userId);
+      }
       
-      // 显示成功提示
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('数据刷新成功!为您跳转到Best50页面'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      onProgress(100, '完成');
       
-      // 导航到B50Page并传递新数据
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => B50Page(b50Data: b50DataMap)),
-      );
+      // 如果有排行榜数据异常，显示警告
+      if (rankingError != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text('警告'),
+              content: Text(rankingError!),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('确定'),
+                ),
+              ],
+            ),
+          );
+        });
+      }
     } catch (e) {
-      // 显示错误提示
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('刷新数据失败：$e'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      throw e;
     }
   }
   
@@ -1196,6 +1717,12 @@ class _HomePageState extends State<HomePage> {
               MaterialPageRoute(builder: (context) => RankListPage()),
             );
           }
+          if (item.title == '排行榜(仅供参考)'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => RatingRankListPage()),
+            );
+          }
           if (item.title == '检查更新'){
             // 显示加载对话框
             showDialog(
@@ -1322,5 +1849,76 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  /// 从落雪玩家记录计算并更新首页的 Best50 数据
+  Future<void> _calculateBest50FromLuoXueRecords(List<RecordItem> playerRecords) async {
+    try {
+      // 使用缓存的歌曲数据
+      final musicDataManager = MaimaiMusicDataManager();
+      final cachedSongs = await musicDataManager.getCachedSongs();
+      
+      if (cachedSongs == null || cachedSongs.isEmpty) {
+        debugPrint('❌ 无法获取缓存的歌曲数据');
+        return;
+      }
+
+      // 根据歌曲的 is_new 字段分组
+      List<RecordItem> oldSongs = []; // is_new = false
+      List<RecordItem> newSongs = [];  // is_new = true
+
+      for (var record in playerRecords) {
+        bool isNew = _isSongNewFromCache(record.songId, cachedSongs);
+        if (isNew) {
+          newSongs.add(record);
+        } else {
+          oldSongs.add(record);
+        }
+      }
+
+      // 按 ra 降序排序并取前 N 个
+      oldSongs.sort((a, b) => b.ra.compareTo(a.ra));
+      newSongs.sort((a, b) => b.ra.compareTo(a.ra));
+
+      // Best35: is_new=false 的前35首
+      List<RecordItem> best35 = oldSongs.take(35).toList();
+      // Best15: is_new=true 的前15首
+      List<RecordItem> best15 = newSongs.take(15).toList();
+
+      // 计算总 Rating
+      int best35RA = best35.fold(0, (sum, item) => sum + item.ra);
+      int best15RA = best15.fold(0, (sum, item) => sum + item.ra);
+      int totalRA = best35RA + best15RA;
+
+      // 更新首页状态
+      if (mounted) {
+        setState(() {
+          _best50TotalRA = totalRA;
+          _best35TotalRA = best35RA;
+          _best15TotalRA = best15RA;
+        });
+        await _saveUserData(); // 保存到缓存
+      }
+
+      debugPrint('✅ 从落雪数据计算Best50完成: Best35=${best35RA}, Best15=${best15RA}, 总Rating=$totalRA');
+    } catch (e) {
+      debugPrint('Error calculating Best50 from LuoXue records: $e');
+    }
+  }
+
+  /// 根据歌曲ID从缓存判断是否为新曲（is_new=true）
+  bool _isSongNewFromCache(int songId, List<Song> cachedSongs) {
+    try {
+      Song song = cachedSongs.firstWhere(
+        (song) => song.id == songId.toString(),
+      );
+      
+      return song.basicInfo.isNew;
+    } catch (e) {
+      // 歌曲未找到时返回 false
+      debugPrint('Song $songId not found in cached songs');
+    }
+    
+    return false;
   }
 }

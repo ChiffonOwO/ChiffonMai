@@ -16,16 +16,16 @@ import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/constant/CacheKeyConstant.dart';
 
-class DiffBest50ConvertToImg {
+class PersonalizedB50ConvertToImg {
   // 全局Key，用于获取widget的渲染对象
   // ignore: unused_field
   static GlobalKey _globalKey = GlobalKey();
 
   // 导出为图片的方法
-  static Future<File?> convertToImage(BuildContext context, Map<String, dynamic>? diffBest50Data, List<Map<String, dynamic>> diffSongs, List<dynamic>? maimaiMusicData, {int currentMode = 0}) async {
+  static Future<File?> convertToImage(BuildContext context, String title, List<Map<String, dynamic>> personalizedSongs, List<dynamic>? maimaiMusicData) async {
     OverlayEntry? overlayEntry;
     try {
-      debugPrint('=== STARTING DIFF IMAGE CONVERSION ===');
+      debugPrint('=== STARTING PERSONALIZED B50 IMAGE CONVERSION ===');
       debugPrint('Current platform: ${Platform.operatingSystem} ${Platform.version}');
       
       // 首先请求存储权限（在导出前请求）
@@ -40,7 +40,7 @@ class DiffBest50ConvertToImg {
       // 创建一个Widget，用于生成图片
       Widget imageWidget = RepaintBoundary(
         key: globalKey,
-        child: await _buildExportImageWidget(context, diffBest50Data, diffSongs, maimaiMusicData, currentMode: currentMode),
+        child: await _buildExportImageWidget(context, title, personalizedSongs, maimaiMusicData),
       );
 
       // 创建一个屏幕外的OverlayEntry，避免影响主UI
@@ -103,17 +103,13 @@ class DiffBest50ConvertToImg {
         image.dispose();
         return null;
       }
-      debugPrint('ByteData conversion successful');
 
-      // 将图片数据写入文件
       Uint8List pngBytes = byteData.buffer.asUint8List();
-      
-      // 释放图片资源
       image.dispose();
       
       // 立即移除Overlay，避免占用资源
       overlayEntry.remove();
-      
+
       // 优先使用相册目录（需要存储权限）
       Directory? directory;
       debugPrint('Step 4: Saving image. Permission granted: ${status.isGranted}');
@@ -180,7 +176,7 @@ class DiffBest50ConvertToImg {
       // 尝试使用 MediaStore API 保存到相册（Android 13+）
       if (Platform.isAndroid && status.isGranted) {
         debugPrint('Step 5: Trying to save via MediaStore API...');
-        String? galleryPath = await _saveImageToGallery(pngBytes, 'diff_b50_export_${DateTime.now().millisecondsSinceEpoch}.png');
+        String? galleryPath = await _saveImageToGallery(pngBytes, 'personalized_b50_${DateTime.now().millisecondsSinceEpoch}.png');
         if (galleryPath != null) {
           debugPrint('Image saved to gallery via MediaStore: $galleryPath');
           // 调用媒体扫描器
@@ -195,14 +191,13 @@ class DiffBest50ConvertToImg {
         directory.createSync(recursive: true);
       }
 
-      final file = File('${directory.path}/diff_b50_export_${DateTime.now().millisecondsSinceEpoch}.png');
+      final file = File('${directory.path}/personalized_b50_${DateTime.now().millisecondsSinceEpoch}.png');
       await file.writeAsBytes(pngBytes);
-      debugPrint('Image saved to: ${file.path}');
+      debugPrint('Image saved to file system: ${file.path}');
 
-      // 调用媒体扫描器，通知系统有新文件（多重保障）
+      // 调用媒体扫描器（对于保存到文件系统的图片）
       if (Platform.isAndroid) {
         await _notifySystemGallery(file.path);
-        debugPrint('Media scanner completed for: ${file.path}');
       }
 
       return file;
@@ -214,42 +209,18 @@ class DiffBest50ConvertToImg {
   }
 
   // 构建用于导出的Widget
-  static Future<Widget> _buildExportImageWidget(BuildContext context, Map<String, dynamic>? diffBest50Data, List<Map<String, dynamic>> diffSongs, List<dynamic>? maimaiMusicData, {int currentMode = 0}) async {
-    // 计算各项指标
-    int diffRatingSum = diffBest50Data?['diffRatingSum'] ?? 0;
-    int best50Diff = diffBest50Data?['best50Diff'] ?? 0;
-    double diffRatingAverage = diffSongs.isNotEmpty ? diffRatingSum / diffSongs.length : 0.0;
-
-    // 计算平均达成率
-    double achievementsSum = diffSongs.fold(0.0,
-        (sum, song) => sum + (double.tryParse(song['achievements'].toString()) ?? 0.0));
-    double diffBest50AchievementAverage = 
-        diffSongs.isNotEmpty ? achievementsSum / diffSongs.length : 0.0;
-
-    // 计算平均scoreRate
-    double scoreRateSum = diffSongs.fold(0.0, (sum, song) {
-      int songId = song['song_id'] ?? 0;
-      int levelIndex = song['level_index'] ?? 0;
-      int score = song['dxScore'] ?? 0;
-      return sum + _calculateScoreRate(songId, levelIndex, score, maimaiMusicData);
-    });
-
-    double diffBest50ScoreRateAverage = diffSongs.isNotEmpty 
-        ? scoreRateSum / diffSongs.length 
-        : 0.0;
-
+  static Future<Widget> _buildExportImageWidget(BuildContext context, String title, List<Map<String, dynamic>> personalizedSongs, List<dynamic>? maimaiMusicData) async {
     // 获取用户信息
     final userInfo = await _getUserInfo();
     final String nickname = userInfo['nickname'] ?? '';
     final String dataSource = userInfo['dataSource'] ?? '水鱼';
 
-    // 创建一个容器，设置固定宽度以确保布局一致
-    double containerWidth = 1200; // 适合5列布局的宽度
+    double containerWidth = 1200;
 
     return Container(
       width: containerWidth,
       decoration: BoxDecoration(
-        color: Colors.white, // 添加白色背景作为兜底
+        color: Colors.white,
         image: DecorationImage(
           image: AssetImage('assets/bg/b50_bg.png'),
           fit: BoxFit.cover,
@@ -267,141 +238,17 @@ class DiffBest50ConvertToImg {
                 _buildUserInfoSection(context, nickname, dataSource),
                 SizedBox(height: 16.0),
                 
-                // 评分区域
-                _buildRatingSection(context, diffRatingSum, diffRatingAverage, best50Diff, diffBest50AchievementAverage, diffBest50ScoreRateAverage, currentMode),
-                SizedBox(height: 20.0),
-
-                // 基于拟合难度的Best50 标题区域
-                _buildSectionTitle(context, '基于拟合难度的Best50'),
+                // 标题区域
+                _buildSectionTitle(context, title),
                 SizedBox(height: 16.0),
 
-                // 基于拟合难度的Best50 卡片网格 (5列)
-                _buildDataCardGrid(context, diffSongs, 2.0, 5, maimaiMusicData),
-                SizedBox(height: 20.0),
+                // 统计区域
+                _buildStatsSection(context, personalizedSongs),
+                SizedBox(height: 16.0),
+
+                // 歌曲卡片网格
+                _buildDataCardGrid(context, personalizedSongs, 2.0, 5, maimaiMusicData),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 构建评分区域
-  static Widget _buildRatingSection(BuildContext context, int diffRatingSum, double diffRatingAverage, int best50Diff, double diffBest50AchievementAverage, double diffBest50ScoreRateAverage, int currentMode) {
-    // 图片容器固定宽度为1200，以此为基准计算字体大小
-    const double containerWidth = 1200.0;
-    
-    // 根据容器宽度计算字体大小（与App观感一致）
-    double titleFontSize = containerWidth * 0.035; // 约42px
-    double mainFontSize = containerWidth * 0.032; // 约38px
-    double subFontSize = containerWidth * 0.025; // 约30px
-    double sectionTitleFontSize = containerWidth * 0.03; // 约36px
-    double modeFontSize = containerWidth * 0.02; // 模式说明字体大小
-    
-    // 获取模式说明文本
-    String modeText = currentMode == 0
-        ? '模式A：不分类Best35和Best15，直接获取拟合定数下的Rating前50的谱面'
-        : (currentMode == 1
-            ? "模式B：将您的Best35和Best15中的所有谱面的定数都替换为其拟合定数，然后计算Rating并降序排序"
-            : '模式C：在非当前版本中取拟合定数下的Rating前35的谱面，在当前版本中取拟合定数下Rating前15的谱面');
-    
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.black, width: 2.0),
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      padding: EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              // 左侧评分
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '拟合总Rating',
-                      style: TextStyle(
-                        fontSize: titleFontSize,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                    SizedBox(height: 8.0),
-                    RichText(
-                      text: TextSpan(
-                        children: [
-                          TextStyleUtil.span(
-                            diffRatingSum.toString(),
-                            TextStyle(
-                              fontSize: mainFontSize,
-                              color: Colors.black,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          TextStyleUtil.span(
-                            '(平均${diffRatingAverage.toStringAsFixed(1)})',
-                            TextStyle(
-                              fontSize: subFontSize,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: 12.0),
-                    Text(
-                      '与Best50差值',
-                      style: TextStyle(
-                        fontSize: mainFontSize,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                    Text(
-                      '${best50Diff > 0 ? '+' : ''}$best50Diff',
-                      style: TextStyle(
-                        fontSize: mainFontSize,
-                        color: best50Diff >= 0 ? Colors.green : Colors.red,
-                        fontWeight: FontWeight.bold,
-                        
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // 右侧达成率
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '拟合Best50 平均达成率/DX分达成率',
-                      style: TextStyle(
-                        fontSize: sectionTitleFontSize,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                    _buildDualDecimalText(context, diffBest50AchievementAverage, diffBest50ScoreRateAverage * 100),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          // 模式说明
-          SizedBox(height: 12.0),
-          Divider(height: 1.0, color: Colors.grey),
-          SizedBox(height: 8.0),
-          Text(
-            modeText,
-            style: TextStyle(
-              fontSize: modeFontSize,
-              color: Colors.grey[600],
             ),
           ),
         ],
@@ -411,10 +258,7 @@ class DiffBest50ConvertToImg {
 
   // 构建区域标题
   static Widget _buildSectionTitle(BuildContext context, String title) {
-    // 图片容器固定宽度为1200，以此为基准计算字体大小
     const double containerWidth = 1200.0;
-    
-    // 根据容器宽度计算字体大小
     double fontSize = containerWidth * 0.03; // 约36px
     
     return Container(
@@ -437,27 +281,209 @@ class DiffBest50ConvertToImg {
     );
   }
 
+  // 构建统计区域
+  static Widget _buildStatsSection(BuildContext context, List<Map<String, dynamic>> songs) {
+    const double containerWidth = 1200.0;
+    
+    double titleFontSize = containerWidth * 0.025; // 约30px
+    double mainFontSize = containerWidth * 0.03; // 约36px
+    double subFontSize = containerWidth * 0.02; // 约24px
+
+    int totalSongs = songs.length;
+    int totalRa = songs.fold(0, (sum, song) => sum + ((song['ra'] ?? 0) as int));
+    double avgRa = totalSongs > 0 ? totalRa / totalSongs : 0.0;
+    double totalAchievement = songs.fold(0.0, (sum, song) => sum + (double.tryParse(song['achievements'].toString()) ?? 0.0));
+    double avgAchievement = totalSongs > 0 ? totalAchievement / totalSongs : 0.0;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.black, width: 2.0),
+        borderRadius: BorderRadius.circular(8.0),
+      ),
+      padding: EdgeInsets.all(16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          Column(
+            children: [
+              Text(
+                '歌曲数',
+                style: TextStyle(
+                  fontSize: titleFontSize,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              SizedBox(height: 8.0),
+              Text(
+                '$totalSongs',
+                style: TextStyle(
+                  fontSize: mainFontSize,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+            ],
+          ),
+          Column(
+            children: [
+              Text(
+                '总RA',
+                style: TextStyle(
+                  fontSize: titleFontSize,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              SizedBox(height: 8.0),
+              Text(
+                '$totalRa',
+                style: TextStyle(
+                  fontSize: mainFontSize,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+            ],
+          ),
+          Column(
+            children: [
+              Text(
+                '平均RA',
+                style: TextStyle(
+                  fontSize: titleFontSize,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              SizedBox(height: 8.0),
+              RichText(
+                text: TextSpan(
+                  children: [
+                    TextStyleUtil.span(
+                      avgRa.toStringAsFixed(1),
+                      TextStyle(
+                        fontSize: mainFontSize,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Column(
+            children: [
+              Text(
+                '平均达成率',
+                style: TextStyle(
+                  fontSize: titleFontSize,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              SizedBox(height: 8.0),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    avgAchievement.toStringAsFixed(4).split('.')[0],
+                    style: TextStyle(
+                      fontSize: mainFontSize,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                  Text(
+                    '.${avgAchievement.toStringAsFixed(4).split('.')[1]}%',
+                    style: TextStyle(
+                      fontSize: subFontSize,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 构建卡片网格
+  static Widget _buildDataCardGrid(BuildContext context, List<Map<String, dynamic>> songs, double aspectRatio, int crossAxisCount, List<dynamic>? maimaiMusicData) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        childAspectRatio: aspectRatio,
+        mainAxisSpacing: 8.0,
+        crossAxisSpacing: 8.0,
+      ),
+      itemCount: songs.length,
+      itemBuilder: (context, index) {
+        return _buildGameCard(
+          context: context,
+          songData: songs[index],
+          maimaiMusicData: maimaiMusicData,
+          index: index,
+        );
+      },
+    );
+  }
+
   // 构建游戏卡片
   static Widget _buildGameCard({
     required BuildContext context,
-    required Color cardColor,
-    String songName = '未知歌曲',
-    double achievementRate = 0.0,
-    double difficulty = 0.0,
-    bool dxMode = false,
-    bool isUtage = false,
-    int score = 0,
-    int maxScore = 0,
-    int rating = 0,
-    String stars = '',
-    String grade = '',
-    int? songId,
-    Color starsColor = Colors.white,
+    required Map<String, dynamic> songData,
+    List<dynamic>? maimaiMusicData,
+    int index = 0,
   }) {
-    // 与DiffBest50Page一致的卡片布局
+    // 解析数据
+    double achievementRate = double.tryParse(songData['achievements'].toString()) ?? 0.0;
+    int score = songData['dxScore'] ?? 0;
+    String fc = songData['fc'] ?? '';
+    String fs = songData['fs'] ?? '';
+    double difficulty = double.tryParse(songData['ds'].toString()) ?? 0.0;
+    String rate = songData['rate'] ?? '';
+    int levelIndex = songData['level_index'] ?? 0;
+    int rating = songData['ra'] ?? 0;
+    String type = songData['type'] ?? '';
+    String title = songData['title'] ?? '未知歌曲';
+    int songId = songData['song_id'] ?? 0;
+
+    // 计算maxScore
+    int maxScore = _calculateMaxScore(songId, levelIndex, maimaiMusicData);
+
+    // 计算星星等级
+    double scoreRate = _calculateScoreRate(songId, levelIndex, score, maimaiMusicData);
+    String stars = StringUtil.formatStars(scoreRate);
+    Color starsColor = ColorUtil.getStarsColor(stars);
+
+    // 映射FC/FS/Rate属性
+    String fcText = fc.isNotEmpty ? StringUtil.formatFC(fc) : '-';
+    String fsText = fs.isNotEmpty ? StringUtil.formatFS(fs) : '-';
+    String rateText = StringUtil.formatRate(rate);
+    String grade = '$rateText | $fcText | $fsText';
+
+    // 获取卡片颜色
+    Color cardColor;
+    if (songId.toString().length == 6) {
+      cardColor = Color(0xFFFFB3D1);
+    } else {
+      cardColor = ColorUtil.getCardColor(levelIndex);
+    }
+
+    bool dxMode = type == 'DX';
+    bool isUtage = songId.toString().length == 6;
+
     const double containerWidth = 1200.0;
-    
-    // 降低60%缩放倍率后的尺寸计算（保持原始值的40%）
     double songNameFontSize = containerWidth * 0.014;
     double decimalMainFontSize = containerWidth * 0.021;
     double decimalSmallFontSize = containerWidth * 0.016;
@@ -466,8 +492,9 @@ class DiffBest50ConvertToImg {
     double dxFontSize = containerWidth * 0.009;
     double coverSize = containerWidth * 0.048;
     double spacing = containerWidth * 0.006;
+
     double smallSpacing = containerWidth * 0.003;
-    
+
     return Container(
       decoration: BoxDecoration(
         color: cardColor,
@@ -538,21 +565,22 @@ class DiffBest50ConvertToImg {
                     textBaseline: TextBaseline.alphabetic,
                     children: [
                       Text(
-                        difficulty.toStringAsFixed(2).split('.')[0],
+                        difficulty.toString().split('.')[0],
                         style: TextStyle(
                           fontSize: decimalMainFontSize * 0.75,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
                       ),
-                      Text(
-                        '.${difficulty.toStringAsFixed(2).split('.')[1]}',
-                        style: TextStyle(
-                          fontSize: decimalSmallFontSize * 0.75,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                      if (difficulty.toString().split('.').length > 1)
+                        Text(
+                          '.${difficulty.toString().split('.')[1]}',
+                          style: TextStyle(
+                            fontSize: decimalSmallFontSize * 0.75,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ],
@@ -560,7 +588,7 @@ class DiffBest50ConvertToImg {
             ],
           ),
           SizedBox(width: spacing),
-          
+
           // 右侧：歌曲信息
           Expanded(
             child: Column(
@@ -570,7 +598,7 @@ class DiffBest50ConvertToImg {
               children: [
                 // 歌曲名称
                 Text(
-                  songName,
+                  title,
                   style: TextStyle(
                     fontSize: songNameFontSize,
                     fontWeight: FontWeight.w900,
@@ -580,7 +608,7 @@ class DiffBest50ConvertToImg {
                   maxLines: 1,
                 ),
                 SizedBox(height: containerWidth * 0.002),
-                
+
                 // 达成率
                 Row(
                   mainAxisSize: MainAxisSize.min,
@@ -605,8 +633,8 @@ class DiffBest50ConvertToImg {
                     ),
                   ],
                 ),
-                
-                // 评级、分数、星星
+
+                // RA、分数、星星
                 Row(
                   children: [
                     Text(
@@ -627,7 +655,7 @@ class DiffBest50ConvertToImg {
                     ),
                   ],
                 ),
-                
+
                 // 等级
                 Text(
                   grade,
@@ -645,204 +673,26 @@ class DiffBest50ConvertToImg {
     );
   }
 
-  // 构建小数文本
-  static Widget _buildDecimalText(BuildContext context, double value, {
-    bool isPercentage = false,
-    int decimalPlaces = 4,
-    Color color = Colors.white,
-  }) {
-    // 图片容器固定宽度为1200，以此为基准计算字体大小
-    const double containerWidth = 1200.0;
-    
-    // 根据容器宽度计算字体大小（与App观感一致）
-    double mainFontSize = containerWidth * 0.032; // 约38px
-    double subFontSize = containerWidth * 0.025; // 约30px
-    
-    String text = value.toStringAsFixed(decimalPlaces);
-
-    // 分割整数部分和小数部分
-    List<String> parts = text.split('.');
-    String integerPart = parts[0];
-    String decimalPart = parts.length > 1 ? '.${parts[1]}' : '';
-    String percentageSymbol = isPercentage ? '%' : '';
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
-      children: [
-        // 整数部分
-        Text(
-          integerPart,
-          style: TextStyle(
-            fontSize: mainFontSize,
-            fontWeight: FontWeight.bold,
-            color: color,
-            
-          ),
-        ),
-        // 小数部分和百分号
-        Text(
-          '$decimalPart$percentageSymbol',
-          style: TextStyle(
-            fontSize: subFontSize,
-            fontWeight: FontWeight.bold,
-            color: color,
-            
-          ),
-        ),
-      ],
-    );
-  }
-
-  // 构建双小数文本
-  static Widget _buildDualDecimalText(BuildContext context, double value1, double value2, {
-    int decimalPlaces1 = 4, 
-    int decimalPlaces2 = 2, 
-    Color color = Colors.black,
-  }) {
-    // 图片容器固定宽度为1200，以此为基准计算字体大小
-    const double containerWidth = 1200.0;
-    
-    // 根据容器宽度计算字体大小（与App观感一致）
-    double fontSize = containerWidth * 0.03; // 约36px
-    
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildDecimalText(context, value1,
-            decimalPlaces: decimalPlaces1, color: color),
-        Text(
-          '/',
-          style: TextStyle(
-                fontSize: fontSize,
-                fontWeight: FontWeight.bold,
-                color: color,
-                
-              ),
-        ),
-        _buildDecimalText(context, value2,
-            decimalPlaces: decimalPlaces2, color: color),
-      ],
-    );
-  }
-
-  // 构建数据驱动的卡片网格
-  static Widget _buildDataCardGrid(
-      BuildContext context, List<Map<String, dynamic>> songs, double childAspectRatio, int crossAxisCount, List<dynamic>? maimaiMusicData) {
-    return Container(
-      width: 1200,
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: NeverScrollableScrollPhysics(),
-        padding: EdgeInsets.zero,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 6.0,
-          mainAxisSpacing: 6.0,
-          childAspectRatio: childAspectRatio,
-        ),
-        itemCount: songs.length,
-        itemBuilder: (context, index) {
-          return _buildDataGameCard(context, songs[index], maimaiMusicData);
-        },
-      ),
-    );
-  }
-
-  // 根据数据构建游戏卡片
-  static Widget _buildDataGameCard(BuildContext context, Map<String, dynamic> songData, List<dynamic>? maimaiMusicData) {
-    // 解析数据
-    double achievementRate = double.tryParse(songData['achievements'].toString()) ?? 0.0;
-    int score = songData['dxScore'] ?? 0;
-    String fc = songData['fc'] ?? '';
-    String fs = songData['fs'] ?? '';
-    double difficulty = double.tryParse(songData['fit_diff'].toString()) ?? 0.0;
-    String rate = songData['rate'] ?? '';
-    int levelIndex = songData['level_index'] ?? 0;
-    int rating = songData['diffRating'] ?? 0;
-    String type = songData['type'] ?? '';
-    String title = songData['title'] ?? '未知歌曲';
-    int songId = songData['song_id'] ?? 0;
-    
-    // 计算星星等级（使用与App相同的StringUtil）
-    double scoreRate = _calculateScoreRate(songId, levelIndex, score, maimaiMusicData);
-    String stars = StringUtil.formatStars(scoreRate);
-    Color starsColor = ColorUtil.getStarsColor(stars);
-
-    // 计算maxScore
-    int maxScore = _calculateMaxScore(songId, levelIndex, maimaiMusicData);
-
-    // 映射FC属性（使用与App相同的StringUtil）
-    String fcText = fc.isNotEmpty ? StringUtil.formatFC(fc) : '-';
-
-    // 映射FS属性（使用与App相同的StringUtil）
-    String fsText = fs.isNotEmpty ? StringUtil.formatFS(fs) : '-';
-
-    // 映射Rate属性（使用与App相同的StringUtil）
-    String rateText = StringUtil.formatRate(rate);
-
-    // 构建完整grade
-    String grade = '$rateText | $fcText | $fsText';
-
-    // 获取卡片颜色（与App一致，包括宴会场粉色）
-    Color cardColor;
-    if (songId.toString().length == 6) {
-      cardColor = Color(0xFFFFB3D1); // 宴会场粉色
-    } else {
-      cardColor = ColorUtil.getCardColor(levelIndex);
-    }
-
-    // 判断是否为DX模式或UT模式
-    bool dxMode = type == 'DX';
-    bool isUtage = songId.toString().length == 6;
-
-    return _buildGameCard(
-      context: context,
-      cardColor: cardColor,
-      songName: title,
-      achievementRate: achievementRate,
-      difficulty: difficulty,
-      dxMode: dxMode,
-      isUtage: isUtage,
-      score: score,
-      maxScore: maxScore,
-      rating: rating,
-      stars: stars,
-      grade: grade,
-      songId: songId,
-      starsColor: starsColor,
-    );
-  }
-
   // 计算maxScore
   static int _calculateMaxScore(int songId, int levelIndex, List<dynamic>? maimaiMusicData) {
     try {
-      if (maimaiMusicData == null || maimaiMusicData.isEmpty) {
-        return 0;
-      }
+      if (maimaiMusicData == null || maimaiMusicData.isEmpty) return 0;
 
-      // 查找对应的歌曲数据
       dynamic songData;
       try {
-        songData = maimaiMusicData.firstWhere(
-          (song) => song['id'] == songId.toString(),
-        );
+        songData = maimaiMusicData.firstWhere((song) => song['id'] == songId.toString());
       } catch (_) {
-        // 如果找不到歌曲，返回0
         return 0;
       }
 
       if (songData['charts'] == null) return 0;
 
-      // 查找对应的charts
       List<dynamic> charts = songData['charts'];
       if (levelIndex < 0 || levelIndex >= charts.length) return 0;
 
       dynamic chart = charts[levelIndex];
       if (chart['notes'] == null) return 0;
 
-      // 计算maxScore
       List<dynamic> notes = chart['notes'];
       int notesSum = notes.fold(0, (sum, note) => sum + (note as int));
       return notesSum * 3;
@@ -857,137 +707,29 @@ class DiffBest50ConvertToImg {
     try {
       if (maimaiMusicData == null) return 0.0;
 
-      // 查找对应的歌曲
       dynamic songData;
       try {
-        songData = maimaiMusicData.firstWhere(
-          (item) => item['id'] == songId.toString(),
-        );
+        songData = maimaiMusicData.firstWhere((item) => item['id'] == songId.toString());
       } catch (e) {
-        // 如果找不到歌曲，返回0.0
         return 0.0;
       }
 
       if (songData == null || songData['charts'] == null) return 0.0;
 
-      // 查找对应的charts
       List<dynamic> charts = songData['charts'];
       if (levelIndex < 0 || levelIndex >= charts.length) return 0.0;
 
       dynamic chart = charts[levelIndex];
       if (chart['notes'] == null) return 0.0;
 
-      // 计算maxScore
       List<dynamic> notes = chart['notes'];
       int notesSum = notes.fold(0, (sum, note) => sum + (note as int));
       int maxScore = notesSum * 3;
 
-      // 计算scoreRate
       return maxScore > 0 ? score / maxScore : 0.0;
     } catch (e) {
       debugPrint('Error calculating score rate: $e');
       return 0.0;
-    }
-  }
-
-  // 预加载所有需要的图片资源
-  static Future<void> _preloadImages(BuildContext context) async {
-    try {
-      // 预加载背景图片
-      final bgImageProvider = AssetImage('assets/bg/b50_bg.png');
-      await precacheImage(bgImageProvider, context);
-      debugPrint('Background image preloaded');
-    } catch (e) {
-      debugPrint('Error preloading images: $e');
-    }
-  }
-
-  // 等待渲染完成（使用WidgetsBinding确保所有帧都已处理）
-  static Future<void> _waitForRender() async {
-    // 使用addPostFrameCallback等待帧渲染完成
-    Completer<void> frameCompleter = Completer<void>();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      frameCompleter.complete();
-    });
-    await frameCompleter.future;
-
-    // 再等待一帧确保渲染稳定
-    Completer<void> frameCompleter2 = Completer<void>();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      frameCompleter2.complete();
-    });
-    await frameCompleter2.future;
-
-    // 额外等待一段时间确保所有异步操作完成（如图像加载）
-    await Future.delayed(Duration(milliseconds: 500));
-    debugPrint('Render wait completed');
-  }
-
-  // 使用 MediaStore API 将图片保存到系统相册（Android 13+）
-  static Future<String?> _saveImageToGallery(Uint8List imageBytes, String fileName) async {
-    try {
-      const MethodChannel channel = MethodChannel('com.example.app/media_store');
-      final String? result = await channel.invokeMethod('saveImage', {
-        'imageBytes': imageBytes,
-        'fileName': fileName,
-      });
-      debugPrint('MediaStore save result: $result');
-      return result;
-    } catch (e) {
-      debugPrint('Error saving image via MediaStore: $e');
-      return null;
-    }
-  }
-
-  // 检查目录是否可写
-  static Future<bool> _checkDirectoryWritable(Directory directory) async {
-    try {
-      // 创建一个临时文件来测试写入权限
-      String testFileName = 'test_write_permission_${DateTime.now().millisecondsSinceEpoch}.tmp';
-      File testFile = File('${directory.path}/$testFileName');
-      
-      await testFile.writeAsString('test');
-      await testFile.delete();
-      
-      debugPrint('Directory writable test passed: ${directory.path}');
-      return true;
-    } catch (e) {
-      debugPrint('Directory writable test failed: $e');
-      return false;
-    }
-  }
-
-  // 发送Android系统广播，通知相册刷新
-  static Future<void> _sendMediaScanBroadcast(String filePath) async {
-    try {
-      const MethodChannel channel = MethodChannel('com.example.app/media_scan');
-      await channel.invokeMethod('scanFile', {'path': filePath});
-      debugPrint('Broadcast sent for: $filePath');
-    } catch (e) {
-      debugPrint('Error sending broadcast: $e');
-    }
-  }
-
-  // 通知系统刷新媒体库（多重保障）
-  static Future<void> _notifySystemGallery(String filePath) async {
-    // 方法1：使用media_scanner库
-    try {
-      await MediaScanner.loadMedia(path: filePath);
-      debugPrint('MediaScanner.loadMedia succeeded for: $filePath');
-    } catch (e) {
-      debugPrint('MediaScanner.loadMedia failed: $e');
-    }
-
-    // 方法2：发送系统广播
-    await _sendMediaScanBroadcast(filePath);
-
-    // 方法3：尝试使用MediaStore API（Android 10+）
-    try {
-      const MethodChannel channel = MethodChannel('com.example.app/media_scan');
-      await channel.invokeMethod('scanImage', {'path': filePath});
-      debugPrint('MediaStore scan succeeded for: $filePath');
-    } catch (e) {
-      debugPrint('MediaStore scan failed: $e');
     }
   }
 
@@ -1040,6 +782,81 @@ class DiffBest50ConvertToImg {
       debugPrint('Storage permission result: $status');
       return status;
     }
+  }
+
+  // 检查目录是否可写
+  static Future<bool> _checkDirectoryWritable(Directory directory) async {
+    try {
+      // 创建一个临时文件来测试写入权限
+      String testFileName = 'test_write_permission_${DateTime.now().millisecondsSinceEpoch}.tmp';
+      File testFile = File('${directory.path}/$testFileName');
+      
+      await testFile.writeAsString('test');
+      await testFile.delete();
+      
+      debugPrint('Directory writable test passed: ${directory.path}');
+      return true;
+    } catch (e) {
+      debugPrint('Directory writable test failed: $e');
+      return false;
+    }
+  }
+
+  // 使用 MediaStore API 将图片保存到系统相册（Android 13+）
+  static Future<String?> _saveImageToGallery(Uint8List imageBytes, String fileName) async {
+    try {
+      const MethodChannel channel = MethodChannel('com.example.app/media_store');
+      final String? result = await channel.invokeMethod('saveImage', {
+        'imageBytes': imageBytes,
+        'fileName': fileName,
+      });
+      return result;
+    } catch (e) {
+      debugPrint('Error saving image via MediaStore: $e');
+      return null;
+    }
+  }
+
+  // 通知系统相册
+  static Future<void> _notifySystemGallery(String filePath) async {
+    try {
+      await MediaScanner.loadMedia(path: filePath);
+    } catch (e) {
+      debugPrint('Error sending broadcast: $e');
+    }
+  }
+
+  // 预加载所有需要的图片资源
+  static Future<void> _preloadImages(BuildContext context) async {
+    try {
+      // 预加载背景图片
+      final bgImageProvider = AssetImage('assets/bg/b50_bg.png');
+      await precacheImage(bgImageProvider, context);
+      debugPrint('Background image preloaded');
+    } catch (e) {
+      debugPrint('Error preloading images: $e');
+    }
+  }
+
+  // 等待渲染完成（使用WidgetsBinding确保所有帧都已处理）
+  static Future<void> _waitForRender() async {
+    // 使用addPostFrameCallback等待帧渲染完成
+    Completer<void> frameCompleter = Completer<void>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      frameCompleter.complete();
+    });
+    await frameCompleter.future;
+
+    // 再等待一帧确保渲染稳定
+    Completer<void> frameCompleter2 = Completer<void>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      frameCompleter2.complete();
+    });
+    await frameCompleter2.future;
+
+    // 额外等待一段时间确保所有异步操作完成（如图像加载）
+    await Future.delayed(Duration(milliseconds: 500));
+    debugPrint('Render wait completed');
   }
 
   // 获取用户信息（昵称和数据源）
