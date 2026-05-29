@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:my_first_flutter_app/page/RatingRankListPage.dart';
+import 'package:my_first_flutter_app/page/RankingList/RatingRankListPage.dart';
 import 'dart:convert';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -19,6 +19,7 @@ import '../manager/SongAliasManager.dart';
 import '../manager/DivingFish/UserBest50Manager.dart';
 import '../manager/LuoXue/LuoXueUserPlayDataManager.dart';
 import '../entity/DivingFish/RecordItem.dart';
+import '../service/RankingList/SongRankingService.dart';
 import '../entity/DivingFish/Song.dart';
 import 'AchievementFullReverseCalculatorPage.dart';
 import 'AchievementRateCalculatorPage.dart';
@@ -26,7 +27,7 @@ import 'VersionViewPage.dart';
 import 'Best50/Best50Page.dart';
 import 'Best50/DiffBest50Page.dart';
 import 'Best50/PersonalizedBest50Page.dart';
-import 'CollectionSearchPage.dart';
+import 'Collection/CollectionSearchPage.dart';
 import 'GuessChartGame/GuessChartByAliaPage.dart';
 import 'GuessChartGame/GuessChartByBlurredCoverPage.dart';
 import 'GuessChartGame/GuessChartByCoverPage.dart';
@@ -40,7 +41,7 @@ import 'Multiplayer/MultiplayerLobbyPage.dart';
 import 'PaiziProgressPage.dart';
 import 'PersonalizedChartPlayConfigure.dart';
 import 'PersonalizedScorePage.dart';
-import 'RankTablePage.dart';
+import 'RankTable/RankTablePage.dart';
 import 'RandomChartPage.dart';
 import 'RecommendByTagsPage.dart';
 import 'SingleRatingCalculatorPage.dart';
@@ -921,23 +922,27 @@ class _HomePageState extends State<HomePage> {
                         
                         // 刷新成功，停止定时器并关闭对话框
                         LoadingTipsConstant.stopAutoSwitch();
-                        Navigator.of(context).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('数据刷新成功!'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
+                        if (mounted) {
+                          Navigator.of(context).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('数据刷新成功!'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
                       } catch (e) {
                         // 刷新失败，停止定时器并关闭对话框
                         LoadingTipsConstant.stopAutoSwitch();
-                        Navigator.of(context).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('刷新数据失败：$e'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
+                        if (mounted) {
+                          Navigator.of(context).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('刷新数据失败：$e'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
                       }
                     },
                     child: Text('确认'),
@@ -1058,9 +1063,20 @@ class _HomePageState extends State<HomePage> {
               best35Rating: _best35TotalRA,
               best15Rating: _best15TotalRA,
             );
+            
+            // 同步歌曲记录到Redis排行榜
+            if (playerRecords != null && playerRecords.isNotEmpty) {
+              final recordsMap = playerRecords.map((record) => record.toJson()).toList();
+              await SongRankingService().updateSongRankings(
+                userId,
+                displayNickname,
+                recordsMap,
+              );
+            }
           } else {
             // 如果不参与排行榜且有记录，删除记录
             await _deleteRankings(userId);
+            await SongRankingService().deleteSongRankings(userId);
           }
         }
         
@@ -1489,6 +1505,11 @@ class _HomePageState extends State<HomePage> {
       // 更新排行榜数据
       String? rankingError;
       final userId = 'shuiyu:$qq';
+      
+      // 保存水鱼用户ID到本地存储
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('shuiyu_user_id', userId);
+      
       if (participateRankings) {
         final displayNickname = showNickname ? _userNickname : '匿名用户';
         rankingError = await _updateRankings(
@@ -1499,9 +1520,22 @@ class _HomePageState extends State<HomePage> {
           best35Rating: _best35TotalRA,
           best15Rating: _best15TotalRA,
         );
+        
+        // 同步歌曲记录到Redis排行榜
+        if (userPlayData != null && userPlayData['records'] is List) {
+          final records = userPlayData['records'] as List;
+          if (records.isNotEmpty) {
+            await SongRankingService().updateSongRankings(
+              userId,
+              displayNickname,
+              records.cast<Map<String, dynamic>>(),
+            );
+          }
+        }
       } else {
         // 如果不参与排行榜且有记录，删除记录
         await _deleteRankings(userId);
+        await SongRankingService().deleteSongRankings(userId);
       }
       
       onProgress(100, '完成');

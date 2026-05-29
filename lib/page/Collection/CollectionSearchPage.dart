@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import '../service/CollectionSearchService.dart';
-import '../entity/LuoXue/Collection.dart';
-import '../manager/LuoXue/CollectionsManager.dart';
-import '../utils/CommonWidgetUtil.dart';
-import '../utils/CollectionsImageUtil.dart';
+import '../../service/Collection/CollectionSearchService.dart';
+import '../../entity/LuoXue/Collection.dart';
+import '../../manager/LuoXue/CollectionsManager.dart';
+import '../../utils/CommonWidgetUtil.dart';
+import '../../utils/CollectionsImageUtil.dart';
 import 'CollectionInfoPage.dart';
 
 class CollectionSearchPage extends StatefulWidget {

@@ -22,8 +22,10 @@ import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/MaidataDecodeUtil.dart';
 import 'package:my_first_flutter_app/utils/TextStyleUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'CollectionInfoPage.dart';
+import 'Collection/CollectionInfoPage.dart';
 import 'SongPlayPage.dart';
+import 'RankingList/SongRankingPage.dart';
+import 'package:my_first_flutter_app/service/RankingList/SongRankingService.dart';
 
 class SongInfoPage extends StatefulWidget {
   final String songId;
@@ -50,6 +52,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
   Map<int, List<int>> _maidataNoteCounts = {}; // key: 难度索引(0-4), value: [tap, hold, slide, touch, break]
   // Maidata解析的break统计
   Map<int, List<int>> _maidataBreakCounts = {}; // key: 难度索引(0-4), value: [trueZettaiTap, trueZettaiHold, protectedZettai, star]
+  bool _maidataDecodedSuccessfully = false;
   
   // 舞萌DX 完成度-评级-乘数对照表
   final List<Map<String, dynamic>> maimaiRatingMultiplier = [
@@ -315,11 +318,13 @@ class _SongInfoPageState extends State<SongInfoPage> {
         if (newNoteCounts.isNotEmpty) {
           setState(() {
             _maidataNoteCounts = newNoteCounts;
+            _maidataDecodedSuccessfully = true;
           });
         }
         if (newBreakCounts.isNotEmpty) {
           setState(() {
             _maidataBreakCounts = newBreakCounts;
+            _maidataDecodedSuccessfully = true;
           });
         }
       } else {
@@ -395,11 +400,13 @@ class _SongInfoPageState extends State<SongInfoPage> {
               if (newNoteCounts.isNotEmpty) {
                 setState(() {
                   _maidataNoteCounts = newNoteCounts;
+                  _maidataDecodedSuccessfully = true;
                 });
               }
               if (newBreakCounts.isNotEmpty) {
                 setState(() {
                   _maidataBreakCounts = newBreakCounts;
+                  _maidataDecodedSuccessfully = true;
                 });
               }
             }
@@ -1653,19 +1660,19 @@ class _SongInfoPageState extends State<SongInfoPage> {
                             children: [
                               Expanded(
                                   child: _buildBreakItem('真绝赞TAP',
-                                      _getBreakCounts()[0].toString())),
+                                      _getBreakCountDisplay(0))),
                               SizedBox(width: 4),
                               Expanded(
                                   child: _buildBreakItem('真绝赞HOLD',
-                                      _getBreakCounts()[1].toString())),
+                                      _getBreakCountDisplay(1))),
                               SizedBox(width: 4),
                               Expanded(
                                   child: _buildBreakItem('保护套绝赞',
-                                      _getBreakCounts()[2].toString())),
+                                      _getBreakCountDisplay(2))),
                               SizedBox(width: 4),
                               Expanded(
                                   child: _buildBreakItem('绝赞星星',
-                                      _getBreakCounts()[3].toString())),
+                                      _getBreakCountDisplay(3))),
                             ],
                           ),
 
@@ -1870,7 +1877,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                 mainAxisSpacing: 8,
                                 childAspectRatio: 3.0,
                               ),
-                              itemCount: 4,
+                              itemCount: 6,
                               itemBuilder: (context, index) {
                                 switch (index) {
                                   case 0:
@@ -1918,6 +1925,32 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                       child: Text('相关收藏品 $_relatedCollectionsCount'),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.purple,
+                                        foregroundColor: Colors.white,
+                                        padding: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                    );
+                                  case 4:
+                                    return ElevatedButton(
+                                      onPressed: _viewAchievementRanking,
+                                      child: const Text('达成率排行榜'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.orange,
+                                        foregroundColor: Colors.white,
+                                        padding: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                    );
+                                  case 5:
+                                    return ElevatedButton(
+                                      onPressed: _viewDxScoreRanking,
+                                      child: const Text('DX分数排行榜'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.cyan,
                                         foregroundColor: Colors.white,
                                         padding: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
                                         shape: RoundedRectangleBorder(
@@ -2667,16 +2700,51 @@ class _SongInfoPageState extends State<SongInfoPage> {
     );
   }
 
-  // 获取Break统计数量，优先使用Maidata解析的结果
-  List<int> _getBreakCounts() {
-    if (_maidataBreakCounts.containsKey(_currentDiffIndex)) {
+  // 获取Break统计显示值，maidata解析失败时使用兜底方案
+  String _getBreakCountDisplay(int index) {
+    // 如果maidata解析成功，优先使用解析结果
+    if (_maidataDecodedSuccessfully && _maidataBreakCounts.containsKey(_currentDiffIndex)) {
       List<int> counts = _maidataBreakCounts[_currentDiffIndex]!;
       bool allZero = counts.every((count) => count == 0);
-      if (!allZero) {
-        return counts;
+      // 只有当解析出的绝赞数量不全为0时，才使用maidata结果
+      if (!allZero && index >= 0 && index < counts.length) {
+        return counts[index].toString();
       }
     }
-    return [0, 0, 0, 0];
+    
+    // 兜底方案：解析失败或解析结果全为0时
+    if (_songData != null) {
+      String songType = _songData!['type'] ?? '';
+      // ST谱面（type为SD）
+      if (songType == 'SD') {
+        // 获取当前难度的break音符数量
+        int breakCount = 0;
+        try {
+          final currentChart = _songData!['charts'][_currentDiffIndex];
+          if (currentChart != null && currentChart['notes'] != null) {
+            List<dynamic> notes = currentChart['notes'];
+            // ST谱面（SD类型）的notes数组只有4个元素，break在索引3
+            // DX谱面的notes数组有5个元素，break在索引4
+            int breakIndex = notes.length >= 5 ? 4 : 3;
+            if (notes.length > breakIndex) {
+              breakCount = notes[breakIndex] is int ? notes[breakIndex] : 0;
+            }
+          }
+        } catch (e) {
+          debugPrint('[SongInfoPage] Error getting break count: $e');
+        }
+        
+        // 真绝赞TAP（index 0）设为总绝赞数量，其余为0
+        if (index == 0) {
+          return breakCount.toString();
+        } else {
+          return '0';
+        }
+      }
+    }
+    
+    // 默认返回'-'
+    return '-';
   }
 
   // 构建Break统计项
@@ -3752,6 +3820,76 @@ class _SongInfoPageState extends State<SongInfoPage> {
           genre: genre,
           songType: songType,
           difficultyIndex: _currentDiffIndex,
+        ),
+      ),
+    );
+  }
+
+  void _viewAchievementRanking() {
+    if (_songData == null) return;
+
+    final songTitle = _songData!['basic_info']['title'];
+    final songType = _songData!['type'];
+    final artist = _songData!['basic_info']['artist'] ?? '';
+    final from = _songData!['basic_info']['from'] ?? '';
+    
+    double difficultyDs = 0.0;
+    if (_songData!['ds'] != null && _songData!['ds'] is List) {
+      List<dynamic> dsList = _songData!['ds'];
+      if (_currentDiffIndex >= 0 && _currentDiffIndex < dsList.length) {
+        difficultyDs = (dsList[_currentDiffIndex] as num).toDouble();
+      }
+    }
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SongRankingPage(
+          songId: widget.songId,
+          difficultyIndex: _currentDiffIndex,
+          rankingType: RankingType.achievementRate,
+          songTitle: songTitle,
+          difficultyLabel: _getDiffLabel(_currentDiffIndex),
+          songType: songType,
+          artist: artist,
+          genre: '',
+          from: from,
+          difficultyDs: difficultyDs,
+        ),
+      ),
+    );
+  }
+
+  void _viewDxScoreRanking() {
+    if (_songData == null) return;
+
+    final songTitle = _songData!['basic_info']['title'];
+    final songType = _songData!['type'];
+    final artist = _songData!['basic_info']['artist'] ?? '';
+    final from = _songData!['basic_info']['from'] ?? '';
+    
+    double difficultyDs = 0.0;
+    if (_songData!['ds'] != null && _songData!['ds'] is List) {
+      List<dynamic> dsList = _songData!['ds'];
+      if (_currentDiffIndex >= 0 && _currentDiffIndex < dsList.length) {
+        difficultyDs = (dsList[_currentDiffIndex] as num).toDouble();
+      }
+    }
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SongRankingPage(
+          songId: widget.songId,
+          difficultyIndex: _currentDiffIndex,
+          rankingType: RankingType.dxScore,
+          songTitle: songTitle,
+          difficultyLabel: _getDiffLabel(_currentDiffIndex),
+          songType: songType,
+          artist: artist,
+          genre: '',
+          from: from,
+          difficultyDs: difficultyDs,
         ),
       ),
     );

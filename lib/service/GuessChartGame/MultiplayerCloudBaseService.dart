@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
-import '../WebSocketBroadcastService.dart';
+import '../Multiplayer/WebSocketBroadcastService.dart';
 import 'MultiplayerGameService.dart';
 import '../../entity/Multiplayer/RoomEntity.dart';
 import '../../entity/Multiplayer/PlayerEntity.dart';

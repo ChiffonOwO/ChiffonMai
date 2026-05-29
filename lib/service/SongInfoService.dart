@@ -60,27 +60,32 @@ class SongInfoService {
           final songIndex = songs.indexWhere((s) => s.id == songId);
           if (songIndex != -1) {
             final song = songs[songIndex];
-            result['songData'] = {
-              'id': song.id,
-              'title': song.title,
-              'type': song.type,
-              'ds': song.ds,
-              'level': song.level,
-              'cids': song.cids,
-              'charts': song.charts
-                  .map((chart) =>
-                      {'notes': chart.notes, 'charter': chart.charter})
-                  .toList(),
-              'basic_info': {
-                'title': song.basicInfo.title,
-                'artist': song.basicInfo.artist,
-                'genre': song.basicInfo.genre,
-                'bpm': song.basicInfo.bpm,
-                'release_date': song.basicInfo.releaseDate,
-                'from': song.basicInfo.from,
-                'is_new': song.basicInfo.isNew
-              }
-            };
+            // 计算 shortId（去掉前导零的歌曲ID）
+              String shortId = song.id.replaceFirst(RegExp(r'^0+'), '');
+              
+              result['songData'] = {
+                'id': song.id,
+                'title': song.title,
+                'type': song.type,
+                'ds': song.ds,
+                'level': song.level,
+                'cids': song.cids,
+                'shortId': shortId,
+                'charts': song.charts
+                    .map((chart) =>
+                        {'notes': chart.notes, 'charter': chart.charter})
+                    .toList(),
+                'basic_info': {
+                  'title': song.basicInfo.title,
+                  'artist': song.basicInfo.artist,
+                  'genre': song.basicInfo.genre,
+                  'bpm': song.basicInfo.bpm,
+                  'release_date': song.basicInfo.releaseDate,
+                  'from': song.basicInfo.from,
+                  'is_new': song.basicInfo.isNew,
+                  'short_id': shortId
+                }
+              };
           }
         }
       }

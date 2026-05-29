@@ -8,7 +8,7 @@ import 'package:my_first_flutter_app/utils/CollectionsImageUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
-import 'package:my_first_flutter_app/page/CollectionInfoPage.dart';
+import 'package:my_first_flutter_app/page/Collection/CollectionInfoPage.dart';
 
 // 根据 formatVersion2 的顺序定义首字顺序
 const List<String> _firstCharOrder = [

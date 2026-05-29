@@ -275,10 +275,47 @@ class MaidataManager {
   }
 
   String? getMaidata(String songId) {
+    // 尝试直接查询
     String? content = _cachedMaidata[songId];
     if (content != null) {
+      debugPrint('[MaidataManager] getMaidata: 直接查询成功, songId=$songId');
       return _cleanMaidataContent(content);
     }
+    
+    // 尝试去除前导零的ID
+    String trimmedId = songId.replaceFirst(RegExp(r'^0+'), '');
+    if (trimmedId.isNotEmpty && trimmedId != songId) {
+      content = _cachedMaidata[trimmedId];
+      if (content != null) {
+        debugPrint('[MaidataManager] getMaidata: 通过去除前导零查询成功, songId=$songId, trimmedId=$trimmedId');
+        return _cleanMaidataContent(content);
+      }
+    }
+    
+    // 尝试补前导零到5位（常见格式）
+    String paddedId = songId.padLeft(5, '0');
+    if (paddedId != songId) {
+      content = _cachedMaidata[paddedId];
+      if (content != null) {
+        debugPrint('[MaidataManager] getMaidata: 通过补前导零到5位查询成功, songId=$songId, paddedId=$paddedId');
+        return _cleanMaidataContent(content);
+      }
+    }
+    
+    // 尝试补前导零到6位（UTAGE歌曲）
+    String paddedId6 = songId.padLeft(6, '0');
+    if (paddedId6 != songId) {
+      content = _cachedMaidata[paddedId6];
+      if (content != null) {
+        debugPrint('[MaidataManager] getMaidata: 通过补前导零到6位查询成功, songId=$songId, paddedId6=$paddedId6');
+        return _cleanMaidataContent(content);
+      }
+    }
+    
+    // 调试：输出缓存中所有包含该数字的key
+    List<String> matchingKeys = _cachedMaidata.keys.where((key) => key.contains(songId) || songId.contains(key)).toList();
+    debugPrint('[MaidataManager] getMaidata: 查询失败, songId=$songId, 缓存中匹配的key: $matchingKeys, 缓存总数: ${_cachedMaidata.length}');
+    
     return null;
   }
 

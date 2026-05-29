@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import '../manager/LuoXue/CollectionsManager.dart';
-import '../entity/LuoXue/Collection.dart';
+import '../../manager/LuoXue/CollectionsManager.dart';
+import '../../entity/LuoXue/Collection.dart';
 
 class CollectionSearchService {
   // 单例模式

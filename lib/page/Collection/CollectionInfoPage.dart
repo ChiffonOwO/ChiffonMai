@@ -7,15 +7,15 @@ import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:media_scanner/media_scanner.dart';
-import '../service/CollectionInfoService.dart';
-import '../entity/LuoXue/Collection.dart';
-import '../utils/LuoXueToDivingFishUtil.dart';
-import '../utils/CommonWidgetUtil.dart';
-import '../utils/CollectionsImageUtil.dart';
-import '../utils/CoverUtil.dart';
-import '../utils/StringUtil.dart';
-import '../utils/TranslationUtil.dart';
-import 'SongInfoPage.dart';
+import '../../service/Collection/CollectionInfoService.dart';
+import '../../entity/LuoXue/Collection.dart';
+import '../../utils/LuoXueToDivingFishUtil.dart';
+import '../../utils/CommonWidgetUtil.dart';
+import '../../utils/CollectionsImageUtil.dart';
+import '../../utils/CoverUtil.dart';
+import '../../utils/StringUtil.dart';
+import '../../utils/TranslationUtil.dart';
+import '../SongInfoPage.dart';
 
 class CollectionInfoPage extends StatefulWidget {
   final int collectionId;

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
-import 'package:my_first_flutter_app/service/RankTableService.dart';
+import 'package:my_first_flutter_app/service/RankTable/RankTableService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';

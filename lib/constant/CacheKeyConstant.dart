@@ -77,4 +77,7 @@ class CacheKeyConstant {
   static const String shuiyuRankingsCacheTimestamp = 'shuiyu_rankings_cache_timestamp';
   static const String luoxueRankingsCache = 'luoxue_rankings_cache';
   static const String luoxueRankingsCacheTimestamp = 'luoxue_rankings_cache_timestamp';
+  
+  // 免责声明相关
+  static const String songRankingDisclaimerShown = 'song_ranking_disclaimer_shown';
 }

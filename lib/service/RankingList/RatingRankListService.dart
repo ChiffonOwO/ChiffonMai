@@ -1,8 +1,8 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../api/ApiUrls.dart';
-import '../constant/CacheKeyConstant.dart';
-import '../constant/CacheTimestampConstant.dart';
+import '../../api/ApiUrls.dart';
+import '../../constant/CacheKeyConstant.dart';
+import '../../constant/CacheTimestampConstant.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class RatingRankListService {

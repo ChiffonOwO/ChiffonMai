@@ -33,6 +33,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
   String? _errorMessage;
   List<String> _inoteList = [];
   String? _selectedInote;
+  String? _displayedInote; // 当前显示的难度
   final ScrollController _scrollController = ScrollController();
 
   late SongMaidataPageService _service;
@@ -238,26 +239,75 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
   void _scrollToInote(String inoteNum) {
     setState(() {
       _selectedInote = inoteNum;
-    });
-
-    Future.delayed(const Duration(milliseconds: 100), () {
-      String targetText = '&inote_$inoteNum';
-      int targetIndex = _maidataContent.indexOf(targetText);
-
-      if (targetIndex != -1) {
-        double lineHeight = 18.0;
-        int linesBefore = _maidataContent.substring(0, targetIndex).split('\n').length;
-        double targetPosition = linesBefore * lineHeight;
-        double offsetPosition = targetPosition - (lineHeight * 6);
-        offsetPosition = offsetPosition < 0 ? 0 : offsetPosition;
-
-        _scrollController.animateTo(
-          offsetPosition,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
+      // 切换显示单个难度或全部
+      if (_displayedInote == inoteNum) {
+        _displayedInote = null; // 显示全部
+      } else {
+        _displayedInote = inoteNum; // 只显示该难度
       }
     });
+
+    if (_displayedInote == null) {
+      // 显示全部时滚动到该难度位置
+      Future.delayed(const Duration(milliseconds: 100), () {
+        String targetText = '&inote_$inoteNum';
+        int targetIndex = _maidataContent.indexOf(targetText);
+
+        if (targetIndex != -1) {
+          double lineHeight = 18.0;
+          int linesBefore = _maidataContent.substring(0, targetIndex).split('\n').length;
+          double targetPosition = linesBefore * lineHeight;
+          double offsetPosition = targetPosition - (lineHeight * 6);
+          offsetPosition = offsetPosition < 0 ? 0 : offsetPosition;
+
+          _scrollController.animateTo(
+            offsetPosition,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        }
+      });
+    }
+  }
+  
+  // 提取单个难度的maidata内容
+  String _getFilteredMaidata() {
+    if (_displayedInote == null || _maidataContent.isEmpty) {
+      return _maidataContent;
+    }
+    
+    String targetInote = '&inote_${_displayedInote}';
+    String nextInote = '';
+    
+    // 找到下一个难度的起始位置
+    for (String inote in _inoteList) {
+      if (inote != _displayedInote) {
+        String candidate = '&inote_$inote';
+        int targetIndex = _maidataContent.indexOf(targetInote);
+        int candidateIndex = _maidataContent.indexOf(candidate);
+        
+        if (candidateIndex > targetIndex) {
+          if (nextInote.isEmpty || candidateIndex < _maidataContent.indexOf('&inote_$nextInote')) {
+            nextInote = inote;
+          }
+        }
+      }
+    }
+    
+    int startIndex = _maidataContent.indexOf(targetInote);
+    if (startIndex == -1) {
+      return _maidataContent;
+    }
+    
+    int endIndex = nextInote.isEmpty 
+        ? _maidataContent.length 
+        : _maidataContent.indexOf('&inote_$nextInote');
+    
+    if (endIndex == -1) {
+      endIndex = _maidataContent.length;
+    }
+    
+    return _maidataContent.substring(startIndex, endIndex);
   }
 
   Widget _buildTypeTag(String type, String songId) {
@@ -596,7 +646,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                                   controller: _scrollController,
                                   padding: const EdgeInsets.all(16),
                                   child: SelectableText(
-                                    _maidataContent,
+                                    _getFilteredMaidata(),
                                     style: const TextStyle(
                                       fontFamily: 'Courier New',
                                       fontSize: 12,

@@ -4,6 +4,7 @@
         "allprojects",
         "debugdebug",
         "inote",
+        "prefs",
         "wyllg"
     ],
     "java.configuration.updateBuildConfiguration": "automatic"

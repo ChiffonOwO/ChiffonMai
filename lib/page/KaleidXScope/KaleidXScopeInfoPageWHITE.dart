@@ -11,7 +11,7 @@ import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
-import 'package:my_first_flutter_app/page/CollectionInfoPage.dart';
+import 'package:my_first_flutter_app/page/Collection/CollectionInfoPage.dart';
 
 class KaleidXScopeInfoPageWHITE extends StatefulWidget {
   const KaleidXScopeInfoPageWHITE({

@@ -25,12 +25,14 @@ class _RandomChartPageState extends State<RandomChartPage> {
   int _drawCount = 4;
   double? _minDs;
   double? _maxDs;
-  String _selectedVersion = '全部版本';
-  String _selectedGenre = '全部类型';
+  List<String> _selectedVersions = [];
+  List<String> _selectedGenres = [];
+  bool _requireMaster = false;
+  bool _excludeSixDigitId = false;
 
   // 版本和流派列表
-  List<String> _versionList = ['全部版本'];
-  List<String> _genreList = ['全部类型'];
+  List<String> _versionList = [];
+  List<String> _genreList = [];
 
   // 输入控制器
   final TextEditingController _minDsController = TextEditingController();
@@ -69,8 +71,10 @@ class _RandomChartPageState extends State<RandomChartPage> {
         count: _drawCount,
         minDs: _minDs,
         maxDs: _maxDs,
-        version: _selectedVersion,
-        genre: _selectedGenre,
+        versions: _selectedVersions.isEmpty ? null : _selectedVersions,
+        genres: _selectedGenres.isEmpty ? null : _selectedGenres,
+        requireMaster: _requireMaster,
+        excludeSixDigitId: _excludeSixDigitId,
       );
 
       setState(() {
@@ -98,6 +102,170 @@ class _RandomChartPageState extends State<RandomChartPage> {
     setState(() {
       _history.removeAt(index);
     });
+  }
+
+  // 显示版本选择对话框
+  void _showVersionSelector() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        List<String> tempSelected = List.from(_selectedVersions);
+        
+        return AlertDialog(
+          title: Text('选择版本'),
+          content: StatefulBuilder(
+            builder: (context, setState) {
+              return Container(
+                width: double.maxFinite,
+                height: 300,
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      // 全选/全不选按钮
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: tempSelected.length == _versionList.length,
+                            onChanged: (value) {
+                              setState(() {
+                                if (value == true) {
+                                  tempSelected = List.from(_versionList);
+                                } else {
+                                  tempSelected.clear();
+                                }
+                              });
+                            },
+                          ),
+                          Text('全选'),
+                        ],
+                      ),
+                      Divider(),
+                      // 版本列表
+                      Column(
+                        children: _versionList.map((version) {
+                          return CheckboxListTile(
+                            title: Text(StringUtil.formatVersion2(version)),
+                            value: tempSelected.contains(version),
+                            onChanged: (value) {
+                              setState(() {
+                                if (value == true) {
+                                  tempSelected.add(version);
+                                } else {
+                                  tempSelected.remove(version);
+                                }
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('取消'),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _selectedVersions = tempSelected;
+                });
+                Navigator.of(context).pop();
+              },
+              child: Text('确定'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 显示类型选择对话框
+  void _showGenreSelector() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        List<String> tempSelected = List.from(_selectedGenres);
+        
+        return AlertDialog(
+          title: Text('选择类型'),
+          content: StatefulBuilder(
+            builder: (context, setState) {
+              return Container(
+                width: double.maxFinite,
+                height: 300,
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      // 全选/全不选按钮
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: tempSelected.length == _genreList.length,
+                            onChanged: (value) {
+                              setState(() {
+                                if (value == true) {
+                                  tempSelected = List.from(_genreList);
+                                } else {
+                                  tempSelected.clear();
+                                }
+                              });
+                            },
+                          ),
+                          Text('全选'),
+                        ],
+                      ),
+                      Divider(),
+                      // 类型列表
+                      Column(
+                        children: _genreList.map((genre) {
+                          return CheckboxListTile(
+                            title: Text(genre),
+                            value: tempSelected.contains(genre),
+                            onChanged: (value) {
+                              setState(() {
+                                if (value == true) {
+                                  tempSelected.add(genre);
+                                } else {
+                                  tempSelected.remove(genre);
+                                }
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('取消'),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _selectedGenres = tempSelected;
+                });
+                Navigator.of(context).pop();
+              },
+              child: Text('确定'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   // 曲绘加载使用CoverPathUtil工具类
@@ -275,33 +443,33 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                           ),
                                         ),
                                         SizedBox(height: spacingSmall),
-                                        DropdownButtonFormField<String>(
-                                          value: _selectedVersion,
-                                          items: _versionList.map((version) {
-                                            return DropdownMenuItem<String>(
-                                              value: version,
-                                              child: Text(
-                                                version == '全部版本' ? version : StringUtil.formatVersion2(version),
-                                                style: TextStyle(
-                                                    fontSize: textSizeSmall),
-                                              ),
-                                            );
-                                          }).toList(),
-                                          onChanged: (value) {
-                                            setState(() {
-                                              _selectedVersion = value!;
-                                            });
-                                          },
-                                          decoration: InputDecoration(
-                                            border: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                      borderRadius),
+                                        InkWell(
+                                          onTap: _showVersionSelector,
+                                          child: Container(
+                                            padding: EdgeInsets.symmetric(
+                                                horizontal: spacingSmall,
+                                                vertical: spacingSmall),
+                                            decoration: BoxDecoration(
+                                              border: Border.all(
+                                                  color: Colors.grey),
+                                              borderRadius: BorderRadius.circular(
+                                                  borderRadius),
                                             ),
-                                            contentPadding:
-                                                EdgeInsets.symmetric(
-                                                    horizontal: spacingSmall,
-                                                    vertical: spacingSmall),
+                                            child: Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    _selectedVersions.isEmpty
+                                                        ? '全部版本'
+                                                        : '已选 ${_selectedVersions.length} 个版本',
+                                                    style: TextStyle(
+                                                        fontSize: textSizeSmall),
+                                                  ),
+                                                ),
+                                                Icon(Icons.arrow_drop_down,
+                                                    size: 16),
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -323,33 +491,33 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                           ),
                                         ),
                                         SizedBox(height: spacingSmall),
-                                        DropdownButtonFormField<String>(
-                                          value: _selectedGenre,
-                                          items: _genreList.map((genre) {
-                                            return DropdownMenuItem<String>(
-                                              value: genre,
-                                              child: Text(
-                                                genre,
-                                                style: TextStyle(
-                                                    fontSize: textSizeSmall),
-                                              ),
-                                            );
-                                          }).toList(),
-                                          onChanged: (value) {
-                                            setState(() {
-                                              _selectedGenre = value!;
-                                            });
-                                          },
-                                          decoration: InputDecoration(
-                                            border: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                      borderRadius),
+                                        InkWell(
+                                          onTap: _showGenreSelector,
+                                          child: Container(
+                                            padding: EdgeInsets.symmetric(
+                                                horizontal: spacingSmall,
+                                                vertical: spacingSmall),
+                                            decoration: BoxDecoration(
+                                              border: Border.all(
+                                                  color: Colors.grey),
+                                              borderRadius: BorderRadius.circular(
+                                                  borderRadius),
                                             ),
-                                            contentPadding:
-                                                EdgeInsets.symmetric(
-                                                    horizontal: spacingSmall,
-                                                    vertical: spacingSmall),
+                                            child: Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    _selectedGenres.isEmpty
+                                                        ? '全部类型'
+                                                        : '已选 ${_selectedGenres.length} 个类型',
+                                                    style: TextStyle(
+                                                        fontSize: textSizeSmall),
+                                                  ),
+                                                ),
+                                                Icon(Icons.arrow_drop_down,
+                                                    size: 16),
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -390,7 +558,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                                           horizontal:
                                                               spacingSmall,
                                                           vertical:
-                                                              spacingSmall),
+                                                              spacingSmall * 1.5),
                                                 ),
                                                 style: TextStyle(
                                                     fontSize: textSizeSmall),
@@ -416,10 +584,114 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                                           horizontal:
                                                               spacingSmall,
                                                           vertical:
-                                                              spacingSmall),
+                                                              spacingSmall * 1.5),
                                                 ),
                                                 style: TextStyle(
                                                     fontSize: textSizeSmall),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  SizedBox(height: spacingMedium),
+
+                                  // 快捷选项
+                                  Container(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '快捷选项',
+                                          style: TextStyle(
+                                            fontSize: textSizeSmall,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                        SizedBox(height: spacingSmall),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: ElevatedButton(
+                                                onPressed: () async {
+                                                  debugPrint('[RandomChartPage] 点击MASTER上级快捷按钮');
+                                                  // 确保版本和流派列表已加载
+                                                  if (_versionList.isEmpty || _genreList.isEmpty) {
+                                                    debugPrint('[RandomChartPage] 列表未加载，重新加载...');
+                                                    await _loadFilterOptions();
+                                                  }
+                                                  debugPrint('[RandomChartPage] _versionList长度: ${_versionList.length}');
+                                                  debugPrint('[RandomChartPage] _genreList长度: ${_genreList.length}');
+                                                  setState(() {
+                                                    _minDsController.text = '13.2';
+                                                    _maxDsController.text = '14.4';
+                                                    _requireMaster = true;
+                                                    _excludeSixDigitId = true;
+                                                    // 自动选中所有版本
+                                                    _selectedVersions = List.from(_versionList);
+                                                    // 自动选中所有类型，排除"\u5bb4\u4f1a\u5834"
+                                                    _selectedGenres = _genreList.where((genre) => genre != '\u5bb4\u4f1a\u5834').toList();
+                                                  });
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.lightBlue[200],
+                                                  foregroundColor: Colors.blue[800],
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            borderRadius),
+                                                  ),
+                                                  padding: EdgeInsets.symmetric(
+                                                      vertical: spacingSmall),
+                                                ),
+                                                child: Text(
+                                                  'MASTER 上级',
+                                                  style: TextStyle(
+                                                      fontSize: textSizeSmall,
+                                                      fontWeight: FontWeight.bold),
+                                                ),
+                                              ),
+                                            ),
+                                            SizedBox(width: spacingSmall),
+                                            Expanded(
+                                              child: ElevatedButton(
+                                                onPressed: () async {
+                                                  debugPrint('[RandomChartPage] 点击MASTER超上级快捷按钮');
+                                                  // 确保版本和流派列表已加载
+                                                  if (_versionList.isEmpty || _genreList.isEmpty) {
+                                                    debugPrint('[RandomChartPage] 列表未加载，重新加载...');
+                                                    await _loadFilterOptions();
+                                                  }
+                                                  setState(() {
+                                                    _minDsController.text = '14.5';
+                                                    _maxDsController.text = '14.9';
+                                                    _requireMaster = true;
+                                                    _excludeSixDigitId = true;
+                                                    // 自动选中所有版本
+                                                    _selectedVersions = List.from(_versionList);
+                                                    // 自动选中所有类型，排除"\u5bb4\u4f1a\u5834"
+                                                    _selectedGenres = _genreList.where((genre) => genre != '\u5bb4\u4f1a\u5834').toList();
+                                                  });
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.lightBlue[200],
+                                                  foregroundColor: Colors.blue[800],
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            borderRadius),
+                                                  ),
+                                                  padding: EdgeInsets.symmetric(
+                                                      vertical: spacingSmall),
+                                                ),
+                                                child: Text(
+                                                  'MASTER 超上级',
+                                                  style: TextStyle(
+                                                      fontSize: textSizeSmall,
+                                                      fontWeight: FontWeight.bold),
+                                                ),
                                               ),
                                             ),
                                           ],

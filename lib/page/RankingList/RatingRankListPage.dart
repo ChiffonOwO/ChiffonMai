@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../service/RatingRankListService.dart';
-import '../constant/CacheKeyConstant.dart';
+import '../../service/RankingList/RatingRankListService.dart';
+import '../../constant/CacheKeyConstant.dart';
 
 class RatingRankListPage extends StatefulWidget {
   const RatingRankListPage({super.key});
