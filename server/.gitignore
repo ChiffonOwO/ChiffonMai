@@ -1,3 +1,5 @@
-
 # Environment variables
 .env.local
+
+# Production server config with sensitive data
+server.js
