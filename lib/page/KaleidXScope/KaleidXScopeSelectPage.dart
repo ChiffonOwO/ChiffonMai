@@ -4,6 +4,7 @@ import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPageBLUE.dart';
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPageWHITE.dart';
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPagePURPLE.dart';
+import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPageYELLOW.dart';
 
 class KaleidXScopeSelectPage extends StatefulWidget {
   const KaleidXScopeSelectPage({super.key});
@@ -19,6 +20,7 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
     {'image': 'assets/kaleidxscope/white.webp', 'title': '白の扉（白色之门）', 'type': 'white'},
     {'image': 'assets/kaleidxscope/purple.webp', 'title': '紫の扉（紫色之门）', 'type': 'purple'},
     {'image': 'assets/kaleidxscope/black.webp', 'title': '黑の扉（黑色之门）', 'type': 'black'},
+    {'image': 'assets/kaleidxscope/yellow.webp', 'title': '黄の扉（黄色之门）', 'type': 'yellow'},
   ];
 
   @override
@@ -137,6 +139,13 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
                                         builder: (context) => KaleidXScopeInfoPageBLACK(),
                                       ),
                                     );
+                                  } else if (item['type'] == 'yellow') {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => KaleidXScopeInfoPageYELLOW(),
+                                      ),
+                                    );
                                   } else {
                                     // 其他门暂未开放
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -151,7 +160,29 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
                                   borderRadius: BorderRadius.circular(12),
                                   child: Stack(
                                     children: [
-                                      Image.asset(
+                                      if (item['type'] == 'yellow')
+                                        Container(
+                                          width: imageWidth,
+                                          height: imageHeight,
+                                          decoration: BoxDecoration(
+                                            color: Colors.amber[100],
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(color: Colors.amber[300]!, width: 2),
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              '黄色之门\n（图片占位符）',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.amber[700],
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      else
+                                        Image.asset(
                                         item['image']!,
                                         width: imageWidth,
                                         height: imageHeight,

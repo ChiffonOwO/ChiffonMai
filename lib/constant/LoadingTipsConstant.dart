@@ -24,7 +24,8 @@ class LoadingTipsConstant {
     '每日首次游玩可盖1个章，拼机游玩可额外盖1个章',
     '扇形 SLIDE（WiFi 星星）：引导星星前往三个方向，需触碰更大范围判定区',
     '如果你想为Tips添砖加瓦，可以滑到底部填写问卷!',
-    'CRH380AL说：小朋友，今天去哪🎹🎹?'
+    'CRH380AL说：小朋友，今天去哪🎹🎹?',
+    'wander说：你的星星被迪拉熊吃掉啦哈哈',
   ];
 
   static int _currentIndex = 0;

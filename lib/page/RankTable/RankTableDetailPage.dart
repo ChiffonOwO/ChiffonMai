@@ -83,6 +83,95 @@ class _RankDetailPageState extends State<RankDetailPage> {
     return '';
   }
 
+  int _parseAchievementToInt(String achievement) {
+    if (achievement.isEmpty) return 0;
+    String cleaned = achievement.replaceAll('%', '');
+    double value = double.tryParse(cleaned) ?? 0.0;
+    return (value * 10000).round();
+  }
+
+  int _calcMinDamage(Song song, int levelIndex, String achievement, RankData rankData) {
+    if (achievement.isEmpty) return 0;
+    if (levelIndex < 0 || levelIndex >= song.charts.length) return 0;
+    
+    final chart = song.charts[levelIndex];
+    final notes = chart.notes;
+    if (notes.isEmpty) return 0;
+    
+    // notes数组: DX=[tap, hold, slide, touch, break], SD=[tap, hold, slide, break]
+    final tap = notes[0];
+    final hold = notes.length >= 2 ? notes[1] : 0;
+    final slide = notes.length >= 3 ? notes[2] : 0;
+    final touch = notes.length >= 5 ? notes[3] : 0;
+    final breakNote = notes.length >= 5 ? notes[4] : (notes.length >= 4 ? notes[3] : 0);
+    
+    final totalBase = tap + touch + 2 * hold + 3 * slide + 5 * breakNote;
+    if (totalBase == 0) return 0;
+    
+    final base = 100000.0 / totalBase;
+    final achievementInt = _parseAchievementToInt(achievement);
+    if (achievementInt <= 0) return 0;
+    
+    final minus = 1010000 - achievementInt;
+    final amount = minus / base;
+    
+    final greats = (amount / 2).floor();
+    final goods = (amount / 5).floor();
+    final misses = (amount / 10).floor();
+    
+    final damages = <int>[];
+    if (rankData.greatDamage != 0) {
+      damages.add(rankData.greatDamage * greats);
+    }
+    if (rankData.goodDamage != 0) {
+      damages.add(rankData.goodDamage * goods);
+    }
+    if (rankData.missDamage != 0) {
+      damages.add(rankData.missDamage * misses);
+    }
+    
+    if (damages.isEmpty) return 0;
+    damages.sort();
+    return damages.first;
+  }
+
+  // 计算剩余血量和总达成率
+  Map<String, dynamic> _calcResult(RankData rankData) {
+    double totalAchievement = 0;
+    int remainingHp = rankData.initialHp;
+    bool isDead = false;
+    
+    for (int i = 0; i < 4; i++) {
+      final songId = rankData.songIds[i];
+      final levelIndex = rankData.levelIndexes[i];
+      final achievement = _getAchievement(songId, levelIndex);
+      final achievementValue = double.tryParse(achievement) ?? 0.0;
+      totalAchievement += achievementValue;
+      
+      if (!isDead && achievement.isNotEmpty) {
+        final song = _getSongById(songId);
+        if (song != null) {
+          final damage = _calcMinDamage(song, levelIndex, achievement, rankData);
+          remainingHp -= damage;
+          if (remainingHp <= 0) {
+            remainingHp = 0;
+            isDead = true;
+          } else if (i < 3) {
+            // 前3首通关后回复（不超过初始血量上限）
+            remainingHp = (remainingHp + rankData.healAmount).clamp(0, rankData.initialHp);
+          }
+          // 最后一首（i==3）不回复，直接以扣血后的血量作为最终结果
+        }
+      }
+    }
+    
+    return {
+      'totalAchievement': totalAchievement,
+      'remainingHp': remainingHp,
+      'isDead': isDead,
+    };
+  }
+
   Song? _getSongById(String songId) {
     if (_songs == null) return null;
     try {
@@ -304,7 +393,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
                               ),
                               SizedBox(width: _paddingS),
                               Text(
-                                hasAchievement ? '达成率: ${achievement}%' : '未游玩',
+                                hasAchievement ? '达成率: ${achievementValue.toStringAsFixed(4)}%' : '未游玩',
                                 style: TextStyle(
                                   fontSize: _textSizeS,
                                   color: hasAchievement && achievementValue >= 100 ? Colors.green : Colors.grey[600]!,
@@ -313,6 +402,22 @@ class _RankDetailPageState extends State<RankDetailPage> {
                               ),
                             ],
                           ),
+                          if (hasAchievement && song != null) ...[
+                            SizedBox(height: 2),
+                            Builder(
+                              builder: (context) {
+                                final minDamage = _calcMinDamage(song, levelIndex, achievement, rankData);
+                                return Text(
+                                  '预计最低扣血: $minDamage',
+                                  style: TextStyle(
+                                    fontSize: _textSizeS,
+                                    color: minDamage > 0 ? Colors.red : Colors.grey[500]!,
+                                    fontWeight: minDamage > 0 ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -322,6 +427,99 @@ class _RankDetailPageState extends State<RankDetailPage> {
             );
           }).toList(),
         ),
+        
+        // 计算预计结果
+        () {
+          final result = _calcResult(rankData);
+          final totalAchievement = result['totalAchievement'] as double;
+          final remainingHp = result['remainingHp'] as int;
+          final isDead = result['isDead'] as bool;
+          
+          // 检查四首是否都有成绩
+          bool allHaveAchievement = true;
+          for (int i = 0; i < 4; i++) {
+            final a = _getAchievement(rankData.songIds[i], rankData.levelIndexes[i]);
+            if (a.isEmpty) {
+              allHaveAchievement = false;
+              break;
+            }
+          }
+          
+          if (!allHaveAchievement) return SizedBox.shrink();
+          
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(height: _paddingM),
+              Text(
+                '预计结果',
+                style: TextStyle(
+                  fontSize: _textSizeM,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[700]!,
+                ),
+              ),
+              SizedBox(height: _paddingXS),
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.black, width: 1.0),
+                  borderRadius: BorderRadius.circular(_borderRadiusSmall),
+                ),
+                padding: EdgeInsets.all(_paddingM),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        _buildStatCell('总达成率'),
+                        _buildStatCell('剩余血量'),
+                        _buildStatCell('结果'),
+                      ],
+                    ),
+                    SizedBox(height: _paddingXS),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${totalAchievement.toStringAsFixed(4)}%',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: _textSizeL,
+                              fontWeight: FontWeight.bold,
+                              color: totalAchievement >= 400 ? Colors.green : Colors.red,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            remainingHp.toString(),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: _textSizeL,
+                              fontWeight: FontWeight.bold,
+                              color: remainingHp > 0 ? Colors.green : Colors.red,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            isDead ? '不合格' : '合格',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: _textSizeL,
+                              fontWeight: FontWeight.bold,
+                              color: isDead ? Colors.red : Colors.green,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        }(),
         
         SizedBox(height: _paddingM),
         
@@ -438,7 +636,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
         tagColor = Colors.orange;
       } else if (type.toLowerCase() == 'sd') {
         tagText = 'ST';
-        tagColor = Colors.blue.shade300;
+        tagColor = Colors.blue;
       }
     }
     

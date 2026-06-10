@@ -33,6 +33,9 @@ class StringUtil {
     if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM') {
       return 'DX 2025';
     }
+    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM PLUS') {
+      return 'DX 2026';
+    }
     if (version.contains(' PLUS')) {
       version = version.replaceFirst(' PLUS', '+');
     }

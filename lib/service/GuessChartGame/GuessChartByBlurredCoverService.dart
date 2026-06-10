@@ -7,6 +7,7 @@ import 'package:my_first_flutter_app/entity/DXRating/MaiTagsEntity.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
 
 class GuessChartByBlurredCoverService {
   // 单例模式
@@ -15,27 +16,7 @@ class GuessChartByBlurredCoverService {
   GuessChartByBlurredCoverService._internal();
 
   // 版本列表
-  static List<String> _versionList = [
-    'maimai',
-    'maimai PLUS',
-    'maimai GreeN',
-    'maimai GreeN PLUS',
-    'maimai ORANGE',
-    'maimai ORANGE PLUS',
-    'maimai PiNK',
-    'maimai PiNK PLUS',
-    'maimai MURASAKi',
-    'maimai MURASAKi PLUS',
-    'maimai MiLK',
-    'maimai MiLK PLUS',
-    'maimai FiNALE',
-    'maimai \u3067\u3089\u3063\u304f\u3059',
-    'maimai \u3067\u3089\u3063\u304f\u3059 Splash',
-    'maimai \u3067\u3089\u3063\u304f\u3059 UNiVERSE',
-    'maimai \u3067\u3089\u3063\u304f\u3059 FESTiVAL',
-    'maimai \u3067\u3089\u3063\u304f\u3059 BUDDiES',
-    'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM'
-  ];
+  static List<String> _versionList = VersionListConstant.versionOrderList;
 
   // 处理版本字符串，使其在前端简化展示
   // 使用StringUtil.formatVersion方法

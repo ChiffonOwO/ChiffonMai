@@ -261,7 +261,7 @@ class _VersionViewState extends State<VersionView> {
     VersionData(name: "maimai MURASAKi", imagePath: "assets/version/maimai_MURASAKi.webp", code: "紫"),
     VersionData(name: "maimai MURASAKi PLUS", imagePath: "assets/version/maimai_MURASAKi_PLUS.webp", code: "堇"),
     VersionData(name: "maimai MiLK", imagePath: "assets/version/maimai_MiLK.webp", code: "白"),
-    VersionData(name: "maimai MiLK PLUS", imagePath: "assets/version/maimai_MiLK_PLUS.webp", code: "雪"),
+    VersionData(name: "MiLK PLUS", imagePath: "assets/version/maimai_MiLK_PLUS.webp", code: "雪"),
     VersionData(name: "maimai FiNALE", imagePath: "assets/version/maimai_FiNALE.webp", code: "辉"),
     VersionData(name: "maimai でらっくす", imagePath: "assets/version/maimai_2020.webp", code: "熊/華"),
     VersionData(name: "maimai でらっくす Splash", imagePath: "assets/version/maimai_2021.webp", code: "爽/煌"),

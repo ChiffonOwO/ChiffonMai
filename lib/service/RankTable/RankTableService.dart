@@ -52,7 +52,7 @@ class RankListService {
     final rankDataMap = {
       '初段': RankData(
         name: '初段',
-        songIds: ['11558', '11086', '404', '628'],
+        songIds: ['10256', '11052', '10319', '617'],
         levelIndexes: [0, 0, 0, 0],
         initialHp: 350,
         greatDamage: 0,
@@ -62,7 +62,7 @@ class RankListService {
       ),
       '二段': RankData(
         name: '二段',
-        songIds: ['11115', '11437', '11447', '11185'],
+        songIds: ['11764', '11136', '11265', '11697'],
         levelIndexes: [1, 1, 1, 1],
         initialHp: 350,
         greatDamage: 0,
@@ -72,7 +72,7 @@ class RankListService {
       ),
       '三段': RankData(
         name: '三段',
-        songIds: ['11325', '647', '11578', '11472'],
+        songIds: ['11701', '11411', '11491', '11638'],
         levelIndexes: [1, 1, 1, 1],
         initialHp: 600,
         greatDamage: 1,
@@ -82,7 +82,7 @@ class RankListService {
       ),
       '四段': RankData(
         name: '四段',
-        songIds: ['11188', '11158', '11137', '11488'],
+        songIds: ['11698', '11276', '10535', '417'],
         levelIndexes: [2, 2, 2, 2],
         initialHp: 700,
         greatDamage: 2,
@@ -92,7 +92,7 @@ class RankListService {
       ),
       '五段': RankData(
         name: '五段',
-        songIds: ['418', '11608', '11333', '548'],
+        songIds: ['579', '11003', '11333', '11770'],
         levelIndexes: [2, 2, 2, 2],
         initialHp: 700,
         greatDamage: 2,
@@ -102,7 +102,7 @@ class RankListService {
       ),
       '六段': RankData(
         name: '六段',
-        songIds: ['11591', '681', '11596', '11272'],
+        songIds: ['439', '11405', '432', '11272'],
         levelIndexes: [2, 2, 2, 3],
         initialHp: 700,
         greatDamage: 2,
@@ -112,7 +112,7 @@ class RankListService {
       ),
       '七段': RankData(
         name: '七段',
-        songIds: ['11271', '11009', '782', '11609'],
+        songIds: ['11271', '634', '11580', '11767'],
         levelIndexes: [3, 3, 3, 3],
         initialHp: 700,
         greatDamage: 2,
@@ -122,7 +122,7 @@ class RankListService {
       ),
       '八段': RankData(
         name: '八段',
-        songIds: ['11161', '11499', '11465', '11447'],
+        songIds: ['11017', '11048', '11615', '11512'],
         levelIndexes: [3, 3, 3, 3],
         initialHp: 700,
         greatDamage: 2,
@@ -132,7 +132,7 @@ class RankListService {
       ),
       '九段': RankData(
         name: '九段',
-        songIds: ['11383', '464', '11514', '11455'],
+        songIds: ['11699', '11141', '798', '11496'],
         levelIndexes: [3, 3, 3, 3],
         initialHp: 800,
         greatDamage: 2,
@@ -142,7 +142,7 @@ class RankListService {
       ),
       '十段': RankData(
         name: '十段',
-        songIds: ['840', '11541', '11575', '379'],
+        songIds: ['840', '11207', '11412', '227'],
         levelIndexes: [3, 3, 3, 3],
         initialHp: 900,
         greatDamage: 2,
@@ -152,7 +152,7 @@ class RankListService {
       ),
       '真初段': RankData(
         name: '真初段',
-        songIds: ['11010', '11008', '586', '136'],
+        songIds: ['11010', '11133', '759', '136'],
         levelIndexes: [3, 3, 3, 2],
         initialHp: 50,
         greatDamage: 2,
@@ -162,7 +162,7 @@ class RankListService {
       ),
       '真二段': RankData(
         name: '真二段',
-        songIds: ['791', '11572', '11472', '832'],
+        songIds: ['791', '11350', '191', '11532'],
         levelIndexes: [3, 3, 2, 3],
         initialHp: 50,
         greatDamage: 2,
@@ -172,7 +172,7 @@ class RankListService {
       ),
       '真三段': RankData(
         name: '真三段',
-        songIds: ['11500', '11226', '239', '11608'],
+        songIds: ['11599', '794', '239', '709'],
         levelIndexes: [3, 3, 2, 3],
         initialHp: 50,
         greatDamage: 2,
@@ -182,7 +182,7 @@ class RankListService {
       ),
       '真四段': RankData(
         name: '真四段',
-        songIds: ['11435', '581', '11555', '453'],
+        songIds: ['11715', '581', '204', '453'],
         levelIndexes: [3, 2, 3, 3],
         initialHp: 50,
         greatDamage: 2,
@@ -192,7 +192,7 @@ class RankListService {
       ),
       '真五段': RankData(
         name: '真五段',
-        songIds: ['11427', '218', '11214', '299'],
+        songIds: ['11583', '11653', '448', '673'],
         levelIndexes: [3, 3, 3, 3],
         initialHp: 50,
         greatDamage: 2,
@@ -202,7 +202,7 @@ class RankListService {
       ),
       '真六段': RankData(
         name: '真六段',
-        songIds: ['800', '11616', '11204', '11296'],
+        songIds: ['11316', '11710', '11177', '700'],
         levelIndexes: [3, 3, 3, 3],
         initialHp: 50,
         greatDamage: 2,
@@ -212,7 +212,7 @@ class RankListService {
       ),
       '真七段': RankData(
         name: '真七段',
-        songIds: ['11211', '701', '11140', '740'],
+        songIds: ['11460', '11208', '451', '11413'],
         levelIndexes: [3, 3, 3, 3],
         initialHp: 50,
         greatDamage: 2,
@@ -222,8 +222,8 @@ class RankListService {
       ),
       '真八段': RankData(
         name: '真八段',
-        songIds: ['24', '11509', '446', '803'],
-        levelIndexes: [4, 3, 3, 3],
+        songIds: ['766', '11213', '24', '556'],
+        levelIndexes: [3, 3, 4, 3],
         initialHp: 50,
         greatDamage: 2,
         goodDamage: 3,
@@ -232,8 +232,8 @@ class RankListService {
       ),
       '真九段': RankData(
         name: '真九段',
-        songIds: ['301', '11386', '11300', '11378'],
-        levelIndexes: [4, 3, 3, 3],
+        songIds: ['11675', '11618', '589', '11687'],
+        levelIndexes: [3, 3, 3, 3],
         initialHp: 50,
         greatDamage: 2,
         goodDamage: 3,
@@ -242,7 +242,7 @@ class RankListService {
       ),
       '真十段': RankData(
         name: '真十段',
-        songIds: ['365', '11307', '11374', '643'],
+        songIds: ['11295', '11026', '11470', '11619'],
         levelIndexes: [3, 3, 3, 3],
         initialHp: 50,
         greatDamage: 2,
@@ -252,7 +252,7 @@ class RankListService {
       ),
       '真皆传': RankData(
         name: '真皆传',
-        songIds: ['11165', '11537', '11394', '11379'],
+        songIds: ['11223', '11745', '11311', '11753'],
         levelIndexes: [3, 3, 3, 3],
         initialHp: 50,
         greatDamage: 2,

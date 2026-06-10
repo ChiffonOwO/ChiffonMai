@@ -239,35 +239,18 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
   void _scrollToInote(String inoteNum) {
     setState(() {
       _selectedInote = inoteNum;
-      // 切换显示单个难度或全部
-      if (_displayedInote == inoteNum) {
-        _displayedInote = null; // 显示全部
-      } else {
-        _displayedInote = inoteNum; // 只显示该难度
-      }
+      // ALL选项显示全部内容，其他选项显示对应难度
+      _displayedInote = inoteNum == 'ALL' ? null : inoteNum;
     });
 
-    if (_displayedInote == null) {
-      // 显示全部时滚动到该难度位置
-      Future.delayed(const Duration(milliseconds: 100), () {
-        String targetText = '&inote_$inoteNum';
-        int targetIndex = _maidataContent.indexOf(targetText);
-
-        if (targetIndex != -1) {
-          double lineHeight = 18.0;
-          int linesBefore = _maidataContent.substring(0, targetIndex).split('\n').length;
-          double targetPosition = linesBefore * lineHeight;
-          double offsetPosition = targetPosition - (lineHeight * 6);
-          offsetPosition = offsetPosition < 0 ? 0 : offsetPosition;
-
-          _scrollController.animateTo(
-            offsetPosition,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          );
-        }
-      });
-    }
+    // 切换难度时自动滚动到最顶端
+    Future.delayed(const Duration(milliseconds: 100), () {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    });
   }
   
   // 提取单个难度的maidata内容
@@ -337,7 +320,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
         style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: Colors.blue.shade300,
+          color: Colors.blue,
         ),
       );
     }
@@ -532,18 +515,17 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                             child: SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               child: Row(
-                                children: _inoteList.map((inote) {
-                                  String difficultyName = _getInoteDifficulty(inote);
-                                  Color inoteColor = _getInoteColor(inote);
-                                  return Padding(
+                                children: [
+                                  // ALL选项
+                                  Padding(
                                     padding: const EdgeInsets.symmetric(horizontal: 4),
                                     child: ElevatedButton(
-                                      onPressed: () => _scrollToInote(inote),
+                                      onPressed: () => _scrollToInote('ALL'),
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: _selectedInote == inote
-                                            ? inoteColor
+                                        backgroundColor: _selectedInote == 'ALL'
+                                            ? Colors.black
                                             : Colors.grey[200],
-                                        foregroundColor: _selectedInote == inote
+                                        foregroundColor: _selectedInote == 'ALL'
                                             ? Colors.white
                                             : Colors.black,
                                         padding: const EdgeInsets.symmetric(
@@ -555,10 +537,38 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                                           borderRadius: BorderRadius.circular(8),
                                         ),
                                       ),
-                                      child: Text(difficultyName),
+                                      child: const Text('ALL'),
                                     ),
-                                  );
-                                }).toList(),
+                                  ),
+                                  // 其他难度选项
+                                  ..._inoteList.map((inote) {
+                                    String difficultyName = _getInoteDifficulty(inote);
+                                    Color inoteColor = _getInoteColor(inote);
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                                      child: ElevatedButton(
+                                        onPressed: () => _scrollToInote(inote),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: _selectedInote == inote
+                                              ? inoteColor
+                                              : Colors.grey[200],
+                                          foregroundColor: _selectedInote == inote
+                                              ? Colors.white
+                                              : Colors.black,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 6,
+                                          ),
+                                          textStyle: const TextStyle(fontSize: 12),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                        child: Text(difficultyName),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ],
                               ),
                             ),
                           ),
@@ -645,13 +655,19 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                               : SingleChildScrollView(
                                   controller: _scrollController,
                                   padding: const EdgeInsets.all(16),
-                                  child: SelectableText(
-                                    _getFilteredMaidata(),
-                                    style: const TextStyle(
-                                      fontFamily: 'Courier New',
-                                      fontSize: 12,
-                                      color: Colors.black87,
-                                      height: 1.4,
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      minWidth: double.infinity,
+                                    ),
+                                    child: SelectableText(
+                                      _getFilteredMaidata(),
+                                      style: const TextStyle(
+                                        fontFamily: 'Courier New',
+                                        fontSize: 12,
+                                        color: Colors.black87,
+                                        height: 1.4,
+                                      ),
+                                      textAlign: TextAlign.left,
                                     ),
                                   ),
                                 ),

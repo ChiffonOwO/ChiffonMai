@@ -580,7 +580,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
           ),
           
           SizedBox(
-            width: 150,
+            width: 130,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -944,7 +944,29 @@ class _SongRankingPageState extends State<SongRankingPage> {
                       ? Center(child: CircularProgressIndicator())
                       : _errorMessage != null
                           ? Center(child: Text(_errorMessage!))
-                          : Column(
+                          : _rankingList.isEmpty
+                              ? Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.emoji_events_outlined,
+                                        size: 64,
+                                        color: Colors.grey[300],
+                                      ),
+                                      SizedBox(height: 16),
+                                      Text(
+                                        '榜上无人哦，快来抢沙发！',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          color: Colors.grey[500],
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : Column(
                               children: [
                                 Expanded(
                                   child: ListView.builder(

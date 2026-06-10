@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:marquee/marquee.dart';
 import 'package:path_provider/path_provider.dart';
@@ -91,6 +92,21 @@ class _SongInfoPageState extends State<SongInfoPage> {
   // 容错计算相关
   String _selectedNoteType = 'TAP'; // 当前选中的音符类型
   final List<String> _noteTypes = ['TAP', 'HOLD', 'SLIDE', 'TOUCH', 'BREAK']; // 五种音符类型
+  // 自定义BREAK输入（用于非BREAK音符的容错计算）
+  int _break50Count = 0; // 已打出的50落数量
+  int _break100Count = 0; // 已打出的100落数量
+  int _break80Count = 0; // 已打出的80%GREAT数量
+  int _break60Count = 0; // 已打出的60%GREAT数量
+  int _break50gCount = 0; // 已打出的50%GREAT数量
+  int _breakGoodCount = 0; // 已打出的GOOD数量
+  int _breakMissCount = 0; // 已打出的MISS数量
+  TextEditingController _break50Controller = TextEditingController();
+  TextEditingController _break100Controller = TextEditingController();
+  TextEditingController _break80Controller = TextEditingController();
+  TextEditingController _break60Controller = TextEditingController();
+  TextEditingController _break50gController = TextEditingController();
+  TextEditingController _breakGoodController = TextEditingController();
+  TextEditingController _breakMissController = TextEditingController();
   // 各音符权重（参考AchievementRateCalculatorPage）
   static const int _tapWeight = 1;
   static const int _holdWeight = 2;
@@ -109,6 +125,18 @@ class _SongInfoPageState extends State<SongInfoPage> {
     super.initState();
     _currentDiffIndex = widget.initialLevelIndex;
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _break50Controller.dispose();
+    _break100Controller.dispose();
+    _break80Controller.dispose();
+    _break60Controller.dispose();
+    _break50gController.dispose();
+    _breakGoodController.dispose();
+    _breakMissController.dispose();
+    super.dispose();
   }
 
   // 加载所有数据
@@ -2032,32 +2060,92 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                             runSpacing: 8,
                                             children: group.value
                                                 .map(
-                                                  (tag) => Container(
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                      horizontal: 12,
-                                                      vertical: 6,
-                                                    ),
-                                                    decoration: BoxDecoration(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              20),
-                                                      color:
-                                                          _getTagColor(group.key),
-                                                      border: Border.all(
-                                                        color: _getTagBorderColor(
-                                                            group.key),
-                                                        width: 1,
+                                                  (tag) => GestureDetector(
+                                                    onTap: () {
+                                                      final description = tag['description']?.toString();
+                                                      if (description != null && description.isNotEmpty) {
+                                                        showDialog(
+                                                          context: context,
+                                                          builder: (ctx) => AlertDialog(
+                                                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                            content: Column(
+                                                              mainAxisSize: MainAxisSize.min,
+                                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                                              children: [
+                                                                Text(
+                                                                  tag['name']?.toString() ?? '',
+                                                                  style: const TextStyle(
+                                                                    fontSize: 16,
+                                                                    fontWeight: FontWeight.bold,
+                                                                  ),
+                                                                ),
+                                                                const SizedBox(height: 8),
+                                                                Text(
+                                                                  description,
+                                                                  style: const TextStyle(
+                                                                    fontSize: 14,
+                                                                    color: Colors.black87,
+                                                                  ),
+                                                                ),
+                                                                const SizedBox(height: 12),
+                                                                RichText(
+                                                                    text: TextSpan(
+                                                                      style: const TextStyle(fontSize: 11),
+                                                                      children: [
+                                                                        TextSpan(
+                                                                          text: '标签数据来源自 ',
+                                                                          style: TextStyle(color: Colors.grey[500]),
+                                                                        ),
+                                                                        TextSpan(
+                                                                          text: 'https://dxrating.net/',
+                                                                          style: const TextStyle(
+                                                                            color: Colors.blue,
+                                                                            decoration: TextDecoration.underline,
+                                                                          ),
+                                                                          recognizer: TapGestureRecognizer()
+                                                                            ..onTap = () async {
+                                                                              final uri = Uri.parse('https://dxrating.net/');
+                                                                              if (await canLaunchUrl(uri)) {
+                                                                                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                                                              }
+                                                                            },
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                  ),
+                                                              ],
+                                                            ),
+                                                            actions: [
+                                                              TextButton(
+                                                                onPressed: () => Navigator.of(ctx).pop(),
+                                                                child: const Text('关闭'),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        );
+                                                      }
+                                                    },
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 6,
                                                       ),
-                                                    ),
-                                                    child: Text(
-                                                      tag['name']?.toString() ?? '未知标签',
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        fontWeight:
-                                                            FontWeight.w500,
-                                                        color: _getTagTextColor(
-                                                            group.key),
+                                                      decoration: BoxDecoration(
+                                                        borderRadius: BorderRadius.circular(20),
+                                                        color: _getTagColor(group.key),
+                                                        border: Border.all(
+                                                          color: _getTagBorderColor(group.key),
+                                                          width: 1,
+                                                        ),
+                                                      ),
+                                                      child: Text(
+                                                        tag['name']?.toString() ?? '未知标签',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight: FontWeight.w500,
+                                                          color: _getTagTextColor(group.key),
+                                                        ),
                                                       ),
                                                     ),
                                                   ),
@@ -2176,11 +2264,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
     double breakGoLoss = totalWeight > 0 ? (0.60 * 100.00 * noteWeight / totalWeight) : 0; // 40% -> 损失60%
     
     // 计算容错数量
-    int tolerance05Great = greatLoss > 0 ? (0.5 / greatLoss).floor() : 0;
-    int tolerance05Good = goodLoss > 0 ? (0.5 / goodLoss).floor() : 0;
     int tolerance05Miss = missLoss > 0 ? (0.5 / missLoss).floor() : 0;
-    int tolerance10Great = greatLoss > 0 ? (1.0 / greatLoss).floor() : 0;
-    int tolerance10Good = goodLoss > 0 ? (1.0 / goodLoss).floor() : 0;
     int tolerance10Miss = missLoss > 0 ? (1.0 / missLoss).floor() : 0;
     
     // BREAK音符容错数量
@@ -2192,6 +2276,51 @@ class _SongInfoPageState extends State<SongInfoPage> {
     int tolerance10Break60 = break60Loss > 0 ? (1.0 / break60Loss).floor() : 0;
     int tolerance10Break50g = break50gLoss > 0 ? (1.0 / break50gLoss).floor() : 0;
     int tolerance10BreakGo = breakGoLoss > 0 ? (1.0 / breakGoLoss).floor() : 0;
+    
+    // 自定义BREAK输入相关的调整计算（用于非BREAK音符）
+    // 计算已输入的BREAK判定的总损失（占整体的百分比），与BREAK选项卡保持一致
+    // 注意：BREAK判定损失必须使用BREAK权重（_breakWeight=5），而非当前选中音符的权重
+    double breakInputLoss = 0;
+    if (totalBreak > 0) {
+      breakInputLoss = (_break50Count * 0.25 + _break100Count * 0.50) / totalBreak;
+    }
+    if (totalWeight > 0) {
+      breakInputLoss += _break80Count * (0.20 * 100.00 * _breakWeight / totalWeight) +
+          _break60Count * (0.40 * 100.00 * _breakWeight / totalWeight) +
+          _break50gCount * (0.50 * 100.00 * _breakWeight / totalWeight) +
+          _breakGoodCount * (0.60 * 100.00 * _breakWeight / totalWeight) +
+          _breakMissCount * (1.00 * 100.00 * _breakWeight / totalWeight);
+    }
+    
+    // 调整后的容错数量（扣除自定义BREAK损失后）
+    double remainingBudget05 = (0.5 - breakInputLoss).clamp(0, 0.5);
+    double remainingBudget10 = (1.0 - breakInputLoss).clamp(0, 1.0);
+    double remainingBudget15 = (1.5 - breakInputLoss).clamp(0, 1.5);
+    double remainingBudget20 = (2.0 - breakInputLoss).clamp(0, 2.0);
+    
+    int adjustedTolerance05Great = (greatLoss > 0 && remainingBudget05 > 0) ? (remainingBudget05 / greatLoss).floor() : 0;
+    int adjustedTolerance05Good = (goodLoss > 0 && remainingBudget05 > 0) ? (remainingBudget05 / goodLoss).floor() : 0;
+    int adjustedTolerance05Miss = (missLoss > 0 && remainingBudget05 > 0) ? (remainingBudget05 / missLoss).floor() : 0;
+    int adjustedTolerance10Great = (greatLoss > 0 && remainingBudget10 > 0) ? (remainingBudget10 / greatLoss).floor() : 0;
+    int adjustedTolerance10Good = (goodLoss > 0 && remainingBudget10 > 0) ? (remainingBudget10 / goodLoss).floor() : 0;
+    int adjustedTolerance10Miss = (missLoss > 0 && remainingBudget10 > 0) ? (remainingBudget10 / missLoss).floor() : 0;
+    int adjustedTolerance15Great = (greatLoss > 0 && remainingBudget15 > 0) ? (remainingBudget15 / greatLoss).floor() : 0;
+    int adjustedTolerance15Good = (goodLoss > 0 && remainingBudget15 > 0) ? (remainingBudget15 / goodLoss).floor() : 0;
+    int adjustedTolerance15Miss = (missLoss > 0 && remainingBudget15 > 0) ? (remainingBudget15 / missLoss).floor() : 0;
+    int adjustedTolerance20Great = (greatLoss > 0 && remainingBudget20 > 0) ? (remainingBudget20 / greatLoss).floor() : 0;
+    int adjustedTolerance20Good = (goodLoss > 0 && remainingBudget20 > 0) ? (remainingBudget20 / goodLoss).floor() : 0;
+    int adjustedTolerance20Miss = (missLoss > 0 && remainingBudget20 > 0) ? (remainingBudget20 / missLoss).floor() : 0;
+    
+    // 校验输入提示
+    String? breakInputError;
+    final int totalInputCount = _break50Count + _break100Count + _break80Count + _break60Count + _break50gCount + _breakGoodCount + _breakMissCount;
+    if (_break50Count < 0 || _break100Count < 0 || _break80Count < 0 || _break60Count < 0 || _break50gCount < 0 || _breakGoodCount < 0 || _breakMissCount < 0) {
+      breakInputError = '数量不能为负数';
+    } else if (totalInputCount > totalBreak) {
+      breakInputError = '已打出总数（$totalInputCount）不能超过BREAK总数（$totalBreak）';
+    } else if (breakInputLoss >= 2.0) {
+      breakInputError = 'BREAK损失已达${breakInputLoss.toStringAsFixed(2)}%，超过SS(-2%)上限，无法继续容错';
+    }
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2278,216 +2407,466 @@ class _SongInfoPageState extends State<SongInfoPage> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                // 仅当选中非BREAK音符时显示常规判定损失
+                // 仅当选中非BREAK音符时显示常规判定损失和自定义BREAK输入
                 if (_selectedNoteType != 'BREAK') ...[
+                  // 自定义BREAK损失输入区域
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.orange[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange[200]!),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('已打出的BREAK损失', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.orange[800])),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _break50Controller,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: '50落数量',
+                                  hintText: '0',
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  border: OutlineInputBorder(),
+                                  errorText: _break50Count < 0 || totalInputCount > totalBreak ? '无效' : null,
+                                ),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _break50Count = int.tryParse(value) ?? 0;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextField(
+                                controller: _break100Controller,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: '100落数量',
+                                  hintText: '0',
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  border: OutlineInputBorder(),
+                                  errorText: _break100Count < 0 || totalInputCount > totalBreak ? '无效' : null,
+                                ),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _break100Count = int.tryParse(value) ?? 0;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _break80Controller,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: '80%GREAT数量',
+                                  hintText: '0',
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  border: OutlineInputBorder(),
+                                  errorText: _break80Count < 0 || totalInputCount > totalBreak ? '无效' : null,
+                                ),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _break80Count = int.tryParse(value) ?? 0;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextField(
+                                controller: _break60Controller,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: '60%GREAT数量',
+                                  hintText: '0',
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  border: OutlineInputBorder(),
+                                  errorText: _break60Count < 0 || totalInputCount > totalBreak ? '无效' : null,
+                                ),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _break60Count = int.tryParse(value) ?? 0;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextField(
+                                controller: _break50gController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: '50%GREAT数量',
+                                  hintText: '0',
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  border: OutlineInputBorder(),
+                                  errorText: _break50gCount < 0 || totalInputCount > totalBreak ? '无效' : null,
+                                ),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _break50gCount = int.tryParse(value) ?? 0;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _breakGoodController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: 'GOOD数量',
+                                  hintText: '0',
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  border: OutlineInputBorder(),
+                                  errorText: _breakGoodCount < 0 || totalInputCount > totalBreak ? '无效' : null,
+                                ),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _breakGoodCount = int.tryParse(value) ?? 0;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextField(
+                                controller: _breakMissController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: 'MISS数量',
+                                  hintText: '0',
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                  border: OutlineInputBorder(),
+                                  errorText: _breakMissCount < 0 || totalInputCount > totalBreak ? '无效' : null,
+                                ),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _breakMissCount = int.tryParse(value) ?? 0;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        // 校验错误提示
+                        if (breakInputError != null) ...[
+                          const SizedBox(height: 4),
+                          Text(breakInputError, style: TextStyle(color: Colors.red, fontSize: 12)),
+                        ],
+                        // BREAK损失摘要
+                        if (_break50Count > 0 || _break100Count > 0 || _break80Count > 0 || _break60Count > 0 || _break50gCount > 0 || _breakGoodCount > 0 || _breakMissCount > 0) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Text('BREAK总损失: ', style: TextStyle(color: Colors.grey[700], fontSize: 12)),
+                              Text('${breakInputLoss.toStringAsFixed(4)}%', 
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, 
+                                  color: breakInputLoss >= 2.0 ? Colors.red : Colors.orange[800])),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              Text('剩余预算(SSS+): ', style: TextStyle(color: Colors.grey[700], fontSize: 12)),
+                              Text('${remainingBudget05.toStringAsFixed(4)}%', 
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: remainingBudget05 <= 0 ? Colors.red : Colors.green)),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              Text('剩余预算(SSS): ', style: TextStyle(color: Colors.grey[700], fontSize: 12)),
+                              Text('${remainingBudget10.toStringAsFixed(4)}%', 
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: remainingBudget10 <= 0 ? Colors.red : Colors.green)),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              Text('剩余预算(SS+): ', style: TextStyle(color: Colors.grey[700], fontSize: 12)),
+                              Text('${remainingBudget15.toStringAsFixed(4)}%', 
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: remainingBudget15 <= 0 ? Colors.red : Colors.green)),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              Text('剩余预算(SS): ', style: TextStyle(color: Colors.grey[700], fontSize: 12)),
+                              Text('${remainingBudget20.toStringAsFixed(4)}%', 
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: remainingBudget20 <= 0 ? Colors.red : Colors.green)),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  
+                  // 损失部分：三列两行布局
+                  // 第一行：标题
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('GREAT损失:', style: TextStyle(color: Colors.grey)),
-                      Text('${greatLoss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('GREAT损失', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('GOOD损失', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('MISS损失', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // 第二行：值
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('GOOD损失:', style: TextStyle(color: Colors.grey)),
-                      Text('${goodLoss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('MISS损失:', style: TextStyle(color: Colors.grey)),
-                      Text('${missLoss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('${greatLoss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${goodLoss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${missLoss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
                     ],
                   ),
                   const SizedBox(height: 12),
+                  // 容错部分 SSS+：三列两行布局
+                  // 第一行：标题
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('-0.5% 容错 (GREAT):', style: TextStyle(color: Colors.grey)),
-                      Text('${tolerance05Great}个', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('SSS+容错(GREAT)', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('SSS+容错(GOOD)', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('SSS+容错(MISS)', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // 第二行：值
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('-0.5% 容错 (GOOD):', style: TextStyle(color: Colors.grey)),
-                      Text('${tolerance05Good}个', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('${adjustedTolerance05Great}个', style: TextStyle(fontWeight: FontWeight.bold, color: (_break50Count > 0 || _break100Count > 0) && adjustedTolerance05Great == 0 ? Colors.red : null), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${adjustedTolerance05Good}个', style: TextStyle(fontWeight: FontWeight.bold, color: (_break50Count > 0 || _break100Count > 0) && adjustedTolerance05Good == 0 ? Colors.red : null), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${adjustedTolerance05Miss}个', style: TextStyle(fontWeight: FontWeight.bold, color: (_break50Count > 0 || _break100Count > 0) && adjustedTolerance05Miss == 0 ? Colors.red : null), textAlign: TextAlign.center)),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
+                  // 容错部分 SSS：三列两行布局
+                  // 第一行：标题
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('-0.5% 容错 (MISS):', style: TextStyle(color: Colors.grey)),
-                      Text('${tolerance05Miss}个', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('SSS容错(GREAT)', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('SSS容错(GOOD)', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('SSS容错(MISS)', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // 第二行：值
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('-1% 容错 (GREAT):', style: TextStyle(color: Colors.grey)),
-                      Text('${tolerance10Great}个', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('${adjustedTolerance10Great}个', style: TextStyle(fontWeight: FontWeight.bold, color: (_break50Count > 0 || _break100Count > 0) && adjustedTolerance10Great == 0 ? Colors.red : null), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${adjustedTolerance10Good}个', style: TextStyle(fontWeight: FontWeight.bold, color: (_break50Count > 0 || _break100Count > 0) && adjustedTolerance10Good == 0 ? Colors.red : null), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${adjustedTolerance10Miss}个', style: TextStyle(fontWeight: FontWeight.bold, color: (_break50Count > 0 || _break100Count > 0) && adjustedTolerance10Miss == 0 ? Colors.red : null), textAlign: TextAlign.center)),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
+                  // 容错部分 SS+：三列两行布局
+                  // 第一行：标题
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('-1% 容错 (GOOD):', style: TextStyle(color: Colors.grey)),
-                      Text('${tolerance10Good}个', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('SS+容错(GREAT)', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('SS+容错(GOOD)', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('SS+容错(MISS)', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // 第二行：值
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('-1% 容错 (MISS):', style: TextStyle(color: Colors.grey)),
-                      Text('${tolerance10Miss}个', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('${adjustedTolerance15Great}个', style: TextStyle(fontWeight: FontWeight.bold, color: (_break50Count > 0 || _break100Count > 0) && adjustedTolerance15Great == 0 ? Colors.red : null), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${adjustedTolerance15Good}个', style: TextStyle(fontWeight: FontWeight.bold, color: (_break50Count > 0 || _break100Count > 0) && adjustedTolerance15Good == 0 ? Colors.red : null), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${adjustedTolerance15Miss}个', style: TextStyle(fontWeight: FontWeight.bold, color: (_break50Count > 0 || _break100Count > 0) && adjustedTolerance15Miss == 0 ? Colors.red : null), textAlign: TextAlign.center)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // 容错部分 SS：三列两行布局
+                  // 第一行：标题
+                  Row(
+                    children: [
+                      Expanded(child: Text('SS容错(GREAT)', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('SS容错(GOOD)', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('SS容错(MISS)', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  // 第二行：值
+                  Row(
+                    children: [
+                      Expanded(child: Text('${adjustedTolerance20Great}个', style: TextStyle(fontWeight: FontWeight.bold, color: (_break50Count > 0 || _break100Count > 0) && adjustedTolerance20Great == 0 ? Colors.red : null), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${adjustedTolerance20Good}个', style: TextStyle(fontWeight: FontWeight.bold, color: (_break50Count > 0 || _break100Count > 0) && adjustedTolerance20Good == 0 ? Colors.red : null), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${adjustedTolerance20Miss}个', style: TextStyle(fontWeight: FontWeight.bold, color: (_break50Count > 0 || _break100Count > 0) && adjustedTolerance20Miss == 0 ? Colors.red : null), textAlign: TextAlign.center)),
                     ],
                   ),
                 ],
                 
-                // BREAK音符特殊判定损失（仅当选中BREAK时显示）
+       // BREAK音符特殊判定损失（仅当选中BREAK时显示）
                 if (_selectedNoteType == 'BREAK') ...[
+                  // 损失部分
+                  // 第一行：50落、100落
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('50落损失:', style: TextStyle(color: Colors.grey)),
-                      Text('${break50Loss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('50落损失', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('100落损失', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // 第二行：值
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('100落损失:', style: TextStyle(color: Colors.grey)),
-                      Text('${break100Loss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('${break50Loss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${break100Loss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // 第三行：三种GREAT
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('80% GREAT损失:', style: TextStyle(color: Colors.grey)),
-                      Text('${break80Loss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('80%GREAT损失', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('60%GREAT损失', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('50%GREAT损失', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // 第四行：值
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('60% GREAT损失:', style: TextStyle(color: Colors.grey)),
-                      Text('${break60Loss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('${break80Loss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${break60Loss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${break50gLoss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // 第五行：GOOD、MISS
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('50% GREAT损失:', style: TextStyle(color: Colors.grey)),
-                      Text('${break50gLoss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('GOOD损失', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('MISS损失', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // 第六行：值
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('GOOD 损失:', style: TextStyle(color: Colors.grey)),
-                      Text('${breakGoLoss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('MISS损失:', style: TextStyle(color: Colors.grey)),
-                      Text('${missLoss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('${breakGoLoss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${missLoss.toStringAsFixed(4)}%', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
                     ],
                   ),
                   const SizedBox(height: 12),
+                  // 容错部分 -0.5%：三列两行布局（5项分2组）
+                  // 第一行：标题
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('-0.5% 容错 (80% GREAT):', style: TextStyle(color: Colors.grey)),
-                      Text('${tolerance05Break80}个', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('-0.5%容错80%GREAT', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('-0.5%容错60%GREAT', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('-0.5%容错50%GREAT', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // 第二行：值
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('-0.5% 容错 (60% GREAT):', style: TextStyle(color: Colors.grey)),
-                      Text('${tolerance05Break60}个', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('${tolerance05Break80}个', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${tolerance05Break60}个', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${tolerance05Break50g}个', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // 第三行：标题
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('-0.5% 容错 (50% GREAT):', style: TextStyle(color: Colors.grey)),
-                      Text('${tolerance05Break50g}个', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Text('-0.5%容错', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center),
+                            Text('GOOD', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Text('-0.5%容错', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center),
+                            Text('MISS', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // 第四行：值
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('-0.5% 容错 (GOOD):', style: TextStyle(color: Colors.grey)),
-                      Text('${tolerance05BreakGo}个', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('${tolerance05BreakGo}个', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${tolerance05Miss}个', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
+                  // 容错部分 -1%：三列两行布局（5项分2组）
+                  // 第一行：标题
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('-0.5% 容错 (MISS):', style: TextStyle(color: Colors.grey)),
-                      Text('${tolerance05Miss}个', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('-1%容错80%GREAT', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('-1%容错60%GREAT', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
+                      Expanded(child: Text('-1%容错50%GREAT', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center)),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // 第二行：值
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('-1% 容错 (80% GREAT):', style: TextStyle(color: Colors.grey)),
-                      Text('${tolerance10Break80}个', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('${tolerance10Break80}个', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${tolerance10Break60}个', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${tolerance10Break50g}个', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // 第三行：标题
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('-1% 容错 (60% GREAT):', style: TextStyle(color: Colors.grey)),
-                      Text('${tolerance10Break60}个', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Text('-1%容错', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center),
+                            Text('GOOD', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Text('-1%容错', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center),
+                            Text('MISS', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  // 第四行：值
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('-1% 容错 (50% GREAT):', style: TextStyle(color: Colors.grey)),
-                      Text('${tolerance10Break50g}个', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('-1% 容错 (GOOD):', style: TextStyle(color: Colors.grey)),
-                      Text('${tolerance10BreakGo}个', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                   const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('-1% 容错 (MISS):', style: TextStyle(color: Colors.grey)),
-                      Text('${tolerance10Miss}个', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text('${tolerance10BreakGo}个', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                      Expanded(child: Text('${tolerance10Miss}个', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
                     ],
                   ),
                 ],

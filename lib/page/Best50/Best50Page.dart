@@ -12,6 +12,8 @@ import '../../service/Best50/Best50ConvertToImgService.dart';
 import '../../manager/DivingFish/UserBest50Manager.dart';
 import '../../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../../manager/DivingFish/UserPlayDataManager.dart';
+import '../../manager/MaiTagsManager.dart';
+import '../../entity/DXRating/MaiTagsEntity.dart';
 import '../SongInfoPage.dart';
 import '../../utils/CoverUtil.dart';
 import '../../utils/TextStyleUtil.dart';
@@ -38,6 +40,11 @@ class _B50PageState extends State<B50Page> {
   Map<String, dynamic>? _remainingDxSongsInfo;
   bool _isLoading = true;
   bool _isTheoreticalMode = false;
+  
+  // 标签统计相关
+  MaiTagsEntity? _tagsEntity;
+  Map<String, Map<String, int>> _tagStats = {}; // 标签分组 → (标签名 → 统计次数)
+  bool _isLoadingTags = false;
 
   @override
   void initState() {
@@ -239,6 +246,7 @@ class _B50PageState extends State<B50Page> {
       _isLoading = false;
     });
     _calculateTheoreticalBest50();
+    _loadTagDataAndCalculateStats();
   }
 
   // 计算理论Rating Best50
@@ -343,6 +351,116 @@ class _B50PageState extends State<B50Page> {
     setState(() {
       _isTheoreticalMode = !_isTheoreticalMode;
     });
+  }
+
+  // 加载标签数据并计算统计
+  Future<void> _loadTagDataAndCalculateStats() async {
+    setState(() {
+      _isLoadingTags = true;
+    });
+    
+    try {
+      final maiTagsManager = MaiTagsManager();
+      _tagsEntity = await maiTagsManager.getTags();
+      
+      if (_tagsEntity != null) {
+        await _calculateTagGroupStats();
+      }
+    } catch (e) {
+      debugPrint('Error loading tag data: $e');
+    } finally {
+      setState(() {
+        _isLoadingTags = false;
+      });
+    }
+  }
+
+  // 计算各标签统计
+  Future<void> _calculateTagGroupStats() async {
+    if (_tagsEntity == null || _maimaiMusicData == null) {
+      return;
+    }
+    
+    final maiTagsManager = MaiTagsManager();
+    final tagIdToNameMap = await maiTagsManager.getTagIdToNameMap();
+    final groupIdToNameMap = await maiTagsManager.getGroupIdToNameMap();
+    
+    // 构建标签ID → 分组名称 的映射
+    Map<int, String> tagIdToGroupName = {};
+    for (var tag in _tagsEntity!.tags) {
+      tagIdToGroupName[tag.id] = groupIdToNameMap[tag.groupId] ?? '未分类';
+    }
+    
+    // 获取所有歌曲标题到标签的映射
+    Map<String, Set<int>> songTitleToTagIds = {};
+    for (var tagSong in _tagsEntity!.tagSongs) {
+      String key = '${tagSong.songId}|${tagSong.sheetType}|${tagSong.sheetDifficulty}';
+      if (!songTitleToTagIds.containsKey(key)) {
+        songTitleToTagIds[key] = {};
+      }
+      songTitleToTagIds[key]!.add(tagSong.tagId);
+    }
+    
+    // 统计各标签的出现次数
+    Map<String, Map<String, int>> stats = {};
+    List<Map<String, dynamic>> allSongs = [
+      ...(_isTheoreticalMode ? _theoreticalSdSongs : _sdSongs),
+      ...(_isTheoreticalMode ? _theoreticalDxSongs : _dxSongs)
+    ];
+    
+    for (var song in allSongs) {
+      int songId = song['song_id'];
+      int levelIndex = song['level_index'];
+      
+      int index = _maimaiMusicData!.indexWhere((m) => int.parse(m['id']) == songId);
+      Map<String, dynamic> songData = index >= 0 ? _maimaiMusicData![index] : {};
+      
+      String songTitle = songData['basic_info']?['title'] ?? '';
+      String songType = songData['type'] ?? 'SD';
+      
+      String sheetType = songType == 'DX' ? 'dx' : 'std';
+      String difficulty = _getDifficultyByIndex(levelIndex);
+      
+      String key = '$songTitle|$sheetType|$difficulty';
+      Set<int>? tagIds = songTitleToTagIds[key];
+      
+      if (tagIds != null && tagIds.isNotEmpty) {
+        for (int tagId in tagIds) {
+          String tagName = tagIdToNameMap[tagId] ?? '未知标签';
+          String groupName = tagIdToGroupName[tagId] ?? '未分类';
+          
+          if (!stats.containsKey(groupName)) {
+            stats[groupName] = {};
+          }
+          if (!stats[groupName]!.containsKey(tagName)) {
+            stats[groupName]![tagName] = 0;
+          }
+          stats[groupName]![tagName] = stats[groupName]![tagName]! + 1;
+        }
+      }
+    }
+    
+    setState(() {
+      _tagStats = stats;
+    });
+  }
+
+  // 根据难度索引获取难度名称
+  String _getDifficultyByIndex(int index) {
+    switch (index) {
+      case 0:
+        return 'basic';
+      case 1:
+        return 'advanced';
+      case 2:
+        return 'expert';
+      case 3:
+        return 'master';
+      case 4:
+        return 'remaster';
+      default:
+        return 'unknown';
+    }
   }
 
   @override
@@ -530,6 +648,8 @@ class _B50PageState extends State<B50Page> {
                       children: [
                         _buildRatingSection(),
                         SizedBox(height: 12.0),
+                        if (!_isTheoreticalMode) _buildTagStatsSection(context),
+                        if (!_isTheoreticalMode) SizedBox(height: 12.0),
                         _buildActionButtons(),
                         SizedBox(height: 12.0),
                         _buildSectionTitle(_isTheoreticalMode ? '理论Best35 | 非当前版本最高定数' : 'Best35 | 非当前版本最好成绩', context),
@@ -891,6 +1011,164 @@ class _B50PageState extends State<B50Page> {
                 ),
               ],
             ),
+    );
+  }
+
+  // 构建标签统计区域
+  Widget _buildTagStatsSection(BuildContext context) {
+    if (_isLoadingTags) {
+      return Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.black, width: 2.0),
+          borderRadius: BorderRadius.circular(8.0),
+        ),
+        padding: EdgeInsets.all(16.0),
+        child: Center(
+          child: CircularProgressIndicator(
+            color: Color.fromARGB(255, 84, 97, 97),
+          ),
+        ),
+      );
+    }
+    
+    if (_tagStats.isEmpty) {
+      return Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.black, width: 2.0),
+          borderRadius: BorderRadius.circular(8.0),
+        ),
+        padding: EdgeInsets.all(16.0),
+        child: Center(
+          child: Text(
+            '暂无标签数据',
+            style: TextStyle(
+              fontSize: MediaQuery.of(context).size.width * 0.035,
+              color: Colors.grey,
+            ),
+          ),
+        ),
+      );
+    }
+    
+    // 分组颜色映射
+    Map<String, Color> groupColors = {
+      '配置': Colors.blue,
+      '评价': Colors.amber[700]!,
+      '难度': Colors.indigo,
+    };
+    
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black, width: 2.0),
+        borderRadius: BorderRadius.circular(8.0),
+      ),
+      padding: EdgeInsets.all(12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '标签统计',
+            style: TextStyle(
+              fontSize: MediaQuery.of(context).size.width * 0.04,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          SizedBox(height: 8.0),
+          ..._tagStats.entries.map((groupEntry) {
+            String groupName = groupEntry.key;
+            Map<String, int> tagCounts = groupEntry.value;
+            Color groupColor = groupColors[groupName] ?? Colors.grey;
+            
+            // 对组内标签按数量降序排序
+            List<MapEntry<String, int>> sortedTags = tagCounts.entries.toList()
+              ..sort((a, b) => b.value.compareTo(a.value));
+            
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 分组标题
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                  margin: EdgeInsets.only(top: 8.0),
+                  decoration: BoxDecoration(
+                    color: groupColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(6.0),
+                    border: Border.all(color: groupColor.withOpacity(0.3)),
+                  ),
+                  child: Text(
+                    groupName,
+                    style: TextStyle(
+                      fontSize: MediaQuery.of(context).size.width * 0.035,
+                      fontWeight: FontWeight.bold,
+                      color: groupColor,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 6.0),
+                // 该分组下的标签统计条
+                ...sortedTags.map((tagEntry) {
+                  double percentage = (tagEntry.value / 50) * 100;
+                  Color barColor = groupColor.withOpacity(0.7);
+                  
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: 4.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            tagEntry.key,
+                            style: TextStyle(
+                              fontSize: MediaQuery.of(context).size.width * 0.03,
+                              color: Colors.black,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        SizedBox(width: 8.0),
+                        Expanded(
+                          flex: 6,
+                          child: Container(
+                            height: 20.0,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(10.0),
+                            ),
+                            child: FractionallySizedBox(
+                              widthFactor: percentage / 100,
+                              alignment: Alignment.centerLeft,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: barColor,
+                                  borderRadius: BorderRadius.circular(10.0),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 8.0),
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            '${tagEntry.value}(${(percentage).toStringAsFixed(0)}%)',
+                            style: TextStyle(
+                              fontSize: MediaQuery.of(context).size.width * 0.03,
+                              color: Colors.black,
+                            ),
+                            textAlign: TextAlign.right,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                SizedBox(height: 4.0),
+              ],
+            );
+          }).toList(),
+        ],
+      ),
     );
   }
 

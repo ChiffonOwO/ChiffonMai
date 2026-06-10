@@ -19,6 +19,7 @@ class VersionListConstant {
     'maimai でらっくす FESTiVAL',
     'maimai でらっくす BUDDiES',
     'maimai でらっくす PRiSM',
+    'maimai でらっくす PRiSM PLUS',
   };
 
   static const Map<String, int> versionOrderMap = {
@@ -41,6 +42,7 @@ class VersionListConstant {
     'maimai でらっくす FESTiVAL': 17,
     'maimai でらっくす BUDDiES': 18,
     'maimai でらっくす PRiSM': 19,
+    'maimai でらっくす PRiSM PLUS': 20,
   };
 
   static const List<String> versionOrderList = [
@@ -63,5 +65,6 @@ class VersionListConstant {
     'maimai でらっくす FESTiVAL',
     'maimai でらっくす BUDDiES',
     'maimai でらっくす PRiSM',
+    'maimai でらっくす PRiSM PLUS',
   ];
 }

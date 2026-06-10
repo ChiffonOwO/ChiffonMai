@@ -108,6 +108,7 @@ class SongInfoService {
         result['tagData'] = tagsEntity.tags.map((tag) => {
           'id': tag.id,
           'name': tag.localizedName.zhHans,
+          'description': tag.localizedDescription.zhHans,
           'group_id': tag.groupId
         }).toList();
         result['tagSongsData'] = tagsEntity.tagSongs.map((tagSong) => {

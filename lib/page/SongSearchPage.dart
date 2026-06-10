@@ -3,10 +3,15 @@ import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.d
 import 'package:my_first_flutter_app/service/SongSearchService.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
+import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
+import 'package:my_first_flutter_app/entity/DXRating/MaiTagsEntity.dart';
 import 'dart:async';
 
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:my_first_flutter_app/utils/StringUtil.dart';
+import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
+import 'package:my_first_flutter_app/constant/GenreListConstant.dart';
 
 class SongSearchPage extends StatefulWidget {
   const SongSearchPage({super.key});
@@ -36,43 +41,33 @@ class _SongSearchPageState extends State<SongSearchPage> {
   bool _showLevelFilter = false;
   bool _showVersionFilter = false;
   bool _showGenreFilter = false;
+  bool _showTagFilter = false;
   bool _showAllFilters = true; // 控制是否显示所有筛选区域
   List<String> _selectedVersions = [];
   List<String> _selectedGenres = [];
+  List<int> _selectedTagIds = [];
+  
+  // 标签数据
+  Map<int, String> _tagIdToNameMap = {};
+  Map<int, (String, int)> _tagIdToInfoMap = {};
+  List<TagGroupItem> _tagGroups = [];
+  bool _isLoadingTags = false;
+  
+  // 歌曲标签信息缓存
+  Map<String, List<String>> _songTagInfoCache = {};
+  MaiTagsEntity? _cachedTagsEntity;
 
   // 版本列表
-  List<String> _versionList = [
-    'maimai',
-    'maimai PLUS',
-    'maimai GreeN',
-    'maimai GreeN PLUS',
-    'maimai ORANGE',
-    'maimai ORANGE PLUS',
-    'maimai PiNK',
-    'maimai PiNK PLUS',
-    'maimai MURASAKi',
-    'maimai MURASAKi PLUS',
-    'maimai MiLK',
-    'maimai MiLK PLUS',
-    'maimai FiNALE',
-    'maimai \u3067\u3089\u3063\u304f\u3059',
-    'maimai \u3067\u3089\u3063\u304f\u3059 Splash',
-    'maimai \u3067\u3089\u3063\u304f\u3059 UNiVERSE',
-    'maimai \u3067\u3089\u3063\u304f\u3059 FESTiVAL',
-    'maimai \u3067\u3089\u3063\u304f\u3059 BUDDiES',
-    'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM'
-  ];
+  List<String> _versionList = VersionListConstant.versionOrderList;
 
   // 流派列表
-  List<String> _genreList = [
-    '舞萌',
-    '流行&动漫',
-    'niconico & VOCALOID',
-    '其他游戏',
-    '东方Project',
-    '音击&中二节奏',
-    '\u5bb4\u4f1a\u5834'
-  ];
+  List<String> _genreList = GenreListConstant.genreList;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTagData();
+  }
 
   @override
   void dispose() {
@@ -83,6 +78,27 @@ class _SongSearchPageState extends State<SongSearchPage> {
     super.dispose();
   }
 
+  // 加载标签数据
+  Future<void> _loadTagData() async {
+    setState(() {
+      _isLoadingTags = true;
+    });
+    try {
+      final maiTagsEntity = await MaiTagsManager().getTags();
+      if (maiTagsEntity != null) {
+        _tagGroups = maiTagsEntity.tagGroups;
+        _tagIdToNameMap = await MaiTagsManager().getTagIdToNameMap();
+        _tagIdToInfoMap = await MaiTagsManager().getTagIdToInfoMap();
+      }
+    } catch (e) {
+      debugPrint('加载标签数据失败: $e');
+    } finally {
+      setState(() {
+        _isLoadingTags = false;
+      });
+    }
+  }
+
   // 执行搜索
   Future<void> _performSearch(String query) async {
     // 检查是否所有筛选条件都为空
@@ -90,7 +106,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
         _minLevelController.text.isEmpty &&
         _maxLevelController.text.isEmpty &&
         _selectedVersions.isEmpty &&
-        _selectedGenres.isEmpty;
+        _selectedGenres.isEmpty &&
+        _selectedTagIds.isEmpty;
 
     if (allFiltersEmpty) {
       setState(() {
@@ -165,6 +182,116 @@ class _SongSearchPageState extends State<SongSearchPage> {
         filteredResults = filteredResults.where((song) {
           return _selectedGenres.contains(song.basicInfo.genre);
         }).toList();
+      }
+
+      // 应用标签筛选
+      if (_selectedTagIds.isNotEmpty) {
+        debugPrint('=== 标签筛选开始 ===');
+        debugPrint('所选标签ID: $_selectedTagIds');
+        
+        // 获取标签数据
+        final maiTagsManager = MaiTagsManager();
+        final tagsEntity = await maiTagsManager.getTags();
+        
+        // 缓存标签数据供后续使用
+        _cachedTagsEntity = tagsEntity;
+        
+        if (tagsEntity != null) {
+          debugPrint('标签数据加载成功，tagSongs数量: ${tagsEntity.tagSongs.length}');
+          
+          // 预构建高效的搜索映射：(songId, sheetType, sheetDifficulty) -> List<tagId>
+          Map<String, Set<int>> tagMap = {};
+          for (var tagSong in tagsEntity.tagSongs) {
+            String key = '${tagSong.songId}|${tagSong.sheetType}|${tagSong.sheetDifficulty}';
+            if (!tagMap.containsKey(key)) {
+              tagMap[key] = {};
+            }
+            tagMap[key]!.add(tagSong.tagId);
+          }
+          debugPrint('构建了 ${tagMap.length} 个谱面的标签映射');
+          
+          // 构建所选标签的集合
+          Set<int> selectedTagSet = Set.from(_selectedTagIds);
+          
+          // 获取标签名称映射
+          final tagIdToNameMap = await maiTagsManager.getTagIdToNameMap();
+          
+          // 清空并重建歌曲标签信息缓存
+          _songTagInfoCache.clear();
+          
+          int matchCount = 0;
+          filteredResults = filteredResults.where((song) {
+            // 获取歌曲标题和类型
+            final String songTitle = song.basicInfo.title;
+            
+            // 根据歌曲类型确定sheetType（支持std, dx, utage）
+            String sheetType;
+            if (song.type == 'DX') {
+              sheetType = 'dx';
+            } else if (song.id.length == 6) {
+              // UTAGE歌曲的ID长度为6
+              sheetType = 'utage';
+            } else {
+              sheetType = 'std';
+            }
+            
+            // 为当前歌曲构建标签信息
+            List<String> tagInfoList = [];
+            
+            // 遍历所有难度，检查是否有匹配的标签（根据难度索引确定难度名称）
+            for (int i = 0; i < song.level.length; i++) {
+              // 根据难度索引确定难度名称
+              String sheetDifficulty = _getDifficultyByIndex(i);
+              String difficultyDisplayName = _getDifficultyDisplayName(i);
+              
+              // 构建查找键
+              String key = '$songTitle|$sheetType|$sheetDifficulty';
+              Set<int>? tagIds = tagMap[key];
+              
+              if (tagIds != null && tagIds.isNotEmpty) {
+                // 构建该难度的标签信息（只显示用户所选的标签）
+                List<String> tagNames = [];
+                for (int tagId in tagIds) {
+                  if (selectedTagSet.contains(tagId)) {
+                    String? tagName = tagIdToNameMap[tagId];
+                    if (tagName != null) {
+                      tagNames.add(tagName);
+                    }
+                  }
+                }
+                
+                if (tagNames.isNotEmpty) {
+                  tagInfoList.add('${difficultyDisplayName}：${tagNames.join('、')}');
+                }
+                
+                // 检查是否有交集
+                for (int tagId in selectedTagSet) {
+                  if (tagIds.contains(tagId)) {
+                    matchCount++;
+                    debugPrint('匹配成功: 歌曲[$songTitle], 类型[$sheetType], 难度[$sheetDifficulty], 标签ID[$tagId]');
+                    // 缓存标签信息
+                    _songTagInfoCache[songTitle] = tagInfoList;
+                    return true;
+                  }
+                }
+              }
+            }
+            
+            // 即使不匹配筛选条件，也缓存标签信息
+            if (tagInfoList.isNotEmpty) {
+              _songTagInfoCache[songTitle] = tagInfoList;
+            }
+            
+            return false;
+          }).toList();
+          
+          debugPrint('标签筛选完成，匹配到 $matchCount 首歌曲');
+        } else {
+          debugPrint('标签数据加载失败！');
+          filteredResults = [];
+        }
+        
+        debugPrint('=== 标签筛选结束 ===');
       }
 
       setState(() {
@@ -342,7 +469,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
   Widget _buildVersionFilter(double screenWidth, double screenHeight) {
     // 生成已选内容文本
     String selectedVersionsText =
-        _selectedVersions.map((v) => _formatVersion(v)).join(', ');
+        _selectedVersions.map((v) => StringUtil.formatVersion(v)).join(', ');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -400,7 +527,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
               children: _versionList.map((version) {
                 return FilterChip(
                   label: Text(
-                    _formatVersion(version),
+                    StringUtil.formatVersion2(version),
                     style: TextStyle(fontSize: screenWidth * 0.03),
                   ),
                   selected: _selectedVersions.contains(version),
@@ -502,6 +629,151 @@ class _SongSearchPageState extends State<SongSearchPage> {
                 );
               }).toList(),
             ),
+          ),
+      ],
+    );
+  }
+
+  // 构建标签筛选组件
+  Widget _buildTagFilter(double screenWidth, double screenHeight) {
+    // 生成已选内容文本
+    String selectedTagsText = _selectedTagIds
+        .map((tagId) => _tagIdToNameMap[tagId] ?? '未知标签')
+        .join(', ');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+              child: Row(
+                children: [
+                  Text(
+                    '标签筛选',
+                    style: TextStyle(
+                      fontSize: screenWidth * 0.035,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (selectedTagsText.isNotEmpty)
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(left: screenWidth * 0.02),
+                        child: Text(
+                          selectedTagsText,
+                          style: TextStyle(
+                            fontSize: screenWidth * 0.03,
+                            color: Colors.grey,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: Icon(
+                _showTagFilter ? Icons.expand_less : Icons.expand_more,
+                size: screenWidth * 0.04,
+              ),
+              onPressed: () {
+                setState(() {
+                  _showTagFilter = !_showTagFilter;
+                });
+              },
+            ),
+          ],
+        ),
+        if (_showTagFilter)
+          Container(
+            padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01),
+            child: _isLoadingTags
+                ? Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(screenHeight * 0.02),
+                      child: CircularProgressIndicator(
+                        color: Color.fromARGB(255, 84, 97, 97),
+                      ),
+                    ),
+                  )
+                : _tagGroups.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(screenHeight * 0.02),
+                          child: Text(
+                            '暂无标签数据',
+                            style: TextStyle(
+                              fontSize: screenWidth * 0.03,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        physics: NeverScrollableScrollPhysics(),
+                        padding: EdgeInsets.zero,
+                        itemCount: _tagGroups.length,
+                        itemBuilder: (context, groupIndex) {
+                          TagGroupItem group = _tagGroups[groupIndex];
+                          // 获取该分组下的所有标签
+                          List<int> tagsInGroup = _tagIdToInfoMap.entries
+                              .where((entry) => entry.value.$2 == group.id)
+                              .map((entry) => entry.key)
+                              .toList();
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // 分组标题
+                              Padding(
+                                padding: EdgeInsets.only(
+                                  top: groupIndex == 0 ? 0 : screenHeight * 0.005,
+                                  bottom: screenHeight * 0.008,
+                                ),
+                                child: Text(
+                                  group.localizedName.zhHans,
+                                  style: TextStyle(
+                                    fontSize: screenWidth * 0.032,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color.fromARGB(255, 84, 97, 97),
+                                  ),
+                                ),
+                              ),
+                              // 分组下的标签
+                              Wrap(
+                                spacing: screenWidth * 0.02,
+                                runSpacing: screenHeight * 0.008,
+                                children: tagsInGroup.map((tagId) {
+                                  String tagName = _tagIdToNameMap[tagId] ?? '未知标签';
+                                  return FilterChip(
+                                    label: Text(
+                                      tagName,
+                                      style: TextStyle(fontSize: screenWidth * 0.028),
+                                    ),
+                                    selected: _selectedTagIds.contains(tagId),
+                                    onSelected: (selected) {
+                                      setState(() {
+                                        if (selected) {
+                                          _selectedTagIds.add(tagId);
+                                        } else {
+                                          _selectedTagIds.remove(tagId);
+                                        }
+                                      });
+                                      // 防抖筛选
+                                      _debouncedFilter();
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
           ),
       ],
     );
@@ -632,6 +904,10 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                         // 流派筛选
                                     _buildGenreFilter(screenWidth, screenHeight),
                                     SizedBox(height: screenHeight * 0.01),
+
+                                    // 标签筛选
+                                    _buildTagFilter(screenWidth, screenHeight),
+                                    SizedBox(height: screenHeight * 0.01),
                                   ],
                                 ),
 
@@ -639,6 +915,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                               if ((_searchController.text.isNotEmpty ||
                                       _selectedVersions.isNotEmpty ||
                                       _selectedGenres.isNotEmpty ||
+                                      _selectedTagIds.isNotEmpty ||
                                       _minLevelController.text.isNotEmpty ||
                                       _maxLevelController.text.isNotEmpty) &&
                                   !_isSearching &&
@@ -668,6 +945,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                               _maxLevelController.clear();
                                               _selectedVersions.clear();
                                               _selectedGenres.clear();
+                                              _selectedTagIds.clear();
                                               _showAllFilters = true;
                                               _performSearch('');
                                             });
@@ -878,6 +1156,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
 
     // 生成匹配信息
     List<Map<String, String>> matchInfo = _getMatchInfo(song);
+    
+    // 获取标签信息
+    List<String> tagInfoList = _getTagInfoForSong(song);
 
     return GestureDetector(
       onTap: () {
@@ -993,7 +1274,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                       // 版本和流派
                       Expanded(
                         child: Text(
-                          '${_formatVersion(song.basicInfo.from)} | ${song.basicInfo.genre}',
+                          '${StringUtil.formatVersion(song.basicInfo.from)} | ${song.basicInfo.genre}',
                           style: const TextStyle(
                             fontSize: 14,
                             color: Colors.grey,
@@ -1024,6 +1305,24 @@ class _SongSearchPageState extends State<SongSearchPage> {
                               ))
                           .toList(),
                     ),
+                  
+                  // 标签信息（多行显示）
+                  if (tagInfoList.isNotEmpty)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: tagInfoList
+                          .map((tagInfo) => Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  tagInfo,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.blue,
+                                  ),
+                                ),
+                              ))
+                          .toList(),
+                    ),
                 ],
               ),
             ),
@@ -1033,6 +1332,93 @@ class _SongSearchPageState extends State<SongSearchPage> {
     );
   }
 
+  // 获取歌曲的标签信息（显示每个难度与用户所选标签的交集）
+  List<String> _getTagInfoForSong(dynamic song) {
+    List<String> tagInfoList = [];
+    
+    // 如果没有缓存的标签实体，返回空
+    if (_cachedTagsEntity == null) {
+      return tagInfoList;
+    }
+    
+    // 如果没有选择任何标签，返回空
+    if (_selectedTagIds.isEmpty) {
+      return tagInfoList;
+    }
+    
+    // 构建所选标签的集合
+    Set<int> selectedTagSet = Set.from(_selectedTagIds);
+    
+    // 获取标签名称映射
+    Map<int, String> tagIdToNameMap = {};
+    for (var tag in _cachedTagsEntity!.tags) {
+      tagIdToNameMap[tag.id] = tag.localizedName.zhHans;
+    }
+    
+    // 获取歌曲信息
+    final String songTitle = song.basicInfo.title;
+    String sheetType;
+    if (song.type == 'DX') {
+      sheetType = 'dx';
+    } else if (song.id.length == 6) {
+      sheetType = 'utage';
+    } else {
+      sheetType = 'std';
+    }
+    
+    // 遍历所有难度，获取与所选标签的交集
+    for (int i = 0; i < song.level.length; i++) {
+      String sheetDifficulty = _getDifficultyByIndex(i);
+      
+      // 查找当前谱面的标签
+      final List<TagSongItem> tagSongs = _cachedTagsEntity!.tagSongs
+          .where((tagSong) =>
+              tagSong.songId == songTitle &&
+              tagSong.sheetType == sheetType &&
+              tagSong.sheetDifficulty == sheetDifficulty)
+          .toList();
+      
+      if (tagSongs.isNotEmpty) {
+        // 获取该难度下与所选标签的交集
+        List<String> tagNames = [];
+        for (var tagSong in tagSongs) {
+          if (selectedTagSet.contains(tagSong.tagId)) {
+            String? tagName = tagIdToNameMap[tagSong.tagId];
+            if (tagName != null) {
+              tagNames.add(tagName);
+            }
+          }
+        }
+        
+        // 如果有交集，显示该难度的标签信息
+        if (tagNames.isNotEmpty) {
+          String difficultyName = _getDifficultyDisplayName(i);
+          tagInfoList.add('${difficultyName}：${tagNames.join('、')}');
+        }
+      }
+    }
+    
+    return tagInfoList;
+  }
+  
+  // 获取难度显示名称
+  String _getDifficultyDisplayName(int index) {
+    switch (index) {
+      case 0:
+        return 'Basic';
+      case 1:
+        return 'Advanced';
+      case 2:
+        return 'Expert';
+      case 3:
+        return 'Master';
+      case 4:
+        return 'Re:Master';
+      default:
+        return 'Unknown';
+    }
+  }
+  
   // 获取匹配信息
   List<Map<String, String>> _getMatchInfo(dynamic song) {
     List<Map<String, String>> matchInfos = [];
@@ -1069,7 +1455,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
     // 检查版本匹配
     if (song.basicInfo.from.toLowerCase().contains(query)) {
       matchInfos
-          .add({'type': '版本', 'value': _formatVersion(song.basicInfo.from)});
+          .add({'type': '版本', 'value': StringUtil.formatVersion(song.basicInfo.from)});
     }
     // 检查别名匹配
     final aliases = SongAliasManager.instance.aliases[song.title] ?? [];
@@ -1081,41 +1467,21 @@ class _SongSearchPageState extends State<SongSearchPage> {
     return matchInfos;
   }
 
-  // 处理版本字符串，使其在前端简化展示
-  String _formatVersion(String version) {
-    if (version == 'maimai') {
-      return 'maimai';
+  // 根据难度索引获取难度名称（标签数据中使用的格式）
+  String _getDifficultyByIndex(int index) {
+    switch (index) {
+      case 0:
+        return 'basic';
+      case 1:
+        return 'advanced';
+      case 2:
+        return 'expert';
+      case 3:
+        return 'master';
+      case 4:
+        return 'remaster';
+      default:
+        return 'unknown';
     }
-    if (version == 'maimai PLUS') {
-      return 'maimai+';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059') {
-      return 'DX 2020';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 Splash') {
-      return 'DX 2021';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 UNiVERSE') {
-      return 'DX 2022';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 FESTiVAL') {
-      return 'DX 2023';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 BUDDiES') {
-      return 'DX 2024';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM') {
-      return 'DX 2025';
-    }
-    if (version.contains(' PLUS')) {
-      version = version.replaceFirst(' PLUS', '+');
-    }
-    if (version.contains('maimai') && version != 'maimai') {
-      version = version.replaceFirst('maimai ', '');
-    }
-    if (version.contains('\u3067\u3089\u3063\u304f\u3059')) {
-      version = version.replaceFirst('\u3067\u3089\u3063\u304f\u3059 ', '');
-    }
-    return version;
   }
 }

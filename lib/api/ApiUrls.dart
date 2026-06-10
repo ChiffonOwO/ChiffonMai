@@ -15,16 +15,16 @@ class ApiUrls {
   static const String LuoXueSongsApi = 'https://maimai.lxns.net/api/v0/maimai/song/list';
   static const String ServerStatusApi = 'https://status.awmc.cc/api/status-page/heartbeat/maimai';
   static const String ServerStatusTitleApi = 'https://status.awmc.cc/api/status-page/maimai';
-  static const String checkUpdateApi = 'http://152.136.125.98/app_version.json';
+  static const String checkUpdateApi = 'http://47.93.46.104/app_version.json';
   static const String knowledgeApi = 'https://pastebin.com/raw/Fcdieww7';
   
   // 多人游戏服务器地址
-  static const String MultiplayerServerUrl = 'ws://152.136.125.98:3000';
-  static const String MultiplayerGameServerUrl = 'ws://152.136.125.98:3000';
+  static const String MultiplayerServerUrl = 'ws://47.93.46.104:3000';
+  static const String MultiplayerGameServerUrl = 'ws://47.93.46.104:3000';
   
   // Maidata 服务器地址
-  static const String MaidataServerBaseUrl = 'http://152.136.125.98';
-  static const String MaidataServerPortUrl = 'http://152.136.125.98:8888';
+  static const String MaidataServerBaseUrl = 'http://47.93.46.104';
+  static const String MaidataServerPortUrl = 'http://47.93.46.104:8888';
   
   // 落雪 OAuth 相关地址
   static const String LuoXueBaseUrl = 'https://maimai.lxns.net';
@@ -37,6 +37,6 @@ class ApiUrls {
   static const String LuoXuePlayerScoresApi = 'https://maimai.lxns.net/api/v0/user/maimai/player/scores';
   
   // 排行榜 API 地址
-  static const String RankingsBaseUrl = 'http://152.136.125.98:3000/api/rankings';
+  static const String RankingsBaseUrl = 'http://47.93.46.104:3000/api/rankings';
   static const String RankingsUpdateUrl = '$RankingsBaseUrl/update';
 }

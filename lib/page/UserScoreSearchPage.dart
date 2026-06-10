@@ -7,6 +7,7 @@ import '../manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'HomePage.dart';
 import 'SongInfoPage.dart';
 import '../utils/CoverUtil.dart';
+import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
 
 class UserScoreSearchPage extends StatefulWidget {
   const UserScoreSearchPage({Key? key}) : super(key: key);
@@ -63,27 +64,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   };
   
   // 版本列表
-  static List<String> _versionList = [
-    'maimai',
-    'maimai PLUS',
-    'maimai GreeN',
-    'maimai GreeN PLUS',
-    'maimai ORANGE',
-    'maimai ORANGE PLUS',
-    'maimai PiNK',
-    'maimai PiNK PLUS',
-    'maimai MURASAKi',
-    'maimai MURASAKi PLUS',
-    'maimai MiLK',
-    'maimai MiLK PLUS',
-    'maimai FiNALE',
-    'maimai \u3067\u3089\u3063\u304f\u3059',
-    'maimai \u3067\u3089\u3063\u304f\u3059 Splash',
-    'maimai \u3067\u3089\u3063\u304f\u3059 UNiVERSE',
-    'maimai \u3067\u3089\u3063\u304f\u3059 FESTiVAL',
-    'maimai \u3067\u3089\u3063\u304f\u3059 BUDDiES',
-    'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM'
-  ];
+  static List<String> _versionList = VersionListConstant.versionOrderList;
   
   // 处理版本字符串，使其在前端简化展示
   static String _formatVersion(String version) {
