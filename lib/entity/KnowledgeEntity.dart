@@ -3,9 +3,12 @@ class KnowledgeEntity {
 
   KnowledgeEntity(this.knowledgeItems);
 
-  // 一行解析整个 Pastebin JSON
+  // 解析服务端 /api/knowledge 返回的 JSON 列表
   factory KnowledgeEntity.fromJson(List<dynamic> jsonList) {
-    List<KnowledgeItem> items = jsonList.map((i) => KnowledgeItem.fromJson(i)).toList();
+    List<KnowledgeItem> items = jsonList
+        .where((i) => i is Map<String, dynamic>)
+        .map((i) => KnowledgeItem.fromJson(i as Map<String, dynamic>))
+        .toList();
     return KnowledgeEntity(items);
   }
 }
@@ -14,7 +17,7 @@ class KnowledgeItem {
   static const String tagCategory = '标签';
   static const String knowledgeCategory = '百科';
 
-  String? id;
+  int? id;
   String? title;
   String? category;
   String? content;
@@ -28,24 +31,32 @@ class KnowledgeItem {
     this.recommendSongs,
   });
 
-  // 核心：解析单个知识条目
+  // 解析单个知识条目（id 来自 MySQL 自增主键，为 int）
   factory KnowledgeItem.fromJson(Map<String, dynamic> json) {
     List<KnowledgeRecommendSong>? recommendSongs;
-    
-    if (json['recommendSongs'] is List) {
-      recommendSongs = (json['recommendSongs'] as List).map((songJson) {
-        if (songJson is Map<String, dynamic>) {
-          return KnowledgeRecommendSong.fromJson(songJson);
-        }
-        return null;
-      }).where((song) => song != null).cast<KnowledgeRecommendSong>().toList();
+
+    final recommendData = json['recommendSongs'];
+    if (recommendData is List) {
+      recommendSongs = recommendData
+          .where((songJson) => songJson is Map<String, dynamic>)
+          .map((songJson) =>
+              KnowledgeRecommendSong.fromJson(songJson as Map<String, dynamic>))
+          .toList();
     }
-    
+
+    int? idValue;
+    final rawId = json['id'];
+    if (rawId is int) {
+      idValue = rawId;
+    } else if (rawId is String) {
+      idValue = int.tryParse(rawId);
+    }
+
     return KnowledgeItem(
-      id: json['id'],
-      title: json['title'],
-      category: json['category'],
-      content: json['content'],
+      id: idValue,
+      title: json['title']?.toString(),
+      category: json['category']?.toString(),
+      content: json['content']?.toString(),
       recommendSongs: recommendSongs,
     );
   }
@@ -62,8 +73,8 @@ class KnowledgeRecommendSong {
 
   factory KnowledgeRecommendSong.fromJson(Map<String, dynamic> json) {
     return KnowledgeRecommendSong(
-      id: json['id'],
-      levelIndex: json['level_index'],
+      id: json['id']?.toString(),
+      levelIndex: json['level_index']?.toString(),
     );
   }
 }

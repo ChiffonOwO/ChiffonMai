@@ -5,7 +5,7 @@ class KnowledgeInfoService {
   final KnowledgeManager _knowledgeManager = KnowledgeManager();
 
   // 根据ID获取知识详情
-  Future<KnowledgeItem?> getKnowledgeById(String id) async {
+  Future<KnowledgeItem?> getKnowledgeById(int id) async {
     final knowledgeData = await _knowledgeManager.getKnowledgeData();
     if (knowledgeData == null || knowledgeData.knowledgeItems == null) {
       return null;

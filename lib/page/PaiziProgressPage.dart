@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:io';
+import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:my_first_flutter_app/service/PaiziProgressService.dart';
+import 'package:my_first_flutter_app/service/PaiziProgressConvertToImgService.dart';
+import 'package:my_first_flutter_app/constant/LoadingTipsConstant.dart';
 import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
@@ -322,7 +328,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                         ),
                       ),
                     ),
-                    // 占位，保持标题居中
+                    // 占位（保持标题居中）
                     SizedBox(width: 48),
                   ],
                 ),
@@ -351,7 +357,37 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                             children: [
                               // 选择区域
                               _buildSelectionSection(),
-                              
+
+                              SizedBox(height: _paddingL),
+
+                              // 导出为图片按钮
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    foregroundColor: Colors.white,
+                                    padding: EdgeInsets.symmetric(vertical: _paddingS),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(_borderRadiusSmall),
+                                    ),
+                                  ),
+                                  icon: Icon(Icons.image, size: _textSizeL + 4),
+                                  label: Text(
+                                    '导出为图片',
+                                    style: TextStyle(fontSize: _textSizeM, fontWeight: FontWeight.bold),
+                                  ),
+                                  onPressed: () async {
+                                    debugPrint('=== PAIZI EXPORT BUTTON CLICKED ===');
+                                    try {
+                                      await _exportToImage();
+                                    } catch (e) {
+                                      debugPrint('Error in export: $e');
+                                    }
+                                  },
+                                ),
+                              ),
+
                               SizedBox(height: _paddingL),
 
                               // 曲绘和完成情况显示区域
@@ -494,7 +530,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
     );
   }
 
-  // 获取按顺序排列的首字选项
+  // 获取按顺序排列的首字选项（"舞"始终置于最后）
   List<String> _getOrderedFirstCharOptions() {
     // 按照 formatVersion2 的顺序排列
     final ordered = <String>[];
@@ -505,9 +541,13 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
     }
     // 添加不在顺序列表中的其他首字
     for (final char in _firstCharOptions) {
-      if (!ordered.contains(char)) {
+      if (!ordered.contains(char) && char != '舞') {
         ordered.add(char);
       }
+    }
+    // 将"舞"始终置于最后
+    if (_firstCharOptions.contains('舞')) {
+      ordered.add('舞');
     }
     return ordered;
   }
@@ -1295,5 +1335,217 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
     }
 
     return Column(children: widgets);
+  }
+
+  // 请求存储权限
+  Future<bool> _requestStoragePermission() async {
+    debugPrint('PaiziProgressPage: _requestStoragePermission called');
+    
+    if (Platform.isAndroid) {
+      debugPrint('PaiziProgressPage: Running on Android');
+      
+      PermissionStatus storageStatus = await Permission.storage.status;
+      PermissionStatus photosStatus = await Permission.photos.status;
+      PermissionStatus videosStatus = await Permission.videos.status;
+      
+      debugPrint('PaiziProgressPage: Storage status = $storageStatus');
+      debugPrint('PaiziProgressPage: Photos status = $photosStatus');
+      debugPrint('PaiziProgressPage: Videos status = $videosStatus');
+      
+      if (storageStatus.isGranted || photosStatus.isGranted || videosStatus.isGranted) {
+        debugPrint('PaiziProgressPage: At least one permission already granted');
+        return true;
+      }
+      
+      debugPrint('PaiziProgressPage: Requesting storage, photos and videos permissions...');
+      Map<Permission, PermissionStatus> statuses = await [
+        Permission.storage,
+        Permission.photos,
+        Permission.videos,
+      ].request();
+      
+      bool storageGranted = statuses[Permission.storage]?.isGranted ?? false;
+      bool photosGranted = statuses[Permission.photos]?.isGranted ?? false;
+      bool videosGranted = statuses[Permission.videos]?.isGranted ?? false;
+      
+      debugPrint('PaiziProgressPage: Storage granted = $storageGranted');
+      debugPrint('PaiziProgressPage: Photos granted = $photosGranted');
+      debugPrint('PaiziProgressPage: Videos granted = $videosGranted');
+      
+      return storageGranted || photosGranted || videosGranted;
+    } else {
+      debugPrint('PaiziProgressPage: Non-Android platform');
+      PermissionStatus status = await Permission.storage.request();
+      return status.isGranted;
+    }
+  }
+
+  Future<void> _exportToImage() async {
+    StreamSubscription<String>? _tipSubscription;
+    try {
+      debugPrint('=== PAIZI EXPORT TO IMAGE STARTED ===');
+      debugPrint('Current context: $context');
+
+      debugPrint('Step 1: Requesting storage permission from page...');
+      bool hasPermission = await _requestStoragePermission();
+      debugPrint('Step 1 completed: hasPermission = $hasPermission');
+
+      if (!hasPermission) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('权限不足'),
+            content: Text('需要存储权限才能导出图片到相册，请在设置中开启权限'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('确定'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      String _progressMessage = '正在准备导出...';
+      double _progressValue = 0.0;
+      String _currentLoadingTip = LoadingTipsConstant.getRandomLoadingTip();
+      bool _isFirstBuild = true;
+      void Function(void Function())? _updateDialog;
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              _updateDialog = setDialogState;
+              if (_isFirstBuild) {
+                _isFirstBuild = false;
+                LoadingTipsConstant.startAutoSwitch(3);
+                _tipSubscription = LoadingTipsConstant.tipStream.listen((tip) {
+                  try {
+                    _updateDialog?.call(() {
+                      _currentLoadingTip = tip;
+                    });
+                  } catch (_) {}
+                });
+              }
+              return AlertDialog(
+                title: Text('导出中'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(),
+                        ),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: Text(_progressMessage),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 16.0),
+                    LinearProgressIndicator(value: _progressValue > 0 ? _progressValue : null),
+                    SizedBox(height: 12.0),
+                    Text(
+                      _currentLoadingTip,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      );
+
+      final file = await PaiziProgressConvertToImg.convertToImage(
+        context,
+        currentPlate: _currentPlate,
+        cachedSongsWithStatus: _cachedSongsWithStatus,
+        selectedFirstChar: _selectedFirstChar,
+        selectedTitleType: _selectedTitleType,
+        selectedDifficulty: _selectedDifficulty,
+        useLevelDisplay: _useLevelDisplay,
+        filterMode: _filterMode,
+        getDifficultyName: _getDifficultyName,
+        getLevelDisplay: _getLevelDisplay,
+        getSongAchievement: _service.getSongAchievement,
+        onProgress: (message, progress) {
+          _progressMessage = message;
+          _progressValue = progress;
+          _updateDialog?.call(() {});
+        },
+      );
+
+      _tipSubscription?.cancel();
+      LoadingTipsConstant.stopAutoSwitch();
+      Navigator.of(context, rootNavigator: true).pop();
+
+      if (file != null) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('导出成功'),
+            content: Text('图片已保存到：\n${file.path}'),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: file.path));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('路径已复制到剪贴板')),
+                  );
+                },
+                child: Text('复制路径'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+                child: Text('确定'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('导出失败'),
+            content: Text('图片导出失败，请重试'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+                child: Text('确定'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      _tipSubscription?.cancel();
+      LoadingTipsConstant.stopAutoSwitch();
+      try {
+        Navigator.of(context, rootNavigator: true).pop();
+      } catch (_) {}
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('导出失败'),
+          content: Text('图片导出失败：${e.toString()}'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+              child: Text('确定'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }

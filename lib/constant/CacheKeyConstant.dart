@@ -81,4 +81,22 @@ class CacheKeyConstant {
   
   // 免责声明相关
   static const String songRankingDisclaimerShown = 'song_ranking_disclaimer_shown';
+
+  // 歌曲评论缓存相关
+  static const String songCommentsCachePrefix = 'song_comments_cache_';
+  static const String songCommentsCacheTimestampPrefix = 'song_comments_cache_timestamp_';
+
+  // 评论身份相关
+  static const String commentDataSource = 'comment_data_source';
+  static const String commentOriginalId = 'comment_original_id';
+  static const String commentNickname = 'comment_nickname';
+
+  // 用户身份相关（与HomePage共用，用于自动构建评论身份）
+  static const String userNickname = 'userNickname';
+  static const String cachedQQ = 'cachedQQ';
+  static const String luoxueUserId = 'luoxue_user_id';
+  static const String shuiyuUserId = 'shuiyu_user_id';
+
+  // 首页后台初始化时间戳（用于控制初始化频率）
+  static const String lastInitializationTimestamp = 'last_initialization_timestamp';
 }

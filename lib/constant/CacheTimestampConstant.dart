@@ -30,4 +30,8 @@ class CacheTimestampConstant {
   static const int kaleidXMarkedSongsCacheDays = 365;
   static const int kaleidXMarkedSongsCacheMillis = kaleidXMarkedSongsCacheDays * 24 * 60 * 60 * 1000;
   static const Duration kaleidXMarkedSongsDuration = Duration(days: kaleidXMarkedSongsCacheDays);
+
+  // 歌曲评论缓存时间（5分钟）
+  static const int songCommentsCacheMinutes = 5;
+  static const int songCommentsCacheSeconds = songCommentsCacheMinutes * 60;
 }

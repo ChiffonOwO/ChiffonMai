@@ -70,71 +70,77 @@ class _SongRankingPageState extends State<SongRankingPage> {
 
   // 显示免责声明对话框
   void _showDisclaimerDialogFunc({bool showCheckbox = true}) {
+    bool localDontShowAgain = _dontShowAgain;
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              Icon(
-                Icons.info_outline,
-                size: 24,
-                color: Colors.yellow[700],
-              ),
-              SizedBox(width: 8),
-              Text(
-                '免责声明',
-                style: TextStyle(
-                  color: Colors.yellow[800],
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '本排行榜数据仅供参考和娱乐使用，不代表任何官方立场或权威性排名。排名数据基于玩家自愿上传的游戏数据，可能存在误差或延迟。请理性看待排名结果，享受游戏乐趣。',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[700],
-                    height: 1.6,
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 24,
+                    color: Colors.yellow[700],
                   ),
-                ),
-                if (showCheckbox) ...[
-                  SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: _dontShowAgain,
-                        onChanged: (value) {
-                          setState(() {
-                            _dontShowAgain = value ?? false;
-                          });
-                        },
-                      ),
-                      Text('不再提示'),
-                    ],
+                  SizedBox(width: 8),
+                  Text(
+                    '免责声明',
+                    style: TextStyle(
+                      color: Colors.yellow[800],
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '本排行榜数据仅供参考和娱乐使用，不代表任何官方立场或权威性排名。排名数据基于玩家自愿上传的游戏数据，可能存在误差或延迟。请理性看待排名结果，享受游戏乐趣。',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[700],
+                        height: 1.6,
+                      ),
+                    ),
+                    if (showCheckbox) ...[
+                      SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: localDontShowAgain,
+                            onChanged: (value) {
+                              setDialogState(() {
+                                localDontShowAgain = value ?? false;
+                              });
+                              _dontShowAgain = value ?? false;
+                            },
+                          ),
+                          Text('不再提示'),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    _closeDisclaimer(dontShowAgain: showCheckbox ? localDontShowAgain : false);
+                  },
+                  child: Text('知道了'),
+                ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                _closeDisclaimer(dontShowAgain: showCheckbox ? _dontShowAgain : false);
-              },
-              child: Text('知道了'),
-            ),
-          ],
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            );
+          },
         );
       },
     );

@@ -12,7 +12,7 @@ import '../entity/DivingFish/RecordItem.dart';
 import 'SongInfoPage.dart';
 
 class KnowledgeInfoPage extends StatefulWidget {
-  final String? knowledgeId;
+  final int? knowledgeId;
   final String? knowledgeTitle;
 
   const KnowledgeInfoPage({
@@ -412,24 +412,30 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
                                             width: double.infinity,
                                             padding: EdgeInsets.zero,
                                             margin: EdgeInsets.zero,
-                                            child: MarkdownWidget(
-                                              data: _knowledgeItem!.content!,
-                                              config: MarkdownConfig(
-                                                configs: [
-                                                  LinkConfig(
-                                                    onTap: (url) {
-                                                      // 处理链接点击
-                                                      debugPrint(
-                                                          'Link tapped: $url');
-                                                    },
-                                                  ),
-                                                  CodeConfig(),
-                                                ],
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: MarkdownGenerator()
+                                                  .buildWidgets(
+                                                _knowledgeItem!.content!
+                                                    .replaceAll('\\n', '\n')
+                                                    .replaceAll('\\t', '\t'),
+                                                config: MarkdownConfig(
+                                                  configs: [
+                                                    LinkConfig(
+                                                      onTap: (url) {
+                                                        debugPrint(
+                                                            'Link tapped: $url');
+                                                      },
+                                                    ),
+                                                    CodeConfig(
+                                                      style: TextStyle(
+                                                        color: Colors.black87,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
-                                              shrinkWrap: true,
-                                              physics:
-                                                  NeverScrollableScrollPhysics(),
-                                              padding: EdgeInsets.zero,
                                             ),
                                           ),
                                         SizedBox(height: 16),

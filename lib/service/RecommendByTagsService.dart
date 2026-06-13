@@ -604,6 +604,10 @@ Future<List<RecommendationResult>> calculateRecommendations(
    * 1. 达成率已达到100.5%以上的谱面
    */
   for (var song in songs!) {
+    // 0. 过滤掉从maidata追加的歌曲（cids全为0表示从maidata解析）
+    if (song.cids.isNotEmpty && song.cids.every((cid) => cid == 0)) {
+      continue;
+    }
     // 1. 歌曲必须是目标版本的谱面（根据isNewOnly判断）
     if (song.basicInfo.isNew != isNewOnly) {
       continue;

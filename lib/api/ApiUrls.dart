@@ -16,7 +16,7 @@ class ApiUrls {
   static const String ServerStatusApi = 'https://status.awmc.cc/api/status-page/heartbeat/maimai';
   static const String ServerStatusTitleApi = 'https://status.awmc.cc/api/status-page/maimai';
   static const String checkUpdateApi = 'http://47.93.46.104/app_version.json';
-  static const String knowledgeApi = 'https://pastebin.com/raw/Fcdieww7';
+  static const String knowledgeApi = 'http://47.93.46.104:3000/api/knowledge';
   
   // 多人游戏服务器地址
   static const String MultiplayerServerUrl = 'ws://47.93.46.104:3000';
@@ -39,4 +39,17 @@ class ApiUrls {
   // 排行榜 API 地址
   static const String RankingsBaseUrl = 'http://47.93.46.104:3000/api/rankings';
   static const String RankingsUpdateUrl = '$RankingsBaseUrl/update';
+
+  // 歌曲评论 API 地址
+  static const String CommentsBaseUrl = 'http://47.93.46.104:3000/api/comments';
+  static const String CommentsBySongUrl = '$CommentsBaseUrl/song';
+  static const String CommentsByUserUrl = '$CommentsBaseUrl/user';
+  static const String CommentsCreateUrl = '$CommentsBaseUrl/create';
+  static const String CommentsClearCacheUrl = '$CommentsBaseUrl/clear-cache';
+
+  // 谱面评分 API 地址
+  static const String RatingsBaseUrl = 'http://47.93.46.104:3000/api/ratings';
+  static const String RatingsByChartUrl = '$RatingsBaseUrl/chart';
+  static const String RatingsCreateUrl = '$RatingsBaseUrl/create';
+  static const String RatingsDeleteUrl = '$RatingsBaseUrl';
 }

@@ -856,6 +856,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "0.27.7"
+  safe_text:
+    dependency: "direct main"
+    description:
+      name: safe_text
+      sha256: "724a88d6c60de8cc5f85e3b5a1a50ce7c088f521bae6fa74f411a3662f3ea1da"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "2.1.5"
   scroll_to_index:
     dependency: transitive
     description:

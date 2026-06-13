@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/page/RankingList/RatingRankListPage.dart';
 import 'package:my_first_flutter_app/page/RankingList/SpecialRankingListPage.dart';
@@ -10,6 +11,8 @@ import '../api/ApiUrls.dart';
 import '../constant/CacheKeyConstant.dart';
 import '../constant/LoadingTipsConstant.dart';
 import '../service/HomeService.dart';
+import '../service/PaiziProgressService.dart';
+import '../service/PersonalizedScoreService.dart';
 import '../service/RecommendByTagsService.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../manager/LZYCheckUpdateManager.dart';
@@ -37,6 +40,7 @@ import 'GuessChartGame/GuessChartBySongExcerptPage.dart';
 import 'GuessChartGame/GuessSongByOpenLettersPage.dart';
 import 'KaleidXScope/KaleidXScopeSelectPage.dart';
 import 'KnowledgeSearchPage.dart';
+import 'FavoriteFolderPage.dart';
 import 'MaimaiServerStatusPage.dart';
 import 'Multiplayer/MultiplayerLobbyPage.dart';
 import 'PaiziProgressPage.dart';
@@ -75,6 +79,11 @@ class DsSong {
     required this.songTitle,
     required this.level,
   });
+}
+
+// 首页初始化时间间隔常量
+class _InitInterval {
+  static const Duration initializationCooldown = Duration(days: 7);
 }
 
 // 应用常量类：集中管理所有硬编码的配置值
@@ -147,9 +156,6 @@ enum DataSource {
 
 /// 首页状态类：处理页面状态、存储数据、实现布局构建
 class _HomePageState extends State<HomePage> {
-  // 加载状态
-  bool _isLoading = false;
-  
   // 后台初始化状态
   bool _isBackgroundInitializing = false;
   bool _isInitializationCompleted = false;
@@ -219,6 +225,22 @@ class _HomePageState extends State<HomePage> {
   
   // 后台初始化数据 - 使用 HomeService
   Future<void> _initializeDataInBackground() async {
+    // 检查上次初始化的时间，如果在冷却时间内则跳过自动初始化
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastInitMillis = prefs.getInt(CacheKeyConstant.lastInitializationTimestamp);
+      if (lastInitMillis != null) {
+        final lastInit = DateTime.fromMillisecondsSinceEpoch(lastInitMillis);
+        final diff = DateTime.now().difference(lastInit);
+        if (diff < _InitInterval.initializationCooldown) {
+          debugPrint('距上次初始化仅 ${diff.inHours} 小时，跳过自动初始化（冷却时间：${_InitInterval.initializationCooldown.inHours} 小时）');
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('检查上次初始化时间失败: $e，继续执行初始化');
+    }
+
     if (mounted) {
       setState(() {
         _isBackgroundInitializing = true;
@@ -236,6 +258,18 @@ class _HomePageState extends State<HomePage> {
         if (result.success) {
           _isInitializationCompleted = true;
           _initializationProgress = '数据初始化完成！总耗时 ${result.durationStr}';
+          
+          // 保存本次成功初始化的时间戳
+          try {
+            SharedPreferences.getInstance().then((prefs) {
+              prefs.setInt(
+                CacheKeyConstant.lastInitializationTimestamp,
+                DateTime.now().millisecondsSinceEpoch,
+              );
+            });
+          } catch (e) {
+            debugPrint('保存初始化时间戳失败: $e');
+          }
           
           // 4秒后隐藏完成提示
           Future.delayed(const Duration(seconds: 4), () {
@@ -303,6 +337,7 @@ class _HomePageState extends State<HomePage> {
     ButtonItem(icon: Icons.network_check, title: '服务器状态', subtitle: '查看舞萌服务器状态'),
     ButtonItem(icon: Icons.update, title: '检查更新', subtitle: '检查应用是否有新版本'),
     ButtonItem(icon: Icons.poll_outlined, title: '问卷调查', subtitle: '助力ChiffonMai更上一层楼!'),
+    ButtonItem(icon: Icons.favorite, title: '收藏夹', subtitle: '管理你收藏的谱面'),
     ButtonItem(icon: Icons.play_arrow, title: '自定义谱面播放', subtitle: '播放你自己本地的谱面')
   ];
 
@@ -490,33 +525,10 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           
-          // 加载中提示
-          if (_isLoading)
-            Container(
-              color: Colors.black.withValues(alpha: 0.5),
-              child: Center(
-                child: Container(
-                  padding: EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 10),
-                      Text('正在刷新数据,这需要一些时间,请稍后...'),
-                    ],
-                  ),
-                ),
-              ),
-            )
-        ],
+          ],
       ),
     );
   }
-
 
   // 构建用户信息文本
   Widget _buildUserInfo(BuildContext context) {
@@ -616,39 +628,12 @@ class _HomePageState extends State<HomePage> {
     
     // 包装成可点击的Widget
     return GestureDetector(
-      onTap: () async {
-        // 获取上次更新使用的数据源
-        final lastDataSource = await _getLastDataSource();
-        
-        if (lastDataSource == 'shuiyu' && _cachedQQ.isNotEmpty) {
-          // 如果上次是水鱼数据源且有缓存的QQ号，直接执行刷新操作
-          await _refreshDataWithoutNavigation(_cachedQQ);
-          await _saveLastDataSource('shuiyu');
-        } else if (lastDataSource == 'luoxue') {
-          // 如果上次是落雪数据源，显示对话框引导用户完成授权
-          _showRefreshDataDialog(context);
-        } else if (_currentDataSource == DataSource.shuiyu && _cachedQQ.isNotEmpty) {
-          // 当前选择水鱼且有缓存
-          await _refreshDataWithoutNavigation(_cachedQQ);
-          await _saveLastDataSource('shuiyu');
-        } else {
-          // 否则显示刷新数据对话框
-          _showRefreshDataDialog(context);
-        }
+      onTap: () {
+        // 点击个人信息区域时显示刷新数据对话框
+        _showRefreshDataDialog(context);
       },
       child: userInfoContent,
     );
-  }
-  
-  // 获取上次更新使用的数据源
-  Future<String?> _getLastDataSource() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.getString(CacheKeyConstant.lastDataSource);
-    } catch (e) {
-      debugPrint('获取上次数据源失败: $e');
-      return null;
-    }
   }
   
   // 保存上次更新使用的数据源
@@ -696,7 +681,7 @@ class _HomePageState extends State<HomePage> {
     
     showDialog(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: true,
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setState) {
@@ -926,24 +911,14 @@ class _HomePageState extends State<HomePage> {
                         LoadingTipsConstant.stopAutoSwitch();
                         if (mounted) {
                           Navigator.of(context).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('数据刷新成功!'),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
+                          Fluttertoast.showToast(msg: '数据刷新成功!');
                         }
                       } catch (e) {
                         // 刷新失败，停止定时器并关闭对话框
                         LoadingTipsConstant.stopAutoSwitch();
                         if (mounted) {
                           Navigator.of(context).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('刷新数据失败：$e'),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
+                          Fluttertoast.showToast(msg: '刷新数据失败：$e');
                         }
                       }
                     },
@@ -1081,6 +1056,10 @@ class _HomePageState extends State<HomePage> {
             await SongRankingService().deleteSongRankings(userId);
           }
         }
+        
+        // 清除有状态服务的记录缓存，确保下次打开时使用最新数据
+        PersonalizedScoreService().clearRecordsCache();
+        PaiziProgressService().clearRecordsCache();
         
         onProgress(100, '完成');
         
@@ -1312,99 +1291,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
   
-  // 刷新数据（不跳转）
-  Future<void> _refreshDataWithoutNavigation(String qq) async {
-    setState(() {
-      _isLoading = true;
-    });
-    
-    try {
-      // 清除推荐结果缓存
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove(CacheKeyConstant.recommendationResults);
-        debugPrint('推荐结果缓存已清除');
-      } catch (e) {
-        debugPrint('清除推荐结果缓存失败: $e');
-      }
-      
-      // 使用智能刷新：初次拉取获取全量maidata，后续只获取追加歌曲的maidata
-      await MaimaiMusicDataManager().refreshDataWithSmartMaidata();
-      
-      // 从API获取并更新难度数据
-      await DiffMusicDataManager().fetchAndUpdateDiffData();
-      
-      // 刷新标签数据
-      await RecommendByTagsService.initializeTags();
-      
-      // 刷新别名数据
-      await SongAliasManager.instance.refresh();
-      
-      // 从API获取并更新用户游玩数据
-      final userPlayDataManager = UserPlayDataManager();
-      final userPlayData = await userPlayDataManager.fetchUserPlayData(qq);
-      
-      final best50Manager = UserBest50Manager();
-      final best50Data = await best50Manager.getUserBest50(qq);
-      debugPrint(best50Data.toString());
-      
-      // 更新用户昵称
-      if (userPlayData != null && userPlayData.containsKey('nickname')) {
-        setState(() {
-          _userNickname = userPlayData['nickname'];
-        });
-      }
-      
-      // 计算Best50、Best35、Best15总RA
-      int totalRA = 0;
-      int best35RA = 0;
-      int best15RA = 0;
-      
-      // 计算Best35总RA (sd charts)
-      for (var record in best50Data.charts.sd) {
-        best35RA += record.ra;
-      }
-      
-      // 计算Best15总RA (dx charts)
-      for (var record in best50Data.charts.dx) {
-        best15RA += record.ra;
-      }
-      
-      // 计算Best50总RA (sd + dx)
-      totalRA = best35RA + best15RA;
-      
-      // 更新状态
-      setState(() {
-        _best50TotalRA = totalRA;
-        _best35TotalRA = best35RA;
-        _best15TotalRA = best15RA;
-      });
-      
-      // 保存数据到本地存储
-      await _saveUserData();
-      
-      // 显示成功提示
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('数据刷新成功!'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      // 显示错误提示
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('刷新数据失败：$e'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-  
   // 刷新Best50数据（带进度回调）
   Future<void> _refreshBest50DataWithProgress(
     String qq, 
@@ -1504,6 +1390,10 @@ class _HomePageState extends State<HomePage> {
       // 保存数据到本地存储
       await _saveUserData();
       
+      // 清除有状态服务的记录缓存，确保下次打开时使用最新数据
+      PersonalizedScoreService().clearRecordsCache();
+      PaiziProgressService().clearRecordsCache();
+      
       // 更新排行榜数据
       String? rankingError;
       final userId = 'shuiyu:$qq';
@@ -1539,6 +1429,10 @@ class _HomePageState extends State<HomePage> {
         await _deleteRankings(userId);
         await SongRankingService().deleteSongRankings(userId);
       }
+      
+      // 清除有状态服务的记录缓存，确保下次打开时使用最新数据
+      PersonalizedScoreService().clearRecordsCache();
+      PaiziProgressService().clearRecordsCache();
       
       onProgress(100, '完成');
       
@@ -1812,6 +1706,12 @@ class _HomePageState extends State<HomePage> {
                 );
               }
             });
+          }
+          if (item.title == '收藏夹'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const FavoriteFolderPage()),
+            );
           }
         },
         child: Column(

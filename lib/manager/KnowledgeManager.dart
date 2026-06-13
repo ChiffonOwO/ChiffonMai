@@ -38,9 +38,13 @@ class KnowledgeManager {
     final response = await http.get(Uri.parse(ApiUrls.knowledgeApi));
     if (response.statusCode == 200) {
       final jsonData = json.decode(response.body);
-      return KnowledgeEntity.fromJson(jsonData);
+      // 服务端直接返回知识条目的列表
+      if (jsonData is List) {
+        return KnowledgeEntity.fromJson(jsonData);
+      }
+      throw Exception('知识数据格式错误: 期望 List, 实际 ${jsonData.runtimeType}');
     } else {
-      throw Exception('Failed to load knowledge data');
+      throw Exception('Failed to load knowledge data (status: ${response.statusCode})');
     }
   }
 
@@ -56,7 +60,10 @@ class KnowledgeManager {
       if (now - timestamp < CacheTimestampConstant.knowledgeCacheMillis) {
         try {
           final jsonData = json.decode(cachedData);
-          return KnowledgeEntity.fromJson(jsonData);
+          if (jsonData is List) {
+            return KnowledgeEntity.fromJson(jsonData);
+          }
+          return null;
         } catch (e) {
           debugPrint('解析缓存数据失败: $e');
           return null;

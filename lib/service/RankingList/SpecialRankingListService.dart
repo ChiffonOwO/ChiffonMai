@@ -72,56 +72,43 @@ class SpecialRankingListService {
   
   // 远程缓存key前缀
   static const String remoteCacheKey = 'special:break_count_ranking_remote';
-  static const String remoteCacheTimestampKey = 'special:break_count_ranking_remote:timestamp';
-  
+
   // 定数差值排行榜相关缓存key
   static const String diffCacheKey = 'special:difficulty_diff_ranking_remote';
-  static const String diffCacheTimestampKey = 'special:difficulty_diff_ranking_remote:timestamp';
-  
+
   // MASTER/RE:MASTER定数差值排行榜相关缓存key
   static const String masterDiffCacheKey = 'special:master_diff_ranking_remote';
-  static const String masterDiffCacheTimestampKey = 'special:master_diff_ranking_remote:timestamp';
-  
+
   // EXPERT定数差值排行榜相关缓存key
   static const String expertDiffCacheKey = 'special:expert_diff_ranking_remote';
-  static const String expertDiffCacheTimestampKey = 'special:expert_diff_ranking_remote:timestamp';
-  
+
   // 反向定数差值排行榜相关缓存key
   static const String reverseDiffCacheKey = 'special:reverse_diff_ranking_remote';
-  static const String reverseDiffCacheTimestampKey = 'special:reverse_diff_ranking_remote:timestamp';
-  
+
   // 反向MASTER/RE:MASTER定数差值排行榜相关缓存key
   static const String reverseMasterDiffCacheKey = 'special:reverse_master_diff_ranking_remote';
-  static const String reverseMasterDiffCacheTimestampKey = 'special:reverse_master_diff_ranking_remote:timestamp';
-  
+
   // 反向EXPERT定数差值排行榜相关缓存key
   static const String reverseExpertDiffCacheKey = 'special:reverse_expert_diff_ranking_remote';
-  static const String reverseExpertDiffCacheTimestampKey = 'special:reverse_expert_diff_ranking_remote:timestamp';
-  
+
   // 样本总数排行榜相关缓存key
   static const String sampleCountCacheKey = 'special:sample_count_ranking_remote';
-  static const String sampleCountCacheTimestampKey = 'special:sample_count_ranking_remote:timestamp';
-  
+
   // 物量排行榜相关缓存key
   static const String noteCountCacheKey = 'special:note_count_ranking_remote';
-  static const String noteCountCacheTimestampKey = 'special:note_count_ranking_remote:timestamp';
-  
+
   // 平均达成排行榜相关缓存key
   static const String avgAchievementCacheKey = 'special:avg_achievement_ranking_remote';
-  static const String avgAchievementCacheTimestampKey = 'special:avg_achievement_ranking_remote:timestamp';
-  
+
   // MASTER/RE:MASTER平均达成排行榜相关缓存key
   static const String masterAvgAchievementCacheKey = 'special:master_avg_achievement_ranking_remote';
-  static const String masterAvgAchievementCacheTimestampKey = 'special:master_avg_achievement_ranking_remote:timestamp';
-  
+
   // EXPERT平均达成排行榜相关缓存key
   static const String expertAvgAchievementCacheKey = 'special:expert_avg_achievement_ranking_remote';
-  static const String expertAvgAchievementCacheTimestampKey = 'special:expert_avg_achievement_ranking_remote:timestamp';
 
-  // 获取谱面绝赞总数排行榜
+  /// 仅读取缓存，不触发重新计算。缓存不存在时返回空列表，页面可据此决定是否显示重新计算进度。
   Future<List<SpecialRankingEntry>> getBreakCountRanking({
     int limit = 100,
-    Function(int)? onProgress,
   }) async {
     List<SpecialRankingEntry> result = [];
     
@@ -143,58 +130,40 @@ class SpecialRankingListService {
         
         if (localCacheEmpty) {
           debugPrint('[SpecialRankingListService] Local cache is empty, checking remote cache');
-          
-          // 检查远程缓存时间戳
-          dynamic timestampResult = await conn.send_object(['GET', remoteCacheTimestampKey]);
-          int? remoteTimestamp;
-          if (timestampResult is String) {
-            remoteTimestamp = int.tryParse(timestampResult);
-          }
-          
-          bool remoteCacheValid = false;
-          if (remoteTimestamp != null) {
-            int currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-            remoteCacheValid = (currentTime - remoteTimestamp) < cacheExpireSeconds;
-          }
-          
+
+          // 检查远程缓存是否存在（由Redis自动根据TTL过期）
+          dynamic remoteData = await conn.send_object(['GET', remoteCacheKey]);
+          bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
+
           if (remoteCacheValid) {
             // 远程缓存有效，加载远程缓存
             debugPrint('[SpecialRankingListService] Loading from remote cache');
-            dynamic remoteData = await conn.send_object(['GET', remoteCacheKey]);
-            if (remoteData is String) {
-              try {
-                List<dynamic> remoteList = json.decode(remoteData);
-                for (int i = 0; i < remoteList.length; i++) {
-                  Map<String, dynamic> item = remoteList[i];
-                  result.add(SpecialRankingEntry(
-                    rank: i + 1,
-                    songId: item['songId'],
-                    songTitle: item['songTitle'],
-                    songType: item['songType'],
-                    difficultyIndex: item['difficultyIndex'],
-                    difficultyLabel: item['difficultyLabel'],
-                    ds: item['ds'],
-                    breakCount: item['breakCount'],
-                    updateTime: item['updateTime'],
-                  ));
-                }
-                debugPrint('[SpecialRankingListService] Loaded ${result.length} entries from remote cache');
-              } catch (e) {
-                debugPrint('[SpecialRankingListService] Failed to parse remote cache: $e');
+            String rawRemoteData = remoteData;
+            try {
+              List<dynamic> remoteList = json.decode(rawRemoteData);
+              for (int i = 0; i < remoteList.length; i++) {
+                Map<String, dynamic> item = remoteList[i];
+                result.add(SpecialRankingEntry(
+                  rank: i + 1,
+                  songId: item['songId'],
+                  songTitle: item['songTitle'],
+                  songType: item['songType'],
+                  difficultyIndex: item['difficultyIndex'],
+                  difficultyLabel: item['difficultyLabel'],
+                  ds: item['ds'],
+                  breakCount: item['breakCount'],
+                  updateTime: item['updateTime'],
+                ));
               }
+              debugPrint('[SpecialRankingListService] Loaded ${result.length} entries from remote cache');
+            } catch (e) {
+              debugPrint('[SpecialRankingListService] Failed to parse remote cache: $e');
             }
           }
           
-          // 远程缓存也无效或为空，重新计算
+          // 缓存不存在也不触发重新计算，由调用方决定是否显示重新计算进度
           if (result.isEmpty) {
-            debugPrint('[SpecialRankingListService] Remote cache empty or expired, recalculating...');
-            await _recalculateAndCacheRanking(conn, onProgress);
-            
-            // 重新获取计算后的结果
-            redisResult = await conn.send_object(
-              ['ZREVRANGE', key, 0, limit - 1, 'WITHSCORES']
-            );
-            localCacheEmpty = redisResult == null || redisResult.isEmpty;
+            debugPrint('[SpecialRankingListService] No cached data available, returning empty. Page should trigger background recalc.');
           }
         }
         
@@ -312,44 +281,33 @@ class SpecialRankingListService {
       try {
         await conn.send_object(['AUTH', redisPassword]);
         
-        // 检查远程缓存
-        dynamic timestampResult = await conn.send_object(['GET', diffCacheTimestampKey]);
-        int? remoteTimestamp;
-        if (timestampResult is String) {
-          remoteTimestamp = int.tryParse(timestampResult);
-        }
-        
-        bool remoteCacheValid = false;
-        if (remoteTimestamp != null) {
-          int currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-          remoteCacheValid = (currentTime - remoteTimestamp) < cacheExpireSeconds;
-        }
-        
+        // 检查远程缓存是否存在（由Redis自动根据TTL过期）
+        dynamic remoteData = await conn.send_object(['GET', diffCacheKey]);
+        bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
+
         if (remoteCacheValid) {
           debugPrint('[SpecialRankingListService] Loading difficulty diff ranking from remote cache');
-          dynamic remoteData = await conn.send_object(['GET', diffCacheKey]);
-          if (remoteData is String) {
-            try {
-              List<dynamic> remoteList = json.decode(remoteData);
-              for (int i = 0; i < remoteList.length && i < limit; i++) {
-                Map<String, dynamic> item = remoteList[i];
-                result.add(SpecialRankingEntry(
-                  rank: i + 1,
-                  songId: item['songId'],
-                  songTitle: item['songTitle'],
-                  songType: item['songType'],
-                  difficultyIndex: item['difficultyIndex'],
-                  difficultyLabel: item['difficultyLabel'],
-                  ds: item['ds'],
-                  breakCount: item['breakCount'], // 这里用breakCount存储差值
-                  updateTime: item['updateTime'],
-                ));
-              }
-              debugPrint('[SpecialRankingListService] Loaded ${result.length} entries from remote cache');
-              return result;
-            } catch (e) {
-              debugPrint('[SpecialRankingListService] Failed to parse remote cache: $e');
+          String rawRemoteData = remoteData;
+          try {
+            List<dynamic> remoteList = json.decode(rawRemoteData);
+            for (int i = 0; i < remoteList.length && i < limit; i++) {
+              Map<String, dynamic> item = remoteList[i];
+              result.add(SpecialRankingEntry(
+                rank: i + 1,
+                songId: item['songId'],
+                songTitle: item['songTitle'],
+                songType: item['songType'],
+                difficultyIndex: item['difficultyIndex'],
+                difficultyLabel: item['difficultyLabel'],
+                ds: item['ds'],
+                breakCount: item['breakCount'], // 这里用breakCount存储差值
+                updateTime: item['updateTime'],
+              ));
             }
+            debugPrint('[SpecialRankingListService] Loaded ${result.length} entries from remote cache');
+            return result;
+          } catch (e) {
+            debugPrint('[SpecialRankingListService] Failed to parse remote cache: $e');
           }
         }
         
@@ -472,9 +430,7 @@ class SpecialRankingListService {
         
         // 缓存到远程
         if (result.isNotEmpty) {
-          await conn.send_object(['SET', diffCacheKey, json.encode(result)]);
-          await conn.send_object(['SET', diffCacheTimestampKey, 
-              (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString()]);
+          await conn.send_object(['SET', diffCacheKey, json.encode(result), 'EX', cacheExpireSeconds.toString()]);
           debugPrint('[SpecialRankingListService] Difficulty diff ranking cached to remote');
         }
         
@@ -505,44 +461,33 @@ class SpecialRankingListService {
       try {
         await conn.send_object(['AUTH', redisPassword]);
         
-        // 检查远程缓存
-        dynamic timestampResult = await conn.send_object(['GET', masterDiffCacheTimestampKey]);
-        int? remoteTimestamp;
-        if (timestampResult is String) {
-          remoteTimestamp = int.tryParse(timestampResult);
-        }
-        
-        bool remoteCacheValid = false;
-        if (remoteTimestamp != null) {
-          int currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-          remoteCacheValid = (currentTime - remoteTimestamp) < cacheExpireSeconds;
-        }
-        
+        // 检查远程缓存是否存在（由Redis自动根据TTL过期）
+        dynamic remoteData = await conn.send_object(['GET', masterDiffCacheKey]);
+        bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
+
         if (remoteCacheValid) {
           debugPrint('[SpecialRankingListService] Loading master diff ranking from remote cache');
-          dynamic remoteData = await conn.send_object(['GET', masterDiffCacheKey]);
-          if (remoteData is String) {
-            try {
-              List<dynamic> remoteList = json.decode(remoteData);
-              for (int i = 0; i < remoteList.length && i < limit; i++) {
-                Map<String, dynamic> item = remoteList[i];
-                result.add(SpecialRankingEntry(
-                  rank: i + 1,
-                  songId: item['songId'],
-                  songTitle: item['songTitle'],
-                  songType: item['songType'],
-                  difficultyIndex: item['difficultyIndex'],
-                  difficultyLabel: item['difficultyLabel'],
-                  ds: item['ds'],
-                  breakCount: item['breakCount'],
-                  updateTime: item['updateTime'],
-                ));
-              }
-              debugPrint('[SpecialRankingListService] Loaded ${result.length} entries from remote cache');
-              return result;
-            } catch (e) {
-              debugPrint('[SpecialRankingListService] Failed to parse remote cache: $e');
+          String rawRemoteData = remoteData;
+          try {
+            List<dynamic> remoteList = json.decode(rawRemoteData);
+            for (int i = 0; i < remoteList.length && i < limit; i++) {
+              Map<String, dynamic> item = remoteList[i];
+              result.add(SpecialRankingEntry(
+                rank: i + 1,
+                songId: item['songId'],
+                songTitle: item['songTitle'],
+                songType: item['songType'],
+                difficultyIndex: item['difficultyIndex'],
+                difficultyLabel: item['difficultyLabel'],
+                ds: item['ds'],
+                breakCount: item['breakCount'],
+                updateTime: item['updateTime'],
+              ));
             }
+            debugPrint('[SpecialRankingListService] Loaded ${result.length} entries from remote cache');
+            return result;
+          } catch (e) {
+            debugPrint('[SpecialRankingListService] Failed to parse remote cache: $e');
           }
         }
         
@@ -656,9 +601,7 @@ class SpecialRankingListService {
         
         // 缓存到远程
         if (result.isNotEmpty) {
-          await conn.send_object(['SET', masterDiffCacheKey, json.encode(result)]);
-          await conn.send_object(['SET', masterDiffCacheTimestampKey, 
-              (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString()]);
+          await conn.send_object(['SET', masterDiffCacheKey, json.encode(result), 'EX', cacheExpireSeconds.toString()]);
           debugPrint('[SpecialRankingListService] Master diff ranking cached to remote');
         }
         
@@ -689,41 +632,30 @@ class SpecialRankingListService {
       try {
         await conn.send_object(['AUTH', redisPassword]);
         
-        // 检查远程缓存
-        dynamic timestampResult = await conn.send_object(['GET', expertDiffCacheTimestampKey]);
-        int? remoteTimestamp;
-        if (timestampResult is String) {
-          remoteTimestamp = int.tryParse(timestampResult);
-        }
-        
-        bool remoteCacheValid = false;
-        if (remoteTimestamp != null) {
-          int currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-          remoteCacheValid = (currentTime - remoteTimestamp) < cacheExpireSeconds;
-        }
-        
+        // 检查远程缓存是否存在（由Redis自动根据TTL过期）
+        dynamic remoteData = await conn.send_object(['GET', expertDiffCacheKey]);
+        bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
+
         if (remoteCacheValid) {
           debugPrint('[SpecialRankingListService] Loading expert diff ranking from remote cache');
-          dynamic remoteData = await conn.send_object(['GET', expertDiffCacheKey]);
-          if (remoteData is String) {
-            try {
-              List<dynamic> remoteList = json.decode(remoteData);
-              for (var item in remoteList) {
-                result.add(SpecialRankingEntry(
-                  rank: item['rank'],
-                  songId: item['songId'],
-                  songTitle: item['songTitle'],
-                  songType: item['songType'],
-                  difficultyIndex: item['difficultyIndex'],
-                  difficultyLabel: item['difficultyLabel'],
-                  ds: item['ds'],
-                  breakCount: item['breakCount'],
-                  updateTime: item['updateTime'],
-                ));
-              }
-            } catch (e) {
-              debugPrint('[SpecialRankingListService] Failed to parse remote expert diff ranking: $e');
+          String rawRemoteData = remoteData;
+          try {
+            List<dynamic> remoteList = json.decode(rawRemoteData);
+            for (var item in remoteList) {
+              result.add(SpecialRankingEntry(
+                rank: item['rank'],
+                songId: item['songId'],
+                songTitle: item['songTitle'],
+                songType: item['songType'],
+                difficultyIndex: item['difficultyIndex'],
+                difficultyLabel: item['difficultyLabel'],
+                ds: item['ds'],
+                breakCount: item['breakCount'],
+                updateTime: item['updateTime'],
+              ));
             }
+          } catch (e) {
+            debugPrint('[SpecialRankingListService] Failed to parse remote expert diff ranking: $e');
           }
         }
         
@@ -838,9 +770,7 @@ class SpecialRankingListService {
           
           // 缓存到远程
           if (result.isNotEmpty) {
-            await conn.send_object(['SET', expertDiffCacheKey, json.encode(result)]);
-            await conn.send_object(['SET', expertDiffCacheTimestampKey, 
-                (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString()]);
+            await conn.send_object(['SET', expertDiffCacheKey, json.encode(result), 'EX', cacheExpireSeconds.toString()]);
             debugPrint('[SpecialRankingListService] Expert diff ranking cached to remote');
           }
           
@@ -871,41 +801,30 @@ class SpecialRankingListService {
       try {
         await conn.send_object(['AUTH', redisPassword]);
         
-        // 检查远程缓存
-        dynamic timestampResult = await conn.send_object(['GET', reverseDiffCacheTimestampKey]);
-        int? remoteTimestamp;
-        if (timestampResult is String) {
-          remoteTimestamp = int.tryParse(timestampResult);
-        }
-        
-        bool remoteCacheValid = false;
-        if (remoteTimestamp != null) {
-          int currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-          remoteCacheValid = (currentTime - remoteTimestamp) < cacheExpireSeconds;
-        }
-        
+        // 检查远程缓存是否存在（由Redis自动根据TTL过期）
+        dynamic remoteData = await conn.send_object(['GET', reverseDiffCacheKey]);
+        bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
+
         if (remoteCacheValid) {
           debugPrint('[SpecialRankingListService] Loading reverse diff ranking from remote cache');
-          dynamic remoteData = await conn.send_object(['GET', reverseDiffCacheKey]);
-          if (remoteData is String) {
-            try {
-              List<dynamic> remoteList = json.decode(remoteData);
-              for (var item in remoteList) {
-                result.add(SpecialRankingEntry(
-                  rank: item['rank'],
-                  songId: item['songId'],
-                  songTitle: item['songTitle'],
-                  songType: item['songType'],
-                  difficultyIndex: item['difficultyIndex'],
-                  difficultyLabel: item['difficultyLabel'],
-                  ds: item['ds'],
-                  breakCount: item['breakCount'],
-                  updateTime: item['updateTime'],
-                ));
-              }
-            } catch (e) {
-              debugPrint('[SpecialRankingListService] Failed to parse remote reverse diff ranking: $e');
+          String rawRemoteData = remoteData;
+          try {
+            List<dynamic> remoteList = json.decode(rawRemoteData);
+            for (var item in remoteList) {
+              result.add(SpecialRankingEntry(
+                rank: item['rank'],
+                songId: item['songId'],
+                songTitle: item['songTitle'],
+                songType: item['songType'],
+                difficultyIndex: item['difficultyIndex'],
+                difficultyLabel: item['difficultyLabel'],
+                ds: item['ds'],
+                breakCount: item['breakCount'],
+                updateTime: item['updateTime'],
+              ));
             }
+          } catch (e) {
+            debugPrint('[SpecialRankingListService] Failed to parse remote reverse diff ranking: $e');
           }
         }
         
@@ -1019,9 +938,7 @@ class SpecialRankingListService {
           
           // 缓存到远程
           if (result.isNotEmpty) {
-            await conn.send_object(['SET', reverseDiffCacheKey, json.encode(result)]);
-            await conn.send_object(['SET', reverseDiffCacheTimestampKey, 
-                (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString()]);
+            await conn.send_object(['SET', reverseDiffCacheKey, json.encode(result), 'EX', cacheExpireSeconds.toString()]);
             debugPrint('[SpecialRankingListService] Reverse diff ranking cached to remote');
           }
           
@@ -1052,41 +969,30 @@ class SpecialRankingListService {
       try {
         await conn.send_object(['AUTH', redisPassword]);
         
-        // 检查远程缓存
-        dynamic timestampResult = await conn.send_object(['GET', reverseMasterDiffCacheTimestampKey]);
-        int? remoteTimestamp;
-        if (timestampResult is String) {
-          remoteTimestamp = int.tryParse(timestampResult);
-        }
-        
-        bool remoteCacheValid = false;
-        if (remoteTimestamp != null) {
-          int currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-          remoteCacheValid = (currentTime - remoteTimestamp) < cacheExpireSeconds;
-        }
-        
+        // 检查远程缓存是否存在（由Redis自动根据TTL过期）
+        dynamic remoteData = await conn.send_object(['GET', reverseMasterDiffCacheKey]);
+        bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
+
         if (remoteCacheValid) {
           debugPrint('[SpecialRankingListService] Loading reverse master diff ranking from remote cache');
-          dynamic remoteData = await conn.send_object(['GET', reverseMasterDiffCacheKey]);
-          if (remoteData is String) {
-            try {
-              List<dynamic> remoteList = json.decode(remoteData);
-              for (var item in remoteList) {
-                result.add(SpecialRankingEntry(
-                  rank: item['rank'],
-                  songId: item['songId'],
-                  songTitle: item['songTitle'],
-                  songType: item['songType'],
-                  difficultyIndex: item['difficultyIndex'],
-                  difficultyLabel: item['difficultyLabel'],
-                  ds: item['ds'],
-                  breakCount: item['breakCount'],
-                  updateTime: item['updateTime'],
-                ));
-              }
-            } catch (e) {
-              debugPrint('[SpecialRankingListService] Failed to parse remote reverse master diff ranking: $e');
+          String rawRemoteData = remoteData;
+          try {
+            List<dynamic> remoteList = json.decode(rawRemoteData);
+            for (var item in remoteList) {
+              result.add(SpecialRankingEntry(
+                rank: item['rank'],
+                songId: item['songId'],
+                songTitle: item['songTitle'],
+                songType: item['songType'],
+                difficultyIndex: item['difficultyIndex'],
+                difficultyLabel: item['difficultyLabel'],
+                ds: item['ds'],
+                breakCount: item['breakCount'],
+                updateTime: item['updateTime'],
+              ));
             }
+          } catch (e) {
+            debugPrint('[SpecialRankingListService] Failed to parse remote reverse master diff ranking: $e');
           }
         }
         
@@ -1200,9 +1106,7 @@ class SpecialRankingListService {
           
           // 缓存到远程
           if (result.isNotEmpty) {
-            await conn.send_object(['SET', reverseMasterDiffCacheKey, json.encode(result)]);
-            await conn.send_object(['SET', reverseMasterDiffCacheTimestampKey, 
-                (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString()]);
+            await conn.send_object(['SET', reverseMasterDiffCacheKey, json.encode(result), 'EX', cacheExpireSeconds.toString()]);
             debugPrint('[SpecialRankingListService] Reverse master diff ranking cached to remote');
           }
           
@@ -1233,41 +1137,30 @@ class SpecialRankingListService {
       try {
         await conn.send_object(['AUTH', redisPassword]);
         
-        // 检查远程缓存
-        dynamic timestampResult = await conn.send_object(['GET', reverseExpertDiffCacheTimestampKey]);
-        int? remoteTimestamp;
-        if (timestampResult is String) {
-          remoteTimestamp = int.tryParse(timestampResult);
-        }
-        
-        bool remoteCacheValid = false;
-        if (remoteTimestamp != null) {
-          int currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-          remoteCacheValid = (currentTime - remoteTimestamp) < cacheExpireSeconds;
-        }
-        
+        // 检查远程缓存是否存在（由Redis自动根据TTL过期）
+        dynamic remoteData = await conn.send_object(['GET', reverseExpertDiffCacheKey]);
+        bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
+
         if (remoteCacheValid) {
           debugPrint('[SpecialRankingListService] Loading reverse expert diff ranking from remote cache');
-          dynamic remoteData = await conn.send_object(['GET', reverseExpertDiffCacheKey]);
-          if (remoteData is String) {
-            try {
-              List<dynamic> remoteList = json.decode(remoteData);
-              for (var item in remoteList) {
-                result.add(SpecialRankingEntry(
-                  rank: item['rank'],
-                  songId: item['songId'],
-                  songTitle: item['songTitle'],
-                  songType: item['songType'],
-                  difficultyIndex: item['difficultyIndex'],
-                  difficultyLabel: item['difficultyLabel'],
-                  ds: item['ds'],
-                  breakCount: item['breakCount'],
-                  updateTime: item['updateTime'],
-                ));
-              }
-            } catch (e) {
-              debugPrint('[SpecialRankingListService] Failed to parse remote reverse expert diff ranking: $e');
+          String rawRemoteData = remoteData;
+          try {
+            List<dynamic> remoteList = json.decode(rawRemoteData);
+            for (var item in remoteList) {
+              result.add(SpecialRankingEntry(
+                rank: item['rank'],
+                songId: item['songId'],
+                songTitle: item['songTitle'],
+                songType: item['songType'],
+                difficultyIndex: item['difficultyIndex'],
+                difficultyLabel: item['difficultyLabel'],
+                ds: item['ds'],
+                breakCount: item['breakCount'],
+                updateTime: item['updateTime'],
+              ));
             }
+          } catch (e) {
+            debugPrint('[SpecialRankingListService] Failed to parse remote reverse expert diff ranking: $e');
           }
         }
         
@@ -1382,9 +1275,7 @@ class SpecialRankingListService {
           
           // 缓存到远程
           if (result.isNotEmpty) {
-            await conn.send_object(['SET', reverseExpertDiffCacheKey, json.encode(result)]);
-            await conn.send_object(['SET', reverseExpertDiffCacheTimestampKey, 
-                (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString()]);
+            await conn.send_object(['SET', reverseExpertDiffCacheKey, json.encode(result), 'EX', cacheExpireSeconds.toString()]);
             debugPrint('[SpecialRankingListService] Reverse expert diff ranking cached to remote');
           }
           
@@ -1415,41 +1306,30 @@ class SpecialRankingListService {
       try {
         await conn.send_object(['AUTH', redisPassword]);
         
-        // 检查远程缓存
-        dynamic timestampResult = await conn.send_object(['GET', sampleCountCacheTimestampKey]);
-        int? remoteTimestamp;
-        if (timestampResult is String) {
-          remoteTimestamp = int.tryParse(timestampResult);
-        }
-        
-        bool remoteCacheValid = false;
-        if (remoteTimestamp != null) {
-          int currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-          remoteCacheValid = (currentTime - remoteTimestamp) < cacheExpireSeconds;
-        }
-        
+        // 检查远程缓存是否存在（由Redis自动根据TTL过期）
+        dynamic remoteData = await conn.send_object(['GET', sampleCountCacheKey]);
+        bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
+
         if (remoteCacheValid) {
           debugPrint('[SpecialRankingListService] Loading sample count ranking from remote cache');
-          dynamic remoteData = await conn.send_object(['GET', sampleCountCacheKey]);
-          if (remoteData is String) {
-            try {
-              List<dynamic> remoteList = json.decode(remoteData);
-              for (var item in remoteList) {
-                result.add(SpecialRankingEntry(
-                  rank: item['rank'],
-                  songId: item['songId'],
-                  songTitle: item['songTitle'],
-                  songType: item['songType'],
-                  difficultyIndex: item['difficultyIndex'],
-                  difficultyLabel: item['difficultyLabel'],
-                  ds: item['ds'],
-                  breakCount: item['breakCount'],
-                  updateTime: item['updateTime'],
-                ));
-              }
-            } catch (e) {
-              debugPrint('[SpecialRankingListService] Failed to parse remote sample count ranking: $e');
+          String rawRemoteData = remoteData;
+          try {
+            List<dynamic> remoteList = json.decode(rawRemoteData);
+            for (var item in remoteList) {
+              result.add(SpecialRankingEntry(
+                rank: item['rank'],
+                songId: item['songId'],
+                songTitle: item['songTitle'],
+                songType: item['songType'],
+                difficultyIndex: item['difficultyIndex'],
+                difficultyLabel: item['difficultyLabel'],
+                ds: item['ds'],
+                breakCount: item['breakCount'],
+                updateTime: item['updateTime'],
+              ));
             }
+          } catch (e) {
+            debugPrint('[SpecialRankingListService] Failed to parse remote sample count ranking: $e');
           }
         }
         
@@ -1559,9 +1439,7 @@ class SpecialRankingListService {
           
           // 缓存到远程
           if (result.isNotEmpty) {
-            await conn.send_object(['SET', sampleCountCacheKey, json.encode(result)]);
-            await conn.send_object(['SET', sampleCountCacheTimestampKey, 
-                (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString()]);
+            await conn.send_object(['SET', sampleCountCacheKey, json.encode(result), 'EX', cacheExpireSeconds.toString()]);
             debugPrint('[SpecialRankingListService] Sample count ranking cached to remote');
           }
           
@@ -1592,44 +1470,33 @@ class SpecialRankingListService {
       try {
         await conn.send_object(['AUTH', redisPassword]);
         
-        // 检查远程缓存
-        dynamic timestampResult = await conn.send_object(['GET', noteCountCacheTimestampKey]);
-        int? remoteTimestamp;
-        if (timestampResult is String) {
-          remoteTimestamp = int.tryParse(timestampResult);
-        }
-        
-        bool remoteCacheValid = false;
-        if (remoteTimestamp != null) {
-          int currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-          remoteCacheValid = (currentTime - remoteTimestamp) < cacheExpireSeconds;
-        }
-        
+        // 检查远程缓存是否存在（由Redis自动根据TTL过期）
+        dynamic remoteData = await conn.send_object(['GET', noteCountCacheKey]);
+        bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
+
         if (remoteCacheValid) {
           debugPrint('[SpecialRankingListService] Loading note count ranking from remote cache');
-          dynamic remoteData = await conn.send_object(['GET', noteCountCacheKey]);
-          if (remoteData is String) {
-            try {
-              List<dynamic> remoteList = json.decode(remoteData);
-              for (int i = 0; i < remoteList.length && i < limit; i++) {
-                Map<String, dynamic> item = remoteList[i];
-                result.add(SpecialRankingEntry(
-                  rank: i + 1,
-                  songId: item['songId'],
-                  songTitle: item['songTitle'],
-                  songType: item['songType'],
-                  difficultyIndex: item['difficultyIndex'],
-                  difficultyLabel: item['difficultyLabel'],
-                  ds: item['ds'],
-                  breakCount: item['breakCount'],
-                  updateTime: item['updateTime'],
-                ));
-              }
-              debugPrint('[SpecialRankingListService] Loaded ${result.length} entries from remote cache');
-              return result;
-            } catch (e) {
-              debugPrint('[SpecialRankingListService] Failed to parse remote cache: $e');
+          String rawRemoteData = remoteData;
+          try {
+            List<dynamic> remoteList = json.decode(rawRemoteData);
+            for (int i = 0; i < remoteList.length && i < limit; i++) {
+              Map<String, dynamic> item = remoteList[i];
+              result.add(SpecialRankingEntry(
+                rank: i + 1,
+                songId: item['songId'],
+                songTitle: item['songTitle'],
+                songType: item['songType'],
+                difficultyIndex: item['difficultyIndex'],
+                difficultyLabel: item['difficultyLabel'],
+                ds: item['ds'],
+                breakCount: item['breakCount'],
+                updateTime: item['updateTime'],
+              ));
             }
+            debugPrint('[SpecialRankingListService] Loaded ${result.length} entries from remote cache');
+            return result;
+          } catch (e) {
+            debugPrint('[SpecialRankingListService] Failed to parse remote cache: $e');
           }
         }
         
@@ -1722,9 +1589,7 @@ class SpecialRankingListService {
         
         // 缓存到远程
         if (result.isNotEmpty) {
-          await conn.send_object(['SET', noteCountCacheKey, json.encode(result)]);
-          await conn.send_object(['SET', noteCountCacheTimestampKey, 
-              (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString()]);
+          await conn.send_object(['SET', noteCountCacheKey, json.encode(result), 'EX', cacheExpireSeconds.toString()]);
           debugPrint('[SpecialRankingListService] Note count ranking cached to remote');
         }
         
@@ -1755,44 +1620,33 @@ class SpecialRankingListService {
       try {
         await conn.send_object(['AUTH', redisPassword]);
         
-        // 检查远程缓存
-        dynamic timestampResult = await conn.send_object(['GET', avgAchievementCacheTimestampKey]);
-        int? remoteTimestamp;
-        if (timestampResult is String) {
-          remoteTimestamp = int.tryParse(timestampResult);
-        }
-        
-        bool remoteCacheValid = false;
-        if (remoteTimestamp != null) {
-          int currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-          remoteCacheValid = (currentTime - remoteTimestamp) < cacheExpireSeconds;
-        }
-        
+        // 检查远程缓存是否存在（由Redis自动根据TTL过期）
+        dynamic remoteData = await conn.send_object(['GET', avgAchievementCacheKey]);
+        bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
+
         if (remoteCacheValid) {
           debugPrint('[SpecialRankingListService] Loading avg achievement ranking from remote cache');
-          dynamic remoteData = await conn.send_object(['GET', avgAchievementCacheKey]);
-          if (remoteData is String) {
-            try {
-              List<dynamic> remoteList = json.decode(remoteData);
-              for (int i = 0; i < remoteList.length && i < limit; i++) {
-                Map<String, dynamic> item = remoteList[i];
-                result.add(SpecialRankingEntry(
-                  rank: i + 1,
-                  songId: item['songId'],
-                  songTitle: item['songTitle'],
-                  songType: item['songType'],
-                  difficultyIndex: item['difficultyIndex'],
-                  difficultyLabel: item['difficultyLabel'],
-                  ds: item['ds'],
-                  breakCount: item['breakCount'],
-                  updateTime: item['updateTime'],
-                ));
-              }
-              debugPrint('[SpecialRankingListService] Loaded ${result.length} entries from remote cache');
-              return result;
-            } catch (e) {
-              debugPrint('[SpecialRankingListService] Failed to parse remote cache: $e');
+          String rawRemoteData = remoteData;
+          try {
+            List<dynamic> remoteList = json.decode(rawRemoteData);
+            for (int i = 0; i < remoteList.length && i < limit; i++) {
+              Map<String, dynamic> item = remoteList[i];
+              result.add(SpecialRankingEntry(
+                rank: i + 1,
+                songId: item['songId'],
+                songTitle: item['songTitle'],
+                songType: item['songType'],
+                difficultyIndex: item['difficultyIndex'],
+                difficultyLabel: item['difficultyLabel'],
+                ds: item['ds'],
+                breakCount: item['breakCount'],
+                updateTime: item['updateTime'],
+              ));
             }
+            debugPrint('[SpecialRankingListService] Loaded ${result.length} entries from remote cache');
+            return result;
+          } catch (e) {
+            debugPrint('[SpecialRankingListService] Failed to parse remote cache: $e');
           }
         }
         
@@ -1920,9 +1774,7 @@ class SpecialRankingListService {
         
         // 缓存到远程
         if (result.isNotEmpty) {
-          await conn.send_object(['SET', avgAchievementCacheKey, json.encode(result)]);
-          await conn.send_object(['SET', avgAchievementCacheTimestampKey, 
-              (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString()]);
+          await conn.send_object(['SET', avgAchievementCacheKey, json.encode(result), 'EX', cacheExpireSeconds.toString()]);
           debugPrint('[SpecialRankingListService] Avg achievement ranking cached to remote');
         }
         
@@ -1953,44 +1805,33 @@ class SpecialRankingListService {
       try {
         await conn.send_object(['AUTH', redisPassword]);
         
-        // 检查远程缓存
-        dynamic timestampResult = await conn.send_object(['GET', masterAvgAchievementCacheTimestampKey]);
-        int? remoteTimestamp;
-        if (timestampResult is String) {
-          remoteTimestamp = int.tryParse(timestampResult);
-        }
-        
-        bool remoteCacheValid = false;
-        if (remoteTimestamp != null) {
-          int currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-          remoteCacheValid = (currentTime - remoteTimestamp) < cacheExpireSeconds;
-        }
-        
+        // 检查远程缓存是否存在（由Redis自动根据TTL过期）
+        dynamic remoteData = await conn.send_object(['GET', masterAvgAchievementCacheKey]);
+        bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
+
         if (remoteCacheValid) {
           debugPrint('[SpecialRankingListService] Loading master avg achievement ranking from remote cache');
-          dynamic remoteData = await conn.send_object(['GET', masterAvgAchievementCacheKey]);
-          if (remoteData is String) {
-            try {
-              List<dynamic> remoteList = json.decode(remoteData);
-              for (int i = 0; i < remoteList.length && i < limit; i++) {
-                Map<String, dynamic> item = remoteList[i];
-                result.add(SpecialRankingEntry(
-                  rank: i + 1,
-                  songId: item['songId'],
-                  songTitle: item['songTitle'],
-                  songType: item['songType'],
-                  difficultyIndex: item['difficultyIndex'],
-                  difficultyLabel: item['difficultyLabel'],
-                  ds: item['ds'],
-                  breakCount: item['breakCount'],
-                  updateTime: item['updateTime'],
-                ));
-              }
-              debugPrint('[SpecialRankingListService] Loaded ${result.length} entries from remote cache');
-              return result;
-            } catch (e) {
-              debugPrint('[SpecialRankingListService] Failed to parse remote cache: $e');
+          String rawRemoteData = remoteData;
+          try {
+            List<dynamic> remoteList = json.decode(rawRemoteData);
+            for (int i = 0; i < remoteList.length && i < limit; i++) {
+              Map<String, dynamic> item = remoteList[i];
+              result.add(SpecialRankingEntry(
+                rank: i + 1,
+                songId: item['songId'],
+                songTitle: item['songTitle'],
+                songType: item['songType'],
+                difficultyIndex: item['difficultyIndex'],
+                difficultyLabel: item['difficultyLabel'],
+                ds: item['ds'],
+                breakCount: item['breakCount'],
+                updateTime: item['updateTime'],
+              ));
             }
+            debugPrint('[SpecialRankingListService] Loaded ${result.length} entries from remote cache');
+            return result;
+          } catch (e) {
+            debugPrint('[SpecialRankingListService] Failed to parse remote cache: $e');
           }
         }
         
@@ -2110,9 +1951,7 @@ class SpecialRankingListService {
         
         // 缓存到远程
         if (result.isNotEmpty) {
-          await conn.send_object(['SET', masterAvgAchievementCacheKey, json.encode(result)]);
-          await conn.send_object(['SET', masterAvgAchievementCacheTimestampKey, 
-              (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString()]);
+          await conn.send_object(['SET', masterAvgAchievementCacheKey, json.encode(result), 'EX', cacheExpireSeconds.toString()]);
           debugPrint('[SpecialRankingListService] Master avg achievement ranking cached to remote');
         }
         
@@ -2143,44 +1982,33 @@ class SpecialRankingListService {
       try {
         await conn.send_object(['AUTH', redisPassword]);
         
-        // 检查远程缓存
-        dynamic timestampResult = await conn.send_object(['GET', expertAvgAchievementCacheTimestampKey]);
-        int? remoteTimestamp;
-        if (timestampResult is String) {
-          remoteTimestamp = int.tryParse(timestampResult);
-        }
-        
-        bool remoteCacheValid = false;
-        if (remoteTimestamp != null) {
-          int currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-          remoteCacheValid = (currentTime - remoteTimestamp) < cacheExpireSeconds;
-        }
-        
+        // 检查远程缓存是否存在（由Redis自动根据TTL过期）
+        dynamic remoteData = await conn.send_object(['GET', expertAvgAchievementCacheKey]);
+        bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
+
         if (remoteCacheValid) {
           debugPrint('[SpecialRankingListService] Loading expert avg achievement ranking from remote cache');
-          dynamic remoteData = await conn.send_object(['GET', expertAvgAchievementCacheKey]);
-          if (remoteData is String) {
-            try {
-              List<dynamic> remoteList = json.decode(remoteData);
-              for (int i = 0; i < remoteList.length && i < limit; i++) {
-                Map<String, dynamic> item = remoteList[i];
-                result.add(SpecialRankingEntry(
-                  rank: i + 1,
-                  songId: item['songId'],
-                  songTitle: item['songTitle'],
-                  songType: item['songType'],
-                  difficultyIndex: item['difficultyIndex'],
-                  difficultyLabel: item['difficultyLabel'],
-                  ds: item['ds'],
-                  breakCount: item['breakCount'],
-                  updateTime: item['updateTime'],
-                ));
-              }
-              debugPrint('[SpecialRankingListService] Loaded ${result.length} entries from remote cache');
-              return result;
-            } catch (e) {
-              debugPrint('[SpecialRankingListService] Failed to parse remote cache: $e');
+          String rawRemoteData = remoteData;
+          try {
+            List<dynamic> remoteList = json.decode(rawRemoteData);
+            for (int i = 0; i < remoteList.length && i < limit; i++) {
+              Map<String, dynamic> item = remoteList[i];
+              result.add(SpecialRankingEntry(
+                rank: i + 1,
+                songId: item['songId'],
+                songTitle: item['songTitle'],
+                songType: item['songType'],
+                difficultyIndex: item['difficultyIndex'],
+                difficultyLabel: item['difficultyLabel'],
+                ds: item['ds'],
+                breakCount: item['breakCount'],
+                updateTime: item['updateTime'],
+              ));
             }
+            debugPrint('[SpecialRankingListService] Loaded ${result.length} entries from remote cache');
+            return result;
+          } catch (e) {
+            debugPrint('[SpecialRankingListService] Failed to parse remote cache: $e');
           }
         }
         
@@ -2301,9 +2129,7 @@ class SpecialRankingListService {
         
         // 缓存到远程
         if (result.isNotEmpty) {
-          await conn.send_object(['SET', expertAvgAchievementCacheKey, json.encode(result)]);
-          await conn.send_object(['SET', expertAvgAchievementCacheTimestampKey, 
-              (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString()]);
+          await conn.send_object(['SET', expertAvgAchievementCacheKey, json.encode(result), 'EX', cacheExpireSeconds.toString()]);
           debugPrint('[SpecialRankingListService] Expert avg achievement ranking cached to remote');
         }
         
@@ -2363,6 +2189,14 @@ class SpecialRankingListService {
         // 初始化maidata管理器
         await MaidataManager().initialize();
         
+        // ==== 优化：先在内存中收集所有数据，再批量写入Redis，避免逐条网络往返 ====
+        // 收集ZADD参数: [score1, member1, score2, member2, ...]
+        final List<String> zaddMembers = [];
+        // 收集SET命令
+        final List<List<String>> setCommands = [];
+        // 记录更新时间戳（所有条目使用同一时间戳）
+        final String nowTimestamp = DateTime.now().millisecondsSinceEpoch.toString();
+        
         int updatedCount = 0;
         int excludedCount = 0;
         int failedCount = 0;
@@ -2385,7 +2219,6 @@ class SpecialRankingListService {
             if (maidataContent == null || maidataContent.isEmpty) {
               failedCount++;
               processedCount++;
-              debugPrint('[SpecialRankingListService] No maidata found for song ${song.id}, skipped');
               continue;
             }
             
@@ -2396,7 +2229,6 @@ class SpecialRankingListService {
             } catch (e) {
               failedCount++;
               processedCount++;
-              debugPrint('[SpecialRankingListService] Failed to decode maidata for song ${song.id}: $e, skipped');
               continue;
             }
             
@@ -2411,8 +2243,10 @@ class SpecialRankingListService {
                   int displayIndex = _getDisplayDifficultyIndex(song.id, chart.difficultyIndex);
                   if (displayIndex >= 0 && displayIndex <= 4) {
                     String songKey = '${song.id}:$displayIndex';
-                    await conn.send_object(['ZADD', 'special:song_break_count', breakCount.toString(), songKey]);
-                    await conn.send_object(['SET', 'special:song_break_count:updateTime:$songKey', DateTime.now().millisecondsSinceEpoch.toString()]);
+                    // 收集到内存中，暂不写入Redis
+                    zaddMembers.add(breakCount.toString());
+                    zaddMembers.add(songKey);
+                    setCommands.add(['SET', 'special:song_break_count:updateTime:$songKey', nowTimestamp]);
                     updatedCount++;
                   }
                 }
@@ -2420,7 +2254,6 @@ class SpecialRankingListService {
             }
           } catch (e) {
             failedCount++;
-            debugPrint('[SpecialRankingListService] Error processing song ${song.id}: $e, skipped');
           }
           
           processedCount++;
@@ -2432,7 +2265,24 @@ class SpecialRankingListService {
           }
         }
         
-        debugPrint('[SpecialRankingListService] Updated $updatedCount songs break counts, excluded $excludedCount maidata-added songs, failed $failedCount songs');
+        // ==== 批量写入Redis ====
+        // 1. 一次ZADD写入所有成员（替代逐个ZADD，减少~2000次网络往返到1次）
+        if (zaddMembers.isNotEmpty) {
+          await conn.send_object(['ZADD', 'special:song_break_count', ...zaddMembers]);
+        }
+        
+        // 2. 批量SET：禁用Nagle算法批量发送，再统一等待完成
+        if (setCommands.isNotEmpty) {
+          conn.pipe_start();
+          final List<Future> setFutures = [];
+          for (final cmd in setCommands) {
+            setFutures.add(conn.send_object(cmd));
+          }
+          await Future.wait(setFutures);
+          conn.pipe_end();
+        }
+        
+        debugPrint('[SpecialRankingListService] Updated $updatedCount charts break counts (${zaddMembers.length ~/ 2} entries), excluded $excludedCount maidata-added songs, failed $failedCount songs');
       } finally {
         try {
           await conn.send_object(['QUIT']);
@@ -2484,7 +2334,26 @@ class SpecialRankingListService {
     }
     return song.ds[index];
   }
-  
+
+  /// 触发绝赞数排行榜的重新计算（解析maidata），支持进度回调。
+  /// 计算完成后数据自动写入Redis缓存，页面再次调用 [getBreakCountRanking] 即可获取最新结果。
+  Future<void> recalculateBreakCountRanking({Function(int)? onProgress}) async {
+    try {
+      final conn = await RedisConnection().connect(redisHost, redisPort);
+      try {
+        await conn.send_object(['AUTH', redisPassword]);
+        await _recalculateAndCacheRanking(conn, onProgress);
+        debugPrint('[SpecialRankingListService] Break count ranking recalculated successfully');
+      } finally {
+        try {
+          await conn.send_object(['QUIT']);
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('[SpecialRankingListService] Error in recalculateBreakCountRanking: $e');
+    }
+  }
+
   // 重新计算排名并上传到远程缓存
   Future<void> _recalculateAndCacheRanking(Command? conn, Function(int)? onProgress) async {
     if (conn == null) return;
@@ -2574,12 +2443,8 @@ class SpecialRankingListService {
         
         // 上传到远程缓存
         String jsonData = json.encode(entries);
-        await conn.send_object(['SET', remoteCacheKey, jsonData]);
-        
-        // 设置时间戳和过期时间
-        int currentTime = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-        await conn.send_object(['SET', remoteCacheTimestampKey, currentTime.toString()]);
-        
+        await conn.send_object(['SET', remoteCacheKey, jsonData, 'EX', cacheExpireSeconds.toString()]);
+
         debugPrint('[SpecialRankingListService] Uploaded ranking to remote cache with ${entries.length} entries');
       }
     } catch (e) {

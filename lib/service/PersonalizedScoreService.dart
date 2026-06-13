@@ -426,6 +426,11 @@ class PersonalizedScoreService {
     };
   }
 
+  // 清空记录缓存，下次访问时重新从SharedPreferences加载
+  void clearRecordsCache() {
+    _recordsCache = null;
+  }
+
   // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析）
   bool _isMaidataSong(Song song) {
     if (song.cids.isEmpty) return false;

@@ -1,4 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:mysql1/mysql1.dart';
+import '../api/ApiUrls.dart';
+import '../api/DeveloperToken.dart';
+import '../constant/CacheKeyConstant.dart';
+import '../constant/CacheTimestampConstant.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/DiffMusicDataManager.dart';
@@ -7,15 +15,81 @@ import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+// 评论数据模型
+class CommentItem {
+  final int id;
+  final String songId;
+  final int? levelIndex;
+  final String userId;
+  final String dataSource;
+  final String originalId;
+  final String? nickname;
+  final String content;
+  final String? createdAt;
+
+  CommentItem({
+    required this.id,
+    required this.songId,
+    this.levelIndex,
+    required this.userId,
+    required this.dataSource,
+    required this.originalId,
+    this.nickname,
+    required this.content,
+    this.createdAt,
+  });
+
+  factory CommentItem.fromJson(Map<String, dynamic> json) {
+    return CommentItem(
+      id: json['id'] ?? 0,
+      songId: json['songId'] ?? json['song_id'] ?? '',
+      levelIndex: json['levelIndex'] ?? json['level_index'],
+      userId: json['userId'] ?? json['user_id'] ?? '',
+      dataSource: json['dataSource'] ?? json['data_source'] ?? '',
+      originalId: json['originalId'] ?? json['original_id'] ?? '',
+      nickname: json['nickname'],
+      content: json['content'] ?? '',
+      createdAt: json['createdAt'] ?? json['created_at'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'songId': songId,
+      'levelIndex': levelIndex,
+      'userId': userId,
+      'dataSource': dataSource,
+      'originalId': originalId,
+      'nickname': nickname,
+      'content': content,
+      'createdAt': createdAt,
+    };
+  }
+}
+
+// 评论身份信息模型
+class CommentIdentity {
+  final String dataSource;
+  final String originalId;
+  final String? nickname;
+
+  CommentIdentity({
+    required this.dataSource,
+    required this.originalId,
+    this.nickname,
+  });
+}
+
 class SongInfoService {
   // 单例实例
   static final SongInfoService _instance = SongInfoService._internal();
-  
+
   // 工厂构造函数
   factory SongInfoService() {
     return _instance;
   }
-  
+
   // 私有构造函数
   SongInfoService._internal();
 
@@ -41,7 +115,6 @@ class SongInfoService {
     {"completion": 50.0, "rating": "C", "multiplier": 0.08},
   ];
 
-
   // 加载所有数据
   Future<Map<String, dynamic>> loadData(String songId) async {
     Map<String, dynamic> result = {
@@ -61,31 +134,31 @@ class SongInfoService {
           if (songIndex != -1) {
             final song = songs[songIndex];
             // 计算 shortId（去掉前导零的歌曲ID）
-              String shortId = song.id.replaceFirst(RegExp(r'^0+'), '');
-              
-              result['songData'] = {
-                'id': song.id,
-                'title': song.title,
-                'type': song.type,
-                'ds': song.ds,
-                'level': song.level,
-                'cids': song.cids,
-                'shortId': shortId,
-                'charts': song.charts
-                    .map((chart) =>
-                        {'notes': chart.notes, 'charter': chart.charter})
-                    .toList(),
-                'basic_info': {
-                  'title': song.basicInfo.title,
-                  'artist': song.basicInfo.artist,
-                  'genre': song.basicInfo.genre,
-                  'bpm': song.basicInfo.bpm,
-                  'release_date': song.basicInfo.releaseDate,
-                  'from': song.basicInfo.from,
-                  'is_new': song.basicInfo.isNew,
-                  'short_id': shortId
-                }
-              };
+            String shortId = song.id.replaceFirst(RegExp(r'^0+'), '');
+
+            result['songData'] = {
+              'id': song.id,
+              'title': song.title,
+              'type': song.type,
+              'ds': song.ds,
+              'level': song.level,
+              'cids': song.cids,
+              'shortId': shortId,
+              'charts': song.charts
+                  .map((chart) =>
+                      {'notes': chart.notes, 'charter': chart.charter})
+                  .toList(),
+              'basic_info': {
+                'title': song.basicInfo.title,
+                'artist': song.basicInfo.artist,
+                'genre': song.basicInfo.genre,
+                'bpm': song.basicInfo.bpm,
+                'release_date': song.basicInfo.releaseDate,
+                'from': song.basicInfo.from,
+                'is_new': song.basicInfo.isNew,
+                'short_id': shortId
+              }
+            };
           }
         }
       }
@@ -105,18 +178,22 @@ class SongInfoService {
       final maiTagsManager = MaiTagsManager();
       final tagsEntity = await maiTagsManager.getTags();
       if (tagsEntity != null) {
-        result['tagData'] = tagsEntity.tags.map((tag) => {
-          'id': tag.id,
-          'name': tag.localizedName.zhHans,
-          'description': tag.localizedDescription.zhHans,
-          'group_id': tag.groupId
-        }).toList();
-        result['tagSongsData'] = tagsEntity.tagSongs.map((tagSong) => {
-          'song_id': tagSong.songId,
-          'sheet_type': tagSong.sheetType,
-          'sheet_difficulty': tagSong.sheetDifficulty,
-          'tag_id': tagSong.tagId
-        }).toList();
+        result['tagData'] = tagsEntity.tags
+            .map((tag) => {
+                  'id': tag.id,
+                  'name': tag.localizedName.zhHans,
+                  'description': tag.localizedDescription.zhHans,
+                  'group_id': tag.groupId
+                })
+            .toList();
+        result['tagSongsData'] = tagsEntity.tagSongs
+            .map((tagSong) => {
+                  'song_id': tagSong.songId,
+                  'sheet_type': tagSong.sheetType,
+                  'sheet_difficulty': tagSong.sheetDifficulty,
+                  'tag_id': tagSong.tagId
+                })
+            .toList();
       }
     } catch (e) {
       debugPrint('加载数据失败: $e');
@@ -126,7 +203,8 @@ class SongInfoService {
   }
 
   // 获取用户最佳成绩
-  Map<String, dynamic>? getUserBestRecord(Map<String, dynamic>? userData, String songId, int currentDiffIndex) {
+  Map<String, dynamic>? getUserBestRecord(
+      Map<String, dynamic>? userData, String songId, int currentDiffIndex) {
     if (userData == null) return null;
 
     final records = userData['records'];
@@ -143,7 +221,11 @@ class SongInfoService {
   }
 
   // 获取标签分组
-  Map<String, List<dynamic>> getTagsByGroup(List<dynamic>? tagData, List<dynamic>? tagSongsData, Map<String, dynamic>? songData, int currentDiffIndex) {
+  Map<String, List<dynamic>> getTagsByGroup(
+      List<dynamic>? tagData,
+      List<dynamic>? tagSongsData,
+      Map<String, dynamic>? songData,
+      int currentDiffIndex) {
     final Map<String, List<dynamic>> groupedTags = {
       '配置': [],
       '评价': [],
@@ -170,7 +252,8 @@ class SongInfoService {
 
       // 根据标签ID获取标签详情
       for (int tagId in tagIds) {
-        final tag = tagData.firstWhere((t) => t['id'] == tagId, orElse: () => null);
+        final tag =
+            tagData.firstWhere((t) => t['id'] == tagId, orElse: () => null);
 
         if (tag != null) {
           int groupId = tag['group_id'] ?? 0;
@@ -272,7 +355,7 @@ class SongInfoService {
         return Color(0xFF9966CC);
     }
   }
-  
+
   // 计算单曲Rating
   int calculateSingleRating(double difficulty, double completion) {
     // 特别处理：如果达成率大于100.5，则按100.5计算
@@ -281,7 +364,7 @@ class SongInfoService {
 
     // 查找对应的评级和乘数
     Map<String, dynamic>? selectedRating;
-    
+
     // 遍历表格查找正确的区间
     for (var item in maimaiRatingMultiplier) {
       if (adjustedCompletion >= item['completion']) {
@@ -289,7 +372,7 @@ class SongInfoService {
         break;
       }
     }
-    
+
     // 如果没有找到（不应该发生），使用默认值
     selectedRating ??= {"rating": "D", "multiplier": 0.016};
 
@@ -299,7 +382,7 @@ class SongInfoService {
     double singleRating = difficulty * multiplier * calculationCompletion;
     return singleRating.floor(); // 取整数部分（向下取整）
   }
-  
+
   // 计算maxScore
   int calculateMaxScore(Map<String, dynamic>? songData, int levelIndex) {
     if (songData == null) return 0;
@@ -320,7 +403,8 @@ class SongInfoService {
   // 计算最大DX分
   // 当ds数组长度为2时，返回两个难度谱面DX分之和
   // 否则返回当前难度的最大分数
-  int calculateMaxDxScore(Map<String, dynamic>? songData, int songId, int levelIndex) {
+  int calculateMaxDxScore(
+      Map<String, dynamic>? songData, int songId, int levelIndex) {
     if (songData == null) return 0;
 
     // 检查ds数组长度
@@ -337,13 +421,15 @@ class SongInfoService {
   }
 
   // 计算scoreRate
-  double calculateScoreRate(Map<String, dynamic>? songData, int songId, int levelIndex, int score) {
+  double calculateScoreRate(
+      Map<String, dynamic>? songData, int songId, int levelIndex, int score) {
     int maxScore = calculateMaxDxScore(songData, songId, levelIndex);
     return maxScore > 0 ? score / maxScore : 0.0;
   }
 
   // 计算星星等级
-  String calculateStars(Map<String, dynamic>? songData, int songId, int levelIndex, int score) {
+  String calculateStars(
+      Map<String, dynamic>? songData, int songId, int levelIndex, int score) {
     double scoreRate = calculateScoreRate(songData, songId, levelIndex, score);
 
     // 确定星星等级
@@ -363,7 +449,8 @@ class SongInfoService {
   }
 
   // 计算星星等级的最低DX分和超出部分
-  String calculateStarsBonus(Map<String, dynamic>? songData, int songId, int levelIndex, int score) {
+  String calculateStarsBonus(
+      Map<String, dynamic>? songData, int songId, int levelIndex, int score) {
     int maxScore = calculateMaxDxScore(songData, songId, levelIndex);
     double scoreRate = score / maxScore;
     int starLevel = 0;
@@ -426,14 +513,16 @@ class SongInfoService {
     final searchQuery = '$songTitle $diffLabel';
 
     // B站搜索链接
-    final url = Uri.parse('bilibili://search?keyword=${Uri.encodeComponent(searchQuery)}');
+    final url = Uri.parse(
+        'bilibili://search?keyword=${Uri.encodeComponent(searchQuery)}');
 
     // 尝试打开B站应用
     if (await canLaunchUrl(url)) {
       await launchUrl(url);
     } else {
       // 如果无法打开B站应用，尝试在浏览器中打开
-      final webUrl = Uri.parse('https://search.bilibili.com/all?keyword=${Uri.encodeComponent(searchQuery)}');
+      final webUrl = Uri.parse(
+          'https://search.bilibili.com/all?keyword=${Uri.encodeComponent(searchQuery)}');
       if (await canLaunchUrl(webUrl)) {
         await launchUrl(webUrl);
       }
@@ -441,7 +530,8 @@ class SongInfoService {
   }
 
   // 查看相关收藏品
-  Future<List<Map<String, dynamic>>> fetchRelatedCollections(String songTitle, String songType) async {
+  Future<List<Map<String, dynamic>>> fetchRelatedCollections(
+      String songTitle, String songType) async {
     try {
       // 获取所有收藏品数据
       final collectionsManager = CollectionsManager();
@@ -536,14 +626,16 @@ class SongInfoService {
   }
 
   // 判断收藏品是否与歌曲相关
-  bool isRelatedToSong(Collection collection, String songTitle, String songType) {
+  bool isRelatedToSong(
+      Collection collection, String songTitle, String songType) {
     // 检查 required 集合中是否有任何一个元素的 songs 集合中包含与当前歌曲标题和类型匹配的条目
     if (collection.required != null) {
       for (var requiredItem in collection.required!) {
         if (requiredItem.songs != null) {
           for (var song in requiredItem.songs!) {
             // 映射收藏品类型：standard -> SD
-            String mappedCollectionType = song.type.toLowerCase() == 'standard' ? 'SD' : song.type;
+            String mappedCollectionType =
+                song.type.toLowerCase() == 'standard' ? 'SD' : song.type;
             if (song.title.toLowerCase() == songTitle.toLowerCase() &&
                 mappedCollectionType.toLowerCase() == songType.toLowerCase()) {
               return true;
@@ -562,12 +654,12 @@ class SongInfoService {
     if (songData != null && songData['level'] != null) {
       difficultyCount = songData['level'].length;
     }
-    
+
     // 如果难度数量≤2个，显示"U\u00b7TA\u00b7GE​"
     if (difficultyCount <= 2) {
       return 'U\u00b7TA\u00b7GE​';
     }
-    
+
     // 否则返回原来的标签
     switch (index) {
       case 0:
@@ -688,6 +780,585 @@ class SongInfoService {
         return '评价';
       default:
         return '配置';
+    }
+  }
+
+  // ============== 歌曲评论相关方法 ==============
+
+  // 生成唯一用户ID（与服务器端保持一致: dataSource:originalId）
+  static String generateUserId(String dataSource, String originalId) {
+    return '$dataSource:$originalId';
+  }
+
+  // 获取评论者身份信息（与SongRankingService.getCurrentPlayerId()对齐）
+  static Future<CommentIdentity?> getCommentIdentity() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // 1. 优先尝试从已保存的评论身份键读取（兼容旧版手动输入）
+    final savedDataSource = prefs.getString(CacheKeyConstant.commentDataSource);
+    final savedOriginalId = prefs.getString(CacheKeyConstant.commentOriginalId);
+    if (savedDataSource != null && savedOriginalId != null) {
+      final savedNickname = prefs.getString(CacheKeyConstant.commentNickname);
+      return CommentIdentity(
+        dataSource: savedDataSource,
+        originalId: savedOriginalId,
+        nickname: savedNickname,
+      );
+    }
+
+    // 2. 自动从HomePage缓存的用户数据构建（与SongRankingService.getCurrentPlayerId()一致）
+    // 优先落雪，其次水鱼
+    String? luoxueUserId = prefs.getString(CacheKeyConstant.luoxueUserId);
+    if (luoxueUserId != null && luoxueUserId.isNotEmpty) {
+      final parts = luoxueUserId.split(':');
+      if (parts.length >= 2) {
+        return CommentIdentity(
+          dataSource: 'luoxue',
+          originalId: parts.sublist(1).join(':'), // 兼容ID中包含冒号的情况
+          nickname: prefs.getString(CacheKeyConstant.userNickname),
+        );
+      }
+    }
+
+    String? shuiyuUserId = prefs.getString(CacheKeyConstant.shuiyuUserId);
+    if (shuiyuUserId != null && shuiyuUserId.isNotEmpty) {
+      final parts = shuiyuUserId.split(':');
+      if (parts.length >= 2) {
+        return CommentIdentity(
+          dataSource: 'shuiyu',
+          originalId: parts.sublist(1).join(':'),
+          nickname: prefs.getString(CacheKeyConstant.userNickname),
+        );
+      }
+    }
+
+    return null;
+  }
+
+  // 保存评论者身份信息到本地prefs
+  static Future<void> saveCommentIdentity(
+      String dataSource, String originalId, String? nickname) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(CacheKeyConstant.commentDataSource, dataSource);
+    await prefs.setString(CacheKeyConstant.commentOriginalId, originalId);
+    if (nickname != null) {
+      await prefs.setString(CacheKeyConstant.commentNickname, nickname);
+    }
+  }
+
+  // 清除评论者身份信息
+  static Future<void> clearCommentIdentity() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(CacheKeyConstant.commentDataSource);
+    await prefs.remove(CacheKeyConstant.commentOriginalId);
+    await prefs.remove(CacheKeyConstant.commentNickname);
+  }
+
+  // 获取指定歌曲的评论列表（带缓存）
+  static Future<List<CommentItem>> getCommentsForSong(String songId,
+      {int? levelIndex,
+      int? limit,
+      bool forceRefresh = false,
+      bool serverRefresh = false}) async {
+    // 先检查缓存
+    if (!forceRefresh) {
+      final cachedData =
+          await _getCachedComments(songId, levelIndex: levelIndex);
+      if (cachedData != null) {
+        debugPrint(
+            'SongInfoService: 使用缓存的评论数据，songId=$songId，levelIndex=$levelIndex，数量=${cachedData.length}');
+        return cachedData;
+      }
+    }
+
+    try {
+      String url = '${ApiUrls.CommentsBySongUrl}/$songId';
+      final queryParams = <String>[];
+      if (levelIndex != null) {
+        queryParams.add('levelIndex=$levelIndex');
+      }
+      if (limit != null) {
+        queryParams.add('limit=$limit');
+      }
+      if (serverRefresh) {
+        queryParams.add('refresh=true');
+      }
+      if (queryParams.isNotEmpty) {
+        url += '?${queryParams.join('&')}';
+      }
+      debugPrint('SongInfoService: 从服务器获取评论，url=$url');
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final result = json.decode(response.body);
+        if (result['success'] == true) {
+          final List<dynamic> dataList = result['data'] ?? [];
+          final items =
+              dataList.map((item) => CommentItem.fromJson(item)).toList();
+
+          // 保存到缓存
+          await _cacheComments(songId, items, levelIndex: levelIndex);
+          debugPrint('SongInfoService: 获取评论成功，数量=${items.length}');
+          return items;
+        }
+      }
+
+      debugPrint('SongInfoService: 获取评论失败，statusCode=${response.statusCode}');
+    } catch (e) {
+      debugPrint('SongInfoService: 获取歌曲评论异常: $e');
+    }
+
+    // 失败时尝试返回缓存数据
+    final cachedData = await _getCachedComments(songId, levelIndex: levelIndex);
+    if (cachedData != null) {
+      return cachedData;
+    }
+    return [];
+  }
+
+  // 创建新评论
+  static Future<Map<String, dynamic>> createComment({
+    required String songId,
+    int? levelIndex,
+    required String dataSource,
+    required String originalId,
+    String? nickname,
+    required String content,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse(ApiUrls.CommentsCreateUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'songId': songId,
+          'levelIndex': levelIndex,
+          'dataSource': dataSource,
+          'originalId': originalId,
+          'nickname': nickname,
+          'content': content,
+        }),
+      );
+
+      debugPrint('SongInfoService: 创建评论，statusCode=${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final result = json.decode(response.body);
+        if (result['success'] == true) {
+          // 保存身份信息到本地
+          await saveCommentIdentity(dataSource, originalId, nickname);
+
+          // 清除该歌曲该难度的评论缓存
+          await _clearCommentsCache(songId, levelIndex: levelIndex);
+
+          debugPrint('SongInfoService: 评论创建成功');
+          return {
+            'success': true,
+            'message': result['message'] ?? '评论创建成功',
+            'comment': result['comment'] != null
+                ? CommentItem.fromJson(result['comment'])
+                : null,
+          };
+        }
+        return {
+          'success': false,
+          'message': result['error'] ?? '评论创建失败',
+        };
+      }
+      final errorResult = json.decode(response.body);
+      return {
+        'success': false,
+        'message': errorResult['error'] ?? '评论创建失败 (${response.statusCode})',
+      };
+    } catch (e) {
+      debugPrint('SongInfoService: 创建评论异常: $e');
+      return {
+        'success': false,
+        'message': '网络连接异常: $e',
+      };
+    }
+  }
+
+  // 删除评论
+  static Future<Map<String, dynamic>> deleteComment({
+    required int commentId,
+    required String songId,
+    int? levelIndex,
+    required String dataSource,
+    required String originalId,
+  }) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('${ApiUrls.CommentsBaseUrl}/$commentId'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'dataSource': dataSource,
+          'originalId': originalId,
+        }),
+      );
+
+      debugPrint(
+          'SongInfoService: 删除评论，commentId=$commentId，statusCode=${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final result = json.decode(response.body);
+        if (result['success'] == true) {
+          // 清除该歌曲该难度的评论缓存
+          await _clearCommentsCache(songId, levelIndex: levelIndex);
+          return {
+            'success': true,
+            'message': result['message'] ?? '评论删除成功',
+          };
+        }
+        return {
+          'success': false,
+          'message': result['error'] ?? '评论删除失败',
+        };
+      }
+      final errorResult = json.decode(response.body);
+      return {
+        'success': false,
+        'message': errorResult['error'] ?? '评论删除失败 (${response.statusCode})',
+      };
+    } catch (e) {
+      debugPrint('SongInfoService: 删除评论异常: $e');
+      return {
+        'success': false,
+        'message': '网络连接异常: $e',
+      };
+    }
+  }
+
+  // ============== 评论缓存相关私有方法 ==============
+
+  // 从缓存获取评论数据
+  static Future<List<CommentItem>?> _getCachedComments(String songId,
+      {int? levelIndex}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final suffix = levelIndex != null ? '${songId}_$levelIndex' : songId;
+    final cacheKey = '${CacheKeyConstant.songCommentsCachePrefix}$suffix';
+    final timestampKey =
+        '${CacheKeyConstant.songCommentsCacheTimestampPrefix}$suffix';
+    final timestamp = prefs.getInt(timestampKey);
+
+    if (timestamp != null) {
+      final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      if (now - timestamp < CacheTimestampConstant.songCommentsCacheSeconds) {
+        final cachedJson = prefs.getString(cacheKey);
+        if (cachedJson != null) {
+          try {
+            final List<dynamic> data = json.decode(cachedJson);
+            return data.map((item) => CommentItem.fromJson(item)).toList();
+          } catch (e) {
+            debugPrint('SongInfoService: 解析缓存评论数据失败: $e');
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  // 保存评论数据到缓存
+  static Future<void> _cacheComments(String songId, List<CommentItem> items,
+      {int? levelIndex}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final suffix = levelIndex != null ? '${songId}_$levelIndex' : songId;
+    final cacheKey = '${CacheKeyConstant.songCommentsCachePrefix}$suffix';
+    final timestampKey =
+        '${CacheKeyConstant.songCommentsCacheTimestampPrefix}$suffix';
+    try {
+      final jsonString =
+          json.encode(items.map((item) => item.toJson()).toList());
+      await prefs.setString(cacheKey, jsonString);
+      await prefs.setInt(
+          timestampKey, DateTime.now().millisecondsSinceEpoch ~/ 1000);
+    } catch (e) {
+      debugPrint('SongInfoService: 保存评论缓存失败: $e');
+    }
+  }
+
+  // 清除指定歌曲的评论缓存
+  static Future<void> _clearCommentsCache(String songId,
+      {int? levelIndex}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final suffix = levelIndex != null ? '${songId}_$levelIndex' : songId;
+    final cacheKey = '${CacheKeyConstant.songCommentsCachePrefix}$suffix';
+    final timestampKey =
+        '${CacheKeyConstant.songCommentsCacheTimestampPrefix}$suffix';
+    await prefs.remove(cacheKey);
+    await prefs.remove(timestampKey);
+  }
+
+  // 清除所有歌曲评论缓存
+  static Future<void> clearAllCommentsCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    final allKeys = prefs.getKeys();
+    for (String key in allKeys) {
+      if (key.startsWith(CacheKeyConstant.songCommentsCachePrefix) ||
+          key.startsWith(CacheKeyConstant.songCommentsCacheTimestampPrefix)) {
+        await prefs.remove(key);
+      }
+    }
+    debugPrint('SongInfoService: 所有歌曲评论缓存已清除');
+  }
+
+  // ============== 谱面评分功能 ==============
+
+  // 获取用户当前总Rating（从缓存的Best50数据或游玩数据计算）
+  static Future<int> getUserTotalRating() async {
+    try {
+      final userPlayDataManager = UserPlayDataManager();
+      final userPlayData = await userPlayDataManager.getCachedUserPlayData();
+
+      if (userPlayData == null || userPlayData['records'] == null) return 0;
+
+      final records = userPlayData['records'] as List;
+      if (records.isEmpty) return 0;
+
+      final songs = await MaimaiMusicDataManager().getCachedSongs();
+      if (songs == null) return 0;
+
+      List<Map<String, dynamic>> allRatings = [];
+
+      for (var record in records) {
+        String songIdStr = record['song_id'].toString();
+        int ra = record['ra'] is int
+            ? record['ra']
+            : int.tryParse(record['ra'].toString()) ?? 0;
+
+        bool isNew = false;
+        try {
+          final song = songs.firstWhere((s) => s.id == songIdStr);
+          isNew = song.basicInfo.isNew;
+        } catch (_) {}
+
+        allRatings.add({
+          'ra': ra,
+          'is_new': isNew,
+        });
+      }
+
+      List<Map<String, dynamic>> oldSongs =
+          allRatings.where((s) => s['is_new'] == false).toList();
+      List<Map<String, dynamic>> newSongs =
+          allRatings.where((s) => s['is_new'] == true).toList();
+
+      oldSongs.sort((a, b) => (b['ra'] as int).compareTo(a['ra'] as int));
+      newSongs.sort((a, b) => (b['ra'] as int).compareTo(a['ra'] as int));
+
+      int best35 =
+          oldSongs.take(35).fold(0, (sum, item) => sum + (item['ra'] as int));
+      int best15 =
+          newSongs.take(15).fold(0, (sum, item) => sum + (item['ra'] as int));
+
+      return best35 + best15;
+    } catch (e) {
+      debugPrint('获取用户总Rating失败: $e');
+      return 0;
+    }
+  }
+
+  // 计算理论Rating（所有谱面SSS+时的Best50 Rating）
+  static Future<int> getTheoreticalRating() async {
+    try {
+      final songs = await MaimaiMusicDataManager().getCachedSongs();
+      if (songs == null) return 0;
+
+      List<Map<String, dynamic>> allSongs = [];
+
+      for (var song in songs) {
+        int songId = int.parse(song.id);
+        bool isNew = song.basicInfo.isNew;
+        List<dynamic> cids = song.cids;
+
+        bool isMaidataSong = cids.isNotEmpty && cids.every((cid) => cid == 0);
+        if (songId >= 100000 || isMaidataSong) continue;
+
+        for (int levelIndex = 0;
+            levelIndex < song.charts.length;
+            levelIndex++) {
+          double ds = song.ds.length > levelIndex
+              ? double.parse(song.ds[levelIndex].toString())
+              : 0.0;
+          int ra = (ds * 0.224 * 100.5).floor();
+
+          allSongs.add({
+            'ra': ra,
+            'is_new': isNew,
+          });
+        }
+      }
+
+      List<Map<String, dynamic>> oldSongs =
+          allSongs.where((s) => s['is_new'] == false).toList();
+      List<Map<String, dynamic>> newSongs =
+          allSongs.where((s) => s['is_new'] == true).toList();
+
+      oldSongs.sort((a, b) => (b['ra'] as int).compareTo(a['ra'] as int));
+      newSongs.sort((a, b) => (b['ra'] as int).compareTo(a['ra'] as int));
+
+      int best35 =
+          oldSongs.take(35).fold(0, (sum, item) => sum + (item['ra'] as int));
+      int best15 =
+          newSongs.take(15).fold(0, (sum, item) => sum + (item['ra'] as int));
+
+      return best35 + best15;
+    } catch (e) {
+      debugPrint('计算理论Rating失败: $e');
+      return 0;
+    }
+  }
+
+  // 获取谱面评分信息（含加权平均分、用户自己的评分）
+  static Future<Map<String, dynamic>> getChartRating({
+    required String songId,
+    required int levelIndex,
+  }) async {
+    try {
+      final identity = await getCommentIdentity();
+      final url = Uri.parse('${ApiUrls.RatingsByChartUrl}/$songId')
+          .replace(queryParameters: {
+        'levelIndex': levelIndex.toString(),
+        if (identity != null)
+          'userId': '${identity.dataSource}:${identity.originalId}',
+      });
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return {'success': false, 'error': '获取评分信息失败'};
+    } catch (e) {
+      debugPrint('获取谱面评分失败: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  // 直接从 MySQL 查询用户的谱面评分行（只取 score 和 createdAt）
+  static Future<Map<String, dynamic>?> getUserChartRatingFromMySQL({
+    required String songId,
+    required int levelIndex,
+  }) async {
+    final identity = await getCommentIdentity();
+    if (identity == null) {
+      return null;
+    }
+
+    final String userId = '${identity.dataSource}:${identity.originalId}';
+
+    MySqlConnection? conn;
+    try {
+      final settings = ConnectionSettings(
+        host: DeveloperToken.MySQLHost,
+        port: DeveloperToken.MySQLPort,
+        db: DeveloperToken.MySQLDatabase,
+        user: DeveloperToken.MySQLUsername,
+        password: DeveloperToken.MySQLPassword,
+        timeout: const Duration(seconds: 10),
+      );
+
+      conn = await MySqlConnection.connect(settings);
+
+      final results = await conn.query(
+        'SELECT score, created_at FROM chart_ratings WHERE user_id = ? AND song_id = ? AND level_index = ?',
+        [userId, songId, levelIndex],
+      );
+
+      if (results.isNotEmpty) {
+        final row = results.first;
+        return {
+          'score': row[0] is num
+              ? (row[0] as num).toDouble()
+              : (row[0] != null ? double.tryParse(row[0].toString()) : null),
+          'createdAt': row[1]?.toString(),
+        };
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('从MySQL获取用户评分失败: $e');
+      return null;
+    } finally {
+      if (conn != null) {
+        try {
+          await conn.close();
+        } catch (_) {}
+      }
+    }
+  }
+
+  // 提交谱面评分（创建或覆盖）
+  static Future<Map<String, dynamic>> submitChartRating({
+    required String songId,
+    required int levelIndex,
+    required double score,
+    required double achievementRate,
+    required int totalRating,
+    required int theoreticalRating,
+  }) async {
+    try {
+      final identity = await getCommentIdentity();
+      if (identity == null) {
+        return {'success': false, 'message': '请先在首页刷新数据以获取用户身份'};
+      }
+
+      final url = Uri.parse(ApiUrls.RatingsCreateUrl);
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'songId': songId,
+          'levelIndex': levelIndex,
+          'dataSource': identity.dataSource,
+          'originalId': identity.originalId,
+          'score': score,
+          'achievementRate': achievementRate,
+          'totalRating': totalRating,
+          'theoreticalRating': theoreticalRating,
+        }),
+      );
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return {'success': false, 'message': '提交评分失败'};
+    } catch (e) {
+      debugPrint('提交谱面评分失败: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  // 删除谱面评分
+  static Future<Map<String, dynamic>> deleteChartRating({
+    required String songId,
+    required int levelIndex,
+  }) async {
+    try {
+      final identity = await getCommentIdentity();
+      if (identity == null) {
+        return {'success': false, 'message': '请先在首页刷新数据以获取用户身份'};
+      }
+
+      final url = Uri.parse('${ApiUrls.RatingsDeleteUrl}/$songId/$levelIndex')
+          .replace(queryParameters: {
+        'userId': '${identity.dataSource}:${identity.originalId}',
+      });
+      final response = await http.delete(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'dataSource': identity.dataSource,
+          'originalId': identity.originalId,
+        }),
+      );
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      return {'success': false, 'message': '删除评分失败'};
+    } catch (e) {
+      debugPrint('删除谱面评分失败: $e');
+      return {'success': false, 'message': e.toString()};
     }
   }
 }

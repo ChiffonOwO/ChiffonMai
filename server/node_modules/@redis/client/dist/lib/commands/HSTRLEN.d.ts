@@ -1,0 +1,10 @@
+import { CommandParser } from '../client/parser';
+import { RedisArgument, ArrayReply, BlobStringReply } from '../RESP/types';
+declare const _default: {
+    readonly CACHEABLE: true;
+    readonly IS_READ_ONLY: true;
+    readonly parseCommand: (this: void, parser: CommandParser, key: RedisArgument, field: RedisArgument) => void;
+    readonly transformReply: () => ArrayReply<BlobStringReply>;
+};
+export default _default;
+//# sourceMappingURL=HSTRLEN.d.ts.map

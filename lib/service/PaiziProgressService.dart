@@ -309,6 +309,11 @@ class PaiziProgressService {
     };
   }
 
+  // 清空记录缓存，下次访问时重新从SharedPreferences加载
+  void clearRecordsCache() {
+    _recordsCache = null;
+  }
+
   // 获取指定称号和难度的所有歌曲及其完成状态
   Future<List<Map<String, dynamic>>> getSongsWithCompletionStatus(
     String firstChar,
