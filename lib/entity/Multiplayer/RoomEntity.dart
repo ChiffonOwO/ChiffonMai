@@ -51,6 +51,19 @@ class RoomEntity {
   /// 选中的流派列表（歌曲筛选参数）
   final List<String> selectedGenres;
 
+  // ==================== 游戏模式专属设置 ====================
+  /// 模糊程度（0-100），用于 blurred 模式
+  final int blurLevel;
+
+  /// 音频片段播放时长（秒），用于 audio 模式
+  final int playDuration;
+
+  /// 每次抽取歌曲数，用于 letters 模式
+  final int songCount;
+
+  /// 非英文字符过滤阈值（0-100），用于 letters 模式
+  final int nonEnglishCharThreshold;
+
   RoomEntity({
     required this.roomId,
     String roomCode = '',
@@ -68,6 +81,10 @@ class RoomEntity {
     this.masterMinDx = 1.0,
     this.masterMaxDx = 15.0,
     this.selectedGenres = const [],
+    this.blurLevel = 50,
+    this.playDuration = 5,
+    this.songCount = 3,
+    this.nonEnglishCharThreshold = 50,
   }) : _roomCode = roomCode,
        lastActivityAt = lastActivityAt ?? createdAt;
 
@@ -106,6 +123,12 @@ class RoomEntity {
       return [];
     }
     
+    int parseInt(dynamic value, int defaultValue) {
+      if (value == null) return defaultValue;
+      if (value is int) return value;
+      return int.tryParse(value.toString()) ?? defaultValue;
+    }
+
     return RoomEntity(
       roomId: roomId,
       roomCode: json['room_code'] ?? json['roomCode'] ?? json['code'] ?? '',
@@ -120,13 +143,17 @@ class RoomEntity {
       createdAt: parseDateTime(json['created_at'] ?? json['createdAt']),
       lastActivityAt: parseDateTime(json['last_activity_at'] ?? json['lastActivityAt']),
       selectedVersions: parseStringList(json['selectedVersions'] ?? json['selected_versions']),
-      masterMinDx: (json['masterMinDx'] ?? json['master_min_dx'] ?? 1.0) is double 
-          ? (json['masterMinDx'] ?? json['master_min_dx']) 
+      masterMinDx: (json['masterMinDx'] ?? json['master_min_dx'] ?? 1.0) is double
+          ? (json['masterMinDx'] ?? json['master_min_dx'])
           : double.parse((json['masterMinDx'] ?? json['master_min_dx'] ?? '1.0').toString()),
-      masterMaxDx: (json['masterMaxDx'] ?? json['master_max_dx'] ?? 15.0) is double 
-          ? (json['masterMaxDx'] ?? json['master_max_dx']) 
+      masterMaxDx: (json['masterMaxDx'] ?? json['master_max_dx'] ?? 15.0) is double
+          ? (json['masterMaxDx'] ?? json['master_max_dx'])
           : double.parse((json['masterMaxDx'] ?? json['master_max_dx'] ?? '15.0').toString()),
       selectedGenres: parseStringList(json['selectedGenres'] ?? json['selected_genres']),
+      blurLevel: parseInt(json['blur_level'] ?? json['blurLevel'], 50),
+      playDuration: parseInt(json['play_duration'] ?? json['playDuration'], 5),
+      songCount: parseInt(json['song_count'] ?? json['songCount'], 3),
+      nonEnglishCharThreshold: parseInt(json['non_english_char_threshold'] ?? json['nonEnglishCharThreshold'], 50),
     );
   }
 
@@ -148,6 +175,10 @@ class RoomEntity {
       'master_min_dx': masterMinDx,
       'master_max_dx': masterMaxDx,
       'selected_genres': selectedGenres,
+      'blur_level': blurLevel,
+      'play_duration': playDuration,
+      'song_count': songCount,
+      'non_english_char_threshold': nonEnglishCharThreshold,
     };
   }
 
@@ -169,6 +200,10 @@ class RoomEntity {
     double? masterMinDx,
     double? masterMaxDx,
     List<String>? selectedGenres,
+    int? blurLevel,
+    int? playDuration,
+    int? songCount,
+    int? nonEnglishCharThreshold,
   }) {
     return RoomEntity(
       roomId: roomId ?? this.roomId,
@@ -187,6 +222,10 @@ class RoomEntity {
       masterMinDx: masterMinDx ?? this.masterMinDx,
       masterMaxDx: masterMaxDx ?? this.masterMaxDx,
       selectedGenres: selectedGenres ?? this.selectedGenres,
+      blurLevel: blurLevel ?? this.blurLevel,
+      playDuration: playDuration ?? this.playDuration,
+      songCount: songCount ?? this.songCount,
+      nonEnglishCharThreshold: nonEnglishCharThreshold ?? this.nonEnglishCharThreshold,
     );
   }
 

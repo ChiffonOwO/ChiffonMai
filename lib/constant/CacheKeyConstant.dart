@@ -99,4 +99,16 @@ class CacheKeyConstant {
 
   // 首页后台初始化时间戳（用于控制初始化频率）
   static const String lastInitializationTimestamp = 'last_initialization_timestamp';
+
+  // 曲绘识别相关
+  static const String coverHashCache = 'cover_hash_cache_v5';
+  static const String coverHashCacheTimestamp = 'cover_hash_cache_timestamp_v5';
+
+  // Maimai Score Hub 探针同步相关
+  static const String probeAuthToken = 'probe_auth_token';
+  static const String probeFriendCode = 'probe_friend_code';
+  static const String probeLastSyncTime = 'probe_last_sync_time';
+  static const String probeDivingFishToken = 'probe_diving_fish_token';
+  static const String probeDivingFishImportToken = 'probe_diving_fish_import_token';
+  static const String probeDivingFishBindQQ = 'probe_diving_fish_bind_qq';
 }

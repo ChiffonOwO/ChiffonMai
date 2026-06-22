@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/RoomEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/GameStateEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/PlayerEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/GuessRecord.dart';
+import 'package:my_first_flutter_app/entity/Multiplayer/GameType.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/entity/GuessChartGame/GuessSong.dart';
 import 'package:my_first_flutter_app/manager/MultiplayerManager.dart';
@@ -14,6 +17,8 @@ import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartByInfoServ
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
+import 'package:my_first_flutter_app/utils/GameSeedUtil.dart';
+import 'package:my_first_flutter_app/utils/LuoXueSongUtil.dart';
 
 class GameRoomPage extends StatefulWidget {
   final RoomEntity room;
@@ -62,6 +67,21 @@ class _GameRoomPageState extends State<GameRoomPage> {
   
   // 游戏是否已结算（房主点击结算后变为true）
   bool _isGameSettled = false;
+
+  // ==================== 模式专属状态 ====================
+  // 曲绘截取参数 (cover 模式，基于种子确定性生成)
+  CropRect? _cropRect;
+
+  // 音频播放相关 (audio 模式)
+  bool _isPlaying = false;
+  bool _hasPlayed = false;
+  int? _audioStartTime;
+  double _currentPosition = 0.0;
+  double _totalDuration = 0.0;
+  int _elapsedTime = 0;
+  Timer? _playbackTimer;
+  AudioPlayer? _audioPlayer;
+  StreamSubscription<Duration>? _positionSubscription;
 
   // 获取玩家显示名称（处理重复昵称）
   String _getPlayerDisplayName(PlayerEntity player) {
@@ -289,12 +309,14 @@ class _GameRoomPageState extends State<GameRoomPage> {
             debugPrint('  - 当前回合: ${state.currentRound}/${state.totalRounds}');
             debugPrint('  - 共享猜测次数: ${state.currentGuesses}/${state.maxGuesses}');
             debugPrint('  - 本地投降状态已重置: _hasSurrendered=$_hasSurrendered');
-            
+
             _remainingTime = state.timeRemaining;
             // 重置投降状态
             _hasSurrendered = false;
             // 重置回合结束原因（重要：防止显示上一回合的获胜者）
             _isRoundOverByTimeout = false;
+            // 重置模式专属状态（曲绘截取、音频起始时间等）
+            _resetModeSpecificState();
             
             // 新回合开始时，使用服务器状态并强制清空猜测历史
             _gameState = state.copyWith(guesses: []);
@@ -428,20 +450,25 @@ class _GameRoomPageState extends State<GameRoomPage> {
   @override
   void dispose() {
     debugPrint('[DEBUG][GameRoomPage] dispose - 用户离开页面，取消所有订阅');
-    
+
     // 取消搜索控制器和定时器
     _searchController.dispose();
     _searchTimer?.cancel();
     _countdownTimer?.cancel();
-    
+
     // 取消房间和游戏状态订阅
     _roomSubscription?.cancel();
     _gameStateSubscription?.cancel();
     _errorMessageSubscription?.cancel();
-    
+
+    // 清理音频资源
+    _playbackTimer?.cancel();
+    _positionSubscription?.cancel();
+    _audioPlayer?.dispose();
+
     // 通知管理器停止监听房间
     _manager.stopListening();
-    
+
     super.dispose();
   }
 
@@ -676,6 +703,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
       // 重置回合结束原因
       _isRoundOverByTimeout = false;
     });
+    _resetModeSpecificState();
     _manager.startNextRound();
   }
 
@@ -684,6 +712,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
     setState(() {
       _guessHistory.clear();
     });
+    _resetModeSpecificState();
     _manager.startGame();
   }
 
@@ -937,12 +966,15 @@ class _GameRoomPageState extends State<GameRoomPage> {
     return Column(
       children: [
         const SizedBox(height: 16),
-        const Text(
-          '🎵 无提示猜歌',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        Text(
+          _getGameTitle(),
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
-        
+
+        // 模式专属提示（曲绘截取/模糊曲绘/音频播放器）
+        _buildModeSpecificHint(),
+
         // 倒计时显示
         if (_remainingTime > 0)
           Text(
@@ -1689,6 +1721,408 @@ class _GameRoomPageState extends State<GameRoomPage> {
         }),
       ],
     );
+  }
+
+  // ==================== 模式专属构建器 ====================
+
+  /// 获取当前游戏模式的标题
+  String _getGameTitle() {
+    if (_currentRoom == null) return '多人猜歌游戏';
+    switch (_currentRoom!.gameType) {
+      case GameType.info:
+        return '🎵 无提示猜歌';
+      case GameType.cover:
+        return '🖼️ 曲绘猜歌';
+      case GameType.blurred:
+        return '🌫️ 模糊曲绘';
+      case GameType.audio:
+        return '🎧 歌曲片段';
+      case GameType.alia:
+        return '📝 别名猜歌';
+      case GameType.letters:
+        return '🔤 开字母';
+    }
+  }
+
+  /// 构建模式专属的提示区域（曲绘截取、模糊曲绘、音频播放器）
+  Widget _buildModeSpecificHint() {
+    if (_targetSong == null || _gameState == null) return const SizedBox.shrink();
+
+    final gameType = _currentRoom?.gameType;
+    final roomId = _currentRoom?.roomId ?? '';
+    final roundNumber = _gameState!.currentRound;
+    final targetSongId = _targetSong!.id;
+
+    switch (gameType) {
+      case GameType.cover:
+        return _buildCroppedCoverHint(roomId, roundNumber, targetSongId);
+
+      case GameType.blurred:
+        return _buildBlurredCoverHint(roomId, roundNumber, targetSongId);
+
+      case GameType.audio:
+        return _buildAudioPlayerHint(roomId, roundNumber, targetSongId);
+
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  /// 构建曲绘截取提示（cover 模式）
+  Widget _buildCroppedCoverHint(String roomId, int roundNumber, String targetSongId) {
+    // 使用确定性种子生成截取区域，确保所有玩家看到相同的截取
+    if (_cropRect == null) {
+      _cropRect = GameSeedUtil.generateCropRect(
+        roomId: roomId,
+        roundNumber: roundNumber,
+        targetSongId: targetSongId,
+      );
+    }
+
+    final rect = _cropRect!;
+    final double size = 200.0;
+    final bool isGameOver = _gameState?.isGameOver ?? false;
+
+    return Center(
+      child: Column(
+        children: [
+          Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // 完整曲绘
+                  CoverUtil.buildCoverWidgetWithContext(context, targetSongId, size),
+                  // 游戏未结束时用黑色遮盖非截取区域
+                  if (!isGameOver) ...[
+                    // 顶部遮盖
+                    Positioned(
+                      top: 0, left: 0, right: 0,
+                      height: rect.y1 * size,
+                      child: Container(color: Colors.black),
+                    ),
+                    // 底部遮盖
+                    Positioned(
+                      top: rect.y2 * size, left: 0, right: 0, bottom: 0,
+                      child: Container(color: Colors.black),
+                    ),
+                    // 左侧遮盖
+                    Positioned(
+                      top: rect.y1 * size, left: 0,
+                      width: rect.x1 * size,
+                      height: (rect.y2 - rect.y1) * size,
+                      child: Container(color: Colors.black),
+                    ),
+                    // 右侧遮盖
+                    Positioned(
+                      top: rect.y1 * size,
+                      left: rect.x2 * size, right: 0,
+                      height: (rect.y2 - rect.y1) * size,
+                      child: Container(color: Colors.black),
+                    ),
+                  ],
+                  // 游戏结束后用红框标示截取区域
+                  if (isGameOver)
+                    Positioned(
+                      left: rect.x1 * size,
+                      top: rect.y1 * size,
+                      width: rect.width * size,
+                      height: rect.height * size,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.red, width: 2),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (!isGameOver)
+            const Text(
+              '根据截取的曲绘部分猜歌名',
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 构建模糊曲绘提示（blurred 模式）
+  Widget _buildBlurredCoverHint(String roomId, int roundNumber, String targetSongId) {
+    final int blurLevel = _currentRoom?.blurLevel ?? 50;
+    final bool isGameOver = _gameState?.isGameOver ?? false;
+
+    // 使用确定性种子微调模糊程度，确保所有玩家一致
+    final int effectiveBlur = GameSeedUtil.generateBlurLevel(
+      roomId: roomId,
+      roundNumber: roundNumber,
+      targetSongId: targetSongId,
+      baseBlurLevel: blurLevel,
+    );
+
+    return Center(
+      child: Column(
+        children: [
+          Container(
+            width: 200,
+            height: 200,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: isGameOver
+                  ? CoverUtil.buildCoverWidgetWithContext(context, targetSongId, 200)
+                  : ImageFiltered(
+                      imageFilter: ui.ImageFilter.blur(
+                        sigmaX: effectiveBlur / 3,
+                        sigmaY: effectiveBlur / 3,
+                      ),
+                      child: CoverUtil.buildCoverWidgetWithContext(context, targetSongId, 200),
+                    ),
+            ),
+          ),
+          if (!isGameOver) ...[
+            const SizedBox(height: 8),
+            Text(
+              '模糊程度: $effectiveBlur%',
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 构建音频播放器提示（audio 模式）
+  Widget _buildAudioPlayerHint(String roomId, int roundNumber, String targetSongId) {
+    final int playDuration = _currentRoom?.playDuration ?? 5;
+    final bool isGameOver = _gameState?.isGameOver ?? false;
+
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.blue, Colors.purple],
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // 进度条
+            Slider(
+              value: _currentPosition.clamp(0.0, _totalDuration > 0 ? _totalDuration : playDuration.toDouble()),
+              min: 0.0,
+              max: _totalDuration > 0 ? _totalDuration : playDuration.toDouble(),
+              onChanged: (value) {
+                setState(() {
+                  _currentPosition = value;
+                  _elapsedTime = value.toInt();
+                });
+              },
+              activeColor: Colors.white,
+              inactiveColor: Colors.white.withOpacity(0.5),
+            ),
+            // 时间显示
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${_currentPosition.toStringAsFixed(1)}秒',
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                ),
+                Text(
+                  '${_totalDuration > 0 ? _totalDuration : playDuration}秒',
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // 播放/暂停按钮
+            ElevatedButton(
+              onPressed: isGameOver
+                  ? null
+                  : (_isPlaying ? _pausePlayback : () => _playSongExcerpt(roomId, roundNumber, targetSongId)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.blue,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              child: Text(
+                isGameOver
+                    ? '游戏已结束'
+                    : (_isPlaying
+                        ? '暂停'
+                        : (_hasPlayed ? '重新播放' : '播放歌曲片段')),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 播放歌曲片段（使用确定性起始时间）
+  Future<void> _playSongExcerpt(String roomId, int roundNumber, String targetSongId) async {
+    if (_targetSong == null) return;
+
+    final int playDuration = _currentRoom?.playDuration ?? 5;
+
+    try {
+      setState(() {
+        _isPlaying = true;
+        _totalDuration = playDuration.toDouble();
+        _currentPosition = 0.0;
+        _elapsedTime = 0;
+      });
+
+      // 停止之前的播放
+      _playbackTimer?.cancel();
+      _positionSubscription?.cancel();
+      await _audioPlayer?.stop();
+      await _audioPlayer?.dispose();
+      _audioPlayer = null;
+
+      // 尝试通过落雪获取音乐文件
+      final luoXueSongUtil = LuoXueSongUtil();
+      // 使用 targetSong 的 id 作为落雪歌曲 ID 尝试
+      final file = await luoXueSongUtil.getMusicFile(targetSongId);
+
+      if (file != null) {
+        // 获取歌曲时长
+        final duration = await luoXueSongUtil.getSongDuration(targetSongId);
+        int totalSongDuration = duration?.inSeconds ?? 180;
+
+        // 使用确定性种子生成音频起始时间，确保所有玩家听到相同的片段
+        if (_audioStartTime == null) {
+          _audioStartTime = GameSeedUtil.generateAudioStartTime(
+            roomId: roomId,
+            roundNumber: roundNumber,
+            targetSongId: targetSongId,
+            totalDuration: totalSongDuration,
+            playDuration: playDuration,
+          );
+        }
+
+        _audioPlayer = AudioPlayer();
+        await _audioPlayer!.setSource(DeviceFileSource(file.path));
+        await _audioPlayer!.seek(Duration(seconds: _audioStartTime!));
+        await _audioPlayer!.play(DeviceFileSource(file.path));
+
+        final playStartTime = DateTime.now();
+
+        _playbackTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+          if (!_isPlaying) {
+            timer.cancel();
+            return;
+          }
+          final elapsed = DateTime.now().difference(playStartTime).inMilliseconds / 1000;
+          setState(() {
+            _currentPosition = elapsed;
+            _elapsedTime = elapsed.toInt();
+          });
+          if (elapsed >= playDuration) {
+            timer.cancel();
+            _handlePlaybackComplete();
+          }
+        });
+      } else {
+        // 没有音频文件，模拟播放（仅显示进度条动画）
+        debugPrint('[GameRoomPage] 未找到歌曲音频文件，使用模拟播放');
+        final playStartTime = DateTime.now();
+
+        _playbackTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+          if (!_isPlaying) {
+            timer.cancel();
+            return;
+          }
+          final elapsed = DateTime.now().difference(playStartTime).inMilliseconds / 1000;
+          setState(() {
+            _currentPosition = elapsed;
+            _elapsedTime = elapsed.toInt();
+          });
+          if (elapsed >= playDuration) {
+            timer.cancel();
+            _handlePlaybackComplete();
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('[GameRoomPage] 播放歌曲失败: $e');
+      _handlePlaybackComplete();
+    }
+  }
+
+  void _handlePlaybackComplete() {
+    _playbackTimer?.cancel();
+    _positionSubscription?.cancel();
+    _audioPlayer?.stop();
+    setState(() {
+      _isPlaying = false;
+      _hasPlayed = true;
+      _currentPosition = _totalDuration;
+      _elapsedTime = (_currentRoom?.playDuration ?? 5);
+    });
+  }
+
+  void _pausePlayback() {
+    _playbackTimer?.cancel();
+    _positionSubscription?.cancel();
+    _audioPlayer?.pause();
+    setState(() {
+      _isPlaying = false;
+    });
+  }
+
+  /// 在新回合开始时重置模式专属状态
+  void _resetModeSpecificState() {
+    _cropRect = null;
+    _audioStartTime = null;
+    _isPlaying = false;
+    _hasPlayed = false;
+    _currentPosition = 0.0;
+    _totalDuration = 0.0;
+    _elapsedTime = 0;
+    _playbackTimer?.cancel();
+    _positionSubscription?.cancel();
+    _audioPlayer?.stop();
+    _audioPlayer?.dispose();
+    _audioPlayer = null;
   }
 
   @override

@@ -27,14 +27,14 @@ class SongAliasManager {
     await _loadFromLocal();
     debugPrint('SongAliasManager初始化完成，当前缓存${_aliases.length}首歌曲的别名');
 
-    // 检查是否超过24小时未更新，超过则自动刷新
+    // 检查是否超过7天未更新，超过则自动刷新（与首页初始化冷却周期保持一致）
     final prefs = await SharedPreferences.getInstance();
     final lastUpdateTime = prefs.getInt(_keyLastUpdate) ?? 0;
     final now = DateTime.now().millisecondsSinceEpoch;
-    const twentyFourHours = 24 * 60 * 60 * 1000; // 24小时毫秒数
+    const sevenDays = 7 * 24 * 60 * 60 * 1000; // 7天毫秒数
 
-    if (now - lastUpdateTime > twentyFourHours) {
-      debugPrint('别名缓存已过期，开始自动刷新...');
+    if (now - lastUpdateTime > sevenDays) {
+      debugPrint('别名缓存已过期（超过7天），开始自动刷新...');
       await fetchFromApi(); // 自动刷新
     } else {
       debugPrint('别名缓存未过期，上次更新时间: ${DateTime.fromMillisecondsSinceEpoch(lastUpdateTime)}');
@@ -130,7 +130,7 @@ class SongAliasManager {
   Future<Map<String, List<String>>?> _fetchFromSongAliasApi() async {
     try {
       final url = ApiUrls.SongAliasApi;
-      final response = await http.get(Uri.parse(url));
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final responseBody = utf8.decode(response.bodyBytes);
@@ -165,7 +165,7 @@ class SongAliasManager {
     try {
       final url = ApiUrls.DXRatingSongAliasApi;
       debugPrint('开始请求DXRatingSongAliasApi: $url');
-      final response = await http.get(Uri.parse(url));
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final responseBody = utf8.decode(response.bodyBytes);

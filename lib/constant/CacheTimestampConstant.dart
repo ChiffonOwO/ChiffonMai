@@ -2,9 +2,13 @@
 class CacheTimestampConstant {
   // 单位：分钟（-1表示永不过期）
   static const int rankingsCacheMinutes = -1;
-  
+
+  // 默认缓存时间（与首页初始化冷却周期一致，7天）
+  static const int defaultCacheDays = 7;
+  static const int defaultCacheMillis = defaultCacheDays * 24 * 60 * 60 * 1000;
+
   // 单位：天
-  static const int knowledgeCacheDays = 1;
+  static const int knowledgeCacheDays = 7;
   static const int maidataFullCacheDays = 7;
   static const int maidataAddedSongsCacheDays = 15;
   static const int luoxueSongCacheDays = 30;

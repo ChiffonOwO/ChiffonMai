@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/page/RankingList/RatingRankListPage.dart';
@@ -52,6 +54,12 @@ import 'RecommendByTagsPage.dart';
 import 'SingleRatingCalculatorPage.dart';
 import 'SongSearchPage.dart';
 import 'UserScoreSearchPage.dart';
+import 'AboutAppPage.dart';
+import 'CoverRecognitionPage.dart';
+import '../manager/LuoXue/CollectionsManager.dart';
+import '../manager/DivingFishProbeManager.dart';
+import '../entity/LuoXue/Collection.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 // Rating上限数据类
 class RatingLimits {
@@ -138,6 +146,17 @@ class ButtonItem {
   });
 }
 
+// 按钮分类数据模型
+class ButtonCategory {
+  final String name;
+  final List<ButtonItem> items;
+
+  const ButtonCategory({
+    required this.name,
+    required this.items,
+  });
+}
+
 /// 首页组件：有状态组件，包含所有页面元素和业务数据
 class HomePage extends StatefulWidget {
   final VoidCallback? onFirstFrameRendered;
@@ -172,13 +191,23 @@ class _HomePageState extends State<HomePage> {
   
   // 当前数据源
   DataSource _currentDataSource = DataSource.shuiyu;
+
+  // 头像选择器
+  int _selectedAvatarId = 1;
+  List<Collection> _avatarIcons = [];
   
   // 初始化方法，用于从本地存储加载数据
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _loadCachedAvatarId();
+    _fetchAvatarIcons();
     _autoCheckUpdate();
+    _checkDivingFishLoginStatus();
+    // 无论冷却状态如何，都先加载别名缓存到内存
+    // 防止冷却期间别名丢失（详见：冷却逻辑在_initializeDataInBackground内）
+    SongAliasManager.instance.init();
     _initializeDataInBackground();
     
     // 在第一帧渲染完成后触发字体加载
@@ -300,45 +329,86 @@ class _HomePageState extends State<HomePage> {
   Future<void> _saveQQ(String qq) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('cachedQQ', qq);
-    setState(() {
-      _cachedQQ = qq;
-    });
+    if (mounted) {
+      setState(() {
+        _cachedQQ = qq;
+      });
+    }
   }
   
-  // 按钮数据源：使用类型安全的ButtonItem模型
-  final List<ButtonItem> buttonItems = const [
-    ButtonItem(icon: Icons.music_note, title: '乐曲查询', subtitle: '查询舞萌曲库的乐曲'),
-    ButtonItem(icon: Icons.score, title: '成绩查询', subtitle: '查看游玩数据'),
-    ButtonItem(icon: Icons.wysiwyg_rounded, title: '牌子进度', subtitle: '真代没有真将哦'),
-    ButtonItem(icon: Icons.grading_rounded, title: '个性化成绩查询', subtitle: '目前支持等级/谱师的牌子查询'),
-    ButtonItem(icon: Icons.collections_bookmark, title: '收藏品查询', subtitle: '查看收藏品详细信息'),
-    ButtonItem(icon: Icons.bookmark_add, title: '舞萌百科', subtitle: '到底什么是错位?'),
-    ButtonItem(icon: Icons.leaderboard, title: 'Best50查询', subtitle: '我去,龙币!'),
-    ButtonItem(icon: Icons.analytics, title: '拟合Best50查询', subtitle: '我w55怎么拟合才w52?!'),
-    ButtonItem(icon: Icons.person_search_outlined, title: '个性化Best50查询', subtitle: '我超，名刀50!'),
-    ButtonItem(icon: Icons.arrow_circle_up, title: '段位表', subtitle: '我去，炫彩真段位!'),
-    ButtonItem(icon: Icons.door_back_door, title: 'KALEIDXSCOPE', subtitle: '白xx!(bushi)'),
-    ButtonItem(icon: Icons.label, title: '基于标签推荐', subtitle: '基于你游玩的谱面标签推荐曲目'),
-    ButtonItem(icon: Icons.shuffle, title: '随机乐曲', subtitle: '随机选曲1-4首'),
-    ButtonItem(icon: Icons.calculate, title: '单曲Rating计算', subtitle: '我鸟加这个有分吃吗？'),
-    ButtonItem(icon: Icons.percent, title: '达成率计算', subtitle: '根据判定详情算出达成率'),
-    ButtonItem(icon: Icons.compare_arrows, title: '版本对照', subtitle: '舞神要打哪些代的歌？'),
-    ButtonItem(icon: Icons.replay, title: '达成率反推', subtitle: '根据判定详情推出绝赞详情'),
-    ButtonItem(icon: Icons.gamepad, title: '无提示猜歌', subtitle: '舞萌笑传之猜猜呗1'),
-    ButtonItem(icon: Icons.gamepad, title: '根据部分曲绘猜歌', subtitle: '舞萌笑传之猜猜呗2'),
-    ButtonItem(icon: Icons.gamepad, title: '根据模糊曲绘猜歌', subtitle: '舞萌笑传之猜猜呗3'),
-    ButtonItem(icon: Icons.gamepad, title: '根据歌曲片段猜歌', subtitle: '舞萌笑传之猜猜呗4'),
-    ButtonItem(icon: Icons.gamepad, title: '根据别名猜歌', subtitle: '舞萌笑传之猜猜呗5'),
-    ButtonItem(icon: Icons.gamepad, title: '舞萌开字母', subtitle: '舞萌笑传之猜猜呗6'),
-    ButtonItem(icon: Icons.gamepad, title: '多人猜歌游戏', subtitle: '什么叫你随便答了一个就对了?!'),
-    ButtonItem(icon: Icons.leaderboard, title: '排行榜(仅供参考)', subtitle: '总Rating排行榜'),
-    ButtonItem(icon: Icons.leaderboard_outlined, title: '特殊排行榜', subtitle: '各种有意思的排行榜'),
-    ButtonItem(icon: Icons.file_upload_sharp, title: '刷新数据', subtitle: '刷新你的舞萌数据'),
-    ButtonItem(icon: Icons.network_check, title: '服务器状态', subtitle: '查看舞萌服务器状态'),
-    ButtonItem(icon: Icons.update, title: '检查更新', subtitle: '检查应用是否有新版本'),
-    ButtonItem(icon: Icons.poll_outlined, title: '问卷调查', subtitle: '助力ChiffonMai更上一层楼!'),
-    ButtonItem(icon: Icons.favorite, title: '收藏夹', subtitle: '管理你收藏的谱面'),
-    ButtonItem(icon: Icons.play_arrow, title: '自定义谱面播放', subtitle: '播放你自己本地的谱面')
+  // 按钮分类数据源
+  bool _isDivingFishLoggedIn = false;
+
+  Future<void> _checkDivingFishLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jwt = prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '';
+    if (mounted) {
+      setState(() => _isDivingFishLoggedIn = jwt.isNotEmpty);
+    }
+  }
+
+  Future<void> _logoutDivingFish() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(CacheKeyConstant.probeDivingFishToken);
+    await prefs.remove(CacheKeyConstant.probeDivingFishImportToken);
+    await prefs.remove(CacheKeyConstant.probeDivingFishBindQQ);
+    if (mounted) {
+      setState(() => _isDivingFishLoggedIn = false);
+    }
+    Fluttertoast.showToast(msg: '已登出水鱼账号');
+  }
+
+  List<ButtonCategory> get _buttonCategories => [
+    ButtonCategory(name: '曲库与数据', items: [
+      ButtonItem(icon: Icons.music_note, title: '乐曲查询', subtitle: '查询舞萌曲库的乐曲'),
+      ButtonItem(icon: Icons.score, title: '成绩查询', subtitle: '查看游玩数据'),
+      ButtonItem(icon: Icons.wysiwyg_rounded, title: '牌子进度', subtitle: '真代没有真将哦'),
+      ButtonItem(icon: Icons.grading_rounded, title: '个性化成绩查询', subtitle: '目前支持等级/谱师的牌子查询'),
+      ButtonItem(icon: Icons.collections_bookmark, title: '收藏品查询', subtitle: '查看收藏品详细信息'),
+      ButtonItem(icon: Icons.bookmark_add, title: '舞萌百科', subtitle: '到底什么是错位?'),
+    ]),
+    ButtonCategory(name: 'Best50与排行榜', items: [
+      ButtonItem(icon: Icons.leaderboard, title: 'Best50查询', subtitle: '我去,龙币!'),
+      ButtonItem(icon: Icons.analytics, title: '拟合Best50查询', subtitle: '我w55怎么拟合才w52?!'),
+      ButtonItem(icon: Icons.person_search_outlined, title: '个性化Best50查询', subtitle: '我超，名刀50!'),
+      ButtonItem(icon: Icons.leaderboard, title: '排行榜(仅供参考)', subtitle: '总Rating排行榜'),
+      ButtonItem(icon: Icons.leaderboard_outlined, title: '特殊排行榜', subtitle: '各种有意思的排行榜'),
+    ]),
+    ButtonCategory(name: '猜歌游戏', items: [
+      ButtonItem(icon: Icons.gamepad, title: '无提示猜歌', subtitle: '舞萌笑传之猜猜呗1'),
+      ButtonItem(icon: Icons.gamepad, title: '根据部分曲绘猜歌', subtitle: '舞萌笑传之猜猜呗2'),
+      ButtonItem(icon: Icons.gamepad, title: '根据模糊曲绘猜歌', subtitle: '舞萌笑传之猜猜呗3'),
+      ButtonItem(icon: Icons.gamepad, title: '根据歌曲片段猜歌', subtitle: '舞萌笑传之猜猜呗4'),
+      ButtonItem(icon: Icons.gamepad, title: '根据别名猜歌', subtitle: '舞萌笑传之猜猜呗5'),
+      ButtonItem(icon: Icons.gamepad, title: '舞萌开字母', subtitle: '舞萌笑传之猜猜呗6'),
+      ButtonItem(icon: Icons.gamepad, title: '多人猜歌游戏', subtitle: '什么叫你随便答了一个就对了?!'),
+    ]),
+    ButtonCategory(name: '实用工具', items: [
+      ButtonItem(icon: Icons.arrow_circle_up, title: '段位表', subtitle: '我去，炫彩真段位!'),
+      ButtonItem(icon: Icons.label, title: '基于标签推荐', subtitle: '基于你游玩的谱面标签推荐曲目'),
+      ButtonItem(icon: Icons.shuffle, title: '随机乐曲', subtitle: '随机选曲1-4首'),
+      ButtonItem(icon: Icons.calculate, title: '单曲Rating计算', subtitle: '我鸟加这个有分吃吗？'),
+      ButtonItem(icon: Icons.percent, title: '达成率计算', subtitle: '根据判定详情算出达成率'),
+      ButtonItem(icon: Icons.compare_arrows, title: '版本对照', subtitle: '舞神要打哪些代的歌？'),
+      ButtonItem(icon: Icons.replay, title: '达成率反推', subtitle: '根据判定详情推出绝赞详情'),
+      ButtonItem(icon: Icons.door_back_door, title: 'KALEIDXSCOPE', subtitle: '白xx!(bushi)'),
+      ButtonItem(icon: Icons.image_search, title: '曲绘识别', subtitle: '拍照识别曲绘对应的歌曲'),
+      ButtonItem(icon: Icons.favorite, title: '收藏夹', subtitle: '管理你收藏的谱面'),
+      ButtonItem(icon: Icons.play_arrow, title: '自定义谱面播放', subtitle: '播放你自己本地的谱面'),
+      ButtonItem(icon: Icons.qr_code_scanner, title: '同步成绩', subtitle: '将成绩同步到水鱼查分器'),
+    ]),
+    ButtonCategory(name: '系统', items: [
+      ButtonItem(icon: Icons.file_upload_sharp, title: '刷新数据', subtitle: '刷新你的舞萌数据'),
+      if (_isDivingFishLoggedIn)
+        ButtonItem(icon: Icons.logout, title: '登出账号', subtitle: '清除水鱼登录状态')
+      else
+        ButtonItem(icon: Icons.login, title: '登录水鱼', subtitle: '获取ImportToken以便同步成绩'),
+      ButtonItem(icon: Icons.network_check, title: '服务器状态', subtitle: '查看舞萌服务器状态'),
+      ButtonItem(icon: Icons.update, title: '检查更新', subtitle: '检查应用是否有新版本'),
+      ButtonItem(icon: Icons.info_outline, title: '关于本APP', subtitle: '了解ChiffonMai的方方面面'),
+      ButtonItem(icon: Icons.poll_outlined, title: '问卷调查', subtitle: '助力ChiffonMai更上一层楼!'),
+      ButtonItem(icon: Icons.manage_accounts, title: '账号管理', subtitle: '查看已绑定的水鱼账号信息'),
+    ]),
   ];
 
   @override
@@ -367,7 +437,7 @@ class _HomePageState extends State<HomePage> {
               child: Transform.scale(
                 scale: 1,
                 child: Image.asset(
-                  'assets/userinfobg.png',
+                  'assets/userinfobg2.png',
                   fit: BoxFit.cover,
                   opacity: const AlwaysStoppedAnimation(1),
                 ),
@@ -404,7 +474,14 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
-          // 层级4：个人信息静态文本
+          // 层级4：左侧头像选择器
+            Positioned(
+              left: screenWidth * 0.1,
+              top: screenHeight * 0.19,
+              child: _buildAvatarSelector(context),
+            ),
+
+          // 层级5：个人信息静态文本
             Positioned(
               left: screenWidth * 0.5,
               top: screenHeight * 0.21,
@@ -412,52 +489,41 @@ class _HomePageState extends State<HomePage> {
             ),
 
           
-          // 功能中心标题
-          Positioned(
-            left: screenWidth * 0.04,
-            right: screenWidth * 0.04,
-            bottom: screenHeight * 0.62, // 在GridView上方定位
-            child: Center(
-              child: Text(
-                "功能中心",
-                style: TextStyle(
-                  color: AppConstants.textPrimaryColor,
-                  fontSize: screenWidth * 0.045,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          // 层级5：核心功能区 - 直接使用Positioned定位GridView
+          // 层级5：核心功能区 - 分分类的可滚动按钮区域
           Positioned(
             left: screenWidth * 0.02,
             right: screenWidth * 0.02,
-            bottom: screenHeight * 0.06, // 距离底部减小，为版权信息留出空间
-            height: screenHeight * 0.55, // 根据屏幕高度调整
+            top: screenHeight * 0.36,
+            bottom: screenHeight * 0.03,
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.5),
+                color: Colors.white.withValues(alpha: 0.7),
                 borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
                 boxShadow: const [AppConstants.defaultShadow],
               ),
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.03, vertical: screenHeight * 0.015),
-                child: GridView.builder(
-                  padding: EdgeInsets.zero,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: AppConstants.crossAxisCount,
-                    crossAxisSpacing: screenWidth * 0.02,
-                    mainAxisSpacing: screenHeight * 0.01,
-                    childAspectRatio: screenWidth > 600 ? 1.3 : 1.2,
-                  ),
-                  itemCount: buttonItems.length,
-                  itemBuilder: (context, index) {
-                    final item = buttonItems[index];
-                    return _buildCustomButton(item, context);
-                  },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 功能中心标题
+                    Center(
+                      child: Padding(
+                        padding: EdgeInsets.only(bottom: screenHeight * 0.01),
+                        child: Text(
+                          "功能中心",
+                          style: TextStyle(
+                            color: AppConstants.textPrimaryColor,
+                            fontSize: screenWidth * 0.045,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // 分类按钮区域
+                    ..._buttonCategories.map((category) => _buildCategorySection(category, context)),
+                  ],
                 ),
               ),
             ),
@@ -465,7 +531,7 @@ class _HomePageState extends State<HomePage> {
           
           // 层级6：底部版权信息
           Positioned(
-            bottom: screenHeight * 0.015,
+            bottom: screenHeight * 0.01,
             left: 0,
             right: 0,
             child: Center(
@@ -527,6 +593,241 @@ class _HomePageState extends State<HomePage> {
           
           ],
       ),
+    );
+  }
+
+  // 从本地存储加载缓存的头像ID
+  Future<void> _loadCachedAvatarId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedId = prefs.getInt('selectedAvatarId');
+      if (cachedId != null && mounted) {
+        setState(() => _selectedAvatarId = cachedId);
+      }
+    } catch (e) {
+      debugPrint('加载缓存头像ID失败: $e');
+    }
+  }
+
+  // 保存头像ID到本地存储
+  Future<void> _saveAvatarId(int id) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('selectedAvatarId', id);
+    } catch (e) {
+      debugPrint('保存头像ID失败: $e');
+    }
+  }
+
+  // 获取头像列表
+  Future<void> _fetchAvatarIcons() async {
+    try {
+      final collectionData = await CollectionsManager().fetchIconsCollections();
+      if (collectionData?.icons != null && mounted) {
+        setState(() => _avatarIcons = collectionData!.icons!);
+      }
+    } catch (e) {
+      debugPrint('获取头像列表失败: $e');
+    }
+  }
+
+  // 构建头像选择器
+  Widget _buildAvatarSelector(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final avatarSize = screenWidth * 0.3;
+
+    return GestureDetector(
+      onTap: _showAvatarPicker,
+      child: Container(
+        width: avatarSize,
+        height: avatarSize,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color: Colors.white.withValues(alpha: 0.8),
+          border: Border.all(color: AppConstants.textPrimaryColor.withValues(alpha: 0.4), width: 1.5),
+          boxShadow: const [AppConstants.defaultShadow],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: CachedNetworkImage(
+            imageUrl: 'https://assets2.lxns.net/maimai/icon/$_selectedAvatarId.png',
+            placeholder: (ctx, url) => const Icon(Icons.person, size: 30, color: Colors.grey),
+            errorWidget: (ctx, url, err) => const Icon(Icons.person, size: 30, color: Colors.grey),
+            fit: BoxFit.cover,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 显示头像选择对话框
+  void _showAvatarPicker() {
+    if (_avatarIcons.isEmpty) {
+      Fluttertoast.showToast(msg: '头像数据尚未加载，请先刷新数据');
+      return;
+    }
+
+    final screenSize = MediaQuery.of(context).size;
+    final crossAxisCount = 4;
+    final selectedId = _selectedAvatarId;
+    final TextEditingController searchController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            // 根据关键词过滤头像列表
+            final keyword = searchController.text.trim().toLowerCase();
+            final filteredIcons = keyword.isEmpty
+                ? List<Collection>.from(_avatarIcons)
+                : _avatarIcons.where((icon) {
+                    final matchName = icon.name.toLowerCase().contains(keyword);
+                    final matchDesc = icon.description?.toLowerCase().contains(keyword) ?? false;
+                    return matchName || matchDesc;
+                  }).toList();
+            // 将当前选中的头像移到最前面（只移动第一个匹配项）
+            final selectedIndex = filteredIcons.indexWhere((icon) => icon.id == selectedId);
+            if (selectedIndex > 0) {
+              final selected = filteredIcons.removeAt(selectedIndex);
+              filteredIcons.insert(0, selected);
+            }
+
+            return Container(
+              height: screenSize.height * 0.65,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: Column(
+                children: [
+                  // 标题栏
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: Row(
+                      children: [
+                        const Text('选择头像', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () {
+                            searchController.dispose();
+                            Navigator.of(ctx).pop();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  // 搜索栏
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: TextField(
+                      controller: searchController,
+                      onChanged: (_) => setSheetState(() {}),
+                      decoration: InputDecoration(
+                        hintText: '输入头像名称或描述搜索...',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        suffixIcon: searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  searchController.clear();
+                                  setSheetState(() {});
+                                },
+                              )
+                            : null,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color.fromARGB(255, 84, 97, 97)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // 搜索结果数量
+                  if (keyword.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '找到 ${filteredIcons.length} 个头像',
+                          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                        ),
+                      ),
+                    ),
+                  const Divider(height: 1),
+                  // 头像网格
+                  Expanded(
+                    child: filteredIcons.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
+                                const SizedBox(height: 8),
+                                Text('未找到匹配的头像', style: TextStyle(color: Colors.grey.shade500)),
+                              ],
+                            ),
+                          )
+                        : GridView.builder(
+                            padding: const EdgeInsets.all(12),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: crossAxisCount,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                              childAspectRatio: 1,
+                            ),
+                            itemCount: filteredIcons.length,
+                            itemBuilder: (ctx, index) {
+                              final iconItem = filteredIcons[index];
+                              final isSelected = iconItem.id == selectedId;
+                              return GestureDetector(
+                                onTap: () {
+                                  _saveAvatarId(iconItem.id);
+                                  setState(() => _selectedAvatarId = iconItem.id);
+                                  searchController.dispose();
+                                  Navigator.of(ctx).pop();
+                                },
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: isSelected ? Colors.orange : Colors.grey.shade300,
+                                      width: isSelected ? 3 : 1,
+                                    ),
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: CachedNetworkImage(
+                                      imageUrl: 'https://assets2.lxns.net/maimai/icon/${iconItem.id}.png',
+                                      placeholder: (ctx, url) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                      errorWidget: (ctx, url, err) => const Icon(Icons.error, size: 20),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -681,7 +982,7 @@ class _HomePageState extends State<HomePage> {
     
     showDialog(
       context: context,
-      barrierDismissible: true,
+      barrierDismissible: !isRefreshing,
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setState) {
@@ -941,7 +1242,7 @@ class _HomePageState extends State<HomePage> {
   ) async {
     try {
       onProgress(5, '正在清除缓存...');
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 250));
       
       // 清除推荐结果缓存
       try {
@@ -953,44 +1254,44 @@ class _HomePageState extends State<HomePage> {
       }
       
       onProgress(10, '正在换取访问令牌...');
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 250));
       
       // 使用授权码换取令牌
       final success = await LuoXueUserPlayDataManager().exchangeCodeForToken(authCode);
       
       if (success) {
         onProgress(15, '授权成功，正在保存数据源...');
-        await Future.delayed(Duration(milliseconds: 100));
+        await Future.delayed(const Duration(milliseconds: 250));
         
         // 授权成功，保存数据源为落雪
         await _saveLastDataSource('luoxue');
         
         onProgress(20, '正在刷新歌曲数据...');
-        await Future.delayed(Duration(milliseconds: 100));
+        await Future.delayed(const Duration(milliseconds: 250));
         
         // 使用智能刷新：初次拉取获取全量maidata，后续只获取追加歌曲的maidata
         await MaimaiMusicDataManager().refreshDataWithSmartMaidata();
         
         onProgress(35, '正在刷新难度数据...');
-        await Future.delayed(Duration(milliseconds: 100));
+        await Future.delayed(const Duration(milliseconds: 250));
         
         // 从API获取并更新难度数据
         await DiffMusicDataManager().fetchAndUpdateDiffData();
         
         onProgress(50, '正在刷新标签数据...');
-        await Future.delayed(Duration(milliseconds: 100));
+        await Future.delayed(const Duration(milliseconds: 250));
         
         // 刷新标签数据
         await RecommendByTagsService.initializeTags();
         
         onProgress(60, '正在刷新别名数据...');
-        await Future.delayed(Duration(milliseconds: 100));
+        await Future.delayed(const Duration(milliseconds: 250));
         
         // 刷新别名数据
         await SongAliasManager.instance.refresh();
         
         onProgress(65, '正在获取玩家信息...');
-        await Future.delayed(Duration(milliseconds: 100));
+        await Future.delayed(const Duration(milliseconds: 250));
         
         // 授权成功，获取玩家信息
         final playerInfo = await LuoXueUserPlayDataManager().getPlayerInfo();
@@ -1009,14 +1310,14 @@ class _HomePageState extends State<HomePage> {
         }
         
         onProgress(75, '正在获取玩家成绩...');
-        await Future.delayed(Duration(milliseconds: 100));
+        await Future.delayed(const Duration(milliseconds: 250));
         
         // 获取玩家成绩并转换为 RecordItem（自动更新缓存）
         final playerRecords = await LuoXueUserPlayDataManager().getPlayerRecordsAsRecordItems();
         debugPrint('玩家成绩数量: ${playerRecords?.length ?? 0}');
         
         onProgress(85, '正在计算 Best50 数据...');
-        await Future.delayed(Duration(milliseconds: 100));
+        await Future.delayed(const Duration(milliseconds: 250));
         
         // 从落雪数据计算并更新首页的 Best50 数据
         if (playerRecords != null && playerRecords.isNotEmpty) {
@@ -1024,7 +1325,7 @@ class _HomePageState extends State<HomePage> {
         }
         
         onProgress(95, '正在保存数据...');
-        await Future.delayed(Duration(milliseconds: 100));
+        await Future.delayed(const Duration(milliseconds: 250));
         
         // 更新排行榜数据
         String? rankingError;
@@ -1300,7 +1601,7 @@ class _HomePageState extends State<HomePage> {
   ) async {
     try {
       onProgress(5, '正在清除缓存...');
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 250));
       
       // 清除推荐结果缓存
       try {
@@ -1312,38 +1613,38 @@ class _HomePageState extends State<HomePage> {
       }
       
       onProgress(10, '正在刷新歌曲数据...');
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 250));
       
       // 使用智能刷新：初次拉取获取全量maidata，后续只获取追加歌曲的maidata
       await MaimaiMusicDataManager().refreshDataWithSmartMaidata();
       
       onProgress(30, '正在刷新难度数据...');
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 250));
       
       // 从API获取并更新难度数据
       await DiffMusicDataManager().fetchAndUpdateDiffData();
       
       onProgress(45, '正在刷新标签数据...');
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 250));
       
       // 刷新标签数据
       await RecommendByTagsService.initializeTags();
       
       onProgress(55, '正在刷新别名数据...');
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 250));
       
       // 刷新别名数据
       await SongAliasManager.instance.refresh();
       
       onProgress(65, '正在获取用户数据...');
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 250));
       
       // 从API获取并更新用户游玩数据
       final userPlayDataManager = UserPlayDataManager();
       final userPlayData = await userPlayDataManager.fetchUserPlayData(qq);
       
       onProgress(75, '正在获取Best50数据...');
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 250));
       
       final best50Manager = UserBest50Manager();
       final best50Data = await best50Manager.getUserBest50(qq);
@@ -1351,13 +1652,15 @@ class _HomePageState extends State<HomePage> {
       
       // 更新用户昵称
       if (userPlayData != null && userPlayData.containsKey('nickname')) {
-        setState(() {
-          _userNickname = userPlayData['nickname'];
-        });
+        if (mounted) {
+          setState(() {
+            _userNickname = userPlayData['nickname'];
+          });
+        }
       }
       
       onProgress(85, '正在计算Rating...');
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 250));
       
       // 计算Best50、Best35、Best15总RA
       int totalRA = 0;
@@ -1378,14 +1681,16 @@ class _HomePageState extends State<HomePage> {
       totalRA = best35RA + best15RA;
       
       // 更新状态
-      setState(() {
-        _best50TotalRA = totalRA;
-        _best35TotalRA = best35RA;
-        _best15TotalRA = best15RA;
-      });
+      if (mounted) {
+        setState(() {
+          _best50TotalRA = totalRA;
+          _best35TotalRA = best35RA;
+          _best15TotalRA = best15RA;
+        });
+      }
       
       onProgress(95, '正在保存数据...');
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 250));
       
       // 保存数据到本地存储
       await _saveUserData();
@@ -1458,7 +1763,926 @@ class _HomePageState extends State<HomePage> {
       throw e;
     }
   }
-  
+
+  // 同步成功后自动刷新首页数据（成绩 + Best50 + 排行榜）
+  // 调用前需确保 _cachedQQ / bind_qq 已保存
+  Future<void> _autoRefreshAfterSync({
+    Future<void> Function(double progress, String text)? onProgress,
+  }) async {
+    final qq = _cachedQQ.isNotEmpty ? _cachedQQ : null;
+
+    if (qq == null || qq.isEmpty) {
+      debugPrint('[HomePage] _autoRefreshAfterSync: QQ 为空，跳过刷新');
+      return;
+    }
+
+    debugPrint('[HomePage] _autoRefreshAfterSync: 使用 QQ=$qq 自动刷新');
+
+    await _refreshBest50DataWithProgress(
+      qq,
+      (p, t) async {
+        debugPrint('[HomePage] 后台刷新 $p%: $t');
+        await onProgress?.call(0.70 + (p / 100) * 0.30, t);
+      },
+      await _getParticipateRankings(),
+      await _getShowNickname(),
+    );
+    debugPrint('[HomePage] _autoRefreshAfterSync: 完成');
+  }
+
+  Future<bool> _getParticipateRankings() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(CacheKeyConstant.participateRankings) ?? false;
+  }
+
+  Future<bool> _getShowNickname() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(CacheKeyConstant.showNickname) ?? false;
+  }
+
+  // 显示同步成绩对话框，返回 friendCode 表示同步成功
+  Future<String?> _showSyncScoreDialog(BuildContext context) async {
+    final TextEditingController qrController = TextEditingController();
+    final TextEditingController dfUserController = TextEditingController();
+    final TextEditingController dfPassController = TextEditingController();
+    bool isSyncing = false;
+    bool needDivingFishToken = false;
+    bool isBinding = false;
+    String statusText = '';
+    String? bindingError;
+    double? progress;
+    SyncStage? currentStage;
+
+    // 排行榜选项（与刷新数据对话框公用 prefs 缓存）
+    bool participateRankings = false;
+    bool showNickname = false;
+
+    // 从缓存读取排行榜设置
+    Future<void> loadRankingSettings() async {
+      final prefs = await SharedPreferences.getInstance();
+      participateRankings = prefs.getBool(CacheKeyConstant.participateRankings) ?? false;
+      showNickname = prefs.getBool(CacheKeyConstant.showNickname) ?? false;
+    }
+
+    Future<void> saveRankingSettings() async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(CacheKeyConstant.participateRankings, participateRankings);
+      await prefs.setBool(CacheKeyConstant.showNickname, showNickname);
+    }
+
+    loadRankingSettings();
+
+    final String? result = await showDialog<String?>(
+      context: context,
+      barrierDismissible: !isSyncing,
+      builder: (BuildContext dialogContext) {
+        Timer? _autoCloseTimer;
+        int _countdown = 3;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            // 完成态：点击空白可关闭 + 3 秒倒计时自动关闭
+            final isDone = currentStage == SyncStage.completed ||
+                currentStage == SyncStage.failed ||
+                currentStage == SyncStage.cancelled;
+
+            if (isDone && _autoCloseTimer == null) {
+              void tick() {
+                _countdown--;
+                if (_countdown > 0) {
+                  setState(() {}); // 刷新按钮文字
+                  _autoCloseTimer = Timer(const Duration(seconds: 1), tick);
+                } else {
+                  if (Navigator.of(dialogContext).canPop()) {
+                    Navigator.of(dialogContext).pop();
+                  }
+                }
+              }
+              _autoCloseTimer = Timer(const Duration(seconds: 1), tick);
+            }
+
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(
+                    needDivingFishToken ? Icons.link : Icons.qr_code_scanner,
+                    color: AppConstants.textPrimaryColor,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(needDivingFishToken ? '绑定水鱼账号' : '同步成绩到水鱼'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // ===== 阶段 1：输入 QR 码 =====
+                    if (!isSyncing && !needDivingFishToken) ...[
+                      const Text(
+                        '在舞萌|中二公众号请求并打开二维码，扫描后将字符串粘贴到下方：',
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: qrController,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          hintText: 'SGWCMAID...',
+                          hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          contentPadding: const EdgeInsets.all(12),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      CheckboxListTile(
+                        title: const Text('参与排行榜', style: TextStyle(fontSize: 14)),
+                        value: participateRankings,
+                        onChanged: (value) {
+                          setState(() {
+                            participateRankings = value ?? false;
+                            if (!participateRankings) showNickname = false;
+                          });
+                          saveRankingSettings();
+                        },
+                        controlAffinity: ListTileControlAffinity.leading,
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      if (participateRankings)
+                        CheckboxListTile(
+                          title: const Text('展示昵称（不勾选则显示为匿名用户）',
+                              style: TextStyle(fontSize: 13)),
+                          value: showNickname,
+                          onChanged: (value) {
+                            setState(() => showNickname = value ?? false);
+                            saveRankingSettings();
+                          },
+                          controlAffinity: ListTileControlAffinity.leading,
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                    ],
+
+                    // ===== 阶段 2：绑定水鱼账号 =====
+                    if (needDivingFishToken) ...[
+                      const Text(
+                        '成绩已抓取成功！但要推送到水鱼，需要先绑定你的水鱼账号：',
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: dfUserController,
+                        decoration: InputDecoration(
+                          labelText: '水鱼用户名',
+                          hintText: '输入 Diving-Fish 用户名',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: dfPassController,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: '水鱼密码',
+                          hintText: '输入 Diving-Fish 密码',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10,
+                          ),
+                        ),
+                      ),
+                      if (bindingError != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          bindingError!,
+                          style: const TextStyle(fontSize: 12, color: Colors.red),
+                        ),
+                      ],
+                    ],
+
+                    // ===== 同步进度 =====
+                    if (isSyncing && !needDivingFishToken) ...[
+                      if (currentStage != SyncStage.completed &&
+                          currentStage != SyncStage.failed &&
+                          currentStage != SyncStage.cancelled)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.only(bottom: 12),
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2.5),
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+                      Center(child: _buildStageIcon(currentStage)),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: Text(
+                          statusText,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: currentStage == SyncStage.failed ||
+                                    currentStage == SyncStage.cancelled
+                                ? Colors.red
+                                : currentStage == SyncStage.completed
+                                    ? Colors.green
+                                    : AppConstants.textPrimaryColor,
+                          ),
+                        ),
+                      ),
+                      if (currentStage != SyncStage.completed &&
+                          currentStage != SyncStage.failed &&
+                          currentStage != SyncStage.cancelled) ...[
+                        const SizedBox(height: 10),
+                        if (progress != null)
+                          LinearProgressIndicator(value: progress)
+                        else
+                          const LinearProgressIndicator(),
+                      ],
+                      if (currentStage == SyncStage.completed) ...[
+                        const SizedBox(height: 8),
+                        Center(
+                          child: Text(
+                            '成绩已同步！可前往水鱼查看',
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                // ---- 初始/失败/完成：关闭按钮 ----
+                if (!isSyncing && !needDivingFishToken)
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: const Text('关闭'),
+                  ),
+                if (isSyncing &&
+                    (currentStage == SyncStage.completed ||
+                        currentStage == SyncStage.failed ||
+                        currentStage == SyncStage.cancelled))
+                  TextButton(
+                    onPressed: () {
+                      _autoCloseTimer?.cancel();
+                      final fc = currentStage == SyncStage.completed
+                          ? DivingFishProbeManager().currentFriendCode
+                          : null;
+                      Navigator.of(dialogContext).pop(fc);
+                    },
+                    child: Text(
+                      _countdown > 0 ? '确定 ($_countdown)' : '确定',
+                    ),
+                  ),
+
+                // ---- 绑定水鱼账号页面：关闭 & 绑定 ----
+                if (needDivingFishToken) ...[
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: const Text('跳过'),
+                  ),
+                  ElevatedButton.icon(
+                    icon: isBinding
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.link, size: 18),
+                    label: Text(isBinding ? '绑定中...' : '绑定并同步'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: isBinding
+                        ? null
+                        : () async {
+                            final username = dfUserController.text.trim();
+                            final password = dfPassController.text.trim();
+                            if (username.isEmpty || password.isEmpty) {
+                              setState(() {
+                                bindingError = '请输入水鱼用户名和密码';
+                              });
+                              return;
+                            }
+
+                            setState(() {
+                              isBinding = true;
+                              bindingError = null;
+                            });
+
+                            final ok = await DivingFishProbeManager()
+                                .bindDivingFishAccount(username, password);
+
+                            if (!ok) {
+                              setState(() {
+                                isBinding = false;
+                                bindingError = '绑定失败，请检查用户名密码是否正确';
+                              });
+                              return;
+                            }
+
+                            // 绑定成功 → 同步缓存水鱼 JWT（用于后续 fetchBindQQ）
+                            _log('Hub 绑定成功，同步直登水鱼以缓存 JWT...');
+                            await DivingFishProbeManager()
+                                .loginDivingFishDirect(username, password);
+
+                            // 重试导出
+                            _log('重试导出到水鱼...');
+                            final exportData =
+                                await DivingFishProbeManager().exportToDivingFish();
+
+                            if (exportData != null &&
+                                (exportData.tryGet<int>('status') ?? 0) == 200) {
+                              final count = exportData.tryGet<int>('exported') ?? 0;
+
+                              // 自动刷新本地数据
+                              setState(() {
+                                statusText = '同步成功！正在刷新本地数据...';
+                              });
+                              String? qq = _cachedQQ.isNotEmpty ? _cachedQQ : null;
+                              if (qq == null) {
+                                qq = await DivingFishProbeManager().fetchBindQQ();
+                              }
+                              if (qq != null && qq.isNotEmpty) {
+                                await _saveQQ(qq);
+                                await _saveLastDataSource('shuiyu');
+                              }
+                              await _autoRefreshAfterSync(
+                                onProgress: (p, t) async {
+                                  setState(() {
+                                    progress = p;
+                                    statusText = t;
+                                  });
+                                  await Future.delayed(const Duration(milliseconds: 80));
+                                },
+                              );
+
+                              Fluttertoast.showToast(
+                                  msg: '全部完成！$count 条成绩已同步，本地数据已刷新');
+                              final fc = DivingFishProbeManager().currentFriendCode;
+                              Navigator.of(dialogContext).pop(fc);
+                            } else {
+                              setState(() {
+                                isBinding = false;
+                                bindingError = '导出失败，请稍后重试';
+                              });
+                            }
+                          },
+                  ),
+                ],
+
+                // ---- 初始：开始同步按钮 ----
+                if (!isSyncing && !needDivingFishToken)
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.sync, size: 18),
+                    label: const Text('开始同步'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () async {
+                      final qrCode = qrController.text.trim();
+                      if (qrCode.isEmpty) {
+                        Fluttertoast.showToast(msg: '请先粘贴机台上的QR码字符串');
+                        return;
+                      }
+
+                      setState(() {
+                        isSyncing = true;
+                        statusText = '准备同步...';
+                        currentStage = SyncStage.authenticating;
+                      });
+
+                      final result = await DivingFishProbeManager().syncByQrCode(
+                        qrCode,
+                        onProgress: (p) {
+                          setState(() {
+                            currentStage = p.stage;
+                            statusText = p.message;
+                            progress = _stageProgress(p);
+                          });
+                        },
+                      );
+
+                      if (result.isSuccess) {
+                        // ===== 同步成功 → 先展示过渡态 =====
+                        setState(() {
+                          currentStage = SyncStage.exporting;
+                          statusText = '同步成功！正在刷新本地数据...';
+                          progress = 0.70;
+                        });
+                        // 让 UI 先渲染出 70% 和过渡文字
+                        await Future.delayed(const Duration(milliseconds: 300));
+
+                        // 确保 QQ 已保存
+                        String? qq = _cachedQQ.isNotEmpty ? _cachedQQ : null;
+                        if (qq == null) {
+                          qq = await DivingFishProbeManager().fetchBindQQ();
+                        }
+                        final hasQQ = qq != null && qq.isNotEmpty;
+                        if (hasQQ) {
+                          await _saveQQ(qq);
+                          await _saveLastDataSource('shuiyu');
+                        }
+
+                        if (hasQQ) {
+                          await _autoRefreshAfterSync(
+                            onProgress: (p, t) async {
+                              setState(() {
+                                progress = p;
+                                statusText = t;
+                              });
+                              await Future.delayed(const Duration(milliseconds: 80));
+                            },
+                          );
+                        } else {
+                          // 没有 QQ，假装走一段进度让用户看到
+                          for (int i = 0; i < 4; i++) {
+                            setState(() => progress = 0.70 + (i + 1) * 0.05);
+                            await Future.delayed(const Duration(milliseconds: 200));
+                          }
+                        }
+
+                        setState(() {
+                          currentStage = SyncStage.completed;
+                          progress = 1.0;
+                          if (hasQQ) {
+                            statusText = '全部完成！${result.exportedCount} 条成绩已同步，本地数据已刷新';
+                          } else {
+                            statusText = '同步完成！${result.exportedCount} 条成绩已推送到水鱼\n（需先登录水鱼才能自动刷新本地数据）';
+                          }
+                        });
+                      } else if (result.errorMessage == '用户取消同步') {
+                        setState(() {
+                          currentStage = SyncStage.cancelled;
+                          statusText = '同步已取消';
+                        });
+                      } else {
+                        final msg = result.errorMessage ?? '';
+                        if (msg.contains('divingFishImportToken') ||
+                            msg.contains('missing')) {
+                          needDivingFishToken = true;
+                          isSyncing = false;
+                          _log('检测到缺少水鱼 importToken，切换到绑定界面');
+                        } else {
+                          setState(() {
+                            currentStage = SyncStage.failed;
+                            statusText = msg;
+                          });
+                        }
+                      }
+                    },
+                  ),
+              ],
+          );
+          },
+        );
+      },
+    );
+    return result;
+  }
+
+  // 将同步阶段映射为 0~1 的进度值（总范围 0~0.70，刷新占 0.70~1.0）
+  double _stageProgress(SyncProgress p) {
+    switch (p.stage) {
+      case SyncStage.authenticating:
+        return 0.02;
+      case SyncStage.requesting:
+        return 0.10;
+      case SyncStage.sendingFriendRequest:
+        return 0.18;
+      case SyncStage.waitingAcceptance:
+        return 0.25;
+      case SyncStage.scraping:
+        // 抓取阶段：25%~65%，由实际 diffs 进度填充
+        return 0.25 + (p.progress ?? 0) * 0.40;
+      case SyncStage.exporting:
+        return 0.68;
+      default:
+        return 0.0;
+    }
+  }
+
+  // 调试日志（HomePage 内用，避免和 DivingFishProbeManager 混淆）
+  void _log(String msg) {
+    debugPrint('[HomePage-Sync] $msg');
+  }
+
+  // 显示水鱼登录对话框
+  void _showDivingFishLoginDialog(BuildContext context) {
+    final TextEditingController userController = TextEditingController();
+    final TextEditingController passController = TextEditingController();
+    bool isLoggingIn = false;
+    bool loginSuccess = false;
+    String? importedToken;
+    String statusText = '';
+    String? errorMsg;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(
+                    loginSuccess ? Icons.check_circle : Icons.login,
+                    color: loginSuccess ? Colors.green : AppConstants.textPrimaryColor,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(loginSuccess ? '登录成功' : '登录水鱼'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!loginSuccess) ...[
+                      const Text(
+                        '输入你的 Diving-Fish 水鱼账号密码以获取 ImportToken：',
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: userController,
+                        decoration: InputDecoration(
+                          labelText: '用户名',
+                          hintText: 'Diving-Fish 用户名',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: passController,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: '密码',
+                          hintText: 'Diving-Fish 密码',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10,
+                          ),
+                        ),
+                      ),
+                      if (errorMsg != null) ...[
+                        const SizedBox(height: 8),
+                        Text(errorMsg!, style: const TextStyle(fontSize: 12, color: Colors.red)),
+                      ],
+                    ] else ...[
+                      const Icon(Icons.check_circle, color: Colors.green, size: 48),
+                      const SizedBox(height: 12),
+                      Text(
+                        statusText.isNotEmpty ? statusText : '登录成功',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'ImportToken 已获取并缓存',
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Token: ${importedToken ?? "***"}',
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        '现在可以使用"同步成绩"功能一键同步到水鱼了',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(loginSuccess ? '完成' : '取消'),
+                ),
+                if (!loginSuccess)
+                  ElevatedButton.icon(
+                    icon: isLoggingIn
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.login, size: 18),
+                    label: Text(isLoggingIn ? '登录中...' : '登录'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: isLoggingIn
+                        ? null
+                        : () async {
+                            final username = userController.text.trim();
+                            final password = passController.text.trim();
+                            if (username.isEmpty || password.isEmpty) {
+                              setState(() => errorMsg = '请输入用户名和密码');
+                              return;
+                            }
+                            setState(() {
+                              isLoggingIn = true;
+                              errorMsg = null;
+                            });
+
+                            final result = await DivingFishProbeManager()
+                                .loginDivingFishDirect(username, password);
+
+                            if (result != null && result.tryGet<String>('importToken') != null) {
+                              final token = result.tryGet<String>('importToken') ?? '';
+                              final nickname = result.tryGet<String>('nickname') ?? '';
+                              final plate = result.tryGet<String>('plate') ?? '';
+                              setState(() {
+                                isLoggingIn = false;
+                                loginSuccess = true;
+                                importedToken = token.isNotEmpty
+                                    ? '${token.substring(0, token.length > 12 ? 12 : token.length)}...'
+                                    : '***';
+                                statusText = '欢迎，$nickname${plate.isNotEmpty ? " ($plate)" : ""}';
+                              });
+                              _checkDivingFishLoginStatus();
+                            } else {
+                              setState(() {
+                                isLoggingIn = false;
+                                errorMsg = '登录失败：用户名或密码错误';
+                              });
+                            }
+                          },
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 显示账号管理对话框
+  void _showAccountManageDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) {
+        return FutureBuilder<Map<String, dynamic>?>(
+          future: _fetchAccountProfile(),
+          builder: (ctx, snapshot) {
+            final isLoading = snapshot.connectionState != ConnectionState.done;
+            final errorMsg = snapshot.hasError ? '${snapshot.error}' : null;
+            final profile = snapshot.data;
+
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.manage_accounts, size: 22),
+                  SizedBox(width: 8),
+                  Text('账号管理'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: isLoading
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    : errorMsg != null
+                        ? Text(errorMsg,
+                            style: const TextStyle(color: Colors.red))
+                        : profile != null
+                            ? _buildAccountInfo(profile, dialogContext)
+                            : const Text('暂无数据'),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('关闭'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>?> _fetchAccountProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jwt = prefs.getString(CacheKeyConstant.probeDivingFishToken);
+    if (jwt == null || jwt.isEmpty) {
+      throw Exception('未登录水鱼，请先在首页点击「登录水鱼」');
+    }
+    final response = await http.get(
+      Uri.parse(ApiUrls.DivingFishProfileApi),
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': 'jwt_token=$jwt',
+      },
+    );
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('获取账号信息失败 (${response.statusCode})');
+  }
+
+  Widget _buildAccountInfo(Map<String, dynamic> p, BuildContext dialogContext) {
+    final importToken = p.tryGet<String>('import_token') ?? '无';
+    final bindQQ = p.tryGet<String>('bind_qq') ?? '未绑定';
+    final nickname = p.tryGet<String>('nickname') ?? '无';
+    final channelUid = p.tryGet<String>('qq_channel_uid') ?? '未绑定';
+    final username = p.tryGet<String>('username') ?? '无';
+    final plate = p.tryGet<String>('plate') ?? '无';
+    final additionalRating = p.tryGet<int>('additional_rating') ?? 0;
+
+    String displayToken = importToken.length > 20
+        ? '${importToken.substring(0, 16)}...'
+        : importToken;
+
+    // 需要跨 setState 保持状态，声明在 StatefulBuilder 外部
+    bool isRefreshing = false;
+
+    return StatefulBuilder(
+      builder: (ctx, setState) {
+        final rows = <Widget>[
+          _infoRow('用户名', username),
+          _infoRow('昵称', nickname),
+          _infoRow('牌子', plate.isNotEmpty ? plate : '无'),
+          _infoRow('Rating段位', _ratingName(additionalRating)),
+          _infoRow('绑定QQ', bindQQ),
+          _infoRow('频道ID', channelUid),
+          // ImportToken 行带操作按钮
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(
+                  width: 90,
+                  child: Text('ImportToken',
+                      style: TextStyle(color: Colors.grey, fontSize: 13)),
+                ),
+                Expanded(
+                  child: Text(displayToken,
+                      style: const TextStyle(fontSize: 13)),
+                ),
+                if (isRefreshing)
+                  const SizedBox(
+                    width: 24, height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else ...[
+                  IconButton(
+                    icon: const Icon(Icons.refresh, size: 18),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    tooltip: '刷新 ImportToken',
+                    onPressed: () async {
+                      setState(() => isRefreshing = true);
+                      final newToken = await _refreshImportToken();
+                      if (newToken != null) {
+                        displayToken = newToken.length > 20
+                            ? '${newToken.substring(0, 16)}...'
+                            : newToken;
+                        Fluttertoast.showToast(msg: 'ImportToken 已刷新');
+                      } else {
+                        Fluttertoast.showToast(msg: '刷新失败');
+                      }
+                      setState(() => isRefreshing = false);
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 18),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    tooltip: '复制 ImportToken',
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: importToken));
+                      Fluttertoast.showToast(msg: 'ImportToken 已复制到剪贴板');
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ];
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: rows,
+        );
+      },
+    );
+  }
+
+  Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 90,
+            child: Text(label,
+                style: const TextStyle(color: Colors.grey, fontSize: 13)),
+          ),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<String?> _refreshImportToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jwt = prefs.getString(CacheKeyConstant.probeDivingFishToken);
+    if (jwt == null || jwt.isEmpty) return null;
+
+    try {
+      final response = await http.put(
+        Uri.parse(ApiUrls.DivingFishImportTokenApi),
+        headers: {
+          'Content-Type': 'application/json',
+          'Cookie': 'jwt_token=$jwt',
+        },
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        final newToken = data.tryGet<String>('token') ?? '';
+        if (newToken.isNotEmpty) {
+          await prefs.setString(CacheKeyConstant.probeDivingFishImportToken, newToken);
+          return newToken;
+        }
+      }
+    } catch (e) {
+      debugPrint('_refreshImportToken error: $e');
+    }
+    return null;
+  }
+
+  String _ratingName(int rating) {
+    const names = [
+      '初学者', '一段', '二段', '三段', '四段', '五段',
+      '六段', '七段', '八段', '九段', '十段',
+      '真初段', '真二段', '真三段', '真四段', '真五段',
+      '真六段', '真七段', '真八段', '真九段', '真十段',
+      '真皆传', '里皆传',
+    ];
+    if (rating < 0 || rating >= names.length) return '$rating';
+    return '${names[rating]} ($rating)';
+  }
+
+  // 构建同步状态图标
+  Widget _buildStageIcon(SyncStage? stage) {
+    if (stage == null) return const SizedBox.shrink();
+    switch (stage) {
+      case SyncStage.completed:
+        return const Icon(Icons.check_circle, color: Colors.green, size: 36);
+      case SyncStage.failed:
+        return const Icon(Icons.error, color: Colors.red, size: 36);
+      case SyncStage.cancelled:
+        return const Icon(Icons.cancel, color: Colors.grey, size: 36);
+      case SyncStage.waitingAcceptance:
+        return const Icon(Icons.hourglass_bottom, color: Colors.orange, size: 36);
+      default:
+        return const Icon(Icons.sync, color: Colors.blue, size: 36);
+    }
+  }
+
   // 构建自定义功能按钮
   Widget _buildCustomButton(ButtonItem item, BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -1617,6 +2841,12 @@ class _HomePageState extends State<HomePage> {
               MaterialPageRoute(builder: (context) => KaleidXScopeSelectPage()),
             );
           }
+          if (item.title == '曲绘识别'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const CoverRecognitionPage()),
+            );
+          }
           if (item.title == '牌子进度'){
             Navigator.push(
               context,
@@ -1635,10 +2865,104 @@ class _HomePageState extends State<HomePage> {
               MaterialPageRoute(builder: (context) => PersonalizedChartPlayConfigure()),
             );
           }
+          if (item.title == '关于本APP') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AboutAppPage()),
+            );
+          }
           if (item.title == '问卷调查') {
             final uri = Uri.parse('https://wj.qq.com/s2/26540572/7828/');
             if (await canLaunchUrl(uri)) {
               await launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
+          }
+          if (item.title == '同步成绩') {
+            // 检测是否已登录水鱼
+            final prefs = await SharedPreferences.getInstance();
+            final hasJwt = (prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '').isNotEmpty;
+            if (!hasJwt) {
+              if (context.mounted) {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('提示'),
+                    content: const Text('请先在「登录水鱼」中登录你的水鱼账号，再使用同步功能。'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('取消'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          _showDivingFishLoginDialog(context);
+                        },
+                        child: const Text('去登录'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return;
+            }
+
+            // 检测缓存 QQ 与当前水鱼 bind_qq 是否一致
+            final cachedQQ = _cachedQQ.isNotEmpty ? _cachedQQ : null;
+            if (cachedQQ != null) {
+              final bindQQ = await DivingFishProbeManager().fetchBindQQ();
+              if (bindQQ != null && bindQQ.isNotEmpty && bindQQ != cachedQQ) {
+                if (context.mounted) {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('账号不匹配'),
+                      content: Text(
+                        '当前登录的水鱼账号绑定的 QQ（$bindQQ）与本机缓存的 QQ（$cachedQQ）不一致。\n\n'
+                        '请先登出当前水鱼账号，登录正确的账号后再同步。',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          child: const Text('确定'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return;
+              }
+            }
+
+            await _showSyncScoreDialog(context);
+          }
+          if (item.title == '账号管理') {
+            _showAccountManageDialog(context);
+          }
+          if (item.title == '登录水鱼') {
+            _showDivingFishLoginDialog(context);
+          }
+          if (item.title == '登出账号') {
+            final ok = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('确认登出'),
+                content: const Text('登出后将清除缓存的登录信息和 ImportToken，确定要登出吗？'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('取消'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    child: const Text('登出', style: TextStyle(color: Colors.white)),
+                  ),
+                ],
+              ),
+            );
+            if (ok == true) {
+              _logoutDivingFish();
             }
           }
           if (item.title == '段位表'){
@@ -1790,6 +3114,60 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
+    );
+  }
+
+  // 构建分类区域（分类标题 + 分隔条 + 按钮网格）
+  Widget _buildCategorySection(ButtonCategory category, BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 分隔条
+        const Divider(height: 1, thickness: 1),
+        SizedBox(height: screenHeight * 0.008),
+        // 分类标题（居中 + 底色突出）
+        Center(
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: screenWidth * 0.04,
+              vertical: screenHeight * 0.004,
+            ),
+            decoration: BoxDecoration(
+              color: AppConstants.textPrimaryColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
+            ),
+            child: Text(
+              category.name,
+              style: TextStyle(
+                color: AppConstants.textPrimaryColor,
+                fontSize: screenWidth * 0.035,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        SizedBox(height: screenHeight * 0.006),
+        // 按钮网格
+        GridView.builder(
+          padding: EdgeInsets.zero,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: AppConstants.crossAxisCount,
+            crossAxisSpacing: screenWidth * 0.02,
+            mainAxisSpacing: screenHeight * 0.01,
+            childAspectRatio: screenWidth > 600 ? 1.3 : 1.2,
+          ),
+          itemCount: category.items.length,
+          itemBuilder: (context, index) {
+            return _buildCustomButton(category.items[index], context);
+          },
+        ),
+        SizedBox(height: screenHeight * 0.006),
+      ],
     );
   }
 

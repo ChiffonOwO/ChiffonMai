@@ -20,6 +20,10 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
   double _multiplier = 0.0;
   bool _showResults = false;
 
+  // 输入错误提示
+  String? _difficultyError;
+  String? _completionError;
+
   // 舞萌DX 完成度-评级-乘数对照表
   final List<Map<String, dynamic>> maimaiRatingMultiplier = [
     {"completion": 100.5, "rating": "SSS+", "multiplier": 0.224},
@@ -66,16 +70,29 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
       double difficulty = double.tryParse(_difficultyController.text) ?? 0.0;
       double completion = double.tryParse(_completionController.text) ?? 0.0;
 
+      // 先清除之前的错误
+      setState(() {
+        _difficultyError = null;
+        _completionError = null;
+      });
+
       // 验证输入范围
+      bool hasError = false;
       if (difficulty < 1.0 || difficulty > 15.0) {
-        _showError('歌曲定数必须在1.0到15.0之间');
-        return;
+        setState(() {
+          _difficultyError = '歌曲定数必须在1.0到15.0之间';
+        });
+        hasError = true;
       }
 
       if (completion < 0 || completion > 101) {
-        _showError('达成率必须在0到101之间');
-        return;
+        setState(() {
+          _completionError = '达成率必须在0到101之间';
+        });
+        hasError = true;
       }
+
+      if (hasError) return;
 
       // 特别处理：如果达成率大于100.5，则按100.5计算
       double adjustedCompletion = completion > 100.5 ? 100.5 : completion;
@@ -109,7 +126,9 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
         _showResults = true;
       });
     } catch (e) {
-      _showError('计算失败，请检查输入');
+      setState(() {
+        _difficultyError = '计算失败，请检查输入';
+      });
     }
   }
 
@@ -128,6 +147,53 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
         ],
       ),
     );
+  }
+
+  /// 构建等效定数推算行
+  List<Widget> _buildEquivalentRows() {
+    // 等效定数 = 单曲Rating / (乘数 * 达成率)
+    // 达成率传入实际值，如100.5, 100.0, 99.5, 99.0
+    final List<Map<String, dynamic>> tiers = [
+      {"label": "100.5%", "multiplier": 0.224, "completion": 100.5},
+      {"label": "100.0%", "multiplier": 0.216, "completion": 100.0},
+      {"label": "99.5%", "multiplier": 0.211, "completion": 99.5},
+      {"label": "99.0%", "multiplier": 0.208, "completion": 99.0},
+    ];
+
+    final bodyFontSize = MediaQuery.of(context).size.width * 0.04;
+    final smallFontSize = MediaQuery.of(context).size.width * 0.035;
+    final Color textPrimaryColor = const Color.fromARGB(255, 84, 97, 97);
+
+    final List<Widget> rows = [];
+    for (final tier in tiers) {
+      final multiplier = tier["multiplier"] as double;
+      final completion = tier["completion"] as double;
+      final equivalent = _singleRating / (multiplier * completion);
+      // 四舍五入保留一位小数
+      final equivalentStr = equivalent.toStringAsFixed(1);
+
+      // 如果超过15.0则不显示
+      if (equivalent > 15.0) continue;
+
+      rows.add(
+        Padding(
+          padding: EdgeInsets.only(bottom: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '相当于 ${equivalentStr} 的 ${tier["label"]}',
+                style: TextStyle(
+                  fontSize: smallFontSize,
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return rows;
   }
 
   @override
@@ -246,6 +312,17 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                                     contentPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.03, vertical: screenHeight * 0.01),
                                   ),
                                 ),
+                                if (_difficultyError != null)
+                                  Padding(
+                                    padding: EdgeInsets.only(top: smallSpacing * 0.5),
+                                    child: Text(
+                                      _difficultyError!,
+                                      style: TextStyle(
+                                        fontSize: smallFontSize,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                  ),
                                 SizedBox(height: mediumSpacing),
 
                                 // 达成率输入
@@ -270,6 +347,17 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                                     contentPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.03, vertical: screenHeight * 0.01),
                                   ),
                                 ),
+                                if (_completionError != null)
+                                  Padding(
+                                    padding: EdgeInsets.only(top: smallSpacing * 0.5),
+                                    child: Text(
+                                      _completionError!,
+                                      style: TextStyle(
+                                        fontSize: smallFontSize,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                  ),
                                 SizedBox(height: mediumSpacing),
 
                                 // 预留的深色结果区域
@@ -334,6 +422,22 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                                           ),
                                         ],
                                       ),
+                                      // 等效定数推算
+                                      if (_showResults && _singleRating > 0) ...[
+                                        SizedBox(height: mediumSpacing),
+                                        Divider(color: Colors.white30, height: 1),
+                                        SizedBox(height: smallSpacing),
+                                        Text(
+                                          '等效定数对照',
+                                          style: TextStyle(
+                                            fontSize: subtitleFontSize,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                        SizedBox(height: smallSpacing),
+                                        ..._buildEquivalentRows(),
+                                      ],
                                     ],
                                   ),
                                 ),

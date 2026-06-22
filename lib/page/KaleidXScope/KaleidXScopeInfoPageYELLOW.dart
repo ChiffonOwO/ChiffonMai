@@ -515,30 +515,19 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
 
     return Column(
       children: [
-        // 门扉图片（暂无图片，使用占位符）
+        // 门扉图片
         Center(
-          child: Container(
-            width: MediaQuery.of(context).size.width - 64,
-            height: 150,
-            decoration: BoxDecoration(
-              color: Colors.amber[100],
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.amber[300]!, width: 2),
-            ),
-            child: Center(
-              child: Text(
-                '黄色之门\n（图片占位符）',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: _textSizeL,
-                  color: Colors.amber[700],
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.asset(
+              'assets/kaleidxscope/yellow.webp',
+              width: MediaQuery.of(context).size.width - 64,
+              height: 150,
+              fit: BoxFit.contain,
             ),
           ),
         ),
-        SizedBox(height: _paddingS),
+        SizedBox(height: _paddingXS),
 
         // 解锁方法区域
         _buildUnlockSection(),

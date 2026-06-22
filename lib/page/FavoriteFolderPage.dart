@@ -7,6 +7,8 @@ import 'package:my_first_flutter_app/service/FavoriteFolderService.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
+import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
+import 'package:my_first_flutter_app/entity/DXRating/MaiTagsEntity.dart';
 import 'SongInfoPage.dart';
 
 /// 收藏夹管理页面：查看所有收藏夹、创建/重命名/删除收藏夹，浏览收藏夹内的谱面
@@ -227,12 +229,8 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
                         ),
                       ),
                     ),
-                    // 新建按钮
-                    IconButton(
-                      icon: Icon(Icons.add, color: textPrimaryColor),
-                      tooltip: '新建收藏夹',
-                      onPressed: _createFolder,
-                    ),
+                    // 占位，保持标题居中
+                    SizedBox(width: 48),
                   ],
                 ),
               ),
@@ -246,11 +244,38 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
                     boxShadow: [defaultShadow],
                   ),
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _folders.isEmpty
-                          ? _buildEmptyState()
-                          : _buildFolderList(),
+                  child: Column(
+                    children: [
+                      // 新建按钮
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _createFolder,
+                            icon: const Icon(Icons.add, size: 20),
+                            label: const Text('新建收藏夹'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color.fromARGB(255, 84, 97, 97),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(borderRadiusSmall),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // 内容
+                      Expanded(
+                        child: _isLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : _folders.isEmpty
+                                ? _buildEmptyState()
+                                : _buildFolderList(),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -386,6 +411,11 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
   bool _isLoading = true;
   Map<String, Song> _songMap = {};
 
+  // 标签统计相关
+  MaiTagsEntity? _tagsEntity;
+  Map<String, Map<String, int>> _tagStats = {};
+  bool _isLoadingTags = false;
+
   // 样式常量
   final Color textPrimaryColor = const Color.fromARGB(255, 84, 97, 97);
   final double borderRadiusSmall = 8.0;
@@ -420,6 +450,8 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
         _isLoading = false;
       });
     }
+    // 加载标签统计数据
+    await _loadTagDataAndCalculateStats();
   }
 
   /// 从收藏夹中移除谱面
@@ -494,11 +526,8 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
                         ),
                       ),
                     ),
-                    // 占位按钮（保证标题居中）
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.transparent),
-                      onPressed: null,
-                    ),
+                    // 占位，保持标题居中
+                    SizedBox(width: 48),
                   ],
                 ),
               ),
@@ -512,11 +541,38 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
                     boxShadow: [defaultShadow],
                   ),
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _charts.isEmpty
-                          ? _buildEmptyState()
-                          : _buildChartList(),
+                  child: Column(
+                    children: [
+                      // 标签统计按钮（样式、宽度与新建收藏夹一致）
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _showTagStatistics,
+                            icon: const Icon(Icons.label_outline, size: 18),
+                            label: const Text('标签统计'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color.fromARGB(255, 84, 97, 97),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(borderRadiusSmall),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // 内容
+                      Expanded(
+                        child: _isLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : _charts.isEmpty
+                                ? _buildEmptyState()
+                                : _buildChartList(),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -524,6 +580,252 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
         ],
       ),
     );
+  }
+
+  /// 显示标签统计对话框（基于 MaiTagsManager 的标签系统）
+  void _showTagStatistics() {
+    if (_tagStats.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('暂无标签数据')),
+      );
+      return;
+    }
+
+    // 分组颜色映射（与 Best50Page 一致）
+    const Map<String, Color> groupColors = {
+      '配置': Colors.blue,
+      '评价': Colors.amber,
+      '难度': Colors.indigo,
+    };
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        scrollable: true,
+        title: Row(
+          children: [
+            Icon(Icons.label, size: 22, color: textPrimaryColor),
+            const SizedBox(width: 8),
+            Text('标签统计', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimaryColor)),
+          ],
+        ),
+        content: Container(
+          width: double.maxFinite,
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.6),
+          child: _isLoadingTags
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: _tagStats.entries.map((groupEntry) {
+                      final groupName = groupEntry.key;
+                      final tagCounts = groupEntry.value;
+                      final groupColor = groupColors[groupName] ?? Colors.grey;
+                      final total = tagCounts.values.fold(0, (a, b) => a + b);
+
+                      // 对组内标签按数量降序排序
+                      final sortedTags = tagCounts.entries.toList()
+                        ..sort((a, b) => b.value.compareTo(a.value));
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 分组标题
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: groupColor.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: groupColor.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    groupName,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: groupColor,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '共 $total 项',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            // 标签统计条
+                            ...sortedTags.map((tagEntry) {
+                              final percentage = tagEntry.value / _charts.length * 100;
+                              final barColor = groupColor.withOpacity(0.7);
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 48,
+                                      child: Text(
+                                        tagEntry.key,
+                                        style: const TextStyle(fontSize: 13),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: LinearProgressIndicator(
+                                          value: tagEntry.value / _charts.length,
+                                          minHeight: 18,
+                                          backgroundColor: Colors.grey.shade200,
+                                          valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    SizedBox(
+                                      width: 60,
+                                      child: Text(
+                                        '${tagEntry.value} (${(percentage).toStringAsFixed(0)}%)',
+                                        textAlign: TextAlign.right,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: textPrimaryColor,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ========== 标签数据加载与统计（基于 MaiTagsManager） ==========
+
+  /// 加载标签数据并计算当前收藏夹各标签出现次数
+  Future<void> _loadTagDataAndCalculateStats() async {
+    setState(() {
+      _isLoadingTags = true;
+    });
+
+    try {
+      final maiTagsManager = MaiTagsManager();
+      _tagsEntity = await maiTagsManager.getTags();
+
+      if (_tagsEntity != null) {
+        await _calculateTagGroupStats();
+      }
+    } catch (e) {
+      debugPrint('Error loading tag data: $e');
+    } finally {
+      setState(() {
+        _isLoadingTags = false;
+      });
+    }
+  }
+
+  /// 计算各标签分组下每个标签的出现次数
+  Future<void> _calculateTagGroupStats() async {
+    if (_tagsEntity == null) return;
+
+    final maiTagsManager = MaiTagsManager();
+    final tagIdToNameMap = await maiTagsManager.getTagIdToNameMap();
+    final groupIdToNameMap = await maiTagsManager.getGroupIdToNameMap();
+
+    // 构建标签ID → 分组名称 的映射
+    Map<int, String> tagIdToGroupName = {};
+    for (var tag in _tagsEntity!.tags) {
+      tagIdToGroupName[tag.id] = groupIdToNameMap[tag.groupId] ?? '未分类';
+    }
+
+    // 获取所有歌曲标题到标签的映射
+    Map<String, Set<int>> songTitleToTagIds = {};
+    for (var tagSong in _tagsEntity!.tagSongs) {
+      String key = '${tagSong.songId}|${tagSong.sheetType}|${tagSong.sheetDifficulty}';
+      if (!songTitleToTagIds.containsKey(key)) {
+        songTitleToTagIds[key] = {};
+      }
+      songTitleToTagIds[key]!.add(tagSong.tagId);
+    }
+
+    // 遍历收藏夹内的谱面，匹配标签并统计
+    Map<String, Map<String, int>> stats = {};
+    for (var chart in _charts) {
+      String songId = chart.songId;
+      int levelIndex = chart.levelIndex;
+
+      // 从 _songMap 获取歌曲信息（与 Best50Page 一致）
+      String songTitle = _songMap[songId]?.basicInfo.title ?? '';
+      String songType = chart.songType.isNotEmpty
+          ? chart.songType
+          : (_songMap[songId]?.type ?? 'SD');
+
+      String sheetType = songType == 'DX' ? 'dx' : 'std';
+      String difficulty = _getDifficultyByIndex(levelIndex);
+
+      String key = '$songTitle|$sheetType|$difficulty';
+      Set<int>? tagIds = songTitleToTagIds[key];
+
+      if (tagIds != null && tagIds.isNotEmpty) {
+        for (int tagId in tagIds) {
+          String tagName = tagIdToNameMap[tagId] ?? '未知标签';
+          String groupName = tagIdToGroupName[tagId] ?? '未分类';
+
+          if (!stats.containsKey(groupName)) {
+            stats[groupName] = {};
+          }
+          if (!stats[groupName]!.containsKey(tagName)) {
+            stats[groupName]![tagName] = 0;
+          }
+          stats[groupName]![tagName] = stats[groupName]![tagName]! + 1;
+        }
+      }
+    }
+
+    setState(() {
+      _tagStats = stats;
+    });
+  }
+
+  /// 将难度索引映射为标签系统使用的难度字符串
+  String _getDifficultyByIndex(int index) {
+    switch (index) {
+      case 0:
+        return 'basic';
+      case 1:
+        return 'advanced';
+      case 2:
+        return 'expert';
+      case 3:
+        return 'master';
+      case 4:
+        return 'remaster';
+      default:
+        return 'basic';
+    }
   }
 
   Widget _buildEmptyState() {
@@ -556,51 +858,30 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
   Widget _buildTypeTag(String type, String songId) {
     final isUtage = songId.length == 6;
     if (isUtage) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.red.shade100,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: const Text(
-          'UT',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: Colors.red,
-          ),
+      return const Text(
+        'UT',
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: Colors.red,
         ),
       );
     } else if (type == 'DX') {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.orange.shade100,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: const Text(
-          'DX',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: Colors.orange,
-          ),
+      return const Text(
+        'DX',
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: Colors.orange,
         ),
       );
     } else {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.blue.shade100,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: const Text(
-          'ST',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: Colors.blue,
-          ),
+      return const Text(
+        'ST',
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: Colors.blue,
         ),
       );
     }
@@ -667,9 +948,15 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
       'RE:MASTER',
       'UTAGE'
     ];
-    final levelName = chart.levelIndex >= 0 && chart.levelIndex < levelNames.length
-        ? levelNames[chart.levelIndex]
-        : 'Lv.${chart.levelIndex}';
+    final bool isUtage = chart.songId.length == 6;
+    final String levelName;
+    if (isUtage) {
+      levelName = 'UTAGE';
+    } else {
+      levelName = chart.levelIndex >= 0 && chart.levelIndex < levelNames.length
+          ? levelNames[chart.levelIndex]
+          : 'Lv.${chart.levelIndex}';
+    }
 
     // 获取歌曲详细信息
     final song = _songMap[chart.songId];

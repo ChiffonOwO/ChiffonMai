@@ -1,8 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:archive/archive.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/CoverUtil.dart';
 import '../service/SongMaidataPageService.dart';
+import '../service/SongPlayService.dart';
 import '../manager/MaidataManager.dart';
 import 'ChartPlayPage.dart';
 
@@ -29,6 +34,7 @@ class SongMaidataPage extends StatefulWidget {
 class _SongMaidataPageState extends State<SongMaidataPage> {
   bool _isLoading = true;
   bool _isFetchingFullCache = false;
+  bool _isExporting = false;
   String _maidataContent = '';
   String? _errorMessage;
   List<String> _inoteList = [];
@@ -119,6 +125,209 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('已复制到剪贴板')),
     );
+  }
+
+  Future<void> _exportToZip() async {
+    if (_maidataContent.isEmpty || _isExporting) return;
+
+    setState(() {
+      _isExporting = true;
+    });
+
+    // 显示加载对话框
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('正在导出...'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    try {
+      // 1. 获取maidata内容
+      final maidataBytes = Uint8List.fromList(_maidataContent.codeUnits);
+
+      // 2. 获取曲绘字节数据
+      Uint8List? coverBytes = await _getCoverBytes();
+
+      // 3. 获取音源字节数据
+      Uint8List? audioBytes = await _getAudioBytes();
+
+      // 4. 创建zip压缩包
+      final archive = Archive();
+      archive.add(ArchiveFile.bytes('maidata.txt', maidataBytes));
+      if (coverBytes != null) {
+        archive.add(ArchiveFile.bytes('bg.png', coverBytes));
+      }
+      if (audioBytes != null) {
+        archive.add(ArchiveFile.bytes('track.mp3', audioBytes));
+      }
+
+      final zipData = ZipEncoder().encode(archive);
+
+      // 5. 保存到文件（优先使用系统下载目录，方便用户通过文件管理器直接访问）
+      String? dirPath;
+      try {
+        dirPath = (await getDownloadsDirectory())?.path;
+      } catch (_) {
+        dirPath = null;
+      }
+      if (dirPath == null) {
+        // iOS / 备选方案：回退到外置存储或应用文档目录
+        try {
+          dirPath = (await getExternalStorageDirectory())?.path;
+        } catch (_) {
+          dirPath = null;
+        }
+      }
+      dirPath ??= (await getApplicationDocumentsDirectory()).path;
+
+      final exportDir = Directory('$dirPath/maidata_exports');
+      if (!await exportDir.exists()) {
+        await exportDir.create(recursive: true);
+      }
+
+      // 清理文件名中的非法字符
+      String safeName = widget.songTitle.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final filePath = '${exportDir.path}/$safeName.zip';
+      final file = File(filePath);
+      await file.writeAsBytes(zipData);
+
+      // 关闭加载对话框
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // 显示成功提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('导出成功: $safeName.zip\n保存路径: $filePath'),
+            duration: const Duration(seconds: 5),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // 关闭加载对话框
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      // 显示错误提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('导出失败: $e'),
+            duration: const Duration(seconds: 3),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      debugPrint('[DEBUG][SongMaidataPage] 导出zip失败: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
+  }
+
+  /// 获取曲绘字节数据（优先本地资源，兜底网络下载）
+  Future<Uint8List?> _getCoverBytes() async {
+    final songId = widget.songId;
+
+    // 尝试从本地assets加载（依次尝试多种路径）
+    final coverPaths = [
+      CoverUtil.buildCoverPath(songId),
+      CoverUtil.getLocalCoverPath(songId),
+      CoverUtil.getLocalCoverPathRetry1(songId),
+      CoverUtil.getLocalCoverPathRetry2(songId),
+    ];
+
+    for (final path in coverPaths) {
+      try {
+        final byteData = await rootBundle.load(path);
+        return byteData.buffer.asUint8List();
+      } catch (_) {
+        // 当前路径失败，尝试下一个
+      }
+    }
+
+    // 本地加载失败，从网络下载
+    try {
+      final networkUrl = CoverUtil.getNetworkCoverUrl(songId);
+      debugPrint('[DEBUG][SongMaidataPage] 从网络获取曲绘: $networkUrl');
+      final response = await http.get(Uri.parse(networkUrl));
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      }
+    } catch (e) {
+      debugPrint('[DEBUG][SongMaidataPage] 网络获取曲绘失败: $e');
+    }
+
+    return null;
+  }
+
+  /// 获取音源字节数据
+  Future<Uint8List?> _getAudioBytes() async {
+    try {
+      // 使用SongPlayService查找落雪歌曲ID
+      final songPlayService = SongPlayService();
+      final luoXueSongId = await songPlayService.findLuoXueSongId(
+        widget.songTitle,
+        widget.songType,
+      );
+
+      if (luoXueSongId == null) {
+        debugPrint('[DEBUG][SongMaidataPage] 未找到落雪歌曲ID，跳过音源导出');
+        return null;
+      }
+
+      final audioUrl = 'https://assets2.lxns.net/maimai/music/$luoXueSongId.mp3';
+
+      // 先检查本地缓存
+      final directory = await getApplicationDocumentsDirectory();
+      final cacheDir = Directory('${directory.path}/music_cache');
+      final cacheFilePath = '${cacheDir.path}/$luoXueSongId.mp3';
+      final cacheFile = File(cacheFilePath);
+
+      if (await cacheFile.exists()) {
+        debugPrint('[DEBUG][SongMaidataPage] 使用缓存的音源: $cacheFilePath');
+        return await cacheFile.readAsBytes();
+      }
+
+      // 从网络下载
+      debugPrint('[DEBUG][SongMaidataPage] 从网络下载音源: $audioUrl');
+      final response = await http.get(Uri.parse(audioUrl));
+      if (response.statusCode == 200) {
+        // 保存到缓存
+        if (!await cacheDir.exists()) {
+          await cacheDir.create(recursive: true);
+        }
+        try {
+          await cacheFile.writeAsBytes(response.bodyBytes);
+        } catch (_) {
+          // 缓存写入失败不影响使用
+        }
+        return response.bodyBytes;
+      } else {
+        debugPrint('[DEBUG][SongMaidataPage] 下载音源失败，状态码: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('[DEBUG][SongMaidataPage] 获取音源失败: $e');
+    }
+
+    return null;
   }
 
   void _navigateToChartPlay() {
@@ -369,6 +578,27 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
     );
   }
 
+  Widget _buildActionButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback? onPressed,
+    required Color color,
+  }) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 14),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeColor = Colors.purple;
@@ -383,66 +613,61 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
           Column(
             children: [
               Container(
-                padding: const EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
+                padding: const EdgeInsets.fromLTRB(8, 48, 8, 4),
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '谱面代码',
-                          style: TextStyle(
-                            color: textPrimaryColor,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                    // 标题居中
+                    Text(
+                      '谱面代码',
+                      style: TextStyle(
+                        color: textPrimaryColor,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    if (!_isLoading && _maidataContent.isNotEmpty)
-                      ElevatedButton(
-                        onPressed: _copyToClipboard,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey[200],
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 2,
-                          ),
-                          textStyle: const TextStyle(fontSize: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text('复制'),
+                    // 返回按钮靠左
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
                       ),
-                    if (!_isLoading && _maidataContent.isNotEmpty)
-                      const SizedBox(width: 8),
-                    if (!_isLoading && _maidataContent.isNotEmpty)
-                      ElevatedButton(
-                        onPressed: _navigateToChartPlay,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.purple,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 2,
-                          ),
-                          textStyle: const TextStyle(fontSize: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text('渲染'),
-                      ),
+                    ),
                   ],
                 ),
               ),
+              if (!_isLoading && _maidataContent.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      _buildActionButton(
+                        label: '复制',
+                        icon: Icons.copy,
+                        onPressed: _copyToClipboard,
+                        color: Colors.grey[700]!,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildActionButton(
+                        label: '渲染',
+                        icon: Icons.play_circle_outline,
+                        onPressed: _navigateToChartPlay,
+                        color: Colors.purple,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildActionButton(
+                        label: _isExporting ? '导出中...' : '导出',
+                        icon: Icons.download,
+                        onPressed: _isExporting ? null : _exportToZip,
+                        color: Colors.teal,
+                      ),
+                    ],
+                  ),
+                ),
               Container(
                 margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                 padding: const EdgeInsets.all(12),

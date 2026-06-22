@@ -184,40 +184,47 @@ class MaidataManager {
     ];
 
     _cachedMaidata.clear();
-    int totalFetched = 0;
-
-    for (String genrePath in genrePaths) {
-      debugPrint('[DEBUG][MaidataManager] 处理流派路径: $genrePath');
-      
-      try {
-        List<String> folders = await _getFoldersInPath(genrePath);
-        debugPrint('[DEBUG][MaidataManager] 发现 ${folders.length} 个文件夹');
-
-        for (String folder in folders) {
-          String maidataUrl = '$genrePath/$folder/maidata.txt';
-          
-          try {
-            final response = await http.get(Uri.parse(maidataUrl));
-            
-            if (response.statusCode == 200) {
-              String content = _decodeContent(response.bodyBytes);
-              String? songId = _extractSongId(content);
-              
-              if (songId != null) {
-                _cachedMaidata[songId] = content;
-                totalFetched++;
-                debugPrint('[DEBUG][MaidataManager] 缓存歌曲: $songId');
-              } else {
-                debugPrint('[DEBUG][MaidataManager] 无法从 $maidataUrl 提取歌曲ID');
-              }
-            }
-          } catch (e) {
-            debugPrint('[DEBUG][MaidataManager] 获取 $maidataUrl 失败: $e');
-          }
-        }
-      } catch (e) {
-        debugPrint('[DEBUG][MaidataManager] 获取流派路径 $genrePath 的文件夹列表失败: $e');
+    
+    // 第一步：并行获取所有流派的文件夹列表
+    debugPrint('[DEBUG][MaidataManager] 并行获取所有流派文件夹列表...');
+    final List<List<String>> allFolderLists = await Future.wait(
+      genrePaths.map((path) => _getFoldersInPath(path)),
+    );
+    
+    // 收集所有文件夹URL
+    List<String> allFolderUrls = [];
+    for (int i = 0; i < genrePaths.length; i++) {
+      for (final folder in allFolderLists[i]) {
+        allFolderUrls.add('${genrePaths[i]}/$folder/maidata.txt');
       }
+    }
+    debugPrint('[DEBUG][MaidataManager] 共发现 ${allFolderUrls.length} 个maidata.txt，开始并行获取...');
+
+    // 第二步：并行获取所有maidata.txt（控制并发数，避免同时太多请求）
+    const int concurrency = 50;
+    int totalFetched = 0;
+    int completedCount = 0;
+    final int totalCount = allFolderUrls.length;
+
+    for (int i = 0; i < allFolderUrls.length; i += concurrency) {
+      final batch = allFolderUrls.sublist(
+        i,
+        (i + concurrency > allFolderUrls.length) ? allFolderUrls.length : i + concurrency,
+      );
+      
+      final results = await Future.wait(
+        batch.map((url) => _fetchSingleMaidata(url)),
+      );
+      
+      for (final result in results) {
+        if (result != null) {
+          _cachedMaidata[result.$1] = result.$2;
+          totalFetched++;
+        }
+      }
+      
+      completedCount += batch.length;
+      debugPrint('[DEBUG][MaidataManager] 获取进度: $completedCount/$totalCount');
     }
 
     debugPrint('[DEBUG][MaidataManager] 全量缓存获取完成，共 $totalFetched 首歌曲');
@@ -230,6 +237,23 @@ class MaidataManager {
     } catch (e) {
       debugPrint('[DEBUG][MaidataManager] 保存缓存失败: $e');
     }
+  }
+
+  /// 获取单个maidata.txt并返回 (songId, content) 或 null
+  Future<(String, String)?> _fetchSingleMaidata(String url) async {
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        String content = _decodeContent(response.bodyBytes);
+        String? songId = _extractSongId(content);
+        if (songId != null) {
+          return (songId, content);
+        }
+      }
+    } catch (e) {
+      debugPrint('[DEBUG][MaidataManager] 获取 $url 失败: $e');
+    }
+    return null;
   }
 
   Future<List<String>> _getFoldersInPath(String path) async {
@@ -331,68 +355,77 @@ class MaidataManager {
     return _cachedMaidata.values.map((content) => _cleanMaidataContent(content)).toList();
   }
   
-  // 根据歌曲ID列表获取对应的maidata
+  // 根据歌曲ID列表获取对应的maidata（并行优化版）
   Future<List<String>> fetchMaidataForSongIds(List<String> songIds) async {
     debugPrint('[DEBUG][MaidataManager] 开始获取指定歌曲ID的maidata（共 ${songIds.length} 首）');
-    
-    List<String> result = [];
-    Set<String> remainingIds = Set.from(songIds);
-    
-    // 先检查本地缓存中是否已有 - O(n) 复杂度
-    for (String songId in songIds) {
+
+    final List<String> result = [];
+    final Set<String> remainingIds = Set.from(songIds);
+
+    // 先检查本地缓存中是否已有
+    for (final String songId in songIds) {
       if (_cachedMaidata.containsKey(songId)) {
         result.add(_cleanMaidataContent(_cachedMaidata[songId]!));
-        remainingIds.remove(songId);  // Set.remove() 是 O(1)
+        remainingIds.remove(songId);
       }
     }
-    
-    // 如果还有需要获取的
-    if (remainingIds.isNotEmpty) {
-      List<String> genrePaths = [
-        '${ApiUrls.MaidataServerBaseUrl}/maimai',
-        '${ApiUrls.MaidataServerBaseUrl}/niconicoボーカロイド',
-        '${ApiUrls.MaidataServerBaseUrl}/ゲームバラエティ',
-        '${ApiUrls.MaidataServerBaseUrl}/東方Project',
-        '${ApiUrls.MaidataServerBaseUrl}/オンゲキCHUNITHM',
-        '${ApiUrls.MaidataServerBaseUrl}/宴会場',
-      ];
-      
-      for (String genrePath in genrePaths) {
-        if (remainingIds.isEmpty) break;
-        
-        try {
-          List<String> folders = await _getFoldersInPath(genrePath);
-          
-          for (String folder in folders) {
-            if (remainingIds.isEmpty) break;
-            
-            String maidataUrl = '$genrePath/$folder/maidata.txt';
-            
-            try {
-              final response = await http.get(Uri.parse(maidataUrl));
-              
-              if (response.statusCode == 200) {
-                String content = _decodeContent(response.bodyBytes);
-                String? songId = _extractSongId(content);
-                
-                if (songId != null && remainingIds.contains(songId)) {  // Set.contains() 是 O(1)
-                  _cachedMaidata[songId] = content;
-                  result.add(_cleanMaidataContent(content));
-                  remainingIds.remove(songId);  // Set.remove() 是 O(1)
-                  debugPrint('[DEBUG][MaidataManager] 获取到指定歌曲: $songId');
-                }
-              }
-            } catch (e) {
-              debugPrint('[DEBUG][MaidataManager] 获取 $maidataUrl 失败: $e');
-            }
-          }
-        } catch (e) {
-          debugPrint('[DEBUG][MaidataManager] 获取流派路径 $genrePath 的文件夹列表失败: $e');
+
+    if (remainingIds.isEmpty) {
+      debugPrint('[DEBUG][MaidataManager] 全部命中缓存，无需网络请求');
+      return result;
+    }
+
+    debugPrint('[DEBUG][MaidataManager] 缓存未命中 ${remainingIds.length} 首，开始并行获取...');
+
+    // 1. 并行获取所有流派路径的文件夹列表
+    const genrePaths = <String>[
+      '/maimai',
+      '/niconicoボーカロイド',
+      '/ゲームバラエティ',
+      '/東方Project',
+      '/オンゲキCHUNITHM',
+      '/宴会場',
+    ];
+    final baseUrl = ApiUrls.MaidataServerBaseUrl;
+
+    final genreResults = await Future.wait(
+      genrePaths.map((path) => _getFoldersInPath('$baseUrl$path')),
+    );
+
+    // 2. 收集所有 maidata.txt URL
+    final List<String> allUrls = [];
+    for (int i = 0; i < genrePaths.length; i++) {
+      for (final folder in genreResults[i]) {
+        allUrls.add('$baseUrl${genrePaths[i]}/$folder/maidata.txt');
+      }
+    }
+
+    debugPrint('[DEBUG][MaidataManager] 共收集 ${allUrls.length} 个maidata.txt URL，开始并行批量获取...');
+
+    // 3. 并行批量获取（每批 15 个并发），找到所有目标后提前终止
+    const batchSize = 15;
+    int fetchedCount = 0;
+
+    for (int i = 0; i < allUrls.length && remainingIds.isNotEmpty; i += batchSize) {
+      final end = (i + batchSize < allUrls.length) ? i + batchSize : allUrls.length;
+      final batch = allUrls.sublist(i, end);
+
+      final batchResults = await Future.wait(
+        batch.map((url) => _fetchSingleMaidata(url)),
+      );
+
+      for (final r in batchResults) {
+        if (r == null) continue;
+        final (songId, content) = r;
+        if (remainingIds.remove(songId)) {
+          _cachedMaidata[songId] = content;
+          result.add(_cleanMaidataContent(content));
+          fetchedCount++;
         }
       }
     }
-    
-    debugPrint('[DEBUG][MaidataManager] 指定歌曲maidata获取完成，成功获取 ${result.length} 首');
+
+    debugPrint('[DEBUG][MaidataManager] 指定歌曲maidata获取完成，成功获取 $fetchedCount 首（含缓存共 ${result.length} 首）');
     return result;
   }
 

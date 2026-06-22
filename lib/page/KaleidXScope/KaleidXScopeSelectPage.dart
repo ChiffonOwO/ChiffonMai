@@ -160,29 +160,7 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
                                   borderRadius: BorderRadius.circular(12),
                                   child: Stack(
                                     children: [
-                                      if (item['type'] == 'yellow')
-                                        Container(
-                                          width: imageWidth,
-                                          height: imageHeight,
-                                          decoration: BoxDecoration(
-                                            color: Colors.amber[100],
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: Colors.amber[300]!, width: 2),
-                                          ),
-                                          child: Center(
-                                            child: Text(
-                                              '黄色之门\n（图片占位符）',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.amber[700],
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                        )
-                                      else
-                                        Image.asset(
+                                      Image.asset(
                                         item['image']!,
                                         width: imageWidth,
                                         height: imageHeight,

@@ -1,8 +1,8 @@
-import 'dart:convert';
-import 'dart:convert' show utf8;
+import 'dart:convert' show json, utf8;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
+import 'package:my_first_flutter_app/constant/CacheTimestampConstant.dart';
 import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../constant/CacheKeyConstant.dart';
@@ -183,7 +183,7 @@ class CollectionsManager {
     return collectionMap.values.toList();
   }
 
-  // 检查缓存是否过期（1天）
+  // 检查缓存是否过期（与首页初始化冷却周期一致，7天）
   Future<bool> _isCacheExpired(String lastUpdateKey) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -194,9 +194,7 @@ class CollectionsManager {
       }
       
       final now = DateTime.now().millisecondsSinceEpoch;
-      const oneDay = 24 * 60 * 60 * 1000; // 1天的毫秒数
-      
-      return now - lastUpdateTime > oneDay;
+      return now - lastUpdateTime > CacheTimestampConstant.defaultCacheMillis;
     } catch (e) {
       debugPrint('检查缓存过期时出错: $e');
       return true; // 出错时视为过期

@@ -1,6 +1,8 @@
 // Maimai服务器状态标题实体类
 
 // 配置信息
+import 'package:flutter/material.dart';
+
 class ServerStatusConfig {
   final String slug;
   final String title;
@@ -106,13 +108,22 @@ class MonitorItem {
   });
 
   factory MonitorItem.fromJson(Map<String, dynamic> json) {
+    // certExpiryDaysRemaining 可能为 int 或空字符串 ""
+    final dynamic rawCert = json['certExpiryDaysRemaining'];
+    final int? certExpiryDaysRemaining;
+    if (rawCert is int) {
+      certExpiryDaysRemaining = rawCert;
+    } else {
+      certExpiryDaysRemaining = null;
+    }
+
     return MonitorItem(
       id: json['id'] ?? 0,
       name: json['name'] ?? '',
       sendUrl: json['sendUrl'] ?? 0,
       type: json['type'] ?? '',
       tags: json['tags'] ?? [],
-      certExpiryDaysRemaining: json['certExpiryDaysRemaining'],
+      certExpiryDaysRemaining: certExpiryDaysRemaining,
       validCert: json['validCert'],
     );
   }
@@ -204,6 +215,9 @@ class MaimaiServerStatusTitleEntity {
         map[monitor.id.toString()] = monitor.name;
       }
     }
+    
+    debugPrint('[getServerIdToNameMap] 共 ${publicGroupList.length} 个分组, ${map.length} 个监控项');
+    debugPrint('[getServerIdToNameMap] 映射内容: $map');
     
     return map;
   }

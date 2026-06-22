@@ -92,6 +92,10 @@ class MultiplayerGameService {
     double masterMinDx = 1.0,
     double masterMaxDx = 15.0,
     List<String> selectedGenres = const [],
+    int blurLevel = 50,
+    int playDuration = 5,
+    int songCount = 3,
+    int nonEnglishCharThreshold = 50,
   }) {
     _sendMessage({
       'action': 'create_room',
@@ -105,6 +109,10 @@ class MultiplayerGameService {
         'masterMinDx': masterMinDx,
         'masterMaxDx': masterMaxDx,
         'selectedGenres': selectedGenres,
+        'blurLevel': blurLevel,
+        'playDuration': playDuration,
+        'songCount': songCount,
+        'nonEnglishCharThreshold': nonEnglishCharThreshold,
       },
     });
   }

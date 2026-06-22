@@ -8,6 +8,8 @@
     <!-- 传统存储权限（Android 12及以下） -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <!-- 相机权限 -->
+    <uses-permission android:name="android.permission.CAMERA"/>
     <!-- 媒体权限（Android 13+） -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />

@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChiffonMai — 舞萌DX 一站式工具箱</title>
+  <link rel="icon" href="icon.png" type="image/png">
+  <style>
+    /* ===== Reset & 基础 ===== */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+      background: #fdf6f0;
+      color: #3d2c33;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    :root {
+      --pink: #e8c98b;
+      --pink-light: #faf3e2;
+      --bg: #fdf8ee;
+      --card: #ffffff;
+      --text: #3d3228;
+      --text-secondary: #7a6e5e;
+      --muted: #8a7d6e;
+      --accent: #d4913e;
+      --accent-hover: #b87a2e;
+      --accent-light: #fdf3e3;
+      --gold: #d4913e;
+      --gradient-1: linear-gradient(135deg, #fef7ea 0%, #f5e6cc 40%, #fae8c0 100%);
+      --gradient-2: linear-gradient(135deg, #fef9f0, #fcf3e2);
+      --shadow-sm: 0 2px 12px rgba(0,0,0,0.04);
+      --shadow-md: 0 6px 28px rgba(0,0,0,0.08);
+      --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
+      --radius-sm: 12px;
+      --radius-md: 16px;
+      --radius-lg: 20px;
+      --radius-xl: 24px;
+    }
+    a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+    a:hover { color: var(--accent-hover); }
+    img { max-width: 100%; height: auto; }
+
+    /* ===== 动画 ===== */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    @keyframes blob {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      25% { transform: translate(20px, -30px) scale(1.1); }
+      50% { transform: translate(-20px, 20px) scale(0.9); }
+      75% { transform: translate(30px, 10px) scale(1.05); }
+    }
+    .animate-on-scroll {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    .animate-on-scroll.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ===== 装饰性背景 ===== */
+    .bg-blob {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.15;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .bg-blob-1 {
+      width: 600px; height: 600px;
+      background: #d4913e;
+      top: -200px; right: -200px;
+      animation: blob 20s ease-in-out infinite;
+    }
+    .bg-blob-2 {
+      width: 500px; height: 500px;
+      background: #f5a623;
+      bottom: -150px; left: -150px;
+      animation: blob 25s ease-in-out infinite reverse;
+    }
+    .bg-blob-3 {
+      width: 400px; height: 400px;
+      background: #a8d8ea;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      animation: blob 30s ease-in-out infinite;
+    }
+
+    /* ===== Hero 区域 ===== */
+    .hero {
+      position: relative;
+      background: var(--gradient-1);
+      padding: 100px 20px 80px;
+      text-align: center;
+      overflow: hidden;
+      z-index: 1;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.08'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+      opacity: 0.5;
+    }
+    .hero-content { position: relative; z-index: 1; }
+    .hero-icon {
+      width: 96px; height: 96px; border-radius: 22px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      animation: float 4s ease-in-out infinite;
+      margin-bottom: 16px;
+    }
+    .hero h1 {
+      font-size: clamp(36px, 7vw, 56px);
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+    .hero h1 span { color: var(--accent); }
+    .hero .sub {
+      font-size: 18px; color: var(--muted);
+      margin: 10px 0 28px;
+      max-width: 500px;
+      margin-left: auto; margin-right: auto;
+    }
+    .badges {
+      display: flex; gap: 10px; justify-content: center;
+      flex-wrap: wrap; margin-bottom: 32px;
+    }
+    .badge {
+      background: rgba(255,255,255,0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 6px 18px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    .hero-buttons {
+      display: flex; gap: 12px;
+      justify-content: center; flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 32px; border-radius: 50px;
+      font-size: 15px; font-weight: 600;
+      text-decoration: none; transition: all 0.25s ease;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: var(--accent); color: #fff;
+      box-shadow: 0 4px 16px rgba(212,145,62,0.35);
+    }
+    .btn-primary:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 28px rgba(212,145,62,0.45);
+    }
+    .btn-outline {
+      background: rgba(255,255,255,0.85);
+      color: var(--text); border: 2px solid rgba(212,145,62,0.3);
+      backdrop-filter: blur(4px);
+    }
+    .btn-outline:hover {
+      background: #fff;
+      border-color: var(--accent);
+      transform: translateY(-3px);
+      box-shadow: 0 6px 20px rgba(212,145,62,0.15);
+    }
+    .btn-outline.github:hover { border-color: #333; }
+    .btn-outline.gitee:hover { border-color: #c71d23; }
+
+    /* ===== 统计数据条 ===== */
+    .stats-bar {
+      background: #fff;
+      border-bottom: 1px solid rgba(0,0,0,0.04);
+      padding: 28px 20px;
+      position: relative;
+      z-index: 1;
+    }
+    .stats-grid {
+      max-width: 900px; margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      text-align: center;
+    }
+    .stat-item .stat-number {
+      font-size: 28px; font-weight: 800;
+      background: var(--gradient-1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .stat-item .stat-label {
+      font-size: 13px; color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ===== 通用 Section ===== */
+    section {
+      position: relative;
+      z-index: 1;
+      padding: 64px 20px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .section-title {
+      text-align: center;
+      margin-bottom: 44px;
+    }
+    .section-title h2 {
+      font-size: 30px; font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .section-title h2 .highlight-text {
+      background: linear-gradient(135deg, var(--accent), #c8842e);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .section-title p {
+      color: var(--muted);
+      margin-top: 8px;
+      font-size: 15px;
+    }
+    .section-divider {
+      width: 60px; height: 3px;
+      background: linear-gradient(90deg, var(--accent), #f5a623);
+      border-radius: 2px;
+      margin: 12px auto 0;
+    }
+
+    /* ===== QR 同步亮点 ===== */
+    .highlight {
+      background: var(--gradient-2);
+      border-radius: var(--radius-lg);
+      padding: 48px 36px;
+      text-align: center;
+      max-width: 780px;
+      margin: 0 auto;
+      border: 1px solid rgba(212,145,62,0.1);
+      position: relative;
+      overflow: hidden;
+    }
+    .highlight::before {
+      content: '';
+      position: absolute;
+      top: -50%; right: -50%;
+      width: 100%; height: 100%;
+      background: radial-gradient(circle, rgba(212,145,62,0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .highlight h3 { font-size: 26px; margin-bottom: 10px; }
+    .highlight > p { color: var(--muted); font-size: 15px; }
+    .steps {
+      display: flex; gap: 16px;
+      justify-content: center; flex-wrap: wrap;
+      margin-top: 28px;
+    }
+    .step {
+      background: #fff; border-radius: var(--radius-sm);
+      padding: 20px 18px; width: 155px;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.25s ease;
+      border: 1px solid rgba(0,0,0,0.03);
+    }
+    .step:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-md);
+    }
+    .step .num {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), #c8842e);
+      color: #fff; font-weight: 700; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 12px;
+    }
+    .step p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+    /* ===== 功能卡片网格 ===== */
+    .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+    .card {
+      background: var(--card); border-radius: var(--radius-md);
+      padding: 24px; box-shadow: var(--shadow-sm);
+      transition: all 0.3s ease;
+      border: 1px solid rgba(0,0,0,0.03);
+      cursor: default;
+    }
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-md);
+      border-color: rgba(212,145,62,0.15);
+    }
+    .card .card-icon {
+      font-size: 32px; margin-bottom: 12px;
+      display: inline-block;
+    }
+    .card h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+    .card p { font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+    .card .card-tags {
+      display: flex; gap: 6px; flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .card .card-tag {
+      font-size: 11px; padding: 2px 10px;
+      border-radius: 10px; background: var(--accent-light);
+      color: var(--accent); font-weight: 500;
+    }
+
+    /* ===== 功能分类标题 ===== */
+    .category-title {
+      font-size: 20px; font-weight: 700;
+      margin: 36px 0 16px;
+      padding-left: 12px;
+      border-left: 4px solid var(--accent);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .category-title:first-of-type { margin-top: 0; }
+
+    /* ===== 技术栈 ===== */
+    .tech-stack {
+      display: flex; gap: 12px;
+      justify-content: center; flex-wrap: wrap;
+      margin: 20px 0;
+    }
+    .tech-badge {
+      background: #fff; border-radius: 30px;
+      padding: 8px 22px; font-size: 14px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid rgba(0,0,0,0.05);
+      display: flex; align-items: center; gap: 8px;
+      transition: all 0.2s;
+    }
+    .tech-badge:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    /* ===== 下载区域 ===== */
+    .download-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .download-card {
+      background: var(--card); border-radius: var(--radius-md);
+      padding: 32px 24px; text-align: center;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.3s ease;
+      border: 1px solid rgba(0,0,0,0.03);
+    }
+    .download-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-md);
+    }
+    .download-card .platform-icon { font-size: 40px; margin-bottom: 12px; }
+    .download-card h3 { font-size: 18px; font-weight: 700; }
+    .download-card p {
+      font-size: 14px; color: var(--muted);
+      margin: 10px 0 18px;
+    }
+    .download-card .btn {
+      font-size: 14px; padding: 10px 28px;
+    }
+    .download-card.coming-soon {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .download-card.coming-soon:hover { transform: none; }
+    .coming-soon-tag {
+      display: inline-block;
+      background: var(--muted); color: #fff;
+      font-size: 13px; padding: 8px 20px;
+      border-radius: 20px; font-weight: 500;
+    }
+
+    /* ===== 致谢区域 ===== */
+    .thanks-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+    }
+    .thanks-item {
+      background: var(--card); border-radius: var(--radius-sm);
+      padding: 14px 18px; font-size: 13px;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s;
+      border: 1px solid rgba(0,0,0,0.03);
+    }
+    .thanks-item { position: relative; }
+    .thanks-item:has(a) { cursor: pointer; }
+    .thanks-item:has(a):hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+      border-color: var(--accent);
+    }
+    .thanks-item:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    .thanks-item a.card-link::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+    }
+    .thanks-item strong { color: var(--text); }
+
+    /* ===== FAQ ===== */
+    .faq-item {
+      margin-bottom: 10px;
+      max-width: 700px; margin-left: auto; margin-right: auto;
+      border-radius: var(--radius-sm);
+      background: var(--card);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid rgba(0,0,0,0.03);
+      transition: box-shadow 0.2s;
+      overflow: hidden;
+    }
+    .faq-item:hover { box-shadow: var(--shadow-md); }
+    .faq-q {
+      padding: 16px 20px;
+      font-weight: 600; cursor: pointer; user-select: none;
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 14.5px;
+    }
+    .faq-q .faq-arrow {
+      width: 24px; height: 24px;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.3s ease;
+      color: var(--muted);
+      font-size: 18px;
+    }
+    .faq-item.open .faq-arrow { transform: rotate(180deg); }
+    .faq-a {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s ease, padding 0.35s ease;
+      padding: 0 20px;
+      font-size: 14px; color: var(--muted);
+      line-height: 1.7;
+    }
+    .faq-item.open .faq-a {
+      max-height: 300px;
+      padding: 0 20px 18px;
+    }
+
+    /* ===== 页脚 ===== */
+    footer {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--muted);
+      font-size: 13px;
+      border-top: 1px solid rgba(0,0,0,0.04);
+      background: rgba(255,255,255,0.5);
+    }
+    footer .footer-links {
+      display: flex; gap: 16px;
+      justify-content: center; flex-wrap: wrap;
+      margin: 12px 0;
+    }
+    footer .footer-links a {
+      color: var(--muted);
+      font-size: 13px;
+      transition: color 0.2s;
+    }
+    footer .footer-links a:hover { color: var(--accent); }
+    footer .footer-icon {
+      width: 18px; height: 18px; border-radius: 3px;
+      vertical-align: -3px;
+    }
+
+    /* ===== 响应式 ===== */
+    @media (max-width: 768px) {
+      .hero { padding: 60px 16px 50px; }
+      .hero h1 { font-size: 32px; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .download-grid { grid-template-columns: 1fr; }
+      .features { grid-template-columns: 1fr; }
+      .thanks-grid { grid-template-columns: 1fr; }
+      .steps { gap: 10px; }
+      .steps .step { width: 130px; padding: 14px 10px; }
+      section { padding: 40px 16px; }
+      .section-title h2 { font-size: 24px; }
+      .code-block, .resp-block { max-width: 100% !important; }
+    .resp-block pre, .resp-block code { white-space: pre-wrap; word-break: break-all; font-size: 11px; }
+      .download-card { padding: 24px 16px; }
+      .card { padding: 20px; }
+    }
+    @media (max-width: 480px) {
+      .hero { padding: 48px 12px 40px; }
+      .hero h1 { font-size: 26px; }
+      .hero .sub { font-size: 15px; }
+      .badges .badge { font-size: 11px; padding: 4px 12px; }
+      .btn { width: 100%; justify-content: center; font-size: 14px; padding: 12px 20px; }
+      .hero-buttons { flex-direction: column; }
+      .stat-item .stat-number { font-size: 20px; }
+      .stat-item .stat-label { font-size: 11px; }
+      .stats-grid { gap: 8px; }
+      .steps .step { width: 100%; }
+      .steps { flex-direction: column; align-items: center; }
+      section { padding: 32px 12px; }
+      .section-title { margin-bottom: 28px; }
+      .section-title h2 { font-size: 21px; }
+      .highlight { padding: 24px 16px; }
+      .highlight h3 { font-size: 19px; }
+      .back-to-top { bottom: 16px; right: 12px; width: 38px; height: 38px; }
+      .faq-q { padding: 12px 14px; font-size: 14px; }
+      footer { padding: 28px 12px; font-size: 12px; }
+      .card h3 { font-size: 15px; }
+      .card p { font-size: 13px; }
+    }
+
+    /* ===== 回到顶部 ===== */
+    .back-to-top {
+      position: fixed; bottom: 24px; right: 24px;
+      width: 44px; height: 44px; border-radius: 50%;
+      background: var(--accent); color: #fff;
+      border: none; cursor: pointer;
+      font-size: 20px;
+      box-shadow: 0 4px 16px rgba(212,145,62,0.3);
+      transition: all 0.3s ease;
+      opacity: 0; transform: translateY(20px);
+      pointer-events: none;
+      z-index: 100;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .back-to-top.show {
+      opacity: 1; transform: translateY(0);
+      pointer-events: auto;
+    }
+    .back-to-top:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(212,145,62,0.4);
+    }
+
+    /* ===== 代码块样式 ===== */
+    pre {
+      background: #faf5f7;
+      border-radius: var(--radius-sm);
+      padding: 20px 24px;
+      border: 1px solid rgba(0,0,0,0.04);
+      font-size: 13px;
+      line-height: 1.8;
+      overflow-x: auto;
+    }
+    code {
+      background: #f5f0f2;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: 'SF Mono','Fira Code','Consolas',monospace;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+      border-radius: 0;
+    }
+  /* ===== 侧边导航 ===== */
+  .sidenav {
+    position: fixed;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(10px);
+    padding: 10px 8px;
+    border-radius: 14px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+  }
+  .sidenav a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--muted);
+    text-decoration: none;
+    transition: .2s;
+    white-space: nowrap;
+  }
+  .sidenav a:hover,
+  .sidenav a.active {
+    background: var(--accent-light);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .sidenav .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: .2s;
+    flex-shrink: 0;
+  }
+  .sidenav a.active .dot {
+    background: var(--accent);
+    width: 8px; height: 8px;
+  }
+  /* ===== 移动端导航 ===== */
+  .nav-toggle {
+    display: none;
+    position: fixed; top: 12px; right: 12px; z-index: 200;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(255,255,255,0.9); border: none;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    font-size: 20px; cursor: pointer;
+    align-items: center; justify-content: center;
+  }
+  @media (max-width: 1024px) {
+    .nav-toggle { display: flex; }
+    .sidenav {
+      left: -200px; opacity: 0; pointer-events: none;
+      transition: left 0.3s, opacity 0.3s;
+    }
+    .sidenav.open {
+      left: 12px; opacity: 1; pointer-events: auto;
+    }
+  }
+
+  </style>
+</head>
+<body>
+
+<nav class="sidenav" id="sidenav">
+  <a href="#sec-hero"  ><span class="dot"></span>首页</a>
+  <a href="#sec-sync"  ><span class="dot"></span>一键同步</a>
+  <a href="#sec-feat"  ><span class="dot"></span>核心功能</a>
+  <a href="#sec-arch"  ><span class="dot"></span>数据流</a>
+  <a href="#sec-shots" ><span class="dot"></span>界面预览</a>
+  <a href="#sec-tech"  ><span class="dot"></span>技术栈</a>
+  <a href="#sec-down"  ><span class="dot"></span>下载</a>
+  <a href="#sec-thanks"><span class="dot"></span>致谢</a>
+  <a href="#sec-faq"   ><span class="dot"></span>常见问题</a>
+  <a href="#sec-legal" ><span class="dot"></span>隐私与许可</a>
+</nav>
+
+<button class="nav-toggle" id="navToggle" aria-label="菜单">☰</button>
+
+  <!-- 装饰背景 -->
+  <div class="bg-blob bg-blob-1"></div>
+  <div class="bg-blob bg-blob-2"></div>
+  <div class="bg-blob bg-blob-3"></div>
+
+  <!-- ===== Hero ===== -->
+  <header class="hero" id="sec-hero">
+    <div class="hero-content">
+      <img class="hero-icon" src="icon.png" alt="ChiffonMai">
+      <h1><span>Chiffon</span>Mai</h1>
+      <p class="sub">舞萌 DX 2026 一站式工具箱 · 30+ 实用功能<br>从成绩查询到谱面播放，从猜歌游戏到排行榜，一应俱全</p>
+      <div class="badges">
+        <span class="badge">📱 Android</span>
+        <span class="badge">🍎 iOS 即将推出</span>
+        <span class="badge">🆓 完全免费</span>
+        <span class="badge">🔒 数据本地处理</span>
+        <span class="badge">📡 实时同步</span>
+        <span class="badge">🎮 多人对战</span>
+        <span class="badge">🎵 谱面播放</span>
+        <span class="badge">🏆 11种排行榜</span>
+        <span class="badge">🤖 自动化同步</span>
+      </div>
+      <div class="hero-buttons">
+        <a class="btn btn-primary" href="https://wward.lanzouw.com/chiffonmai" target="_blank">
+          ⬇ 下载 Android 版
+        </a>
+        <a class="btn btn-outline github" href="https://github.com/ChiffonOwO/ChiffonMai" target="_blank">
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub
+        </a>
+        <a class="btn btn-outline gitee" href="https://gitee.com/lyjChiFFoN/ChiffonMai" target="_blank">
+          🔴 Gitee
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== 统计数据 ===== -->
+  <div class="stats-bar">
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-number">35+</div>
+        <div class="stat-label">实用功能</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">6</div>
+        <div class="stat-label">猜歌游戏模式</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">11</div>
+        <div class="stat-label">多维排行榜</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">3</div>
+        <div class="stat-label">数据源支持</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">∞</div>
+        <div class="stat-label">免费畅用</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">2</div>
+        <div class="stat-label">数据源（水鱼/落雪）</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">5</div>
+        <div class="stat-label">KALEIDXSCOPE 门</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">⚡</div>
+        <div class="stat-label">毫秒级响应</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== QR 同步亮点 ===== -->
+  <section id="sec-sync">
+    <div class="highlight animate-on-scroll">
+      <h3>📡 一键同步水鱼</h3>
+      <p>全自动抓取官方成绩并推送到 Diving-Fish，进度条可视化，无需任何手动操作</p>
+      <div style="margin-top: 12px; font-size: 13px; color: var(--muted);">
+        基于 <strong>maimai-score-hub</strong> 服务，自动完成从扫码到推送的全流程
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="num">1</div>
+          <p>从公众号请求二维码</p>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <p>Bot 自动加好友<br>抓取 NET 成绩</p>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <p>推送到水鱼<br>刷新本地数据</p>
+        </div>
+        <div class="step">
+          <div class="num">✅</div>
+          <p>Best50 一键导出<br>精美长图分享</p>
+        </div>
+      </div>
+      <div style="margin-top: 24px; padding: 16px 20px; background: rgba(255,255,255,0.6); border-radius: var(--radius-sm); text-align: left; font-size: 13px; color: var(--muted); line-height: 1.8;">
+        <strong style="color: var(--text);">📋 详细流程说明：</strong><br>
+        ① 进入舞萌DX机台的「信息」页面，点击「QR 码发行」，使用微信扫描二维码；<br>
+        ② 在微信打开的页面中，复制以 <code style="background: #f5f5f5; padding: 1px 6px; border-radius: 4px; font-size: 12px;">SGWCMAID</code> 开头的完整字符串；<br>
+        ③ 打开 ChiffonMai → 「同步成绩」，粘贴字符串并点击同步；<br>
+        ④ App 自动连接 maimai-score-hub 服务，向机台 Bot 发送好友请求；<br>
+        ⑤ Bot 接受请求后自动抓取官方 NET 成绩数据；<br>
+        ⑥ 自动推送到 Diving-Fish 水鱼账号，同时更新本地 Best50 数据；<br>
+        ⑦ 完成后可一键导出 Best50 长图分享给好友。
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 核心功能 ===== -->
+  <section id="sec-feat">
+    <div class="section-title animate-on-scroll">
+      <h2>✨ 核心功能</h2>
+      <p>一站式满足舞萌DX玩家的所有需求</p>
+      <div class="section-divider"></div>
+    </div>
+
+    <!-- 成绩与排行 -->
+    <div class="category-title animate-on-scroll">📊 成绩与排行</div>
+    <div class="features animate-on-scroll">
+      <div class="card">
+        <div class="card-icon">🏆</div>
+        <h3>Best50 查询 & 长图导出</h3>
+        <p>自动计算个人 Best50 成绩，按 Rating 从高到低排列，清晰展示每首曲目的难度、达成率、Rating 等核心数据。支持多维度拟合分析（如最高 Rating 潜力估算），以及个性化模式（锁血50、AP50、FS50 等趣味排行）。一键导出精美长图，方便分享到社交平台，记录每一次进步。</p>
+        <div class="card-tags"><span class="card-tag">导出图片</span><span class="card-tag">拟合分析</span><span class="card-tag">个性化</span><span class="card-tag">锁血50</span><span class="card-tag">AP50</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">📊</div>
+        <h3>成绩查询</h3>
+        <p>快速查看个人完整游玩数据，支持按难度、等级、版本等多维度筛选。历史成绩以曲线图展示趋势变化，直观呈现 Rating 成长轨迹。同时支持查看单曲详细判定数据（Perfect/Great/Good/Miss 分布），深度复盘每一局表现。</p>
+        <div class="card-tags"><span class="card-tag">水鱼</span><span class="card-tag">落雪</span><span class="card-tag">历史趋势</span><span class="card-tag">判定分析</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">📡</div>
+        <h3>QR 码一键同步水鱼</h3>
+        <p>全自动同步流程：从公众号请求二维码 → 粘贴到 App → Bot 自动加好友 → 抓取 NET 官方成绩 → 推送 Diving-Fish 水鱼。全程进度条可视化显示当前阶段（认证中/加好友中/抓取中/导出中/完成），无需任何手动操作。支持首次绑定水鱼账号后的自动缓存，后续同步无需重复登录。</p>
+        <div class="card-tags"><span class="card-tag">maimai-score-hub</span><span class="card-tag">自动化</span><span class="card-tag">进度条</span><span class="card-tag">缓存</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🏅</div>
+        <h3>排行榜查询</h3>
+        <p>提供总 Rating 排行榜、水鱼 Rating 排行榜、落雪 Rating 排行榜三大榜单。数据实时更新，展示玩家排名、Rating 值、Best50 达成率总和等关键指标。排行榜参加/退出可选，支持展示昵称或匿名显示，保护个人隐私。</p>
+        <div class="card-tags"><span class="card-tag">总Rating</span><span class="card-tag">水鱼</span><span class="card-tag">落雪</span><span class="card-tag">隐私保护</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">📈</div>
+        <h3>特殊排行榜</h3>
+        <p>多达 11 种特殊维度排行榜，全方位对比玩家实力：绝赞数排行榜、物量排行榜（总分/最高）、平均达成率排行榜、定数差值排行榜、Full Combo 排行榜、All Perfect 排行榜、Sync 排行榜、版本成就排行榜、DX 谱面排行榜、标准谱面排行榜、UTAGE 排行榜。每个榜单都支持查看详情和排名变化。</p>
+        <div class="card-tags"><span class="card-tag">绝赞</span><span class="card-tag">物量</span><span class="card-tag">11种排行</span><span class="card-tag">FC/AP</span></div>
+      </div>
+    </div>
+
+    <!-- 牌子与收藏 -->
+    <div class="category-title animate-on-scroll">🎯 牌子与收藏</div>
+    <div class="features animate-on-scroll">
+      <div class="card">
+        <div class="card-icon">🎯</div>
+        <h3>牌子进度查询</h3>
+        <p>全面查询白极 / 将 / 神牌进度，按等级（BASIC/ADVANCED/EXPERT/MASTER/Re:MASTER）和谱师分类展示。清晰标注每首曲目的达成条件与当前状态（已达成/进行中/未开始），自动计算总进度百分比，让牌子攻略一目了然。</p>
+        <div class="card-tags"><span class="card-tag">白极</span><span class="card-tag">将</span><span class="card-tag">神</span><span class="card-tag">进度百分比</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🖼️</div>
+        <h3>牌子进度导出图片</h3>
+        <p>支持将牌子进度一键导出为高清图片，按等级和谱师分页展示。图片包含每首曲目的达成状态、进度条、总百分比等信息，方便保存到相册或分享到社交平台，与朋友交流攻略心得。</p>
+        <div class="card-tags"><span class="card-tag">导出图片</span><span class="card-tag">分页展示</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🎯</div>
+        <h3>个性化成绩查询</h3>
+        <p>专为推等级 / 谱师的极 / 将 / 神牌特别设计的功能。可按特定等级或特定谱师筛选曲目，集中展示目标牌子的达成进度，支持导出图片分享。帮助玩家聚焦当前目标，高效规划推牌路线。</p>
+        <div class="card-tags"><span class="card-tag">按等级</span><span class="card-tag">按谱师</span><span class="card-tag">目标规划</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🏷️</div>
+        <h3>收藏品查询</h3>
+        <p>查询舞萌DX各类收藏品详情，包括称号（称号名、获取条件、称号类型）、名牌（名牌名、设计风格、解锁方式）、背景（背景图预览、所属系列）、面板（面板预览、特效描述）。每种收藏品都附带详细解锁条件说明，助力快速达成全收集目标。</p>
+        <div class="card-tags"><span class="card-tag">称号</span><span class="card-tag">名牌</span><span class="card-tag">背景</span><span class="card-tag">面板</span><span class="card-tag">全收集</span></div>
+      </div>
+    </div>
+
+    <!-- KALEIDXSCOPE & 段位 -->
+    <div class="category-title animate-on-scroll">🔑 段位与门</div>
+    <div class="features animate-on-scroll">
+      <div class="card">
+        <div class="card-icon">🔑</div>
+        <h3>KALEIDXSCOPE 门进度</h3>
+        <p>国服 KALEIDXSCOPE 门进度查询，支持 BLACK / BLUE / PURPLE / WHITE / YELLOW 五色门。自动标记已解锁歌曲，展示每扇门的总进度和已解锁曲目数量。内置最新攻略信息，帮助玩家规划开锁路线，高效达成全解锁目标。</p>
+        <div class="card-tags"><span class="card-tag">五色门</span><span class="card-tag">进度追踪</span><span class="card-tag">攻略</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🏅</div>
+        <h3>段位表查询</h3>
+        <p>查询真代、里代等各段位的达成条件与要求曲目。展示每个段位的指定曲目列表、达成率要求、段位称号等信息。支持按段位等级筛选，快速定位目标段位，制定练习计划。</p>
+        <div class="card-tags"><span class="card-tag">真代</span><span class="card-tag">里代</span><span class="card-tag">段位条件</span></div>
+      </div>
+    </div>
+
+    <!-- 乐曲相关 -->
+    <div class="category-title animate-on-scroll">🎶 乐曲与谱面</div>
+    <div class="features animate-on-scroll">
+      <div class="card">
+        <div class="card-icon">🎶</div>
+        <h3>乐曲查询 & 详情</h3>
+        <p>全面检索舞萌DX曲库，支持按曲名（中/日/英文）、艺术家、版本、分类等多维度搜索。展示每首乐曲的完整信息：曲绘预览、艺术家、BPM、时长、版本、分类标签，以及所有难度谱面的达成率数据。</p>
+        <div class="card-tags"><span class="card-tag">曲库检索</span><span class="card-tag">多维度搜索</span><span class="card-tag">曲绘预览</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">📝</div>
+        <h3>查看谱面代码</h3>
+        <p>提供舞萌DX全量谱面的 maidata.txt 原始数据，方便玩家深入研究谱面结构。代码高亮显示，支持复制分享。适合谱面分析、二创研究、学术探讨等场景。</p>
+        <div class="card-tags"><span class="card-tag">maidata</span><span class="card-tag">谱面结构</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">▶️</div>
+        <h3>播放谱面</h3>
+        <p>支持在应用内直接解析 maidata.txt 并可视化播放谱面，无需下载到本地。完美还原谱面音符节奏、滑动轨迹、Touch 操作等元素。播放速度可调（0.5x ~ 2.0x），支持暂停/继续，适合离线练习谱面记忆。</p>
+        <div class="card-tags"><span class="card-tag">内嵌播放</span><span class="card-tag">速度调节</span><span class="card-tag">谱面还原</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🎨</div>
+        <h3>自定义播放谱面</h3>
+        <p>支持玩家导入自定义谱面进行播放。只需提供 maidata.txt 谱面文件、曲绘图片和音源文件，即可在 App 内加载并播放任意谱面。支持调整判定偏移量、音符大小、背景透明度等参数，打造专属谱面练习体验。</p>
+        <div class="card-tags"><span class="card-tag">自定义</span><span class="card-tag">灵活导入</span><span class="card-tag">参数调节</span></div>
+      </div>
+    </div>
+
+    <!-- 猜歌游戏 -->
+    <div class="category-title animate-on-scroll">🎮 猜歌游戏</div>
+    <div class="features animate-on-scroll">
+      <div class="card">
+        <div class="card-icon">❓</div>
+        <h3>无提示猜歌</h3>
+        <p>舞萌笑传之猜猜呗① — 最纯粹的猜歌模式，无任何提示信息，仅凭曲目记忆猜测歌名。适合资深玩家挑战自我，考验对舞萌DX曲库的熟悉程度。</p>
+        <div class="card-tags"><span class="card-tag">猜猜呗1</span><span class="card-tag">无提示</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🖼️</div>
+        <h3>根据部分曲绘猜歌</h3>
+        <p>舞萌笑传之猜猜呗② — 随机截取曲绘的局部区域，玩家需要通过曲绘碎片猜测对应的曲目名称。截取位置随机，面积可调（25%~75%），难度随心控制。</p>
+        <div class="card-tags"><span class="card-tag">猜猜呗2</span><span class="card-tag">曲绘碎片</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🌫️</div>
+        <h3>根据模糊曲绘猜歌</h3>
+        <p>舞萌笑传之猜猜呗③ — 曲绘经过高斯模糊处理，模糊程度随时间逐渐降低，玩家需尽快识别出曲绘对应的曲目。考验对曲绘细节的熟悉度，模糊度实时变化增加了紧迫感。</p>
+        <div class="card-tags"><span class="card-tag">猜猜呗3</span><span class="card-tag">模糊曲绘</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🎵</div>
+        <h3>根据歌曲片段猜歌</h3>
+        <p>舞萌笑传之猜猜呗④ — 随机播放歌曲的截取片段（时长可调 3~15 秒），玩家凭借旋律来判断曲目名称。音频片段从歌曲不同位置截取，同一首歌可能以不同段落出现，考验对歌曲的全面熟悉程度。</p>
+        <div class="card-tags"><span class="card-tag">猜猜呗4</span><span class="card-tag">旋律识别</span><span class="card-tag">音频片段</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔤</div>
+        <h3>根据别名猜歌</h3>
+        <p>舞萌笑传之猜猜呗⑤ — 展示舞萌DX曲目的玩家常用别名或昵称，需猜测对应的官方曲名。别名数据库持续更新，涵盖国服/日服社区常见称呼，适合了解社区文化的玩家。</p>
+        <div class="card-tags"><span class="card-tag">猜猜呗5</span><span class="card-tag">别名挑战</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔠</div>
+        <h3>舞萌开字母猜歌</h3>
+        <p>舞萌笑传之猜猜呗⑥ — 曲名以空格分割为若干组，每组逐个揭示字母，玩家需在完全揭示前猜出曲名。揭示速度可调，支持自定义字母组数，互动性与竞技性兼具。</p>
+        <div class="card-tags"><span class="card-tag">猜猜呗6</span><span class="card-tag">逐字符揭示</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">👥</div>
+        <h3>多人猜歌对战</h3>
+        <p>支持与好友进行多人实时猜歌对战，所有 6 种猜歌模式均可游玩。基于 WebSocket 实现低延迟实时通信，支持创建/加入房间、实时同步答题状态、计分板排名。每轮结束后自动进入下一题，比拼猜歌速度和准确率，增加互动性与竞技乐趣。</p>
+        <div class="card-tags"><span class="card-tag">WebSocket</span><span class="card-tag">实时对战</span><span class="card-tag">创建房间</span></div>
+      </div>
+    </div>
+
+    <!-- 实用工具 -->
+    <div class="category-title animate-on-scroll">🧮 实用工具</div>
+    <div class="features animate-on-scroll">
+      <div class="card">
+        <div class="card-icon">🧮</div>
+        <h3>单曲 Rating 计算</h3>
+        <p>输入单曲的难度、达成率、定数等数据，精准计算该曲目对应的 Rating 分数。支持 BASIC/ADVANCED/EXPERT/MASTER/Re:MASTER 全难度计算，帮助玩家预估推分收益，合理规划冲分路线。</p>
+        <div class="card-tags"><span class="card-tag">Rating计算</span><span class="card-tag">推分预估</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">📉</div>
+        <h3>达成率计算</h3>
+        <p>根据 Perfect（含彩P/白P）、Great、Good、Miss 等判定详情，精准核算单曲达成率。支持反向输入 — 输入目标达成率，反推各判定数量的分配方案。适合赛后复盘，分析失分原因，针对性提升。</p>
+        <div class="card-tags"><span class="card-tag">达成率</span><span class="card-tag">判定核算</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔍</div>
+        <h3>达成率反推</h3>
+        <p>根据已知的达成率，反向推算绝赞（BREAK）判定的 Perfect/Great/Good/Miss 分布情况。输入达成率和总音符数，系统自动计算可能的判定组合，辅助复盘游玩表现，找出可优化的绝赞段落。</p>
+        <div class="card-tags"><span class="card-tag">绝赞反推</span><span class="card-tag">复盘分析</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔄</div>
+        <h3>版本对照</h3>
+        <p>清晰对照舞萌DX各版本名称与对应版本号，包括国服和日服的命名差异。涵盖从 maimai GreeN 到最新版本的完整对应关系，提供快速检索功能，方便玩家查阅版本更迭历史。</p>
+        <div class="card-tags"><span class="card-tag">版本对照</span><span class="card-tag">国服/日服</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🎲</div>
+        <h3>随机选曲</h3>
+        <p>随机生成 1~4 首曲目，支持按难度、等级、版本、分类等多维度筛选。打破固定游玩习惯，发现被忽略的好歌。支持「再来一次」重新随机，适合跟朋友一起决定打什么歌。</p>
+        <div class="card-tags"><span class="card-tag">1-4首</span><span class="card-tag">随机</span><span class="card-tag">多维度筛选</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔍</div>
+        <h3>基于标签推荐</h3>
+        <p>根据谱面难度、音乐风格、BPM 范围、版本等标签进行智能匹配，推荐符合个人喜好的曲目。推荐算法考虑玩家历史游玩数据，越用越精准。支持一键查看推荐曲目的详情和谱面信息。</p>
+        <div class="card-tags"><span class="card-tag">智能推荐</span><span class="card-tag">个性化</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">⭐</div>
+        <h3>收藏夹管理</h3>
+        <p>支持创建、重命名、删除多个收藏夹，将喜爱的谱面分门别类收藏。每个收藏夹可添加任意数量的曲目，支持拖拽排序、批量操作。收藏数据本地存储，安全可靠，方便快速访问常玩的曲目。</p>
+        <div class="card-tags"><span class="card-tag">收藏</span><span class="card-tag">管理</span><span class="card-tag">本地存储</span></div>
+      </div>
+    </div>
+
+    <!-- 系统功能 -->
+    <div class="category-title animate-on-scroll">⚙️ 系统功能</div>
+    <div class="features animate-on-scroll">
+      <div class="card">
+        <div class="card-icon">📡</div>
+        <h3>服务器状态</h3>
+        <p>实时查看舞萌DX服务器运行状态，包括 AWMC 状态检测、各服务可用性、历史宕机记录等。数据来源于 status.awmc.cc，帮助玩家及时了解服务器是否正常，避免白跑一趟。</p>
+        <div class="card-tags"><span class="card-tag">AWMC</span><span class="card-tag">实时状态</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">📖</div>
+        <h3>舞萌百科</h3>
+        <p>内置舞萌DX专业术语与知识科普，涵盖游戏机制解读（如"错位""蛇""绝赞""同步"等）、常用缩写对照、社区黑话释义。词条持续更新，新手和老玩家都能从中获益，深入了解舞萌DX的方方面面。</p>
+        <div class="card-tags"><span class="card-tag">词条百科</span><span class="card-tag">术语解读</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔄</div>
+        <h3>刷新数据</h3>
+        <p>支持手动刷新当前页面的所有数据，确保展示最新信息。刷新过程中显示进度条和当前操作提示，操作完成后自动更新界面。支持水鱼和落雪两种数据源的刷新切换。</p>
+        <div class="card-tags"><span class="card-tag">刷新</span><span class="card-tag">双数据源</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔔</div>
+        <h3>检查更新</h3>
+        <p>自动检测新版本可用性，支持强制定向更新（必须更新才能继续使用）和普通更新（可选更新）两种模式。更新提示界面展示版本号、更新内容、发布时间等详情，帮助用户了解每次更新的变化。</p>
+        <div class="card-tags"><span class="card-tag">自动检测</span><span class="card-tag">强制更新</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">📋</div>
+        <h3>问卷反馈</h3>
+        <p>内置问卷调查入口，用户可以直接填写功能建议、BUG 反馈、改进意见等。反馈数据匿名提交，定期整理汇总，帮助开发者持续改进 App 体验。每条反馈都会被认真阅读和评估。</p>
+        <div class="card-tags"><span class="card-tag">反馈</span><span class="card-tag">建议</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 数据流架构 ===== -->
+  <section id="sec-arch">
+    <div class="section-title animate-on-scroll">
+      <h2>🏗️ 数据流架构</h2>
+      <p>了解 ChiffonMai 如何安全高效地处理数据</p>
+      <div class="section-divider"></div>
+    </div>
+
+    <div class="resp-block" style="background: var(--card); border-radius: var(--radius-md); padding: 32px; box-shadow: var(--shadow-sm); max-width: 800px; margin: 0 auto;">
+      <pre style="font-family: 'SF Mono','Fira Code','Consolas',monospace; font-size: 13px; line-height: 1.8; color: var(--text); overflow-x: auto; white-space: pre-wrap; word-break: break-word;">
+<strong style="color: var(--accent);">📱 本地层 (ChiffonMai App)</strong>
+  ├─ 本地存储（SharedPreferences）
+  │   ├─ QQ 号 / 授权码缓存
+  │   ├─ 排行榜参加设置
+  │   ├─ 收藏夹数据
+  │   └─ 应用配置偏好
+  ├─ 本地计算引擎
+  │   ├─ Rating 计算器
+  │   ├─ 达成率核算/反推
+  │   ├─ Best50 拟合分析
+  │   └─ 猜歌游戏逻辑
+  └─ UI 渲染层（Flutter Widget 树）
+
+<strong style="color: var(--accent);">🌐 网络层 (RESTful API / WebSocket)</strong>
+  ├─ Diving-Fish 水鱼 API
+  │   ├─ GET /maimaidx/prober/player/  — 查询玩家数据
+  │   ├─ POST /maimaidx/prober/import/ — 导入成绩
+  │   └─ GET /maimaidx/prober/music/   — 获取曲库
+  ├─ 落雪咖啡屋 API
+  │   ├─ GET /maimai/player/{id}       — 玩家信息
+  │   ├─ GET /maimai/song/list         — 曲库列表
+  │   └─ GET /maimai/collection        — 收藏品数据
+  ├─ maimai-score-hub (WebSocket)
+  │   └─ 实时通信：认证 → 加好友 → 抓取 → 导出
+  ├─ DXRating.net API
+  │   └─ GET /api/songs                — 谱面标签/别名
+  └─ AWMC 服务器状态
+      └─ GET /status/maimai            — 服务器运行状态
+
+<strong style="color: var(--accent);">🔄 QR 同步数据流</strong>
+  App ──(QR码字符串)──→ maimai-score-hub 
+    ──→ 机台 Bot 加好友 
+    ──→ 抓取 NET 成绩 
+    ──→ 返回数据给 App 
+    ──→ App 推送至 Diving-Fish 
+    ──→ 更新本地 Best50</pre>
+    </div>
+  </section>
+
+  <!-- ===== 界面预览 ===== -->
+  <section id="sec-shots">
+    <div class="section-title animate-on-scroll">
+      <h2>📱 界面预览</h2>
+      <p>精心打磨的 UI 设计，直观易用</p>
+      <div class="section-divider"></div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; max-width: 900px; margin: 0 auto;">
+      <div class="card" style="text-align: center; padding: 36px 20px;">
+        <div style="font-size: 64px; margin-bottom: 12px;">🏠</div>
+        <h3>首页</h3>
+        <p style="font-size: 14px;">快速入口 · 数据概览 · 功能导航<br>近期游玩 · 快捷操作</p>
+      </div>
+      <div class="card" style="text-align: center; padding: 36px 20px;">
+        <div style="font-size: 64px; margin-bottom: 12px;">🏆</div>
+        <h3>Best50</h3>
+        <p style="font-size: 14px;">排名列表 · 达成率详情<br>拟合分析 · 一键导出长图</p>
+      </div>
+      <div class="card" style="text-align: center; padding: 36px 20px;">
+        <div style="font-size: 64px; margin-bottom: 12px;">🎮</div>
+        <h3>猜歌游戏</h3>
+        <p style="font-size: 14px;">6 种模式 · 实时计分<br>多人对战 · WebSocket 通信</p>
+      </div>
+      <div class="card" style="text-align: center; padding: 36px 20px;">
+        <div style="font-size: 64px; margin-bottom: 12px;">📡</div>
+        <h3>同步成绩</h3>
+        <p style="font-size: 14px;">QR 码输入 · 进度条可视化<br>自动推送水鱼 · 状态追踪</p>
+      </div>
+      <div class="card" style="text-align: center; padding: 36px 20px;">
+        <div style="font-size: 64px; margin-bottom: 12px;">🎶</div>
+        <h3>乐曲详情</h3>
+        <p style="font-size: 14px;">曲绘预览 · 谱面信息<br>maidata 查看 · 内嵌播放</p>
+      </div>
+      <div class="card" style="text-align: center; padding: 36px 20px;">
+        <div style="font-size: 64px; margin-bottom: 12px;">📊</div>
+        <h3>排行榜</h3>
+        <p style="font-size: 14px;">11 种排行 · 实时排名<br>隐私保护 · 昵称/匿名切换</p>
+      </div>
+    </div>
+    <div style="text-align: center; margin-top: 24px; color: var(--muted); font-size: 13px;">
+      💡 以上为功能示意图，实际界面以 App 内为准
+    </div>
+  </section>
+
+  <!-- ===== 技术栈 ===== -->
+  <section id="sec-tech">
+    <div class="section-title animate-on-scroll">
+      <h2>🛠️ 技术栈</h2>
+      <p>现代化跨平台技术构建</p>
+      <div class="section-divider"></div>
+    </div>
+    <div class="tech-stack animate-on-scroll">
+      <span class="tech-badge">🦋 Flutter</span>
+      <span class="tech-badge">🎯 Dart</span>
+      <span class="tech-badge">📱 Android</span>
+      <span class="tech-badge">🍎 iOS</span>
+      <span class="tech-badge">🌐 RESTful API</span>
+      <span class="tech-badge">🔌 WebSocket</span>
+      <span class="tech-badge">📡 maimai-score-hub</span>
+      <span class="tech-badge">🗃️ SharedPreferences</span>
+      <span class="tech-badge">🔗 HTTP Client</span>
+      <span class="tech-badge">🖼️ Image Render</span>
+    </div>
+    <div style="text-align: center; margin-top: 12px; color: var(--muted); font-size: 14px;">
+      数据来源：<a href="https://www.diving-fish.com/maimaidx/prober/" target="_blank">Diving-Fish 水鱼</a> ·
+      <a href="https://maimai.lxns.net" target="_blank">落雪咖啡屋</a> ·
+      <a href="https://dxrating.net" target="_blank">DXRating.net</a> ·
+      <a href="https://status.awmc.cc/status/maimai" target="_blank">AWMC Status</a>
+    </div>
+    <div class="resp-block" style="margin-top: 20px; max-width: 700px; margin-left: auto; margin-right: auto;">
+      <div style="background: var(--card); border-radius: var(--radius-sm); padding: 16px 20px; box-shadow: var(--shadow-sm); font-size: 14px; color: var(--muted); line-height: 1.8;">
+        <strong style="color: var(--text);">📌 架构特点：</strong><br>
+        ✓ 基于 Flutter 框架，一套代码同时构建 Android 和 iOS 版本<br>
+        ✓ Dart 语言开发，类型安全，性能优异<br>
+        ✓ RESTful API 接口通信，数据格式采用 JSON<br>
+        ✓ WebSocket 全双工通信，保障实时对战低延迟<br>
+        ✓ 本地数据持久化采用 SharedPreferences 键值存储<br>
+        ✓ 所有敏感计算逻辑在本地完成，不依赖第三方服务
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 下载 ===== -->
+  <section id="sec-down">
+    <div class="section-title animate-on-scroll">
+      <h2>📥 立即下载</h2>
+      <p>完全免费，即刻体验</p>
+      <div class="section-divider"></div>
+    </div>
+    <div class="download-grid animate-on-scroll">
+      <div class="download-card">
+        <div class="platform-icon">🤖</div>
+        <h3>Android</h3>
+        <p>下载 APK 直接安装，支持 Android 5.0+</p>
+        <a class="btn btn-primary" href="https://wward.lanzouw.com/chiffonmai" target="_blank" style="font-size:14px;padding:10px 28px;">
+          📦 蓝奏云下载
+        </a>
+      </div>
+      <div class="download-card coming-soon">
+        <div class="platform-icon">🍎</div>
+        <h3>iOS</h3>
+        <p>正在尽力协调上架中</p>
+        <span class="coming-soon-tag">⏳ 敬请期待</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 致谢 ===== -->
+  <section id="sec-thanks">
+    <div class="section-title animate-on-scroll">
+      <h2>🎉 特别致谢</h2>
+      <p>感谢每一位为 ChiffonMai 做出贡献的朋友</p>
+      <div class="section-divider"></div>
+    </div>
+    <div class="thanks-grid animate-on-scroll">
+      <div class="thanks-item">
+        <a class="card-link" href="https://huajia.163.com/main/profile/RrwM5xQB" target="_blank"><strong>Xn1xUfguF1GiNg</strong></a> — 背景图与戚风小狐狸
+      </div>
+      <div class="thanks-item">
+        <strong>Takanashi Rikkkkkkka</strong> — 个性化谱面推荐设计思路
+      </div>
+      <div class="thanks-item">
+        <strong>三由yyyh</strong> — 页面设计宝贵意见
+      </div>
+      <div class="thanks-item">
+        <strong>MYD</strong> — 测试开发个人游玩数据
+      </div>
+      <div class="thanks-item">
+        <a class="card-link" href="https://space.bilibili.com/438391224" target="_blank"><strong>乐观的熊猫</strong></a> — 提议开发，最初契机
+      </div>
+      <div class="thanks-item">
+        <a class="card-link" href="https://www.diving-fish.com/maimaidx/prober/" target="_blank"><strong>Diving-Fish 水鱼</strong></a> — 曲库与玩家记录数据库
+      </div>
+      <div class="thanks-item">
+        <a class="card-link" href="https://dxrating.net" target="_blank"><strong>DXRating.net</strong></a> — 谱面标签与别名数据库
+      </div>
+      <div class="thanks-item">
+        <a class="card-link" href="https://github.com/Yuri-YuzuChaN/maimaiDX" target="_blank"><strong>Yuri-YuzuChaN</strong></a> — 别名数据库
+      </div>
+      <div class="thanks-item">
+        <a class="card-link" href="https://maimai.lxns.net" target="_blank"><strong>落雪咖啡屋</strong></a> — 收藏品/音源/曲库/玩家数据库
+      </div>
+      <div class="thanks-item">
+        <a class="card-link" href="https://github.com/Neskol/Maichart-Converts" target="_blank"><strong>Neskol</strong></a> — 谱面转换支持
+      </div>
+      <div class="thanks-item">
+        <a class="card-link" href="https://status.awmc.cc/status/maimai" target="_blank"><strong>status.awmc.cc</strong></a> — 服务器状态查询
+      </div>
+    </div>
+    <div style="text-align: center; margin-top: 20px; color: var(--muted); font-size: 13px;">
+      设计思路借鉴：
+      <a href="https://github.com/yukineko2233/v0-maimai-wordle" target="_blank">舞萌猜猜呗之潘一把</a> ·
+      <a href="https://github.com/Lista233/EasyMai" target="_blank">EasyMai</a>
+    </div>
+  </section>
+
+  <!-- ===== FAQ ===== -->
+  <section id="sec-faq">
+    <div class="section-title animate-on-scroll">
+      <h2>🙋 常见问题</h2>
+      <p>你可能想了解的</p>
+      <div class="section-divider"></div>
+    </div>
+
+    <div class="faq-item animate-on-scroll">
+      <div class="faq-q" onclick="toggleFAQ(this)">
+        ChiffonMai 安全吗？我的数据会被上传吗？
+        <span class="faq-arrow">▾</span>
+      </div>
+      <div class="faq-a">所有数据在你的手机本地处理。登录水鱼 / 落雪仅用于同步官方数据，不会收集敏感信息。所有计算逻辑均在本地完成，保障数据安全。具体来说：<br><br>
+        • 个人游戏数据（QQ 号、授权码等）仅存储在本地 SharedPreferences 中<br>
+        • 排行榜参与状态可随时关闭，关闭后你的数据不会出现在任何排行榜上<br>
+        • 猜歌游戏对战仅传输答案和得分信息，不涉及个人账号数据<br>
+        • App 不包含任何第三方统计 SDK（如友盟、Google Analytics 等）<br>
+        • 源代码完全开源，可自行审查数据安全性</div>
+    </div>
+
+    <div class="faq-item animate-on-scroll">
+      <div class="faq-q" onclick="toggleFAQ(this)">
+        QR 码同步怎么用？步骤是什么？
+        <span class="faq-arrow">▾</span>
+      </div>
+      <div class="faq-a">在舞萌DX机台登录后的信息页面点击「QR 码发行」，使用微信扫描二维码后复制以 <strong>SGWCMAID</strong> 开头的完整字符串。打开 ChiffonMai → 点击「同步成绩」→ 粘贴字符串 → 点击「同步」，App 会自动通过 maimai-score-hub 服务完成：Bot 加好友 → 抓取 NET 官方成绩 → 推送 Diving-Fish → 更新本地 Best50 的全流程。进度条会实时显示当前所处的阶段（认证中 / 加好友中 / 抓取中 / 导出中 / 完成），全程无需手动干预。</div>
+    </div>
+
+    <div class="faq-item animate-on-scroll">
+      <div class="faq-q" onclick="toggleFAQ(this)">
+        需要登录水鱼账号吗？登录信息安全吗？
+        <span class="faq-arrow">▾</span>
+      </div>
+      <div class="faq-a">首次使用 QR 码同步功能需要登录水鱼账号。在「同步成绩」对话框中输入一次水鱼用户名和密码即可，之后 App 会自动缓存 ImportToken，后续同步无需重复输入。密码仅用于获取 ImportToken，不会明文存储，也不会上传到任何第三方服务器。查询 Best50、查看排行榜、玩猜歌游戏等基础功能均无需登录水鱼账号。</div>
+    </div>
+
+    <div class="faq-item animate-on-scroll">
+      <div class="faq-q" onclick="toggleFAQ(this)">
+        和官方 NET 有什么区别？为什么要用 ChiffonMai？
+        <span class="faq-arrow">▾</span>
+      </div>
+      <div class="faq-a">ChiffonMai 是第三方工具，相比官方 NET 提供更丰富的功能：<br><br>
+        • <strong>Best50 长图导出</strong> — 一键生成精美长图，方便分享到社交平台<br>
+        • <strong>6 种猜歌游戏</strong> — 支持多人实时 WebSocket 对战，趣味性拉满<br>
+        • <strong>牌子进度可视化</strong> — 按等级 / 谱师分类展示，一键导出进度图片<br>
+        • <strong>Rating 计算器</strong> — 精准计算单曲 Rating，辅助推分规划<br>
+        • <strong>11 种多维排行榜</strong> — 绝赞数、物量、FC/AP 等排行，全方位对比<br>
+        • <strong>收藏品攻略</strong> — 称号/名牌/背景/面板的全收集指南<br>
+        • <strong>谱面内嵌播放</strong> — 支持 maidata.txt 解析与可视化播放<br>
+        • <strong>KALEIDXSCOPE 门进度</strong> — 五色门进度追踪，内置攻略<br>
+        • <strong>舞萌百科</strong> — 术语科普、机制解读、社区黑话释义</div>
+    </div>
+
+    <div class="faq-item animate-on-scroll">
+      <div class="faq-q" onclick="toggleFAQ(this)">
+        猜歌游戏支持多人吗？怎么玩？
+        <span class="faq-arrow">▾</span>
+      </div>
+      <div class="faq-a">支持！全部 6 种猜歌模式均支持 WebSocket 多人实时对战。玩法如下：<br><br>
+        • <strong>创建房间</strong>：选择猜歌模式 → 创建房间 → 将房间号分享给好友<br>
+        • <strong>加入房间</strong>：输入好友分享的房间号 → 加入等待 → 房主点击开始<br>
+        • <strong>实时对战</strong>：所有玩家同步答题，每题限时，答对得分，答错不扣分<br>
+        • <strong>计分板</strong>：实时显示每位玩家的得分和排名，每轮结束后自动更新<br>
+        • <strong>结束</strong>：所有题目完成后显示最终排名，可再来一局<br>
+        建议使用稳定的 Wi-Fi 或 5G 网络，以获得最佳对战体验。</div>
+    </div>
+
+    <div class="faq-item animate-on-scroll">
+      <div class="faq-q" onclick="toggleFAQ(this)">
+        为什么需要联网？离线能用吗？
+        <span class="faq-arrow">▾</span>
+      </div>
+      <div class="faq-a">ChiffonMai 的大部分功能需要联网使用，因为需要从 Diving-Fish、落雪咖啡屋等第三方服务获取歌曲数据、成绩数据和排行榜信息。以下功能在联网状态下可用：<br><br>
+        • 所有需要查询数据的功能（Best50、成绩、排行榜、收藏品等）<br>
+        • QR 码同步水鱼（需连接 maimai-score-hub 和 Diving-Fish）<br>
+        • 猜歌游戏多人对战（需 WebSocket 通信）<br>
+        • 检查更新、问卷反馈等<br><br>
+        以下功能可以在弱网环境下使用（但需要提前加载数据）：<br>
+        • 本地 Rating 计算器、达成率计算/反推<br>
+        • 本地收藏夹管理（数据存储在本地）<br>
+        • 已缓存的谱面播放（需提前查看过）<br><br>
+        你的个人游玩数据仅在你主动同步时才会传输，且仅用于查询展示，不会泄露给第三方。</div>
+    </div>
+
+    <div class="faq-item animate-on-scroll">
+      <div class="faq-q" onclick="toggleFAQ(this)">
+        支持水鱼和落雪双数据源吗？有什么区别？
+        <span class="faq-arrow">▾</span>
+      </div>
+      <div class="faq-a">支持！ChiffonMai 同时支持 <strong>Diving-Fish 水鱼</strong> 和 <strong>落雪咖啡屋</strong> 两种数据源：<br><br>
+        • <strong>水鱼</strong>：输入 QQ 号即可查询，数据全面，支持 Best50、成绩、排行榜等。但需要主动通过 QR 码同步来更新成绩数据。<br>
+        • <strong>落雪</strong>：需通过授权码（OAuth 2.0）登录，数据实时性更高，除基础查询外还提供收藏品数据。授权码获取方式请查看落雪咖啡屋官网。<br><br>
+        你可以在「刷新数据」对话框中随时切换数据源，App 会自动缓存最后一次使用的数据源，下次打开时自动使用。</div>
+    </div>
+
+    <div class="faq-item animate-on-scroll">
+      <div class="faq-q" onclick="toggleFAQ(this)">
+        什么是「拟合 Best50」和「个性化 Best50」？
+        <span class="faq-arrow">▾</span>
+      </div>
+      <div class="faq-a"><strong>拟合 Best50</strong> 是在你的全部游玩记录中，自动计算出如果按照最高 Rating 排列，理论上能达到的最佳成绩组合。它可以帮你了解自己的 Rating 上限，合理规划冲分目标。<br><br>
+        <strong>个性化 Best50</strong> 是趣味化的 Best50 排行榜，包括：<br>
+        • <strong>锁血50</strong> — 达成率最低的 50 首曲目（排名按达成率从低到高）<br>
+        • <strong>AP50</strong> — 达成率最高的 50 首曲目<br>
+        • <strong>FS50</strong> — Full Sync+ 完成情况最好的 50 首曲目<br>
+        • 更多趣味排行持续开发中<br><br>
+        所有模式都支持一键导出长图分享。</div>
+    </div>
+
+    <div class="faq-item animate-on-scroll">
+      <div class="faq-q" onclick="toggleFAQ(this)">
+        iOS 版本什么时候出？
+        <span class="faq-arrow">▾</span>
+      </div>
+      <div class="faq-a">目前正在尽力协调 iOS 端的发布上架工作。由于 App Store 审核流程较为复杂，需要准备开发者账号、隐私政策文档、应用截图等材料，具体上架时间暂未确定。Android 用户可先通过上方蓝奏云链接下载体验。如有 iOS 版本的最新进展，我们会通过 GitHub Releases 和社区渠道第一时间通知大家。</div>
+    </div>
+
+    <div class="faq-item animate-on-scroll">
+      <div class="faq-q" onclick="toggleFAQ(this)">
+        我遇到了 BUG 或者有功能建议，怎么反馈？
+        <span class="faq-arrow">▾</span>
+      </div>
+      <div class="faq-a">欢迎通过以下渠道反馈：<br><br>
+        • <strong>App 内问卷</strong>：打开 ChiffonMai → 设置 → 问卷反馈，匿名提交<br>
+        • <strong>GitHub Issues</strong>：前往 <a href="https://github.com/ChiffonOwO/ChiffonMai/issues" target="_blank">GitHub Issues</a> 提交 BUG 报告或功能建议<br>
+        • <strong>邮件</strong>：发送邮件至 <a href="mailto:chiffonowo@foxmail.com">chiffonowo@foxmail.com</a><br><br>
+        提交 BUG 时请附上以下信息，有助于快速定位问题：<br>
+        • 手机型号和系统版本<br>
+        • App 版本号（可在设置中查看）<br>
+        • 问题出现前的操作步骤<br>
+        • 问题截图或录屏（可选）<br>
+        每条反馈都会被认真阅读和评估，感谢你的支持！</div>
+    </div>
+
+    <div class="faq-item animate-on-scroll">
+      <div class="faq-q" onclick="toggleFAQ(this)">
+        项目开源吗？我可以贡献代码吗？
+        <span class="faq-arrow">▾</span>
+      </div>
+      <div class="faq-a">完全开源！ChiffonMai 采用 <strong>MIT License</strong> 开源许可证，源代码托管在 <a href="https://github.com/ChiffonOwO/ChiffonMai" target="_blank">GitHub</a> 和 <a href="https://gitee.com/liangyingjun123/ChiffonMai" target="_blank">Gitee</a>（国内镜像）。欢迎任何形式的贡献：<br><br>
+        • <strong>提交 PR</strong>：修复 BUG、新增功能、改进 UI、优化性能<br>
+        • <strong>提交 Issue</strong>：报告 BUG、提出功能建议<br>
+        • <strong>完善文档</strong>：改进 README、补充注释、编写 Wiki<br>
+        • <strong>翻译协助</strong>：帮助添加多语言支持<br>
+        • <strong>社区推广</strong>：向更多玩家推荐 ChiffonMai<br><br>
+        如果你想参与开发，建议先阅读 README 中的开发指南，了解项目结构和代码规范。</div>
+    </div>
+  </section>
+
+  <!-- ===== 隐私 & 许可 ===== -->
+  <section id="sec-legal">
+    <div class="section-title animate-on-scroll">
+      <h2>📄 隐私与许可</h2>
+      <div class="section-divider"></div>
+    </div>
+    <div class="resp-block" style="max-width: 700px; margin: 0 auto; background: var(--card); border-radius: var(--radius-md); padding: 32px; box-shadow: var(--shadow-sm);">
+      <h3 style="font-size: 16px; margin-bottom: 12px;">🔒 隐私说明</h3>
+      <ul style="list-style: none; padding: 0; font-size: 14px; color: var(--muted); line-height: 2;">
+        <li>✓ 应用仅在本地存储你的游戏数据，不会上传至第三方服务器</li>
+        <li>✓ 账号绑定仅用于同步官方数据，不会收集敏感信息</li>
+        <li>✓ 所有计算逻辑均在本地完成，保障数据安全</li>
+        <li>✓ App 不含任何第三方统计 SDK（如友盟、Google Analytics 等）</li>
+        <li>✓ 排行榜参与状态随时可关闭，关闭后数据不再公开</li>
+        <li>✓ 源代码完全开源，接受社区安全审查</li>
+      </ul>
+      <div style="height: 1px; background: rgba(0,0,0,0.06); margin: 20px 0;"></div>
+      <h3 style="font-size: 16px; margin-bottom: 12px;">📝 开源许可</h3>
+      <p style="font-size: 14px; color: var(--muted);">
+        本项目采用 <a href="https://github.com/ChiffonOwO/ChiffonMai/blob/main/LICENSE" target="_blank">MIT License</a> 开源许可证。<br>
+        欢迎 Fork 和二次开发，但请保留原作者署名。
+      </p>
+      <div style="height: 1px; background: rgba(0,0,0,0.06); margin: 20px 0;"></div>
+      <h3 style="font-size: 16px; margin-bottom: 12px;">💡 免责声明</h3>
+      <ul style="list-style: none; padding: 0; font-size: 14px; color: var(--muted); line-height: 2;">
+        <li>• ChiffonMai 是第三方工具，非 SEGA 官方出品</li>
+        <li>• 本应用仅用于学习和娱乐，请勿用于商业用途</li>
+        <li>• 数据来源均为公开信息，如有侵权请联系删除</li>
+        <li>• 使用本应用产生的一切后果由用户自行承担</li>
+      </ul>
+      <div style="height: 1px; background: rgba(0,0,0,0.06); margin: 20px 0;"></div>
+      <h3 style="font-size: 16px; margin-bottom: 12px;">📋 数据处理说明</h3>
+      <ul style="list-style: none; padding: 0; font-size: 14px; color: var(--muted); line-height: 2;">
+        <li>• QQ 号和授权码 — 仅存储在本地，用于向水鱼/落雪 API 查询数据</li>
+        <li>• 水鱼账号密码 — 仅用于获取 ImportToken，不存明文、不上传第三方</li>
+        <li>• 排行榜数据 — 参与/退出完全由用户控制，随时可撤销</li>
+        <li>• 猜歌对战数据 — 仅传输答案和得分，不涉及任何个人身份信息</li>
+        <li>• 应用配置偏好 — 全部存储在本地，不同步到任何云端</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===== 页脚 ===== -->
+  <footer>
+    <div style="max-width: 1100px; margin: 0 auto;">
+      <p>ChiffonMai 是第三方工具，非 SEGA 官方出品 · 仅供学习与娱乐</p>
+      <div class="footer-links">
+        <a href="https://github.com/ChiffonOwO/ChiffonMai" target="_blank">GitHub</a>
+        <a href="https://gitee.com/liangyingjun123/ChiffonMai" target="_blank">Gitee</a>
+        <a href="https://www.diving-fish.com/maimaidx/prober/" target="_blank">Diving-Fish 水鱼</a>
+        <a href="https://maimai.lxns.net" target="_blank">落雪咖啡屋</a>
+        <a href="https://dxrating.net" target="_blank">DXRating.net</a>
+      </div>
+      <p style="margin-top: 16px;">
+        <img class="footer-icon" src="icon.png" alt="ChiffonMai">
+        Made with ❤️ by ChiffonOwO
+      </p>
+      <p style="margin-top: 8px; font-size: 12px;">
+        反馈与建议：<a href="mailto:chiffonowo@foxmail.com">chiffonowo@foxmail.com</a>
+      </p>
+    </div>
+  </footer>
+
+  <!-- ===== 回到顶部 ===== -->
+  <button class="back-to-top" id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="回到顶部">
+    ↑
+  </button>
+
+  <!-- ===== JavaScript ===== -->
+  <script>
+    // FAQ 切换
+    function toggleFAQ(el) {
+      el.parentElement.classList.toggle('open');
+    }
+
+    // 回到顶部按钮显隐
+    window.addEventListener('scroll', function() {
+      const btn = document.getElementById('backToTop');
+      if (window.scrollY > 400) {
+        btn.classList.add('show');
+      } else {
+        btn.classList.remove('show');
+      }
+    });
+
+    // 滚动动画 (Intersection Observer)
+    document.addEventListener('DOMContentLoaded', function() {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+          }
+        });
+      }, {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+      });
+
+      document.querySelectorAll('.animate-on-scroll').forEach(el => {
+        observer.observe(el);
+      });
+    });
+  </script>
+<script>
+(function() {
+  const nav = document.getElementById('sidenav');
+  const toggle = document.getElementById('navToggle');
+  const links = nav.querySelectorAll('a');
+  const sections = [];
+
+  links.forEach(a => {
+    const id = a.getAttribute('href').slice(1);
+    const el = document.getElementById(id);
+    if (el) sections.push({ el, a });
+  });
+
+  // 滚动高亮
+  function update() {
+    const scrollY = window.scrollY + 120;
+    let current = sections[0];
+    for (const s of sections) {
+      if (s.el.offsetTop <= scrollY) current = s;
+    }
+    links.forEach(a => a.classList.remove('active'));
+    if (current) current.a.classList.add('active');
+  }
+
+  window.addEventListener('scroll', update, { passive: true });
+  update();
+
+  // 移动端汉堡菜单
+  toggle.addEventListener('click', () => nav.classList.toggle('open'));
+  links.forEach(a => a.addEventListener('click', () => {
+    if (window.innerWidth <= 1024) nav.classList.remove('open');
+  }));
+  document.addEventListener('click', (e) => {
+    if (!nav.contains(e.target) && e.target !== toggle) nav.classList.remove('open');
+  });
+})();
+</script>
+</body>
+</html>

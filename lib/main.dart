@@ -34,13 +34,10 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: true,
-      onPopInvoked: (didPop) {},
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: HomePage(onFirstFrameRendered: _loadFonts),
-        theme: ThemeData(
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: HomePage(onFirstFrameRendered: _loadFonts),
+      theme: ThemeData(
           fontFamily: _fontsLoaded 
               ? GoogleFonts.notoSansSc(fontWeight: FontWeight.w400).fontFamily 
               : null,
@@ -88,7 +85,6 @@ class _MyAppState extends State<MyApp> {
             ),
           );
         },
-      ),
     );
   }
 }

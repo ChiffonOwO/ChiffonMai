@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:media_scanner/media_scanner.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/MaidataManager.dart';
@@ -17,6 +18,7 @@ import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/page/SongMaidataPage.dart';
 import 'package:my_first_flutter_app/service/SongInfoService.dart';
+import 'package:my_first_flutter_app/service/SongPlayService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CommentTextValidator.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
@@ -26,11 +28,12 @@ import 'package:my_first_flutter_app/utils/TextStyleUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'Collection/CollectionInfoPage.dart';
 import 'SongPlayPage.dart';
-import 'FavoriteFolderPage.dart';
 import 'RankingList/SongRankingPage.dart';
 import 'package:my_first_flutter_app/entity/FavoriteFolder.dart';
 import 'package:my_first_flutter_app/service/FavoriteFolderService.dart';
 import 'package:my_first_flutter_app/service/RankingList/SongRankingService.dart';
+import 'package:my_first_flutter_app/service/BiliSearchService.dart';
+import 'package:my_first_flutter_app/service/BiliRedisService.dart';
 
 class SongInfoPage extends StatefulWidget {
   final String songId;
@@ -64,6 +67,18 @@ class _SongInfoPageState extends State<SongInfoPage> {
       {}; // key: 难度索引(0-4), value: [trueZettaiTap, trueZettaiHold, protectedZettai, star]
   bool _maidataDecodedSuccessfully = false;
   bool _isBookmarked = false;
+
+  // 参考时长
+  int? _referenceDurationSeconds;
+  bool _referenceDurationLoading = false;
+
+  // B站谱面确认播放量
+  int? _biliPlayCount;
+  bool _biliPlayCountLoading = false;
+  int? _biliLoadedDiffIndex; // 记录上次加载 B站播放量时的难度索引
+  String? _biliBvid; // 当前显示的播放量对应的 BV 号
+  bool _biliFromRedis = false; // 是否从 Redis 缓存加载
+  bool _biliFromUser = false; // 是否来自用户上传的 BV
 
   // 舞萌DX 完成度-评级-乘数对照表
   final List<Map<String, dynamic>> maimaiRatingMultiplier = [
@@ -204,6 +219,12 @@ class _SongInfoPageState extends State<SongInfoPage> {
       // 从MaidataManager获取并解析物量统计
       await _loadMaidataNoteCounts();
 
+      // 加载参考时长
+      _loadReferenceDuration();
+
+      // 加载B站谱面确认播放量
+      _loadBiliPlayCount();
+
       // 加载评论者身份信息
       final identity = await SongInfoService.getCommentIdentity();
       if (identity != null) {
@@ -255,9 +276,17 @@ class _SongInfoPageState extends State<SongInfoPage> {
         }
       }
 
-      setState(() {
-        _isLoading = false;
-      });
+      // 如果 _currentDiffIndex 在 finally 中被调整了，重新加载 B站播放量
+      if (_currentDiffIndex != (_biliLoadedDiffIndex ?? -1)) {
+        setState(() {
+          _isLoading = false;
+        });
+        _loadBiliPlayCount();
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+      }
       // 检查当前谱面是否已被收藏
       _checkBookmarkStatus();
     }
@@ -521,6 +550,510 @@ class _SongInfoPageState extends State<SongInfoPage> {
     } catch (e) {
       // 静默处理，继续使用默认数据
     }
+  }
+
+  // 加载参考时长（从落雪音频获取）
+  Future<void> _loadReferenceDuration() async {
+    if (_referenceDurationLoading) return;
+    _referenceDurationLoading = true;
+
+    try {
+      final songId = widget.songId;
+      final songTitle = _songData!['basic_info']['title'];
+
+      // 1. 先查 Redis 缓存
+      final cached = await BiliRedisService().getCachedReferenceDuration(
+        songId: songId,
+      );
+
+      if (cached != null && mounted) {
+        setState(() {
+          _referenceDurationSeconds = cached;
+          _referenceDurationLoading = false;
+        });
+        debugPrint('[RefDuration] Redis 缓存命中: ${cached}s');
+        return;
+      }
+
+      // 2. Redis 未命中，通过落雪获取
+      final songType = _songData!['type'] ?? '';
+
+      final songPlayService = SongPlayService();
+      final luoXueSongId =
+          await songPlayService.findLuoXueSongId(songTitle, songType);
+
+      if (luoXueSongId == null) {
+        setState(() {
+          _referenceDurationLoading = false;
+        });
+        return;
+      }
+
+      final audioUrl =
+          'https://assets2.lxns.net/maimai/music/$luoXueSongId.mp3';
+
+      final directory = await getApplicationDocumentsDirectory();
+      final cacheDir = Directory('${directory.path}/music_cache');
+      if (!cacheDir.existsSync()) {
+        cacheDir.createSync(recursive: true);
+      }
+      final cachedFilePath = '${cacheDir.path}/$luoXueSongId.mp3';
+
+      // 检查本地文件缓存
+      final cachedFile = File(cachedFilePath);
+      if (!cachedFile.existsSync()) {
+        // 下载音频文件
+        final httpClient = HttpClient();
+        final request = await httpClient.getUrl(Uri.parse(audioUrl));
+        final response = await request.close();
+
+        if (response.statusCode == HttpStatus.ok) {
+          final sink = cachedFile.openWrite();
+          await sink.addStream(response);
+          await sink.close();
+        } else {
+          setState(() {
+            _referenceDurationLoading = false;
+          });
+          return;
+        }
+      }
+
+      // 使用 AudioPlayer 获取时长
+      final audioPlayer = AudioPlayer();
+      await audioPlayer.setSource(DeviceFileSource(cachedFilePath));
+
+      final duration = await audioPlayer.getDuration();
+      if (duration != null && mounted) {
+        final seconds = duration.inSeconds;
+        setState(() {
+          _referenceDurationSeconds = seconds;
+          _referenceDurationLoading = false;
+        });
+
+        // 3. 保存到 Redis（30天）
+        BiliRedisService().saveReferenceDuration(
+          songId: songId,
+          songTitle: songTitle,
+          durationSeconds: seconds,
+        );
+      } else {
+        setState(() {
+          _referenceDurationLoading = false;
+        });
+      }
+
+      audioPlayer.dispose();
+    } catch (e) {
+      debugPrint('加载参考时长失败: $e');
+      if (mounted) {
+        setState(() {
+          _referenceDurationLoading = false;
+        });
+      }
+    }
+  }
+
+  // 格式化参考时长显示
+  String _formatReferenceDuration() {
+    if (_referenceDurationSeconds == null) {
+      return _referenceDurationLoading ? '...' : '-';
+    }
+    final minutes = _referenceDurationSeconds! ~/ 60;
+    final seconds = _referenceDurationSeconds! % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  // 加载B站谱面确认播放量
+  Future<void> _loadBiliPlayCount() async {
+    if (_biliPlayCountLoading) return;
+    _biliPlayCountLoading = true;
+    _biliLoadedDiffIndex = _currentDiffIndex;
+    final targetDiffIndex = _currentDiffIndex;
+
+    try {
+      final songId = widget.songId;
+      final songTitle = _songData!['basic_info']['title'];
+
+      // 1. 首先尝试从 Redis 缓存获取
+      final cached = await BiliRedisService().getCachedPlayCount(
+        songId: songId,
+        diffIndex: targetDiffIndex,
+      );
+
+      if (cached != null && mounted && _biliLoadedDiffIndex == targetDiffIndex) {
+        final cachedPlayCount = cached['play_count'] as int?;
+        final cachedBvid = cached['bvid'] as String?;
+        final source = cached['source'] as String?;
+        if (cachedPlayCount != null && cachedPlayCount > 0) {
+          setState(() {
+            _biliPlayCount = cachedPlayCount;
+            _biliBvid = cachedBvid;
+            _biliFromRedis = true;
+            _biliFromUser = source == 'user_upload';
+            _biliPlayCountLoading = false;
+          });
+          debugPrint('[BiliRedis] 使用 Redis 缓存播放量: $cachedPlayCount, BV: $cachedBvid, source: $source');
+          return;
+        }
+      }
+
+      // 2. Redis 未命中，通过 B站 API 搜索
+      final playCount = await BiliSearchService().fetchMaxPlayCount(
+        songTitle,
+        targetDiffIndex,
+      );
+
+      if (mounted && _biliLoadedDiffIndex == targetDiffIndex) {
+        final result = BiliSearchService().lastSearchResult;
+        final bvid = result?.bvid;
+        setState(() {
+          _biliPlayCount = playCount;
+          _biliBvid = bvid;
+          _biliFromRedis = false;
+          _biliFromUser = false;
+          _biliPlayCountLoading = false;
+        });
+
+        // 3. 搜索成功，将结果保存到 Redis
+        if (playCount != null && playCount > 0) {
+          BiliRedisService().savePlayCount(
+            songId: songId,
+            songTitle: songTitle,
+            diffIndex: targetDiffIndex,
+            playCount: playCount,
+            bvid: bvid,
+          );
+        }
+      } else {
+        _biliPlayCountLoading = false;
+      }
+    } catch (e) {
+      debugPrint('加载B站播放量失败: $e');
+      if (mounted) {
+        setState(() {
+          _biliPlayCountLoading = false;
+        });
+      }
+    }
+  }
+
+  // 格式化B站播放量显示
+  String _formatBiliPlayCount() {
+    if (_biliPlayCount == null) {
+      return _biliPlayCountLoading ? '...' : '-';
+    }
+    final n = _biliPlayCount!;
+    if (n >= 10000) {
+      return '${(n / 10000).toStringAsFixed(1)}万';
+    }
+    return n.toString();
+  }
+
+  /// 获取来源标签（仅在对话框中显示）
+  String _getBiliSourceLabel() {
+    if (_biliFromUser) return '用户上传';
+    if (_biliFromRedis) return 'Redis 缓存';
+    return '自动获取';
+  }
+
+  /// 构建 B站播放量统计项（带 BV 上传功能）
+  Widget _buildBiliPlayCountStat() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final accentColor = _getAccentColor(_currentDiffIndex);
+    final fontSize = screenWidth * 0.04;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: _showBvUploadDialog,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'B站播放',
+              style: TextStyle(
+                fontSize: 12,
+                color: accentColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    _formatBiliPlayCount(),
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.bold,
+                      color: accentColor,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                Icon(
+                  _biliBvid != null ? Icons.edit : Icons.upload_file,
+                  size: fontSize * 0.6,
+                  color: accentColor.withValues(alpha: 0.5),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 显示 BV 号上传对话框
+  void _showBvUploadDialog() {
+    if (_songData == null) return;
+
+    final songTitle = _songData!['basic_info']['title'];
+    final songId = widget.songId;
+    final diffIndex = _currentDiffIndex;
+    final diffLabel = _getDiffLabel(diffIndex);
+    final bvController = TextEditingController(text: _biliBvid ?? '');
+    bool isValidating = false;
+    String? validationMessage;
+    bool? validationPassed;
+    int? validatedPlayCount;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('B站谱面确认播放量'),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 歌曲信息
+                    Text(
+                      '歌曲: $songTitle',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text('难度: $diffLabel'),
+                    const SizedBox(height: 8),
+                    // 当前播放量信息
+                    if (_biliPlayCount != null) ...[
+                      Text('当前播放量: ${_formatBiliPlayCount()}'),
+                      if (_biliBvid != null) Text('BV号: ${_biliBvid}'),
+                      Text('来源: ${_getBiliSourceLabel()}',
+                          style: TextStyle(
+                            color: _biliFromUser ? Colors.blue
+                                : (_biliFromRedis ? Colors.orange : Colors.green),
+                            fontSize: 12,
+                          )),
+                      const Divider(),
+                    ] else if (_biliPlayCountLoading) ...[
+                      const Text('正在加载播放量...'),
+                      const SizedBox(height: 8),
+                    ] else ...[
+                      const Text('暂无播放量数据',
+                          style: TextStyle(color: Colors.red)),
+                      const Divider(),
+                    ],
+                    // 手动上传区域
+                    const Text('手动上传 BV 号:',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    const Text(
+                      '当自动获取播放量失败时，可手动输入该歌曲谱面确认视频的 BV 号',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: bvController,
+                      decoration: InputDecoration(
+                        hintText: '例如: BV1xx411c7mD',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: bvController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  bvController.clear();
+                                  setDialogState(() {});
+                                },
+                              )
+                            : null,
+                      ),
+                      onChanged: (_) {
+                        // 清除之前的校验结果
+                        if (validationMessage != null) {
+                          setDialogState(() {
+                            validationMessage = null;
+                            validationPassed = null;
+                            validatedPlayCount = null;
+                          });
+                        }
+                      },
+                    ),
+                    // 校验结果
+                    if (validationMessage != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: validationPassed == true
+                              ? Colors.green[50]
+                              : Colors.red[50],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              validationPassed == true
+                                  ? Icons.check_circle
+                                  : Icons.error,
+                              color: validationPassed == true
+                                  ? Colors.green
+                                  : Colors.red,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                validationMessage!,
+                                style: TextStyle(
+                                  color: validationPassed == true
+                                      ? Colors.green[800]
+                                      : Colors.red[800],
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    // 校验通过后显示播放量
+                    if (validatedPlayCount != null && validationPassed == true) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '播放量: ${validatedPlayCount! >= 10000 ? "${(validatedPlayCount! / 10000).toStringAsFixed(1)}万" : validatedPlayCount.toString()}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('取消'),
+                ),
+                // 校验按钮
+                TextButton(
+                  onPressed: isValidating
+                      ? null
+                      : () async {
+                          final bvid = bvController.text.trim();
+                          if (bvid.isEmpty) {
+                            setDialogState(() {
+                              validationMessage = '请输入 BV 号';
+                              validationPassed = false;
+                            });
+                            return;
+                          }
+                          if (!RegExp(r'^BV[a-zA-Z0-9]{10}$').hasMatch(bvid)) {
+                            setDialogState(() {
+                              validationMessage = 'BV 号格式不正确（应为 BV + 10位字符）';
+                              validationPassed = false;
+                            });
+                            return;
+                          }
+
+                          setDialogState(() => isValidating = true);
+
+                          try {
+                            final result = await BiliSearchService()
+                                .validateBvForSong(bvid, songTitle);
+
+                            if (result == null) {
+                              setDialogState(() {
+                                validationMessage = '校验失败: 无法获取视频信息（BV 号可能不存在）';
+                                validationPassed = false;
+                                isValidating = false;
+                              });
+                            } else if (result.passed) {
+                              setDialogState(() {
+                                validationMessage = '校验通过！视频标题: "${result.videoInfo.title}"';
+                                validationPassed = true;
+                                validatedPlayCount = result.videoInfo.playCount;
+                                isValidating = false;
+                              });
+                            } else {
+                              setDialogState(() {
+                                validationMessage = '校验失败: 视频标题 "${result.videoInfo.title}" 不包含歌曲名 "$songTitle"';
+                                validationPassed = false;
+                                isValidating = false;
+                              });
+                            }
+                          } catch (e) {
+                            setDialogState(() {
+                              validationMessage = '校验异常: $e';
+                              validationPassed = false;
+                              isValidating = false;
+                            });
+                          }
+                        },
+                  child: isValidating
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('校验 BV 号'),
+                ),
+                // 确认上传按钮（只有校验通过后才可点击）
+                TextButton(
+                  onPressed: (validationPassed == true && !isValidating)
+                      ? () async {
+                          final bvid = bvController.text.trim();
+                          final playCount = validatedPlayCount;
+
+                          // 保存到本地状态
+                          setState(() {
+                            _biliPlayCount = playCount ?? _biliPlayCount;
+                            _biliBvid = bvid;
+                            _biliFromRedis = false;
+                            _biliFromUser = true;
+                          });
+
+                          // 保存到 Redis 服务器
+                          BiliRedisService().uploadUserBv(
+                            songId: songId,
+                            songTitle: songTitle,
+                            diffIndex: diffIndex,
+                            bvid: bvid,
+                            playCount: playCount,
+                          );
+
+                          Navigator.of(dialogContext).pop();
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            const SnackBar(
+                              content: Text('BV 号已上传'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      : null,
+                  child: const Text('确认上传'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   // 获取音符数量，优先使用Maidata解析的结果
@@ -861,30 +1394,34 @@ class _SongInfoPageState extends State<SongInfoPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 标题和展开收起按钮
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '星数-DX分数对照表',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: _getAccentColor(_currentDiffIndex),
-              ),
+        // 标题和展开收起按钮（整行可点击）
+        InkWell(
+          onTap: () {
+            setState(() {
+              _starScoreTableExpanded = !_starScoreTableExpanded;
+            });
+          },
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '星数-DX分数对照表',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _getAccentColor(_currentDiffIndex),
+                  ),
+                ),
+                Icon(
+                  _starScoreTableExpanded ? Icons.expand_less : Icons.expand_more,
+                  color: _getAccentColor(_currentDiffIndex),
+                ),
+              ],
             ),
-            IconButton(
-              icon: Icon(
-                _starScoreTableExpanded ? Icons.expand_less : Icons.expand_more,
-                color: _getAccentColor(_currentDiffIndex),
-              ),
-              onPressed: () {
-                setState(() {
-                  _starScoreTableExpanded = !_starScoreTableExpanded;
-                });
-              },
-            ),
-          ],
+          ),
         ),
         const SizedBox(height: 10),
 
@@ -1149,33 +1686,37 @@ class _SongInfoPageState extends State<SongInfoPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 标题和展开收起按钮
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '达成率-得分对照表',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: _getAccentColor(_currentDiffIndex),
-              ),
+        // 标题和展开收起按钮（整行可点击）
+        InkWell(
+          onTap: () {
+            setState(() {
+              _achievementScoreTableExpanded =
+                  !_achievementScoreTableExpanded;
+            });
+          },
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '达成率-得分对照表',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _getAccentColor(_currentDiffIndex),
+                  ),
+                ),
+                Icon(
+                  _achievementScoreTableExpanded
+                      ? Icons.expand_less
+                      : Icons.expand_more,
+                  color: _getAccentColor(_currentDiffIndex),
+                ),
+              ],
             ),
-            IconButton(
-              icon: Icon(
-                _achievementScoreTableExpanded
-                    ? Icons.expand_less
-                    : Icons.expand_more,
-                color: _getAccentColor(_currentDiffIndex),
-              ),
-              onPressed: () {
-                setState(() {
-                  _achievementScoreTableExpanded =
-                      !_achievementScoreTableExpanded;
-                });
-              },
-            ),
-          ],
+          ),
         ),
         const SizedBox(height: 10),
 
@@ -1609,8 +2150,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                               final textWidth =
                                                   textPainter.width;
                                               final safeWidth =
-                                                  constraints.maxWidth *
-                                                      0.9; // 留10%的安全空间
+                                                  constraints.maxWidth;
 
                                               // 如果文本宽度小于安全宽度，不需要滚动
                                               if (textWidth <= safeWidth) {
@@ -1757,12 +2297,19 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                   (index) => Expanded(
                                     child: GestureDetector(
                                       onTap: () {
+                                        BiliSearchService().cancel();
                                         setState(() {
                                           _currentDiffIndex = index;
+                                          _biliPlayCount = null;
+                                          _biliPlayCountLoading = false;
+                                          _biliBvid = null;
+                                          _biliFromRedis = false;
+                                          _biliFromUser = false;
                                         });
                                         _loadChartRating();
                                         _loadComments();
                                         _checkBookmarkStatus();
+                                        _loadBiliPlayCount();
                                       },
                                       child: Container(
                                         margin: const EdgeInsets.symmetric(
@@ -1821,7 +2368,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
                               const SizedBox(height: 10),
 
-                              // 统计信息行
+                              // 统计信息行 - 第一行
                               Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
@@ -1830,16 +2377,32 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                   _buildStatItem(
                                       'BPM', basicInfo['bpm'].toString()),
                                   _buildStatItem(
-                                      '版本',
-                                      StringUtil.formatVersion2(
-                                          basicInfo['from'])),
-                                  _buildStatItem('曲师',
-                                      basicInfo['artist'].split('/').last),
+                                      '参考时长', _formatReferenceDuration()),
+                                  _buildBiliPlayCountStat(),
                                 ],
                               ),
 
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 12),
 
+                              // 统计信息行 - 第二行
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  _buildStatItem('曲师',
+                                      basicInfo['artist'].split('/').last),
+                                  _buildStatItem(
+                                      '版本',
+                                      StringUtil.formatVersion2(
+                                          basicInfo['from'])),
+                                  _buildStatItem(
+                                      '谱面谱师', currentChart['charter']),
+                                ],
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              // 统计信息行 - 第三行
                               Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
@@ -1856,8 +2419,21 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                   : currentDiffData['fit_diff'])
                                               .toStringAsFixed(2)
                                           : '-'),
-                                  _buildStatItem(
-                                      '谱面谱师', currentChart['charter']),
+                                  Builder(builder: (ctx) {
+                                      if (currentDiffData == null) {
+                                        return _buildStatItem('定数差值', '-');
+                                      }
+                                      final ds = (_songData!['ds'][_currentDiffIndex] as num).toDouble();
+                                      final fd = currentDiffData is DiffData
+                                          ? currentDiffData.fitDiff
+                                          : (currentDiffData['fit_diff'] as num).toDouble();
+                                      final diff = fd - ds;
+                                      return _buildStatItem(
+                                        '定数差值',
+                                        '${diff >= 0 ? "+" : ""}${diff.toStringAsFixed(2)}',
+                                        valueColor: diff < 0 ? Colors.green : Colors.red,
+                                      );
+                                    }),
                                   _buildStatItem(
                                       '平均达成',
                                       currentDiffData != null
@@ -2311,34 +2887,38 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    // 标题和展开收起按钮
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          '谱面标签(仅供参考)',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: accentColor,
-                                          ),
+                                    // 标题和展开收起按钮（整行可点击）
+                                    InkWell(
+                                      onTap: () {
+                                        setState(() {
+                                          _tagsTableExpanded =
+                                              !_tagsTableExpanded;
+                                        });
+                                      },
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              '谱面标签(仅供参考)',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: accentColor,
+                                              ),
+                                            ),
+                                            Icon(
+                                              _tagsTableExpanded
+                                                  ? Icons.expand_less
+                                                  : Icons.expand_more,
+                                              color: accentColor,
+                                            ),
+                                          ],
                                         ),
-                                        IconButton(
-                                          icon: Icon(
-                                            _tagsTableExpanded
-                                                ? Icons.expand_less
-                                                : Icons.expand_more,
-                                            color: accentColor,
-                                          ),
-                                          onPressed: () {
-                                            setState(() {
-                                              _tagsTableExpanded =
-                                                  !_tagsTableExpanded;
-                                            });
-                                          },
-                                        ),
-                                      ],
+                                      ),
                                     ),
 
                                     const SizedBox(height: 10),
@@ -4189,33 +4769,37 @@ class _SongInfoPageState extends State<SongInfoPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 标题和展开收起按钮
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '容错计算',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: _getAccentColor(_currentDiffIndex),
-              ),
+        // 标题和展开收起按钮（整行可点击）
+        InkWell(
+          onTap: () {
+            setState(() {
+              _toleranceCalculationExpanded =
+                  !_toleranceCalculationExpanded;
+            });
+          },
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '容错计算',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _getAccentColor(_currentDiffIndex),
+                  ),
+                ),
+                Icon(
+                  _toleranceCalculationExpanded
+                      ? Icons.expand_less
+                      : Icons.expand_more,
+                  color: _getAccentColor(_currentDiffIndex),
+                ),
+              ],
             ),
-            IconButton(
-              icon: Icon(
-                _toleranceCalculationExpanded
-                    ? Icons.expand_less
-                    : Icons.expand_more,
-                color: _getAccentColor(_currentDiffIndex),
-              ),
-              onPressed: () {
-                setState(() {
-                  _toleranceCalculationExpanded =
-                      !_toleranceCalculationExpanded;
-                });
-              },
-            ),
-          ],
+          ),
         ),
         const SizedBox(height: 10),
 
@@ -5091,7 +5675,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
   }
 
   // 构建统计项
-  Widget _buildStatItem(String label, String value) {
+  Widget _buildStatItem(String label, String value, {Color? valueColor}) {
     // 获取当前难度的强调颜色
     final accentColor = _getAccentColor(_currentDiffIndex);
 
@@ -5105,7 +5689,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
     final textStyle = TextStyle(
       fontSize: fontSize,
       fontWeight: FontWeight.bold,
-      color: accentColor,
+      color: valueColor ?? accentColor,
     );
 
     return Expanded(
@@ -5120,7 +5704,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
           ),
           const SizedBox(height: 4),
           // 为超出容器宽度的文本添加水平滚动
-          (label == '谱面谱师' || label == '曲师' || label == '版本' || label == '类别')
+          (label == '谱面谱师' || label == '曲师' || label == '类别')
               ? LayoutBuilder(
                   builder: (context, constraints) {
                     // 计算文本宽度
@@ -5133,8 +5717,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     final textWidth = textPainter.width;
                     final containerWidth = constraints.maxWidth;
 
-                    // 为了确保不换行，给容器宽度一个安全margin
-                    final safeContainerWidth = containerWidth * 0.85;
+                    // 文本宽度未超过容器宽度时不需要滚动
+                    final safeContainerWidth = containerWidth;
 
                     // 如果文本宽度小于安全容器宽度，不需要滚动，但仍然添加点击事件
                     if (textWidth <= safeContainerWidth) {
@@ -5250,9 +5834,13 @@ class _SongInfoPageState extends State<SongInfoPage> {
                       },
                     );
                   },
-                  child: Text(
-                    value,
-                    style: textStyle,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      value,
+                      style: textStyle,
+                      maxLines: 1,
+                    ),
                   ),
                 ),
         ],
@@ -6237,32 +6825,36 @@ class _SongInfoPageState extends State<SongInfoPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 标题和展开收起按钮
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '评级分布(仅供参考)',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: _getAccentColor(_currentDiffIndex),
-              ),
+        // 标题和展开收起按钮（整行可点击）
+        InkWell(
+          onTap: () {
+            setState(() {
+              _ratingDistributionExpanded = !_ratingDistributionExpanded;
+            });
+          },
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '评级分布(仅供参考)',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _getAccentColor(_currentDiffIndex),
+                  ),
+                ),
+                Icon(
+                  _ratingDistributionExpanded
+                      ? Icons.expand_less
+                      : Icons.expand_more,
+                  color: _getAccentColor(_currentDiffIndex),
+                ),
+              ],
             ),
-            IconButton(
-              icon: Icon(
-                _ratingDistributionExpanded
-                    ? Icons.expand_less
-                    : Icons.expand_more,
-                color: _getAccentColor(_currentDiffIndex),
-              ),
-              onPressed: () {
-                setState(() {
-                  _ratingDistributionExpanded = !_ratingDistributionExpanded;
-                });
-              },
-            ),
-          ],
+          ),
         ),
         const SizedBox(height: 10),
 
@@ -6335,32 +6927,36 @@ class _SongInfoPageState extends State<SongInfoPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 标题和展开收起按钮
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '连击分布(仅供参考)',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: _getAccentColor(_currentDiffIndex),
-              ),
+        // 标题和展开收起按钮（整行可点击）
+        InkWell(
+          onTap: () {
+            setState(() {
+              _comboDistributionExpanded = !_comboDistributionExpanded;
+            });
+          },
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '连击分布(仅供参考)',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _getAccentColor(_currentDiffIndex),
+                  ),
+                ),
+                Icon(
+                  _comboDistributionExpanded
+                      ? Icons.expand_less
+                      : Icons.expand_more,
+                  color: _getAccentColor(_currentDiffIndex),
+                ),
+              ],
             ),
-            IconButton(
-              icon: Icon(
-                _comboDistributionExpanded
-                    ? Icons.expand_less
-                    : Icons.expand_more,
-                color: _getAccentColor(_currentDiffIndex),
-              ),
-              onPressed: () {
-                setState(() {
-                  _comboDistributionExpanded = !_comboDistributionExpanded;
-                });
-              },
-            ),
-          ],
+          ),
         ),
         const SizedBox(height: 10),
 
@@ -6675,13 +7271,20 @@ class _BookmarkFolderSelectorDialogState
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final levelNames = ['Basic', 'Advanced', 'Expert', 'Master', 'Re:MASTER', 'UTAGE'];
-    final levelName = widget.chart.levelIndex >= 0 &&
-            widget.chart.levelIndex < levelNames.length
-        ? levelNames[widget.chart.levelIndex]
-        : 'Lv.${widget.chart.levelIndex}';
+    final levelNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'RE:MASTER', 'UTAGE'];
+    final bool isUtage = widget.chart.songId.length == 6;
+    final String levelName;
+    if (isUtage) {
+      levelName = 'UTAGE';
+    } else {
+      levelName = widget.chart.levelIndex >= 0 &&
+              widget.chart.levelIndex < levelNames.length
+          ? levelNames[widget.chart.levelIndex]
+          : 'Lv.${widget.chart.levelIndex}';
+    }
 
     return AlertDialog(
+      scrollable: true,
       title: const Text('收藏到收藏夹'),
       contentPadding: EdgeInsets.zero,
       content: SizedBox(
@@ -6689,7 +7292,7 @@ class _BookmarkFolderSelectorDialogState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 当前谱面信息
+            // 当前谱面信息：左侧曲绘 + 右侧歌名+定数
             Container(
               margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               padding: const EdgeInsets.all(12),
@@ -6699,44 +7302,50 @@ class _BookmarkFolderSelectorDialogState
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade200,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Center(
-                      child: Text(
-                        levelName,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.brown,
-                        ),
-                      ),
-                    ),
+                  // 左侧：曲绘
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: CoverUtil.buildCoverWidget(widget.chart.songId, 60),
                   ),
                   const SizedBox(width: 12),
+                  // 右侧：两行信息
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          widget.chart.songTitle,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        // 第一行：类型标签 + 歌名
+                        Row(
+                          children: [
+                            _buildTypeTag(widget.chart.songType, widget.chart.songId),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                widget.chart.songTitle,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          'Lv.${widget.chart.ds.toStringAsFixed(1)}  ${widget.chart.songType}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
+                        const SizedBox(height: 4),
+                        // 第二行：难度标签 + 定数
+                        Row(
+                          children: [
+                            _buildDifficultyTag(levelName, widget.chart.levelIndex, widget.chart.songId),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Lv.${widget.chart.ds.toStringAsFixed(1)}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -6835,6 +7444,92 @@ class _BookmarkFolderSelectorDialogState
           child: const Text('完成'),
         ),
       ],
+    );
+  }
+
+  /// 构建类型标签（DX/ST/UT）
+  Widget _buildTypeTag(String type, String songId) {
+    final isUtage = songId.length == 6;
+    if (isUtage) {
+      return const Text(
+        'UT',
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: Colors.red,
+        ),
+      );
+    } else if (type == 'DX') {
+      return const Text(
+        'DX',
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: Colors.orange,
+        ),
+      );
+    } else {
+      return const Text(
+        'ST',
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: Colors.blue,
+        ),
+      );
+    }
+  }
+
+  /// 构建难度标签（Basic/Advanced/Expert/Master/Re:MASTER）
+  Widget _buildDifficultyTag(String difficultyLabel, int levelIndex, String songId) {
+    Color bgColor;
+    Color textColor;
+
+    if (songId.length == 6) {
+      bgColor = Colors.red.shade100;
+      textColor = Colors.red;
+    } else {
+      switch (levelIndex) {
+        case 0: // BASIC
+          bgColor = Colors.green.shade100;
+          textColor = Colors.green.shade700;
+          break;
+        case 1: // ADVANCED
+          bgColor = Colors.orange.shade100;
+          textColor = Colors.orange.shade700;
+          break;
+        case 2: // EXPERT
+          bgColor = Colors.red.shade100;
+          textColor = Colors.red;
+          break;
+        case 3: // MASTER
+          bgColor = Colors.purple.shade100;
+          textColor = Colors.purple.shade700;
+          break;
+        case 4: // RE:MASTER
+          bgColor = Colors.purple.shade100;
+          textColor = Colors.purple.shade700;
+          break;
+        default:
+          bgColor = Colors.grey.shade100;
+          textColor = Colors.grey.shade700;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        difficultyLabel.toUpperCase(),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: textColor,
+        ),
+      ),
     );
   }
 }

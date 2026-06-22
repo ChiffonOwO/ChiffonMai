@@ -250,22 +250,27 @@ class MultiplayerManager {
     double masterMinDx = 1.0,
     double masterMaxDx = 15.0,
     List<String> selectedGenres = const [],
+    int blurLevel = 50,
+    int playDuration = 5,
+    int songCount = 3,
+    int nonEnglishCharThreshold = 50,
   }) async {
     debugPrint('[DEBUG][Manager] 开始创建房间请求...');
     debugPrint('[DEBUG][Manager] 参数: gameType=${gameType.name}, maxPlayers=$maxPlayers, timeLimit=$timeLimit, maxGuesses=$maxGuesses');
     debugPrint('[DEBUG][Manager] 歌曲筛选参数: selectedVersions=$selectedVersions, masterMinDx=$masterMinDx, masterMaxDx=$masterMaxDx, selectedGenres=$selectedGenres');
-    
+    debugPrint('[DEBUG][Manager] 模式专属参数: blurLevel=$blurLevel, playDuration=$playDuration, songCount=$songCount');
+
     await initialize();
     debugPrint('[DEBUG][Manager] 初始化完成');
-    
+
     Completer<RoomEntity?> completer = Completer();
     bool completed = false;
-    
+
     StreamSubscription? sub;
     sub = _cloudService.events.listen((event) {
       if (!completed) {
         debugPrint('[DEBUG][Manager] 收到事件: ${event.type}');
-        
+
         if (event is RoomCreatedEvent) {
           completed = true;
           debugPrint('[DEBUG][Manager] 房间创建成功: ${event.room.roomId}');
@@ -279,7 +284,7 @@ class MultiplayerManager {
         }
       }
     });
-    
+
     debugPrint('[DEBUG][Manager] 调用 CloudService.createRoom...');
     await _cloudService.createRoom(
       gameType: gameType,
@@ -290,8 +295,12 @@ class MultiplayerManager {
       masterMinDx: masterMinDx,
       masterMaxDx: masterMaxDx,
       selectedGenres: selectedGenres,
+      blurLevel: blurLevel,
+      playDuration: playDuration,
+      songCount: songCount,
+      nonEnglishCharThreshold: nonEnglishCharThreshold,
     );
-    
+
     debugPrint('[DEBUG][Manager] 等待房间创建结果...');
     return completer.future;
   }

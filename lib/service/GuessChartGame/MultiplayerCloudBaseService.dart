@@ -451,10 +451,14 @@ class MultiplayerCloudBaseService {
     double masterMinDx = 1.0,
     double masterMaxDx = 15.0,
     List<String> selectedGenres = const [],
+    int blurLevel = 50,
+    int playDuration = 5,
+    int songCount = 3,
+    int nonEnglishCharThreshold = 50,
   }) async {
     try {
       debugPrint('[DEBUG][CloudService] 开始创建房间...');
-      
+
       // 如果当前没有玩家ID或WebSocket刚重连，需要重新初始化获取新的玩家ID
       if (currentPlayerId == null || !_wsBroadcast.isConnected) {
         debugPrint('[DEBUG][CloudService] 当前没有玩家ID或连接断开，尝试重新初始化...');
@@ -466,12 +470,12 @@ class MultiplayerCloudBaseService {
         currentPlayerId = null;
         await initialize(envId: _envId!, nickname: currentNickname);
       }
-      
+
       if (currentPlayerId == null) {
         _controller.add(MultiplayerEvent.error(message: '创建房间失败: 用户未登录'));
         return;
       }
-      
+
       await _wsBroadcast.sendCreateRoom({
         'gameType': gameType.name,
         'maxPlayers': maxPlayers,
@@ -483,6 +487,10 @@ class MultiplayerCloudBaseService {
         'masterMinDx': masterMinDx,
         'masterMaxDx': masterMaxDx,
         'selectedGenres': selectedGenres,
+        'blurLevel': blurLevel,
+        'playDuration': playDuration,
+        'songCount': songCount,
+        'nonEnglishCharThreshold': nonEnglishCharThreshold,
       });
       
     } catch (e) {

@@ -43,6 +43,16 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
         _serverNameMap = nameMap;
         _isLoading = false;
       });
+      
+      // 调试：打印服务器名称映射状态
+      debugPrint('[MaimaiServerStatusPage] nameMap: $nameMap');
+      if (status != null) {
+        final serverIds = status.heartbeatList.getServerIds();
+        debugPrint('[MaimaiServerStatusPage] serverIds: $serverIds');
+        for (final id in serverIds) {
+          debugPrint('[MaimaiServerStatusPage] 服务器 $id -> 名称: ${nameMap[id] ?? "未找到"}');
+        }
+      }
     } catch (e) {
       setState(() {
         _errorMessage = '加载服务器状态失败: $e';

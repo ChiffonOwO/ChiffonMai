@@ -328,8 +328,9 @@ class _SongRankingPageState extends State<SongRankingPage> {
               shrinkWrap: true,
               itemCount: levels.length,
               itemBuilder: (context, index) {
-                // 使用难度索引生成标准难度标签
-                String levelLabel = _getDifficultyLabelByIndex(index);
+                // UTAGE歌曲全部显示为UTAGE，否则按下标显示标准标签
+                final bool isUtage = widget.songId.length == 6;
+                String levelLabel = isUtage ? 'UTAGE' : _getDifficultyLabelByIndex(index);
                 double ds = dsList[index] is num ? (dsList[index] as num).toDouble() : 0.0;
                 
                 return InkWell(
