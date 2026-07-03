@@ -18,7 +18,13 @@ import '../service/PersonalizedScoreService.dart';
 import '../service/RecommendByTagsService.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../manager/LZYCheckUpdateManager.dart';
-import '../manager/DivingFish/UserPlayDataManager.dart';
+import '../utils/ThemeManager.dart';
+import '../utils/AppTheme.dart';
+import '../utils/AppConstants.dart';
+import '../service/ConnectivityService.dart';
+import '../widgets/OfflineBanner.dart';
+import '../widgets/QuickSearchBar.dart';
+import 'DifficultyDistributionPage.dart';import '../manager/DivingFish/UserPlayDataManager.dart';
 import '../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../manager/DivingFish/DiffMusicDataManager.dart';
 import '../manager/SongAliasManager.dart';
@@ -29,7 +35,7 @@ import '../service/RankingList/SongRankingService.dart';
 import '../entity/DivingFish/Song.dart';
 import 'AchievementFullReverseCalculatorPage.dart';
 import 'AchievementRateCalculatorPage.dart';
-import 'VersionViewPage.dart';
+import 'VersionViewPage.dart' hide AppConstants;
 import 'Best50/Best50Page.dart';
 import 'Best50/DiffBest50Page.dart';
 import 'Best50/PersonalizedBest50Page.dart';
@@ -56,6 +62,7 @@ import 'SongSearchPage.dart';
 import 'UserScoreSearchPage.dart';
 import 'AboutAppPage.dart';
 import 'CoverRecognitionPage.dart';
+import 'DataBackupPage.dart';
 import '../manager/LuoXue/CollectionsManager.dart';
 import '../manager/DivingFishProbeManager.dart';
 import '../entity/LuoXue/Collection.dart';
@@ -95,45 +102,6 @@ class _InitInterval {
 }
 
 // 应用常量类：集中管理所有硬编码的配置值
-class AppConstants {
-  // 布局尺寸常量
-  static const double targetHeight = 380.0;
-  static const double blockSpacing = 160.0;
-  static const double textLeft = 185.0;
-  static const double textTop = 180.0;
-  static const double buttonHeight = 70.0;
-  static const double gridHorizontalPadding = 15.0; // 减小GridView左右边距
-  static const double buttonPaddingVertical = 6.0;
-  static const double buttonPaddingHorizontal = 4.0;
-
-  // 网格布局常量
-  static const int crossAxisCount = 2;
-  static const double crossAxisSpacing = 8.0; // 减小按钮横向间距
-  static const double mainAxisSpacing = 4.0; // 减小按钮纵向间距
-  static const double childAspectRatio = 1.2;
-
-  // 圆角常量
-  static const double borderRadiusSmall = 8.0;
-  static const double borderRadiusLarge = 12.0;
-
-  // 边框常量
-  static const double borderWidth = 1.5;
-
-  // 阴影常量
-  static const BoxShadow defaultShadow = BoxShadow(
-    color: Colors.black12,
-    blurRadius: 5.0,
-    offset: Offset(2.0, 2.0),
-  );
-
-  // 颜色常量
-  static const Color buttonBackgroundColor = Color.fromARGB(210, 227, 232, 125);
-  static const Color buttonBorderColor = Color.fromARGB(199, 192, 133, 100);
-  static const Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
-  static const Color textSecondaryColor = Color.fromARGB(255, 109, 125, 125);
-}
-
-// 按钮项数据模型
 class ButtonItem {
   final IconData icon;
   final String title;
@@ -175,6 +143,10 @@ enum DataSource {
 
 /// 首页状态类：处理页面状态、存储数据、实现布局构建
 class _HomePageState extends State<HomePage> {
+  // 后台初始化状态
+  // 功能搜索过滤
+  String _featureSearchQuery = '';
+
   // 后台初始化状态
   bool _isBackgroundInitializing = false;
   bool _isInitializationCompleted = false;
@@ -393,6 +365,7 @@ class _HomePageState extends State<HomePage> {
       ButtonItem(icon: Icons.replay, title: '达成率反推', subtitle: '根据判定详情推出绝赞详情'),
       ButtonItem(icon: Icons.door_back_door, title: 'KALEIDXSCOPE', subtitle: '白xx!(bushi)'),
       ButtonItem(icon: Icons.image_search, title: '曲绘识别', subtitle: '拍照识别曲绘对应的歌曲'),
+      ButtonItem(icon: Icons.bar_chart, title: '定数分布', subtitle: '查看谱面定数分布柱状图'),
       ButtonItem(icon: Icons.favorite, title: '收藏夹', subtitle: '管理你收藏的谱面'),
       ButtonItem(icon: Icons.play_arrow, title: '自定义谱面播放', subtitle: '播放你自己本地的谱面'),
       ButtonItem(icon: Icons.qr_code_scanner, title: '同步成绩', subtitle: '将成绩同步到水鱼查分器'),
@@ -408,6 +381,8 @@ class _HomePageState extends State<HomePage> {
       ButtonItem(icon: Icons.info_outline, title: '关于本APP', subtitle: '了解ChiffonMai的方方面面'),
       ButtonItem(icon: Icons.poll_outlined, title: '问卷调查', subtitle: '助力ChiffonMai更上一层楼!'),
       ButtonItem(icon: Icons.manage_accounts, title: '账号管理', subtitle: '查看已绑定的水鱼账号信息'),
+      ButtonItem(icon: Icons.backup, title: '数据备份', subtitle: '导出/导入本地数据'),
+      ButtonItem(icon: Icons.dark_mode, title: '深色模式', subtitle: '切换深色/浅色主题'),
     ]),
   ];
 
@@ -416,6 +391,7 @@ class _HomePageState extends State<HomePage> {
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    final brightness = Theme.of(context).brightness;
 
     // 页面根布局：Scaffold + Stack 实现多层级叠加布局
     // Stack子组件按书写顺序从上到下叠加，越靠后层级越高
@@ -429,6 +405,16 @@ class _HomePageState extends State<HomePage> {
 
           // 层级2：第一张虚化装饰图 - 使用通用装饰背景Widget
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
+
+          // 离线横幅
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: OfflineBanner(
+              onRefresh: () => _showRefreshDataDialog(context),
+            ),
+          ),
 
           // 层级3：第二张虚化装饰图 - 居中显示，与层级2重叠，增强视觉效果
           Center(
@@ -455,7 +441,7 @@ class _HomePageState extends State<HomePage> {
                   Text(
                     "ChiffonMai",
                     style: TextStyle(
-                      color: AppConstants.textPrimaryColor,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: screenWidth * 0.06, // 根据屏幕宽度调整字号
                       fontWeight: FontWeight.bold,
                       letterSpacing: 2,
@@ -465,7 +451,7 @@ class _HomePageState extends State<HomePage> {
                   Text(
                     "基本信息",
                     style: TextStyle(
-                      color: AppConstants.textPrimaryColor,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: screenWidth * 0.045,
                       fontWeight: FontWeight.bold,
                     ),
@@ -495,11 +481,14 @@ class _HomePageState extends State<HomePage> {
             right: screenWidth * 0.02,
             top: screenHeight * 0.36,
             bottom: screenHeight * 0.03,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.7),
+            child: Builder(
+              builder: (context) {
+                final brightness = Theme.of(context).brightness;
+                return Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                 borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-                boxShadow: const [AppConstants.defaultShadow],
+                boxShadow: [AppConstants.defaultShadow(brightness)],
               ),
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -507,6 +496,12 @@ class _HomePageState extends State<HomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // 功能搜索栏
+                    QuickSearchBar(
+                      onChanged: (query) {
+                        setState(() => _featureSearchQuery = query.toLowerCase());
+                      },
+                    ),
                     // 功能中心标题
                     Center(
                       child: Padding(
@@ -514,21 +509,39 @@ class _HomePageState extends State<HomePage> {
                         child: Text(
                           "功能中心",
                           style: TextStyle(
-                            color: AppConstants.textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.045,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                     ),
-                    // 分类按钮区域
-                    ..._buttonCategories.map((category) => _buildCategorySection(category, context)),
+                    // 分类按钮区域（支持搜索过滤）
+                    ..._buttonCategories.where((category) {
+                      if (_featureSearchQuery.isEmpty) return true;
+                      return category.items.any((item) =>
+                        item.title.toLowerCase().contains(_featureSearchQuery) ||
+                        item.subtitle.toLowerCase().contains(_featureSearchQuery));
+                    }).map((category) {
+                      if (_featureSearchQuery.isEmpty) {
+                        return _buildCategorySection(category, context);
+                      }
+                      final filteredItems = category.items.where((item) =>
+                        item.title.toLowerCase().contains(_featureSearchQuery) ||
+                        item.subtitle.toLowerCase().contains(_featureSearchQuery)).toList();
+                      return _buildCategorySection(
+                        ButtonCategory(name: category.name, items: filteredItems),
+                        context,
+                      );
+                    }),
                   ],
                 ),
               ),
-            ),
+              ); // Container end
+            }, // Builder callback
+          ), // Builder end
           ),
-          
+
           // 层级6：底部版权信息
           Positioned(
             bottom: screenHeight * 0.01,
@@ -538,7 +551,7 @@ class _HomePageState extends State<HomePage> {
               child: Text(
                 "ChiffonMai by ChiFFoN 2026",
                 style: TextStyle(
-                  color: AppConstants.textPrimaryColor,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: screenWidth * 0.03,
                   fontWeight: FontWeight.normal,
                 ),
@@ -557,7 +570,9 @@ class _HomePageState extends State<HomePage> {
                   constraints: BoxConstraints(maxWidth: screenWidth * 0.8),
                   padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05, vertical: screenHeight * 0.015),
                   decoration: BoxDecoration(
-                    color: _isInitializationCompleted ? Colors.green.withValues(alpha: 0.85) : Colors.black.withValues(alpha: 0.7),
+                    color: _isInitializationCompleted
+                        ? AppColors.successGreen(brightness).withValues(alpha: 0.85)
+                        : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -570,7 +585,7 @@ class _HomePageState extends State<HomePage> {
                           height: screenWidth * 0.04,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                       SizedBox(width: screenWidth * 0.02),
@@ -580,7 +595,7 @@ class _HomePageState extends State<HomePage> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontSize: screenWidth * 0.03,
                           fontWeight: FontWeight.w500,
                         ),
@@ -635,6 +650,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildAvatarSelector(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final avatarSize = screenWidth * 0.3;
+    final brightness = Theme.of(context).brightness;
 
     return GestureDetector(
       onTap: _showAvatarPicker,
@@ -643,16 +659,16 @@ class _HomePageState extends State<HomePage> {
         height: avatarSize,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
-          color: Colors.white.withValues(alpha: 0.8),
-          border: Border.all(color: AppConstants.textPrimaryColor.withValues(alpha: 0.4), width: 1.5),
-          boxShadow: const [AppConstants.defaultShadow],
+          color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
+          border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4), width: 1.5),
+          boxShadow: [AppConstants.defaultShadow(brightness)],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: CachedNetworkImage(
             imageUrl: 'https://assets2.lxns.net/maimai/icon/$_selectedAvatarId.png',
-            placeholder: (ctx, url) => const Icon(Icons.person, size: 30, color: Colors.grey),
-            errorWidget: (ctx, url, err) => const Icon(Icons.person, size: 30, color: Colors.grey),
+            placeholder: (ctx, url) => Icon(Icons.person, size: 30, color: AppColors.greyHint(brightness)),
+            errorWidget: (ctx, url, err) => Icon(Icons.person, size: 30, color: AppColors.greyHint(brightness)),
             fit: BoxFit.cover,
           ),
         ),
@@ -677,6 +693,7 @@ class _HomePageState extends State<HomePage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
+        final brightness = Theme.of(ctx).brightness;
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
             // 根据关键词过滤头像列表
@@ -697,9 +714,9 @@ class _HomePageState extends State<HomePage> {
 
             return Container(
               height: screenSize.height * 0.65,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              decoration: BoxDecoration(
+                color: Theme.of(ctx).colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               ),
               child: Column(
                 children: [
@@ -742,15 +759,15 @@ class _HomePageState extends State<HomePage> {
                         contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
+                          borderSide: BorderSide(color: AppColors.tableBorder(brightness)),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
+                          borderSide: BorderSide(color: AppColors.tableBorder(brightness)),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color.fromARGB(255, 84, 97, 97)),
+                          borderSide: BorderSide(color: Theme.of(context).colorScheme.onSurface),
                         ),
                       ),
                     ),
@@ -763,7 +780,7 @@ class _HomePageState extends State<HomePage> {
                         alignment: Alignment.centerLeft,
                         child: Text(
                           '找到 ${filteredIcons.length} 个头像',
-                          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                          style: TextStyle(fontSize: 13, color: AppColors.greyHint(brightness, shade: 600)),
                         ),
                       ),
                     ),
@@ -775,9 +792,9 @@ class _HomePageState extends State<HomePage> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
+                                Icon(Icons.search_off, size: 48, color: AppColors.greyHint(brightness, shade: 400)),
                                 const SizedBox(height: 8),
-                                Text('未找到匹配的头像', style: TextStyle(color: Colors.grey.shade500)),
+                                Text('未找到匹配的头像', style: TextStyle(color: AppColors.greyHint(brightness, shade: 500))),
                               ],
                             ),
                           )
@@ -804,7 +821,7 @@ class _HomePageState extends State<HomePage> {
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(6),
                                     border: Border.all(
-                                      color: isSelected ? Colors.orange : Colors.grey.shade300,
+                                      color: isSelected ? AppColors.warningOrange(brightness) : AppColors.tableBorder(brightness),
                                       width: isSelected ? 3 : 1,
                                     ),
                                   ),
@@ -850,7 +867,7 @@ class _HomePageState extends State<HomePage> {
           Text(
             "请点击",
             style: TextStyle(
-              color: AppConstants.textPrimaryColor,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: screenWidth * 0.05,
               fontWeight: FontWeight.w700,
               letterSpacing: 1,
@@ -860,7 +877,7 @@ class _HomePageState extends State<HomePage> {
           Text(
             "刷新数据",
             style: TextStyle(
-              color: AppConstants.textPrimaryColor,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: screenWidth * 0.05,
               fontWeight: FontWeight.w700,
               letterSpacing: 1,
@@ -870,7 +887,7 @@ class _HomePageState extends State<HomePage> {
           Text(
             "刷新成绩",
             style: TextStyle(
-              color: AppConstants.textPrimaryColor,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: screenWidth * 0.05,
               fontWeight: FontWeight.w700,
               letterSpacing: 1,
@@ -888,7 +905,7 @@ class _HomePageState extends State<HomePage> {
           Text(
             _userNickname,
             style: TextStyle(
-              color: AppConstants.textPrimaryColor,
+              color: const Color(0xFF546161),
               fontSize: screenWidth * 0.07,
               fontWeight: FontWeight.w700,
               letterSpacing: 1,
@@ -901,7 +918,7 @@ class _HomePageState extends State<HomePage> {
           Text(
             "Rating",
             style: TextStyle(
-              color: AppConstants.textSecondaryColor,
+              color: const Color(0xFF546161),
               fontSize: screenWidth * 0.045,
               fontWeight: FontWeight.normal,
             ),
@@ -909,7 +926,7 @@ class _HomePageState extends State<HomePage> {
           Text(
             "$_best50TotalRA",
             style: TextStyle(
-              color: AppConstants.textSecondaryColor,
+              color: const Color(0xFF546161),
               fontSize: screenWidth * 0.07,
               fontWeight: FontWeight.w600,
               height: 0.8,
@@ -918,7 +935,7 @@ class _HomePageState extends State<HomePage> {
           Text(
             "$_best35TotalRA+$_best15TotalRA",
             style: TextStyle(
-              color: AppConstants.textSecondaryColor,
+              color: const Color(0xFF546161),
               fontSize: screenWidth * 0.04,
               fontWeight: FontWeight.w300,
             ),
@@ -949,6 +966,7 @@ class _HomePageState extends State<HomePage> {
 
   // 显示刷新数据对话框
   void _showRefreshDataDialog(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final TextEditingController qqController = TextEditingController(text: _cachedQQ);
     final TextEditingController authCodeController = TextEditingController();
     bool isRefreshing = false;
@@ -1074,7 +1092,7 @@ class _HomePageState extends State<HomePage> {
                           SizedBox(height: 8),
                           Text(
                             '授权后复制页面上显示的授权码，粘贴到下方输入框',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                            style: TextStyle(fontSize: 12, color: AppColors.greyHint(brightness)),
                           ),
                           SizedBox(height: 8),
                           TextField(
@@ -1127,11 +1145,12 @@ class _HomePageState extends State<HomePage> {
                       Column(
                         children: [
                           SizedBox(height: 16),
-                          CircularProgressIndicator(),
+                          CircularProgressIndicator(color: AppColors.linkBlue(brightness)),
                           SizedBox(height: 12),
                           LinearProgressIndicator(
                             value: progress / 100,
                             minHeight: 8,
+                            color: AppColors.linkBlue(brightness),
                           ),
                           SizedBox(height: 8),
                           Text(
@@ -1141,14 +1160,14 @@ class _HomePageState extends State<HomePage> {
                           SizedBox(height: 8),
                           Text(
                             '$progress%',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                            style: TextStyle(fontSize: 12, color: AppColors.greyHint(brightness)),
                             textAlign: TextAlign.center,
                           ),
                           SizedBox(height: 16),
                           // 随机加载提示
                           Text(
                             currentLoadingTip,
-                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            style: TextStyle(fontSize: 12, color: AppColors.greyHint(brightness, shade: 600)),
                             textAlign: TextAlign.center,
                           ),
                         ],
@@ -1168,6 +1187,15 @@ class _HomePageState extends State<HomePage> {
                 if (!isRefreshing)
                   TextButton(
                     onPressed: () async {
+                      final isOnline = await ConnectivityService().hasConnection();
+                      if (!isOnline) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('当前无网络连接，无法刷新数据。请联网后重试。'), duration: Duration(seconds: 3)),
+                          );
+                        }
+                        return;
+                      }
                       setState(() {
                         isRefreshing = true;
                         progress = 0;
@@ -1802,6 +1830,7 @@ class _HomePageState extends State<HomePage> {
 
   // 显示同步成绩对话框，返回 friendCode 表示同步成功
   Future<String?> _showSyncScoreDialog(BuildContext context) async {
+    final brightness = Theme.of(context).brightness;
     final TextEditingController qrController = TextEditingController();
     final TextEditingController dfUserController = TextEditingController();
     final TextEditingController dfPassController = TextEditingController();
@@ -1865,7 +1894,7 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   Icon(
                     needDivingFishToken ? Icons.link : Icons.qr_code_scanner,
-                    color: AppConstants.textPrimaryColor,
+                    color: Theme.of(context).colorScheme.onSurface,
                     size: 22,
                   ),
                   const SizedBox(width: 8),
@@ -1879,9 +1908,9 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     // ===== 阶段 1：输入 QR 码 =====
                     if (!isSyncing && !needDivingFishToken) ...[
-                      const Text(
+                      Text(
                         '在舞萌|中二公众号请求并打开二维码，扫描后将字符串粘贴到下方：',
-                        style: TextStyle(fontSize: 13, color: Colors.grey),
+                        style: TextStyle(fontSize: 13, color: AppColors.greyHint(brightness)),
                       ),
                       const SizedBox(height: 12),
                       TextField(
@@ -1889,7 +1918,7 @@ class _HomePageState extends State<HomePage> {
                         maxLines: 3,
                         decoration: InputDecoration(
                           hintText: 'SGWCMAID...',
-                          hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
+                          hintStyle: TextStyle(fontSize: 13, color: AppColors.greyHint(brightness, shade: 400)),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -1928,9 +1957,9 @@ class _HomePageState extends State<HomePage> {
 
                     // ===== 阶段 2：绑定水鱼账号 =====
                     if (needDivingFishToken) ...[
-                      const Text(
+                      Text(
                         '成绩已抓取成功！但要推送到水鱼，需要先绑定你的水鱼账号：',
-                        style: TextStyle(fontSize: 13, color: Colors.grey),
+                        style: TextStyle(fontSize: 13, color: AppColors.greyHint(brightness)),
                       ),
                       const SizedBox(height: 12),
                       TextField(
@@ -1965,7 +1994,7 @@ class _HomePageState extends State<HomePage> {
                         const SizedBox(height: 8),
                         Text(
                           bindingError!,
-                          style: const TextStyle(fontSize: 12, color: Colors.red),
+                          style: TextStyle(fontSize: 12, color: AppColors.errorRed(brightness)),
                         ),
                       ],
                     ],
@@ -1986,7 +2015,7 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                       const SizedBox(height: 8),
-                      Center(child: _buildStageIcon(currentStage)),
+                      Center(child: _buildStageIcon(currentStage, brightness)),
                       const SizedBox(height: 8),
                       Center(
                         child: Text(
@@ -1996,10 +2025,10 @@ class _HomePageState extends State<HomePage> {
                             fontSize: 14,
                             color: currentStage == SyncStage.failed ||
                                     currentStage == SyncStage.cancelled
-                                ? Colors.red
+                                ? AppColors.errorRed(brightness)
                                 : currentStage == SyncStage.completed
-                                    ? Colors.green
-                                    : AppConstants.textPrimaryColor,
+                                    ? AppColors.successGreen(brightness)
+                                    : Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                       ),
@@ -2008,16 +2037,16 @@ class _HomePageState extends State<HomePage> {
                           currentStage != SyncStage.cancelled) ...[
                         const SizedBox(height: 10),
                         if (progress != null)
-                          LinearProgressIndicator(value: progress)
+                          LinearProgressIndicator(value: progress, color: AppColors.linkBlue(brightness))
                         else
-                          const LinearProgressIndicator(),
+                          LinearProgressIndicator(color: AppColors.linkBlue(brightness)),
                       ],
                       if (currentStage == SyncStage.completed) ...[
                         const SizedBox(height: 8),
                         Center(
                           child: Text(
                             '成绩已同步！可前往水鱼查看',
-                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            style: TextStyle(fontSize: 12, color: AppColors.greyHint(brightness, shade: 600)),
                           ),
                         ),
                       ],
@@ -2068,7 +2097,7 @@ class _HomePageState extends State<HomePage> {
                         : const Icon(Icons.link, size: 18),
                     label: Text(isBinding ? '绑定中...' : '绑定并同步'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: AppColors.linkBlue(brightness),
                       foregroundColor: Colors.white,
                     ),
                     onPressed: isBinding
@@ -2155,7 +2184,7 @@ class _HomePageState extends State<HomePage> {
                     icon: const Icon(Icons.sync, size: 18),
                     label: const Text('开始同步'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: AppColors.linkBlue(brightness),
                       foregroundColor: Colors.white,
                     ),
                     onPressed: () async {
@@ -2288,6 +2317,7 @@ class _HomePageState extends State<HomePage> {
 
   // 显示水鱼登录对话框
   void _showDivingFishLoginDialog(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final TextEditingController userController = TextEditingController();
     final TextEditingController passController = TextEditingController();
     bool isLoggingIn = false;
@@ -2307,7 +2337,7 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   Icon(
                     loginSuccess ? Icons.check_circle : Icons.login,
-                    color: loginSuccess ? Colors.green : AppConstants.textPrimaryColor,
+                    color: loginSuccess ? AppColors.successGreen(brightness) : Theme.of(context).colorScheme.onSurface,
                     size: 22,
                   ),
                   const SizedBox(width: 8),
@@ -2320,9 +2350,9 @@ class _HomePageState extends State<HomePage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (!loginSuccess) ...[
-                      const Text(
+                      Text(
                         '输入你的 Diving-Fish 水鱼账号密码以获取 ImportToken：',
-                        style: TextStyle(fontSize: 13, color: Colors.grey),
+                        style: TextStyle(fontSize: 13, color: AppColors.greyHint(brightness)),
                       ),
                       const SizedBox(height: 12),
                       TextField(
@@ -2355,29 +2385,29 @@ class _HomePageState extends State<HomePage> {
                       ),
                       if (errorMsg != null) ...[
                         const SizedBox(height: 8),
-                        Text(errorMsg!, style: const TextStyle(fontSize: 12, color: Colors.red)),
+                        Text(errorMsg!, style: TextStyle(fontSize: 12, color: AppColors.errorRed(brightness))),
                       ],
                     ] else ...[
-                      const Icon(Icons.check_circle, color: Colors.green, size: 48),
+                      Icon(Icons.check_circle, color: AppColors.successGreen(brightness), size: 48),
                       const SizedBox(height: 12),
                       Text(
                         statusText.isNotEmpty ? statusText : '登录成功',
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
+                      Text(
                         'ImportToken 已获取并缓存',
-                        style: TextStyle(fontSize: 13, color: Colors.grey),
+                        style: TextStyle(fontSize: 13, color: AppColors.greyHint(brightness)),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Token: ${importedToken ?? "***"}',
-                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: 11, color: AppColors.greyHint(brightness, shade: 600)),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
+                      Text(
                         '现在可以使用"同步成绩"功能一键同步到水鱼了',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                        style: TextStyle(fontSize: 12, color: AppColors.greyHint(brightness)),
                       ),
                     ],
                   ],
@@ -2401,7 +2431,7 @@ class _HomePageState extends State<HomePage> {
                         : const Icon(Icons.login, size: 18),
                     label: Text(isLoggingIn ? '登录中...' : '登录'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: AppColors.linkBlue(brightness),
                       foregroundColor: Colors.white,
                     ),
                     onPressed: isLoggingIn
@@ -2450,8 +2480,47 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // 显示主题切换对话框
+  void _showThemeDialog() {
+    final currentMode = ThemeManager().themeMode;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: Text('选择主题模式', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildThemeOption(ctx, Icons.light_mode, '浅色模式', '始终使用浅色主题', ThemeMode.light, currentMode),
+            const Divider(),
+            _buildThemeOption(ctx, Icons.dark_mode, '深色模式', '始终使用深色主题', ThemeMode.dark, currentMode),
+            const Divider(),
+            _buildThemeOption(ctx, Icons.settings_suggest, '跟随系统', '根据系统设置自动切换', ThemeMode.system, currentMode),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('取消', style: TextStyle(color: Theme.of(context).colorScheme.onSurface))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThemeOption(BuildContext ctx, IconData icon, String title, String subtitle, ThemeMode mode, ThemeMode currentMode) {
+    final brightness = Theme.of(context).brightness;
+    final isSelected = currentMode == mode;
+    return ListTile(
+      leading: Icon(icon, color: isSelected ? AppColors.linkBlue(brightness) : Theme.of(context).colorScheme.onSurface),
+      title: Text(title, style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
+      subtitle: Text(subtitle, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+      trailing: isSelected ? Icon(Icons.check, color: AppColors.linkBlue(brightness)) : null,
+      selected: isSelected,
+      onTap: () { ThemeManager().setThemeMode(mode); Navigator.of(ctx).pop(); },
+    );
+  }
+
   // 显示账号管理对话框
   void _showAccountManageDialog(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -2481,7 +2550,7 @@ class _HomePageState extends State<HomePage> {
                       )
                     : errorMsg != null
                         ? Text(errorMsg,
-                            style: const TextStyle(color: Colors.red))
+                            style: TextStyle(color: AppColors.errorRed(brightness)))
                         : profile != null
                             ? _buildAccountInfo(profile, dialogContext)
                             : const Text('暂无数据'),
@@ -2519,6 +2588,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildAccountInfo(Map<String, dynamic> p, BuildContext dialogContext) {
+    final brightness = Theme.of(dialogContext).brightness;
     final importToken = p.tryGet<String>('import_token') ?? '无';
     final bindQQ = p.tryGet<String>('bind_qq') ?? '未绑定';
     final nickname = p.tryGet<String>('nickname') ?? '无';
@@ -2537,22 +2607,22 @@ class _HomePageState extends State<HomePage> {
     return StatefulBuilder(
       builder: (ctx, setState) {
         final rows = <Widget>[
-          _infoRow('用户名', username),
-          _infoRow('昵称', nickname),
-          _infoRow('牌子', plate.isNotEmpty ? plate : '无'),
-          _infoRow('Rating段位', _ratingName(additionalRating)),
-          _infoRow('绑定QQ', bindQQ),
-          _infoRow('频道ID', channelUid),
+          _infoRow('用户名', username, brightness),
+          _infoRow('昵称', nickname, brightness),
+          _infoRow('牌子', plate.isNotEmpty ? plate : '无', brightness),
+          _infoRow('Rating段位', _ratingName(additionalRating), brightness),
+          _infoRow('绑定QQ', bindQQ, brightness),
+          _infoRow('频道ID', channelUid, brightness),
           // ImportToken 行带操作按钮
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(
+                SizedBox(
                   width: 90,
                   child: Text('ImportToken',
-                      style: TextStyle(color: Colors.grey, fontSize: 13)),
+                      style: TextStyle(color: AppColors.greyHint(brightness), fontSize: 13)),
                 ),
                 Expanded(
                   child: Text(displayToken,
@@ -2608,7 +2678,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _infoRow(String label, String value) {
+  Widget _infoRow(String label, String value, Brightness brightness) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -2617,7 +2687,7 @@ class _HomePageState extends State<HomePage> {
           SizedBox(
             width: 90,
             child: Text(label,
-                style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                style: TextStyle(color: AppColors.greyHint(brightness), fontSize: 13)),
           ),
           Expanded(
             child: Text(value, style: const TextStyle(fontSize: 13)),
@@ -2667,19 +2737,19 @@ class _HomePageState extends State<HomePage> {
   }
 
   // 构建同步状态图标
-  Widget _buildStageIcon(SyncStage? stage) {
+  Widget _buildStageIcon(SyncStage? stage, Brightness brightness) {
     if (stage == null) return const SizedBox.shrink();
     switch (stage) {
       case SyncStage.completed:
-        return const Icon(Icons.check_circle, color: Colors.green, size: 36);
+        return Icon(Icons.check_circle, color: AppColors.successGreen(brightness), size: 36);
       case SyncStage.failed:
-        return const Icon(Icons.error, color: Colors.red, size: 36);
+        return Icon(Icons.error, color: AppColors.errorRed(brightness), size: 36);
       case SyncStage.cancelled:
-        return const Icon(Icons.cancel, color: Colors.grey, size: 36);
+        return Icon(Icons.cancel, color: AppColors.greyHint(brightness), size: 36);
       case SyncStage.waitingAcceptance:
-        return const Icon(Icons.hourglass_bottom, color: Colors.orange, size: 36);
+        return Icon(Icons.hourglass_bottom, color: AppColors.warningOrange(brightness), size: 36);
       default:
-        return const Icon(Icons.sync, color: Colors.blue, size: 36);
+        return Icon(Icons.sync, color: AppColors.linkBlue(brightness), size: 36);
     }
   }
 
@@ -2687,14 +2757,15 @@ class _HomePageState extends State<HomePage> {
   Widget _buildCustomButton(ButtonItem item, BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
+    final brightness = Theme.of(context).brightness;
+
     return SizedBox(
       height: screenHeight * 0.12,
       child: TextButton(
         style: TextButton.styleFrom(
           backgroundColor: Colors.transparent, // 按钮整体背景设为透明
-          side: const BorderSide(
-            color: AppConstants.buttonBorderColor,
+          side: BorderSide(
+            color: AppColors.buttonBorder(brightness),
             width: AppConstants.borderWidth,
           ),
           padding: EdgeInsets.zero, // 移除默认内边距
@@ -2955,7 +3026,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   ElevatedButton(
                     onPressed: () => Navigator.of(ctx).pop(true),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed(brightness)),
                     child: const Text('登出', style: TextStyle(color: Colors.white)),
                   ),
                 ],
@@ -3031,10 +3102,25 @@ class _HomePageState extends State<HomePage> {
               }
             });
           }
+          if (item.title == '定数分布'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const DifficultyDistributionPage()),
+            );
+          }
+          if (item.title == '深色模式'){
+            _showThemeDialog();
+          }
           if (item.title == '收藏夹'){
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const FavoriteFolderPage()),
+            );
+          }
+          if (item.title == '数据备份'){
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const DataBackupPage()),
             );
           }
         },
@@ -3044,7 +3130,7 @@ class _HomePageState extends State<HomePage> {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppConstants.buttonBackgroundColor,
+                  color: AppColors.buttonBackground(brightness),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(AppConstants.borderRadiusLarge),
                     topRight: Radius.circular(AppConstants.borderRadiusLarge),
@@ -3054,14 +3140,14 @@ class _HomePageState extends State<HomePage> {
                   child: Container(
                     width: screenWidth * 0.09, // 圆形背景的宽度
                     height: screenWidth * 0.09, // 圆形背景的高度
-                    decoration: const BoxDecoration(
-                      color: Colors.white, // 白色背景
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface, // 主题感知背景
                       shape: BoxShape.circle, // 圆形形状
                     ),
                     child: Center(
                       child: Icon(
                         item.icon,
-                        color: AppConstants.textPrimaryColor,
+                        color: Theme.of(context).colorScheme.onSurface,
                         size: screenWidth * 0.05, // 图标尺寸
                       ),
                     ),
@@ -3072,9 +3158,9 @@ class _HomePageState extends State<HomePage> {
             // 下半部分：白色背景，居中标题和副标题
             Expanded(
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: const BorderRadius.only(
                     bottomLeft: Radius.circular(AppConstants.borderRadiusLarge),
                     bottomRight: Radius.circular(AppConstants.borderRadiusLarge),
                   ),
@@ -3086,7 +3172,7 @@ class _HomePageState extends State<HomePage> {
                       Text(
                         item.title,
                         style: TextStyle(
-                          color: AppConstants.textPrimaryColor,
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontSize: screenWidth * 0.035,
                           fontWeight: FontWeight.bold,
                           fontStyle: FontStyle.normal,
@@ -3099,7 +3185,7 @@ class _HomePageState extends State<HomePage> {
                       Text(
                         item.subtitle,
                         style: TextStyle(
-                          color: AppConstants.textPrimaryColor.withValues(alpha: 0.8),
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                           fontSize: screenWidth * 0.025,
                           fontWeight: FontWeight.w300,
                         ),
@@ -3136,13 +3222,13 @@ class _HomePageState extends State<HomePage> {
               vertical: screenHeight * 0.004,
             ),
             decoration: BoxDecoration(
-              color: AppConstants.textPrimaryColor.withValues(alpha: 0.12),
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
             ),
             child: Text(
               category.name,
               style: TextStyle(
-                color: AppConstants.textPrimaryColor,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: screenWidth * 0.035,
                 fontWeight: FontWeight.w600,
               ),

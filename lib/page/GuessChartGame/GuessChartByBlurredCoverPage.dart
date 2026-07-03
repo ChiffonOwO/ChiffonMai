@@ -15,6 +15,7 @@ import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 
 class GuessChartByBlurredCoverPage extends StatefulWidget {
   const GuessChartByBlurredCoverPage({super.key});
@@ -377,7 +378,7 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+          border: Border(bottom: BorderSide(color: AppColors.tableBorder(Theme.of(context).brightness))),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -428,7 +429,7 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
                   // 作者
                   Text(
                     song.basicInfo.artist,
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -458,22 +459,16 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
-        ],
+        boxShadow: [AppColors.defaultShadow(Theme.of(context).brightness)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '猜测 #${index + 1}',
-            style: const TextStyle(fontSize: 14, color: Colors.grey),
+            style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 12),
 
@@ -819,6 +814,7 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        final brightness = Theme.of(context).brightness;
         return AlertDialog(
           title: const Text('设置'),
           contentPadding: EdgeInsets.all(8.0), // 减小对话框内边距
@@ -892,7 +888,7 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: Color.fromARGB(255, 84, 97, 97),
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                           SizedBox(height: 20),
@@ -943,7 +939,7 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Text(
                           '没有找到符合条件的乐曲！请检查设置！',
-                          style: TextStyle(color: Colors.red, fontSize: 14),
+                          style: TextStyle(color: AppColors.errorRed(Theme.of(context).brightness), fontSize: 14),
                         ),
                       ),
                   ],
@@ -1060,10 +1056,10 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
                       );
                     }
                   },
-                  child: const Text(
+                  child: Text(
                     'https://maimai.yukineko2233.top/',
                     style: TextStyle(
-                      color: Colors.blue,
+                      color: AppColors.linkBlue(Theme.of(context).brightness),
                       decoration: TextDecoration.underline,
                     ),
                   ),
@@ -1125,18 +1121,14 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
     // 自定义常量
-    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
     final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = BoxShadow(
-      color: Colors.black12,
-      blurRadius: 5.0,
-      offset: Offset(2.0, 2.0),
-    );
+    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -1157,7 +1149,7 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -1168,7 +1160,7 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
                         child: Text(
                           '猜歌（模糊曲绘）',
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1186,7 +1178,7 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
                     boxShadow: [defaultShadow],
                   ),
@@ -1219,7 +1211,7 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
                                               Container(
                                                 padding: const EdgeInsets.all(16),
                                                 decoration: BoxDecoration(
-                                              color: Colors.blue[50],
+                                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                               borderRadius:
                                                   BorderRadius.circular(8),
                                             ),
@@ -1255,14 +1247,14 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
                                                               '今日统计: 正确${_stats['correct']} | 错误${_stats['wrong']}',
                                                               style: TextStyle(
                                                                   fontSize: screenWidth * 0.04,
-                                                                  color: Colors.black
+                                                                  color: Theme.of(context).colorScheme.onSurface
                                                               ),
                                                             ),
                                                             Text(
                                                               '正确率${_stats['accuracy'].toStringAsFixed(1)}% | 平均用时${_stats['avgTime'].toStringAsFixed(1)}秒',
                                                               style: TextStyle(
                                                                   fontSize: screenWidth * 0.04,
-                                                                  color: Colors.black
+                                                                  color: Theme.of(context).colorScheme.onSurface
                                                               ),
                                                             ),
                                                           ],
@@ -1271,9 +1263,9 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
                                                       const SizedBox(width: 4),
                                                       IconButton(
                                                         padding: EdgeInsets.zero,
-                                                        icon: const Icon(
+                                                        icon: Icon(
                                                             Icons.refresh,
-                                                            color: Color.fromARGB(255, 84, 97, 97),
+                                                            color: Theme.of(context).colorScheme.onSurface,
                                                             size: 20),
                                                         onPressed: () async {
                                                           await _resetAndRefreshStats();
@@ -1352,7 +1344,7 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
                                                     borderRadius:
                                                         BorderRadius.circular(8),
                                                     border: Border.all(
-                                                        color: Colors.grey[300]!),
+                                                        color: AppColors.tableBorder(brightness)),
                                                   ),
                                                   child: TextField(
                                                     controller: _searchController,
@@ -1371,15 +1363,9 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
                                                   Container(
                                                     decoration: BoxDecoration(
                                                       borderRadius: BorderRadius.circular(8),
-                                                      border: Border.all(color: Colors.grey[300]!),
-                                                      color: Colors.white,
-                                                      boxShadow: [
-                                                        BoxShadow(
-                                                          color: Colors.black.withOpacity(0.2),
-                                                          blurRadius: 10,
-                                                          offset: Offset(0, 5),
-                                                        ),
-                                                      ],
+                                                      border: Border.all(color: AppColors.tableBorder(brightness)),
+                                                      color: Theme.of(context).colorScheme.surface,
+                                                      boxShadow: [AppColors.defaultShadow(brightness)],
                                                     ),
                                                     constraints: BoxConstraints(maxHeight: screenHeight * 0.3),
                                                     child: ListView.builder(
@@ -1415,29 +1401,26 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
                                               children: [
                                                 // 规则按钮
                                                 IconButton(
-                                                  icon: const Icon(
+                                                  icon: Icon(
                                                       Icons.info_outline,
-                                                      color: Color.fromARGB(
-                                                          255, 84, 97, 97),
+                                                      color: Theme.of(context).colorScheme.onSurface,
                                                       size: 24),
                                                   onPressed: _showRulesDialog,
                                                 ),
                                                 const SizedBox(width: 8),
                                                 // 设置按钮
                                                 IconButton(
-                                                  icon: const Icon(
+                                                  icon: Icon(
                                                       Icons.settings,
-                                                      color: Color.fromARGB(
-                                                          255, 84, 97, 97),
+                                                      color: Theme.of(context).colorScheme.onSurface,
                                                       size: 24),
                                                   onPressed: _showSettingsDialog,
                                                 ),
                                                 const SizedBox(width: 8),
                                                 // 刷新按钮
                                                 IconButton(
-                                                  icon: const Icon(Icons.refresh,
-                                                      color: Color.fromARGB(
-                                                          255, 84, 97, 97),
+                                                  icon: Icon(Icons.refresh,
+                                                      color: Theme.of(context).colorScheme.onSurface,
                                                       size: 24),
                                                   onPressed: _startNewGame,
                                                 ),
@@ -1449,8 +1432,7 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
                                                         ? Icons.sort_by_alpha
                                                         : Icons
                                                             .sort_by_alpha_outlined,
-                                                    color: Color.fromARGB(
-                                                        255, 84, 97, 97),
+                                                    color: Theme.of(context).colorScheme.onSurface,
                                                     size: 24,
                                                   ),
                                                   onPressed: () {
@@ -1581,7 +1563,7 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
                                                                   '${_targetSong!.basicInfo.artist} | ${_targetSong!.basicInfo.genre}',
                                                                   style: TextStyle(
                                                                     fontSize: screenWidth * 0.03,
-                                                                    color: Colors.grey,
+                                                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                                                                   ),
                                                                   overflow: TextOverflow.ellipsis,
                                                                 ),
@@ -1590,7 +1572,7 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
                                                                 '${_targetSong!.ds.length > 3 ? _targetSong!.ds[3].toString() : '-'} | ${_targetSong!.ds.length > 4 ? _targetSong!.ds[4].toString() : '-'} | ${StringUtil.formatVersion2(_targetSong!.basicInfo.from)}',
                                                                 style: TextStyle(
                                                                   fontSize: screenWidth * 0.03,
-                                                                  color: Colors.grey,
+                                                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                                                                 ),
                                                                 overflow: TextOverflow.ellipsis,
                                                               ),

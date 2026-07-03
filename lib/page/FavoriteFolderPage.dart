@@ -6,8 +6,12 @@ import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.d
 import 'package:my_first_flutter_app/service/FavoriteFolderService.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/UserPlayDataEntity.dart';
 import 'package:my_first_flutter_app/entity/DXRating/MaiTagsEntity.dart';
 import 'SongInfoPage.dart';
 
@@ -25,14 +29,7 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
   bool _isLoading = true;
 
   // 样式常量
-  final Color textPrimaryColor = const Color.fromARGB(255, 84, 97, 97);
   final double borderRadiusSmall = 8.0;
-  final BoxShadow defaultShadow = BoxShadow(
-    color: Colors.grey.withOpacity(0.5),
-    spreadRadius: 2,
-    blurRadius: 5,
-    offset: const Offset(0, 3),
-  );
 
   @override
   void initState() {
@@ -213,7 +210,7 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     // 标题
@@ -222,7 +219,7 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
                         child: Text(
                           '收藏夹',
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -240,9 +237,9 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
                 child: Container(
                   margin: const EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
+                    boxShadow: [AppConstants.defaultShadow(Theme.of(context).brightness)],
                   ),
                   child: Column(
                     children: [
@@ -256,7 +253,7 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
                             icon: const Icon(Icons.add, size: 20),
                             label: const Text('新建收藏夹'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color.fromARGB(255, 84, 97, 97),
+                              backgroundColor: Theme.of(context).colorScheme.onSurface,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
@@ -290,16 +287,16 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.favorite_border, size: 80, color: Colors.grey.shade400),
+          Icon(Icons.favorite_border, size: 80, color: AppColors.greyHint(Theme.of(context).brightness)),
           const SizedBox(height: 16),
           Text(
             '还没有收藏夹',
-            style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 8),
           Text(
             '在乐曲详情页中可以将谱面收藏到收藏夹',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+            style: TextStyle(fontSize: 14, color: AppColors.greyHint(Theme.of(context).brightness)),
           ),
         ],
       ),
@@ -357,13 +354,13 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
                     const SizedBox(height: 4),
                     Text(
                       '$chartCount 个谱面',
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                      style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),
               ),
               PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
+                icon: Icon(Icons.more_vert, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 onSelected: (value) {
                   switch (value) {
                     case 'rename':
@@ -416,15 +413,13 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
   Map<String, Map<String, int>> _tagStats = {};
   bool _isLoadingTags = false;
 
+  // 排序与批量选择
+  FavoriteSortOption _sortOption = FavoriteSortOption.byDsDesc;
+  bool _isBatchMode = false;
+  final Set<String> _selectedKeys = {};
+
   // 样式常量
-  final Color textPrimaryColor = const Color.fromARGB(255, 84, 97, 97);
   final double borderRadiusSmall = 8.0;
-  final BoxShadow defaultShadow = BoxShadow(
-    color: Colors.grey.withOpacity(0.5),
-    spreadRadius: 2,
-    blurRadius: 5,
-    offset: const Offset(0, 3),
-  );
 
   @override
   void initState() {
@@ -452,6 +447,40 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
     }
     // 加载标签统计数据
     await _loadTagDataAndCalculateStats();
+    // 加载用户游玩数据以显示达成率
+    await _loadAchievements();
+  }
+
+  /// 加载用户游玩数据并将达成率关联到收藏夹谱面
+  Future<void> _loadAchievements() async {
+    try {
+      final rawData = await UserPlayDataManager().getCachedUserPlayData();
+      if (rawData == null) return;
+
+      final userData = UserPlayDataEntity.fromJson(rawData);
+      final records = userData.records;
+      bool hasChanges = false;
+      for (int i = 0; i < _charts.length; i++) {
+        final chart = _charts[i];
+        final matchedRecords = records.where((r) =>
+            r.songId.toString() == chart.songId &&
+            r.levelIndex == chart.levelIndex);
+        if (matchedRecords.isNotEmpty) {
+          final best = matchedRecords.reduce((a, b) =>
+              a.achievements > b.achievements ? a : b);
+          _charts[i] = chart.copyWith(
+            achievement: best.achievements.toDouble(),
+            playCount: matchedRecords.length,
+          );
+          hasChanges = true;
+        }
+      }
+      if (hasChanges && mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      debugPrint('加载收藏夹成绩数据失败: $e');
+    }
   }
 
   /// 从收藏夹中移除谱面
@@ -506,11 +535,11 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
               // 标题栏
               Container(
                 padding: const EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
+                child: _isBatchMode ? _buildBatchAppBar() : Row(
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     // 标题
@@ -519,15 +548,49 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
                         child: Text(
                           widget.folderName,
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                     ),
-                    // 占位，保持标题居中
-                    SizedBox(width: 48),
+                    // 排序按钮
+                    PopupMenuButton<FavoriteSortOption>(
+                      icon: Icon(Icons.sort, color: Theme.of(context).colorScheme.onSurface, size: 22),
+                      tooltip: '排序方式',
+                      onSelected: (option) {
+                        setState(() => _sortOption = option);
+                      },
+                      itemBuilder: (ctx) => [
+                        const PopupMenuItem(
+                          value: FavoriteSortOption.byDsDesc,
+                          child: Text('按定数 (高→低)'),
+                        ),
+                        const PopupMenuItem(
+                          value: FavoriteSortOption.byDsAsc,
+                          child: Text('按定数 (低→高)'),
+                        ),
+                        const PopupMenuItem(
+                          value: FavoriteSortOption.byDateNewest,
+                          child: Text('按添加时间 (新→旧)'),
+                        ),
+                        const PopupMenuItem(
+                          value: FavoriteSortOption.byDateOldest,
+                          child: Text('按添加时间 (旧→新)'),
+                        ),
+                        const PopupMenuItem(
+                          value: FavoriteSortOption.byTitle,
+                          child: Text('按歌曲名 (A-Z)'),
+                        ),
+                      ],
+                    ),
+                    // 导出按钮
+                    IconButton(
+                      icon: Icon(Icons.share, color: Theme.of(context).colorScheme.onSurface, size: 22),
+                      tooltip: '导出收藏夹',
+                      onPressed: _exportFolder,
+                    ),
                   ],
                 ),
               ),
@@ -537,9 +600,9 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
                 child: Container(
                   margin: const EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
+                    boxShadow: [AppConstants.defaultShadow(Theme.of(context).brightness)],
                   ),
                   child: Column(
                     children: [
@@ -553,7 +616,7 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
                             icon: const Icon(Icons.label_outline, size: 18),
                             label: const Text('标签统计'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color.fromARGB(255, 84, 97, 97),
+                              backgroundColor: Theme.of(context).colorScheme.onSurface,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               shape: RoundedRectangleBorder(
@@ -604,9 +667,9 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
         scrollable: true,
         title: Row(
           children: [
-            Icon(Icons.label, size: 22, color: textPrimaryColor),
+            Icon(Icons.label, size: 22, color: Theme.of(context).colorScheme.onSurface),
             const SizedBox(width: 8),
-            Text('标签统计', style: TextStyle(fontWeight: FontWeight.bold, color: textPrimaryColor)),
+            Text('标签统计', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface)),
           ],
         ),
         content: Container(
@@ -654,7 +717,7 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
                                   const SizedBox(width: 8),
                                   Text(
                                     '共 $total 项',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                                    style: TextStyle(fontSize: 12, color: AppColors.greyHint(Theme.of(context).brightness)),
                                   ),
                                 ],
                               ),
@@ -684,7 +747,7 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
                                         child: LinearProgressIndicator(
                                           value: tagEntry.value / _charts.length,
                                           minHeight: 18,
-                                          backgroundColor: Colors.grey.shade200,
+                                          backgroundColor: Theme.of(context).colorScheme.surface,
                                           valueColor: AlwaysStoppedAnimation<Color>(barColor),
                                         ),
                                       ),
@@ -698,7 +761,7 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
                                         style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w600,
-                                          color: textPrimaryColor,
+                                          color: Theme.of(context).colorScheme.onSurface,
                                         ),
                                       ),
                                     ),
@@ -833,11 +896,11 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.favorite_border, size: 80, color: Colors.grey.shade400),
+          Icon(Icons.favorite_border, size: 80, color: AppColors.greyHint(Theme.of(context).brightness)),
           const SizedBox(height: 16),
           Text(
             '收藏夹为空',
-            style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -845,17 +908,19 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
   }
 
   Widget _buildChartList() {
+    final sortedCharts = _service.sortCharts(_charts, _sortOption);
     return ListView.builder(
       padding: const EdgeInsets.all(12),
-      itemCount: _charts.length,
+      itemCount: sortedCharts.length,
       itemBuilder: (context, index) {
-        final chart = _charts[index];
+        final chart = sortedCharts[index];
         return _buildChartCard(chart);
       },
     );
   }
 
   Widget _buildTypeTag(String type, String songId) {
+    final brightness = Theme.of(context).brightness;
     final isUtage = songId.length == 6;
     if (isUtage) {
       return const Text(
@@ -867,21 +932,21 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
         ),
       );
     } else if (type == 'DX') {
-      return const Text(
+      return Text(
         'DX',
         style: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w600,
-          color: Colors.orange,
+          color: AppColors.warningOrange(brightness),
         ),
       );
     } else {
-      return const Text(
+      return Text(
         'ST',
         style: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w600,
-          color: Colors.blue,
+          color: AppColors.linkBlue(brightness),
         ),
       );
     }
@@ -917,8 +982,8 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
           textColor = Colors.purple.shade300;
           break;
         default:
-          bgColor = Colors.grey.shade100;
-          textColor = Colors.grey.shade700;
+          bgColor = Theme.of(context).colorScheme.surface;
+          textColor = Theme.of(context).colorScheme.onSurfaceVariant;
       }
     }
 
@@ -964,33 +1029,78 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
     final version = StringUtil.formatVersion2(song?.basicInfo.from ?? '');
     final songType = chart.songType.isNotEmpty ? chart.songType : (song?.type ?? '');
 
+    final isSelected = _selectedKeys.contains(chart.uniqueKey);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      color: isSelected ? Colors.blue.shade50 : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: isSelected
+            ? BorderSide(color: Colors.blue.shade300, width: 1.5)
+            : BorderSide.none,
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
         onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => SongInfoPage(
-                songId: chart.songId,
-                initialLevelIndex: chart.levelIndex,
-                isDefaultLevelIndex: false,
+          if (_isBatchMode) {
+            setState(() {
+              if (isSelected) {
+                _selectedKeys.remove(chart.uniqueKey);
+                if (_selectedKeys.isEmpty) _isBatchMode = false;
+              } else {
+                _selectedKeys.add(chart.uniqueKey);
+              }
+            });
+          } else {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => SongInfoPage(
+                  songId: chart.songId,
+                  initialLevelIndex: chart.levelIndex,
+                  isDefaultLevelIndex: false,
+                ),
               ),
-            ),
-          );
+            );
+          }
+        },
+        onLongPress: () {
+          if (!_isBatchMode) {
+            setState(() {
+              _isBatchMode = true;
+              _selectedKeys.add(chart.uniqueKey);
+            });
+          }
         },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
+              // 批量选择模式下显示复选框
+              if (_isBatchMode) ...[
+                Checkbox(
+                  value: isSelected,
+                  activeColor: Colors.blue,
+                  onChanged: (value) {
+                    setState(() {
+                      if (value == true) {
+                        _selectedKeys.add(chart.uniqueKey);
+                      } else {
+                        _selectedKeys.remove(chart.uniqueKey);
+                        if (_selectedKeys.isEmpty) _isBatchMode = false;
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(width: 4),
+              ],
               // 左侧：曲绘
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: CoverUtil.buildCoverWidget(chart.songId, 60),
               ),
               const SizedBox(width: 12),
-              // 右侧：三行信息
+              // 右侧：信息
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1017,12 +1127,12 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
                     // 第二行：难度标签
                     _buildDifficultyTag(levelName, chart.levelIndex, chart.songId),
                     const SizedBox(height: 4),
-                    // 第三行：定数 | 版本 | 流派
+                    // 第三行：定数 | 达成率 | 版本 | 流派
                     Text(
-                      '${chart.ds.toStringAsFixed(1)} | $version | $genre',
+                      _buildChartInfoLine(chart, version, genre),
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey.shade500,
+                        color: AppColors.greyHint(Theme.of(context).brightness),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1031,16 +1141,184 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
                 ),
               ),
               const SizedBox(width: 4),
-              // 移除按钮
-              IconButton(
-                icon: Icon(Icons.remove_circle_outline, color: Colors.red.shade300),
-                tooltip: '从收藏夹移除',
-                onPressed: () => _removeChart(chart),
-              ),
+              // 非批量模式下显示移除按钮
+              if (!_isBatchMode)
+                IconButton(
+                  icon: Icon(Icons.remove_circle_outline, color: Colors.red.shade300),
+                  tooltip: '从收藏夹移除',
+                  onPressed: () => _removeChart(chart),
+                ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  /// 构建卡片第三行：定数 | [达成率] | 版本 | 流派
+  String _buildChartInfoLine(FavoriteChart chart, String version, String genre) {
+    final ds = chart.ds.toStringAsFixed(1);
+    if (chart.achievement != null) {
+      return '$ds | ${chart.achievement!.toStringAsFixed(1)}% | $version | $genre';
+    }
+    return '$ds | $version | $genre';
+  }
+
+  /// 批量操作工具栏
+  Widget _buildBatchAppBar() {
+    return Row(
+      children: [
+        TextButton(
+          onPressed: () {
+            setState(() {
+              _isBatchMode = false;
+              _selectedKeys.clear();
+            });
+          },
+          child: const Text('取消'),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '已选 ${_selectedKeys.length} 项',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const Spacer(),
+        TextButton.icon(
+          onPressed: _selectedKeys.isEmpty ? null : _batchMoveCharts,
+          icon: const Icon(Icons.drive_file_move, size: 18),
+          label: const Text('移动'),
+        ),
+        TextButton.icon(
+          onPressed: _selectedKeys.isEmpty ? null : _batchRemoveCharts,
+          icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+          label: const Text('删除', style: TextStyle(color: Colors.red)),
+        ),
+      ],
+    );
+  }
+
+  /// 批量移除选中的谱面
+  Future<void> _batchRemoveCharts() async {
+    final count = _selectedKeys.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('批量移除谱面'),
+        content: Text('确定要从「${widget.folderName}」中移除 $count 个谱面吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('移除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _service.removeChartsFromFolder(
+          widget.folderId, _selectedKeys.toList());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('已移除 $count 个谱面')),
+        );
+      }
+      _selectedKeys.clear();
+      _isBatchMode = false;
+      await _loadData();
+    }
+  }
+
+  /// 批量移动选中的谱面到其他文件夹
+  Future<void> _batchMoveCharts() async {
+    final allFolders = await _service.getFolders();
+    final otherFolders =
+        allFolders.where((f) => f.id != widget.folderId).toList();
+    if (otherFolders.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('没有其他收藏夹可移动')),
+        );
+      }
+      return;
+    }
+
+    final targetId = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('移动到...'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: otherFolders.length,
+            itemBuilder: (_, i) => ListTile(
+              title: Text(otherFolders[i].name),
+              subtitle: Text('${otherFolders[i].charts.length} 个谱面'),
+              onTap: () => Navigator.of(ctx).pop(otherFolders[i].id),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+
+    if (targetId != null) {
+      final count = await _service.moveChartsBetweenFolders(
+          widget.folderId, targetId, _selectedKeys.toList());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('已移动 $count 个谱面')),
+        );
+      }
+      _selectedKeys.clear();
+      _isBatchMode = false;
+      await _loadData();
+    }
+  }
+
+  /// 导出收藏夹为文本列表
+  Future<void> _exportFolder() async {
+    try {
+      final sortedCharts = _service.sortCharts(_charts, _sortOption);
+      final buffer = StringBuffer();
+      buffer.writeln('${widget.folderName}');
+      buffer.writeln('共 ${sortedCharts.length} 个谱面');
+      buffer.writeln('---');
+      for (final chart in sortedCharts) {
+        final song = _songMap[chart.songId];
+        final version = StringUtil.formatVersion2(song?.basicInfo.from ?? '');
+        buffer.writeln(
+            '${chart.songTitle} | ${chart.ds.toStringAsFixed(1)} | $version | ${chart.level}');
+      }
+      buffer.writeln('---');
+      buffer.writeln('由 ChiffonMai 导出');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('已导出「${widget.folderName}」的谱面列表'),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('导出收藏夹失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('导出失败')),
+        );
+      }
+    }
   }
 }

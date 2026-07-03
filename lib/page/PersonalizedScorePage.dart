@@ -12,6 +12,8 @@ import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/AppConstants.dart';
 
 class PersonalizedScorePage extends StatefulWidget {
   const PersonalizedScorePage({super.key});
@@ -265,6 +267,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     // 初始化尺寸参数
     final screenWidth = MediaQuery.of(context).size.width;
     _scaleFactor = screenWidth / 375.0;
@@ -297,7 +300,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: Color.fromARGB(255, 84, 97, 97)),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -308,7 +311,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                         child: Text(
                           '个性化成绩查询',
                           style: TextStyle(
-                            color: Color.fromARGB(255, 84, 97, 97),
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -326,14 +329,10 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(_borderRadiusSmall),
                     boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 5.0 * _scaleFactor,
-                        offset: Offset(2.0 * _scaleFactor, 2.0 * _scaleFactor),
-                      ),
+                      AppConstants.defaultShadow(brightness),
                     ],
                   ),
                   child: _isLoading
@@ -352,7 +351,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue,
+                                    backgroundColor: AppColors.linkBlue(brightness),
                                     foregroundColor: Colors.white,
                                     padding: EdgeInsets.symmetric(vertical: _paddingS),
                                     shape: RoundedRectangleBorder(
@@ -402,14 +401,14 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
           style: TextStyle(
             fontSize: _textSizeM,
             fontWeight: FontWeight.bold,
-            color: Colors.grey[700]!,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         SizedBox(height: _paddingXS),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey[100]!,
-            foregroundColor: Colors.grey[700]!,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
             minimumSize: Size(double.infinity, 40 * _scaleFactor),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -430,14 +429,14 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
           style: TextStyle(
             fontSize: _textSizeM,
             fontWeight: FontWeight.bold,
-            color: Colors.grey[700]!,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         SizedBox(height: _paddingXS),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey[100]!,
-            foregroundColor: Colors.grey[700]!,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
             minimumSize: Size(double.infinity, 40 * _scaleFactor),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -460,7 +459,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
           style: TextStyle(
             fontSize: _textSizeM,
             fontWeight: FontWeight.bold,
-            color: Colors.grey[700]!,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         SizedBox(height: _paddingXS),
@@ -471,11 +470,11 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
             return ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: _selectedTitleType == type
-                    ? Colors.blue
-                    : Colors.grey[100]!,
+                    ? AppColors.linkBlue(Theme.of(context).brightness)
+                    : Theme.of(context).colorScheme.surface,
                 foregroundColor: _selectedTitleType == type
                     ? Colors.white
-                    : Colors.grey[700]!,
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
                 minimumSize: Size(64 * _scaleFactor, 40 * _scaleFactor),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -504,7 +503,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
           style: TextStyle(
             fontSize: _textSizeM,
             fontWeight: FontWeight.bold,
-            color: Colors.grey[700]!,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         SizedBox(height: _paddingXS),
@@ -516,10 +515,10 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: _selectedDifficulty == diff
                     ? _getDifficultyColor(diff)
-                    : Colors.grey[100]!,
+                    : Theme.of(context).colorScheme.surface,
                 foregroundColor: _selectedDifficulty == diff
                     ? Colors.white
-                    : Colors.grey[700]!,
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
                 minimumSize: Size(80 * _scaleFactor, 40 * _scaleFactor),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -695,8 +694,8 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _selectedLevel == level
-                          ? Colors.blue
-                          : Colors.grey[100]!,
+                          ? AppColors.linkBlue(Theme.of(context).brightness)
+                          : Theme.of(context).colorScheme.surface,
                       alignment: Alignment.center,
                       padding: EdgeInsets.all(4),
                       minimumSize: Size(50, 40),
@@ -719,7 +718,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: _selectedLevel == level ? Colors.white : Colors.grey[700],
+                          color: _selectedLevel == level ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -747,7 +746,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
           _mode == 'level' ? '当前等级没有匹配的歌曲' : '当前谱师没有匹配的歌曲',
           style: TextStyle(
             fontSize: _textSizeM,
-            color: Colors.grey[500]!,
+            color: AppColors.greyHint(Theme.of(context).brightness),
           ),
         ),
       );
@@ -799,8 +798,8 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: Colors.grey[200]!,
-            border: Border.all(color: Colors.black, width: 1),
+            color: Theme.of(context).colorScheme.surface,
+            border: Border.all(color: AppColors.tableBorder(Theme.of(context).brightness), width: 1),
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
           ),
           padding: EdgeInsets.symmetric(vertical: _paddingXS, horizontal: _paddingM),
@@ -810,7 +809,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: _textSizeM,
-              color: Colors.black,
+              color: Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -864,10 +863,10 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                 },
                 child: Container(
                   decoration: BoxDecoration(
-                    color: isCompleted ? Colors.lightGreen[100]! : Colors.grey[100]!,
+                    color: isCompleted ? Colors.lightGreen[100]! : Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(_borderRadiusSmall),
                     border: Border.all(
-                      color: isCompleted ? Colors.green : Colors.grey[300]!,
+                      color: isCompleted ? Colors.green : AppColors.tableBorder(Theme.of(context).brightness),
                       width: 1,
                     ),
                   ),
@@ -897,6 +896,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                               style: TextStyle(
                                 fontSize: _textSizeS,
                                 fontWeight: FontWeight.w500,
+                                color: isCompleted ? Colors.black87 : null,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -906,7 +906,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                               '${StringUtil.formatSongType(songType)} / ${songDs.isNotEmpty ? songDs : '-'}',
                               style: TextStyle(
                                 fontSize: _textSizeXS,
-                                color: Colors.grey[600]!,
+                                color: isCompleted ? Colors.black54 : Theme.of(context).colorScheme.onSurfaceVariant,
                               ),
                             ),
                             SizedBox(height: 2),
@@ -988,7 +988,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.black, width: 1.0),
+            border: Border.all(color: AppColors.tableBorder(Theme.of(context).brightness), width: 1.0),
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
           ),
           padding: EdgeInsets.all(_paddingM),
@@ -1001,7 +1001,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                 style: TextStyle(
                   fontSize: _textSizeL,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               SizedBox(height: _paddingS),
@@ -1016,7 +1016,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                           '总歌曲数',
                           style: TextStyle(
                             fontSize: _textSizeM,
-                            color: Colors.black,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         Text(
@@ -1024,7 +1024,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                           style: TextStyle(
                             fontSize: _textSizeL,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                       ],
@@ -1038,7 +1038,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                           '已完成',
                           style: TextStyle(
                             fontSize: _textSizeM,
-                            color: Colors.black,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         Text(
@@ -1046,7 +1046,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                           style: TextStyle(
                             fontSize: _textSizeL,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                       ],
@@ -1060,7 +1060,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                           '未完成',
                           style: TextStyle(
                             fontSize: _textSizeM,
-                            color: Colors.black,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         Text(
@@ -1068,7 +1068,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                           style: TextStyle(
                             fontSize: _textSizeL,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                       ],
@@ -1082,7 +1082,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                           '完成率',
                           style: TextStyle(
                             fontSize: _textSizeM,
-                            color: Colors.black,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         Text(
@@ -1090,7 +1090,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                           style: TextStyle(
                             fontSize: _textSizeL,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                       ],
@@ -1104,7 +1104,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                           '平均达成率',
                           style: TextStyle(
                             fontSize: _textSizeM,
-                            color: Colors.black,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         Text(
@@ -1112,7 +1112,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                           style: TextStyle(
                             fontSize: _textSizeL,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                       ],
@@ -1134,8 +1134,8 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
               // 过滤按钮
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey[200]!,
-                  foregroundColor: Colors.black,
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  foregroundColor: Theme.of(context).colorScheme.onSurface,
                   minimumSize: Size(100 * _scaleFactor, 36 * _scaleFactor),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -1162,8 +1162,8 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
               // 曲绘/列表切换按钮
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey[200]!,
-                  foregroundColor: Colors.black,
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  foregroundColor: Theme.of(context).colorScheme.onSurface,
                   minimumSize: Size(100 * _scaleFactor, 36 * _scaleFactor),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -1192,7 +1192,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
               _filterMode == 'completed' ? '暂无已完成歌曲' : _filterMode == 'uncompleted' ? '暂无未完成歌曲' : (_mode == 'level' ? '当前等级没有匹配的歌曲' : '当前谱师没有匹配的歌曲'),
               style: TextStyle(
                 fontSize: _textSizeM,
-                color: Colors.grey[500]!,
+                color: AppColors.greyHint(Theme.of(context).brightness),
               ),
             ),
           ) :
@@ -1241,8 +1241,8 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: Colors.grey[200]!,
-            border: Border.all(color: Colors.black, width: 1),
+            color: Theme.of(context).colorScheme.surface,
+            border: Border.all(color: AppColors.tableBorder(Theme.of(context).brightness), width: 1),
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
           ),
           padding: EdgeInsets.symmetric(vertical: _paddingXS, horizontal: _paddingM),
@@ -1252,7 +1252,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: _textSizeM,
-              color: Colors.black,
+              color: Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -1462,7 +1462,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                     SizedBox(height: 12.0),
                     Text(
                       _currentLoadingTip,
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                       textAlign: TextAlign.center,
                     ),
                   ],

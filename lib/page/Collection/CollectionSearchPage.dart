@@ -5,6 +5,8 @@ import '../../entity/LuoXue/Collection.dart';
 import '../../manager/LuoXue/CollectionsManager.dart';
 import '../../utils/CommonWidgetUtil.dart';
 import '../../utils/CollectionsImageUtil.dart';
+import '../../utils/AppTheme.dart';
+import '../../utils/AppConstants.dart';
 import 'CollectionInfoPage.dart';
 
 class CollectionSearchPage extends StatefulWidget {
@@ -24,16 +26,8 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
   Timer? _debounceTimer;
   
   // 自定义常量
-  final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
   final Color themeColor = Colors.blue;
   final double borderRadiusSmall = 8.0;
-  final BoxShadow defaultShadow = BoxShadow(
-    color: Colors.grey.withOpacity(0.5),
-    spreadRadius: 2,
-    blurRadius: 5,
-    offset: Offset(0, 3),
-  );
-
   // 收藏品类型选项
   final List<Map<String, String>> _typeOptions = [
     {'value': 'trophies', 'label': '称号'},
@@ -146,6 +140,7 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
 
     // 按钮相关配置
@@ -171,7 +166,7 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -182,7 +177,7 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
                         child: Text(
                           '收藏品搜索',
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -191,7 +186,7 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
                     ),
                     // 清除缓存按钮
                     IconButton(
-                      icon: Icon(Icons.refresh, color: textPrimaryColor),
+                      icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: _clearCache,
                       tooltip: '清除缓存并重新加载',
                     ),
@@ -204,9 +199,9 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
+                    boxShadow: [AppConstants.defaultShadow(brightness)],
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -243,10 +238,10 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _selectedType == option['value'] 
                                         ? themeColor 
-                                        : Colors.grey[200],
+                                        : Theme.of(context).colorScheme.surface,
                                     foregroundColor: _selectedType == option['value'] 
                                         ? Colors.white 
-                                        : Colors.black,
+                                        : Theme.of(context).colorScheme.onSurface,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(buttonBorderRadius),
                                     ),
@@ -283,7 +278,7 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
                                                 '找到 ${_searchResults.length} 个收藏品',
                                                 style: TextStyle(
                                                   fontSize: 14,
-                                                  color: Colors.grey[600],
+                                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                                                 ),
                                               ),
                                             ),
@@ -334,7 +329,7 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
                                                                   'ID: ${collection.id}',
                                                                   style: TextStyle(
                                                                     fontSize: 12,
-                                                                    color: Colors.grey[500],
+                                                                    color: AppColors.greyHint(brightness),
                                                                   ),
                                                                 ),
                                                               ),
@@ -414,7 +409,7 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
                                                                           : null,
                                                                       borderRadius: BorderRadius.circular(6),
                                                                       border: Border.all(
-                                                                        color: Colors.grey,
+                                                                        color: AppColors.tableBorder(brightness),
                                                                         width: 1,
                                                                       ),
                                                                     ),
@@ -438,7 +433,7 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
                                                                 'ID: ${collection.id}',
                                                                 style: TextStyle(
                                                                   fontSize: 12,
-                                                                  color: Colors.grey[500],
+                                                                  color: AppColors.greyHint(brightness),
                                                                 ),
                                                               ),
                                                             ),

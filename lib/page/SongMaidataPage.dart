@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/CoverUtil.dart';
+import '../utils/AppTheme.dart';
 import '../service/SongMaidataPageService.dart';
 import '../service/SongPlayService.dart';
 import '../manager/MaidataManager.dart';
@@ -213,7 +214,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
           SnackBar(
             content: Text('导出成功: $safeName.zip\n保存路径: $filePath'),
             duration: const Duration(seconds: 5),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.successGreen(Theme.of(context).brightness),
           ),
         );
       }
@@ -228,7 +229,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
           SnackBar(
             content: Text('导出失败: $e'),
             duration: const Duration(seconds: 3),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.errorRed(Theme.of(context).brightness),
           ),
         );
       }
@@ -383,11 +384,11 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 16),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
                   child: Text(
                     '渲染出的谱面仅供参考，不代表官方谱面。对于高密度谱面，请勿频繁拖动进度条，以免造成应用闪退或卡死。',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -503,6 +504,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
   }
 
   Widget _buildTypeTag(String type, String songId) {
+    final brightness = Theme.of(context).brightness;
     bool isUtage = songId.length == 6;
 
     if (isUtage) {
@@ -520,7 +522,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
         style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: Colors.orange,
+          color: AppColors.warningOrange(brightness),
         ),
       );
     } else {
@@ -529,7 +531,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
         style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: Colors.blue,
+          color: AppColors.linkBlue(brightness),
         ),
       );
     }
@@ -545,15 +547,15 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
             dsList.join(' / '),
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey[700],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           );
         } else {
-          return const Text(
+          return Text(
             '获取定数中...',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           );
         }
@@ -565,14 +567,14 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         '$label: $value',
         style: TextStyle(
           fontSize: 12,
-          color: Colors.grey[700],
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
     );
@@ -601,8 +603,9 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
 
   @override
   Widget build(BuildContext context) {
-    final themeColor = Colors.purple;
-    final textPrimaryColor = const Color.fromARGB(255, 84, 97, 97);
+    final themeColor = Theme.of(context).colorScheme.primary;
+    final brightness = Theme.of(context).brightness;
+    final textPrimaryColor = Theme.of(context).colorScheme.onSurface;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -649,21 +652,21 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                         label: '复制',
                         icon: Icons.copy,
                         onPressed: _copyToClipboard,
-                        color: Colors.grey[700]!,
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       ),
                       const SizedBox(width: 8),
                       _buildActionButton(
                         label: '渲染',
                         icon: Icons.play_circle_outline,
                         onPressed: _navigateToChartPlay,
-                        color: Colors.purple,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                       const SizedBox(width: 8),
                       _buildActionButton(
                         label: _isExporting ? '导出中...' : '导出',
                         icon: Icons.download,
                         onPressed: _isExporting ? null : _exportToZip,
-                        color: Colors.teal,
+                        color: AppColors.successGreen(brightness),
                       ),
                     ],
                   ),
@@ -672,14 +675,10 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                 margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 5.0,
-                      offset: Offset(2.0, 2.0),
-                    ),
+                  boxShadow: [
+                    AppColors.defaultShadow(brightness),
                   ],
                 ),
                 child: Column(
@@ -728,12 +727,12 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                     if (_inoteList.isNotEmpty)
                       Row(
                         children: [
-                          const Text(
+                          Text(
                             'INOTE: ',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: Colors.grey,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                           Expanded(
@@ -748,11 +747,11 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                                       onPressed: () => _scrollToInote('ALL'),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: _selectedInote == 'ALL'
-                                            ? Colors.black
-                                            : Colors.grey[200],
+                                            ? Theme.of(context).colorScheme.onSurface
+                                            : Theme.of(context).colorScheme.surfaceContainerHighest,
                                         foregroundColor: _selectedInote == 'ALL'
-                                            ? Colors.white
-                                            : Colors.black,
+                                            ? Theme.of(context).colorScheme.surface
+                                            : Theme.of(context).colorScheme.onSurface,
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 12,
                                           vertical: 6,
@@ -776,10 +775,10 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: _selectedInote == inote
                                               ? inoteColor
-                                              : Colors.grey[200],
+                                              : Theme.of(context).colorScheme.surfaceContainerHighest,
                                           foregroundColor: _selectedInote == inote
                                               ? Colors.white
-                                              : Colors.black,
+                                              : Theme.of(context).colorScheme.onSurface,
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 12,
                                             vertical: 6,
@@ -806,33 +805,29 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                 child: Container(
                   margin: const EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 5.0,
-                        offset: Offset(2.0, 2.0),
-                      ),
+                    boxShadow: [
+                      AppColors.defaultShadow(brightness),
                     ],
                   ),
                   child: _isFetchingFullCache
-                      ? const Center(
+                      ? Center(
                           child: Padding(
-                            padding: EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(16),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                CircularProgressIndicator(),
-                                SizedBox(height: 16),
-                                Text(
+                                const CircularProgressIndicator(),
+                                const SizedBox(height: 16),
+                                const Text(
                                   '正在获取全量谱面缓存...',
                                   style: TextStyle(fontSize: 16),
                                 ),
-                                SizedBox(height: 8),
+                                const SizedBox(height: 8),
                                 Text(
                                   '首次进入需要拉取大量数据，请耐心等待',
-                                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                                   textAlign: TextAlign.center,
                                 ),
                               ],
@@ -853,15 +848,15 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                                     Icon(
                                       Icons.error_outline,
                                       size: 48,
-                                      color: Colors.red,
+                                      color: AppColors.errorRed(brightness),
                                     ),
                                     const SizedBox(height: 16),
                                     Text(
                                       _errorMessage!,
                                       textAlign: TextAlign.center,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 16,
-                                        color: Colors.red,
+                                        color: AppColors.errorRed(brightness),
                                       ),
                                     ),
                                     const SizedBox(height: 16),
@@ -886,10 +881,10 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                                     ),
                                     child: SelectableText(
                                       _getFilteredMaidata(),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontFamily: 'Courier New',
                                         fontSize: 12,
-                                        color: Colors.black87,
+                                        color: Theme.of(context).colorScheme.onSurface,
                                         height: 1.4,
                                       ),
                                       textAlign: TextAlign.left,

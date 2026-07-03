@@ -15,6 +15,7 @@ import '../../utils/CollectionsImageUtil.dart';
 import '../../utils/CoverUtil.dart';
 import '../../utils/StringUtil.dart';
 import '../../utils/TranslationUtil.dart';
+import '../../utils/AppTheme.dart';
 import '../SongInfoPage.dart';
 
 class CollectionInfoPage extends StatefulWidget {
@@ -186,15 +187,8 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
   }
 
   // 自定义常量
-  final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
   final Color themeColor = Colors.blue;
   final double borderRadiusSmall = 8.0;
-  final BoxShadow defaultShadow = BoxShadow(
-    color: Colors.grey.withOpacity(0.5),
-    spreadRadius: 2,
-    blurRadius: 5,
-    offset: Offset(0, 3),
-  );
 
   @override
   void initState() {
@@ -373,11 +367,11 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
   // 获取难度显示
   Widget _getDifficultiesDisplay(List<int> difficulties) {
     final Map<int, Map<String, dynamic>> difficultyMap = {
-      0: {'label': 'BASIC', 'color': Color(0xFF4CAF50), 'bgColor': Color(0xFFE8F5E8)},
-      1: {'label': 'ADVANCED', 'color': Color(0xFFFF9800), 'bgColor': Color(0xFFFFF8E1)},
-      2: {'label': 'EXPERT', 'color': Color(0xFFE91E63), 'bgColor': Color(0xFFFCE4EC)},
-      3: {'label': 'MASTER', 'color': Color(0xFF9966CC), 'bgColor': Color(0xFFE9D8FF)},
-      4: {'label': 'RE:MASTER', 'color': Color(0xFF9C27B0), 'bgColor': Color(0xFFF3E5F5)},
+      0: {'label': 'BASIC', 'color': AppColors.difficultyForegroundByIndex(0), 'bgColor': AppColors.difficultyBackgroundByIndex(0)},
+      1: {'label': 'ADVANCED', 'color': AppColors.difficultyForegroundByIndex(1), 'bgColor': AppColors.difficultyBackgroundByIndex(1)},
+      2: {'label': 'EXPERT', 'color': AppColors.difficultyForegroundByIndex(2), 'bgColor': AppColors.difficultyBackgroundByIndex(2)},
+      3: {'label': 'MASTER', 'color': AppColors.difficultyForegroundByIndex(3), 'bgColor': AppColors.difficultyBackgroundByIndex(3)},
+      4: {'label': 'RE:MASTER', 'color': AppColors.difficultyForegroundByIndex(4), 'bgColor': AppColors.difficultyBackgroundByIndex(4)},
     };
     
     return Wrap(
@@ -408,10 +402,10 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
   // 获取FC显示
   Widget _getFcDisplay(String fc) {
     final Map<String, Map<String, dynamic>> fcMap = {
-      'ap': {'label': 'AP', 'color': Color(0xFFFF9800), 'bgColor': Color(0xFFFFE0B2)},
-      'app': {'label': 'AP+', 'color': Color(0xFFF57C00), 'bgColor': Color(0xFFFFCC80)},
-      'fc': {'label': 'FC', 'color': Color(0xFF4CAF50), 'bgColor': Color(0xFFE8F5E8)},
-      'fcp': {'label': 'FC+', 'color': Color(0xFF2E7D32), 'bgColor': Color(0xFFC8E6C9)},
+      'ap': {'label': 'AP', 'color': AppColors.achievementForeground('AP'), 'bgColor': AppColors.achievementBackground('AP')},
+      'app': {'label': 'AP+', 'color': AppColors.achievementForeground('AP+'), 'bgColor': AppColors.achievementBackground('AP+')},
+      'fc': {'label': 'FC', 'color': AppColors.achievementForeground('FC'), 'bgColor': AppColors.achievementBackground('FC')},
+      'fcp': {'label': 'FC+', 'color': AppColors.achievementForeground('FC+'), 'bgColor': AppColors.achievementBackground('FC+')},
     };
     
     final fcInfo = fcMap[fc] ?? {'label': fc, 'color': Colors.grey, 'bgColor': Colors.grey[100]};
@@ -436,11 +430,11 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
   // 获取FS显示
   Widget _getFsDisplay(String fs) {
     final Map<String, Map<String, dynamic>> fsMap = {
-      'fs': {'label': 'FS', 'color': Color(0xFF1976D2), 'bgColor': Color(0xFFE3F2FD)},
-      'fsp': {'label': 'FS+', 'color': Color(0xFF1565C0), 'bgColor': Color(0xFFBBDEFB)},
-      'fsd': {'label': 'FDX', 'color': Color(0xFFFF9800), 'bgColor': Color(0xFFFFE0B2)},
-      'fsdp': {'label': 'FDX+', 'color': Color(0xFFF57C00), 'bgColor': Color(0xFFFFCC80)},
-      'sync': {'label': 'SYNC', 'color': Color(0xFFFF5722), 'bgColor': Color(0xFFFFE0B2)},
+      'fs': {'label': 'FS', 'color': AppColors.achievementForeground('FS'), 'bgColor': AppColors.achievementBackground('FS')},
+      'fsp': {'label': 'FS+', 'color': AppColors.achievementForeground('FS+'), 'bgColor': AppColors.achievementBackground('FS+')},
+      'fsd': {'label': 'FDX', 'color': AppColors.achievementForeground('FDX'), 'bgColor': AppColors.achievementBackground('FDX')},
+      'fsdp': {'label': 'FDX+', 'color': AppColors.achievementForeground('FDX+'), 'bgColor': AppColors.achievementBackground('FDX+')},
+      'sync': {'label': 'SYNC', 'color': AppColors.achievementForeground('SYNC'), 'bgColor': AppColors.achievementBackground('SYNC')},
     };
     
     final fsInfo = fsMap[fs] ?? {'label': fs, 'color': Colors.grey, 'bgColor': Colors.grey[100]};
@@ -547,10 +541,10 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                       },
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.grey[100],
+                          color: Theme.of(context).colorScheme.surface,
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                            color: Colors.grey,
+                            color: AppColors.tableBorder(Theme.of(context).brightness),
                             width: 1,
                           ),
                         ),
@@ -590,7 +584,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                     '${_getTypeDisplay(requiredSong.type)} | ${song != null ? StringUtil.formatVersion2(song.basicInfo.from) : '-'}',
                                     style: TextStyle(
                                       fontSize: 9,
-                                      color: Colors.grey[600],
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -601,7 +595,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                     _getDsDisplay(dsList),
                                     style: TextStyle(
                                       fontSize: 9,
-                                      color: Colors.grey[600],
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -632,7 +626,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
             '总计 ${seenSongs.length} 首歌曲',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey[600],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           SizedBox(height: 8),
@@ -726,11 +720,11 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
         // 根据达成率确定颜色
         Color rateColor = Colors.grey[800]!;
         if (requiredRate == '80%') {
-          rateColor = Colors.red;
+          rateColor = AppColors.errorRed(Theme.of(context).brightness);
         } else if (['97%', '98%', '99%', '99.5%'].contains(requiredRate)) {
-          rateColor = Colors.blue;
+          rateColor = AppColors.linkBlue(Theme.of(context).brightness);
         } else if (['100%', '100.5%'].contains(requiredRate)) {
-          rateColor = Colors.orange;
+          rateColor = AppColors.warningOrange(Theme.of(context).brightness);
         }
         
         mergedConditions.add(
@@ -789,16 +783,16 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: AppColors.linkBlue(Theme.of(context).brightness).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.blue, width: 1),
+                    border: Border.all(color: AppColors.linkBlue(Theme.of(context).brightness), width: 1),
                   ),
                   child: Text(
                     'SONIC',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blue,
+                      color: AppColors.linkBlue(Theme.of(context).brightness),
                     ),
                   ),
                 ),
@@ -904,6 +898,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
@@ -925,7 +920,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -936,7 +931,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                         child: Text(
                           '${_getTypeLabel()}详情',
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -957,9 +952,9 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
+                    boxShadow: [AppColors.defaultShadow(brightness)],
                   ),
                   child: _isLoading
                       ? Center(child: CircularProgressIndicator())
@@ -1008,8 +1003,8 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                             Expanded(
                                               child: ElevatedButton(
                                                 style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Colors.grey[700]!,
-                                                  foregroundColor: Colors.white,
+                                                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                                  foregroundColor: Theme.of(context).colorScheme.onSurface,
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(8),
                                                   ),
@@ -1066,8 +1061,8 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                             Expanded(
                                               child: ElevatedButton(
                                                 style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Colors.grey[700]!,
-                                                  foregroundColor: Colors.white,
+                                                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                                  foregroundColor: Theme.of(context).colorScheme.onSurface,
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(8),
                                                   ),
@@ -1124,8 +1119,8 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                             Expanded(
                                               child: ElevatedButton(
                                                 style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Colors.grey[700]!,
-                                                  foregroundColor: Colors.white,
+                                                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                                  foregroundColor: Theme.of(context).colorScheme.onSurface,
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(8),
                                                   ),
@@ -1154,7 +1149,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                     style: TextStyle(
                                       fontSize: 24,
                                       fontWeight: FontWeight.bold,
-                                      color: textPrimaryColor,
+                                      color: Theme.of(context).colorScheme.onSurface,
                                     ),
                                   ),
                                   // 收藏品ID
@@ -1162,7 +1157,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                     'ID: ${widget.collectionId}',
                                     style: TextStyle(
                                       fontSize: 14,
-                                      color: Colors.grey[600],
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                   // 如果名称包含英文或日文，显示翻译按钮和结果
@@ -1173,10 +1168,10 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                         if (_translatedName != null)
                                           Text(
                                             _translatedName!,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 18,
                                               fontStyle: FontStyle.italic,
-                                              color: Colors.grey,
+                                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                                             ),
                                           ),
                                         if (_isTranslatingName)
@@ -1188,9 +1183,9 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                         else if (_translatedName != null)
                                           Text(
                                             '由腾讯云翻译自${_isEnglishAndJapanese(_collection!.name) ? '日语+英语' : _isEnglish(_collection!.name) ? '英语' : '日语'}',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 12,
-                                              color: Colors.grey,
+                                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                                             ),
                                           )
                                         else
@@ -1238,7 +1233,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                                 : null,
                                             borderRadius: BorderRadius.circular(8),
                                             border: Border.all(
-                                              color: Colors.grey,
+                                              color: AppColors.tableBorder(brightness),
                                               width: 1,
                                             ),
                                           ),
@@ -1284,10 +1279,10 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                               if (_translatedDescription != null)
                                                 Text(
                                                   _translatedDescription!,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontSize: 14,
                                                     fontStyle: FontStyle.italic,
-                                                    color: Colors.grey,
+                                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                                                   ),
                                                 ),
                                               if (_isTranslatingDescription)
@@ -1299,9 +1294,9 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                               else if (_translatedDescription != null)
                                                 Text(
                                                   '由腾讯云翻译自${_isEnglishAndJapanese(_collection!.description!) ? '日语+英语' : _isEnglish(_collection!.description!) ? '英语' : '日语'}',
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontSize: 12,
-                                                    color: Colors.grey,
+                                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                                                   ),
                                                 )
                                               else

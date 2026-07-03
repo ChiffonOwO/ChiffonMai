@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'ChartPlayPage.dart';
 
 class PersonalizedChartPlayConfigure extends StatefulWidget {
@@ -125,11 +126,11 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 16),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
                   child: Text(
                     '渲染出的谱面仅供参考，不代表官方谱面。对于高密度谱面，请勿频繁拖动进度条，以免造成应用闪退或卡死。',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -189,20 +190,21 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppColors.scaffoldBackground(brightness),
       appBar: AppBar(
         title: const Text('自定义谱面播放'),
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            const Text(
+            Text(
               '上传自定义谱面',
-              style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 24),
 
@@ -240,13 +242,13 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.grey[800],
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('解析到的难度:', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text('解析到的难度:', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
@@ -271,8 +273,8 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
                   child: ElevatedButton(
                     onPressed: _clearSelection,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[700],
-                      foregroundColor: Colors.white,
+                      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      foregroundColor: Theme.of(context).colorScheme.onSurface,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
@@ -284,7 +286,7 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
                   child: ElevatedButton(
                     onPressed: _startPlayback,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: AppColors.linkBlue(Theme.of(context).brightness),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -299,18 +301,18 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.grey[900],
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Column(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('使用说明:', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 8),
-                  Text('1. 点击"选择maidata.txt"上传谱面数据文件', style: TextStyle(color: Colors.grey)),
-                  Text('2. 可选：上传曲绘图片和音源文件', style: TextStyle(color: Colors.grey)),
-                  Text('3. 系统会自动解析谱面中的难度', style: TextStyle(color: Colors.grey)),
-                  Text('4. 选择想要渲染的难度后即可开始播放', style: TextStyle(color: Colors.grey)),
+                  Text('使用说明:', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text('1. 点击"选择maidata.txt"上传谱面数据文件', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                  Text('2. 可选：上传曲绘图片和音源文件', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                  Text('3. 系统会自动解析谱面中的难度', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                  Text('4. 选择想要渲染的难度后即可开始播放', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 ],
               ),
             ),
@@ -328,19 +330,20 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
     required VoidCallback onPressed,
     required bool required,
   }) {
+    final fsBrightness = Theme.of(context).brightness;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[800],
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: selectedFile != null ? Colors.green : Colors.grey[600]!),
+        border: Border.all(color: selectedFile != null ? AppColors.successGreen(fsBrightness) : AppColors.tableBorder(fsBrightness)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: selectedFile != null ? Colors.green : Colors.grey),
+              Icon(icon, color: selectedFile != null ? AppColors.successGreen(fsBrightness) : AppColors.greyHint(fsBrightness)),
               const SizedBox(width: 8),
               Expanded(
                 child: Column(
@@ -348,11 +351,11 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
                   children: [
                     Row(
                       children: [
-                        Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                        if (required) const Text(' *', style: TextStyle(color: Colors.red)),
+                        Text(title, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold)),
+                        if (required) Text(' *', style: TextStyle(color: AppColors.errorRed(fsBrightness))),
                       ],
                     ),
-                    Text(description, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    Text(description, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
                   ],
                 ),
               ),
@@ -361,13 +364,13 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
           if (selectedFile != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text('已选择: $selectedFile', style: const TextStyle(color: Colors.green, fontSize: 12), overflow: TextOverflow.ellipsis),
+              child: Text('已选择: $selectedFile', style: TextStyle(color: AppColors.successGreen(fsBrightness), fontSize: 12), overflow: TextOverflow.ellipsis),
             ),
           const SizedBox(height: 8),
           ElevatedButton(
             onPressed: onPressed,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
+              backgroundColor: AppColors.linkBlue(fsBrightness),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

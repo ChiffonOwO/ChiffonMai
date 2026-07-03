@@ -14,6 +14,7 @@ import '../../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../SongInfoPage.dart';
 import '../../utils/CoverUtil.dart';
 import '../../utils/TextStyleUtil.dart';
+import '../../utils/AppTheme.dart';
 
 class DiffBest50Page extends StatefulWidget {
   const DiffBest50Page({super.key});
@@ -121,21 +122,14 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     // 初始化尺寸相关变量
     screenWidth = MediaQuery.of(context).size.width;
     screenHeight = MediaQuery.of(context).size.height;
     cardPadding = screenWidth * 0.02;
     fontSizeBase = screenWidth * 0.035;
 
-    // 自定义常量
-    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
     final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = BoxShadow(
-      color: Colors.grey.withOpacity(0.5),
-      spreadRadius: 2,
-      blurRadius: 5,
-      offset: Offset(0, 3),
-    );
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -156,7 +150,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -167,7 +161,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                         child: Text(
                           '拟合Best50查询',
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -177,8 +171,8 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                     // 模式切换按钮（始终显示）
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey[200]!,
-                        foregroundColor: Colors.black,
+                        backgroundColor: Theme.of(context).colorScheme.surface,
+                        foregroundColor: Theme.of(context).colorScheme.onSurface,
                         minimumSize: Size(100 * 0.9, 36 * 0.9),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8.0),
@@ -201,17 +195,17 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                     // 加载中状态（覆盖层）
                     if (_isLoading)
                       Container(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                         child: Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              CircularProgressIndicator(),
+                              CircularProgressIndicator(color: Theme.of(context).colorScheme.onSurface),
                               SizedBox(height: 16),
                               Text(
                                 '正在计算拟合Best50...',
                                 style: TextStyle(
-                                  color: textPrimaryColor,
+                                  color: Theme.of(context).colorScheme.onSurface,
                                   fontSize: 16,
                                 ),
                               ),
@@ -222,7 +216,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
 
                     // 内容
                     if (!_isLoading)
-                      _buildContent(textPrimaryColor, borderRadiusSmall, defaultShadow),
+                      _buildContent(brightness, borderRadiusSmall),
                   ],
                 ),
               ),
@@ -234,7 +228,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
   }
 
   // 构建内容区域
-  Widget _buildContent(Color textPrimaryColor, double borderRadiusSmall, BoxShadow defaultShadow) {
+  Widget _buildContent(Brightness brightness, double borderRadiusSmall) {
     // 如果没有数据，显示空状态
     if (_diffBest50Data == null || _diffSongs.isEmpty) {
       return Center(
@@ -244,14 +238,14 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
             Icon(
               Icons.refresh,
               size: 64,
-              color: Colors.grey,
+              color: AppColors.greyHint(brightness),
             ),
             SizedBox(height: 16),
             Text(
               '暂无拟合Best50数据',
               style: TextStyle(
                 fontSize: 18,
-                color: Colors.grey,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             SizedBox(height: 8),
@@ -259,7 +253,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
               '请返回首页点击"刷新数据"按钮获取',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -272,9 +266,9 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
     return Container(
       margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
+        color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
         borderRadius: BorderRadius.circular(borderRadiusSmall),
-        boxShadow: [defaultShadow],
+        boxShadow: [AppColors.defaultShadow(brightness)],
       ),
       child: SingleChildScrollView(
         padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.03),
@@ -349,9 +343,10 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
       return song['use_official_diff'] ?? false;
     }).length;
 
+    final ratingBrightness = Theme.of(context).brightness;
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.black, width: 2.0),
+        border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2.0),
         borderRadius: BorderRadius.circular(8.0),
       ),
       padding: EdgeInsets.all(12.0),
@@ -367,8 +362,8 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                   style: TextStyle(
                     fontSize: MediaQuery.of(context).size.width * 0.045,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                    
+                    color: Theme.of(context).colorScheme.onSurface,
+
                   ),
                 ),
                 SizedBox(height: 4.0),
@@ -379,7 +374,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                         diffRatingSum.toString(),
                         TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.045,
-                          color: Colors.black,
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -387,7 +382,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                         '(平均${diffRatingAverage.toStringAsFixed(1)})',
                         TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.03,
-                          color: Colors.black,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -399,17 +394,17 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                   style: TextStyle(
                     fontSize: MediaQuery.of(context).size.width * 0.045,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                    
+                    color: Theme.of(context).colorScheme.onSurface,
+
                   ),
                 ),
                 Text(
                   '${best50Diff > 0 ? '+' : ''}$best50Diff',
                   style: TextStyle(
                     fontSize: MediaQuery.of(context).size.width * 0.045,
-                    color: best50Diff >= 0 ? Colors.green : Colors.red,
+                    color: best50Diff >= 0 ? AppColors.successGreen(ratingBrightness) : AppColors.errorRed(ratingBrightness),
                     fontWeight: FontWeight.bold,
-                    
+
                   ),
                 ),
                 // 显示暂无拟合定数的歌曲数量
@@ -420,8 +415,8 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                     '${noFitDiffCount}首暂无拟合定数，按照官方定数计算',
                     style: TextStyle(
                       fontSize: MediaQuery.of(context).size.width * 0.035,
-                      color: Colors.orange,
-                      
+                      color: AppColors.warningOrange(ratingBrightness),
+
                     ),
                   ),
               ],
@@ -438,8 +433,8 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                   style: TextStyle(
                     fontSize: MediaQuery.of(context).size.width * 0.04,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                    
+                    color: Theme.of(context).colorScheme.onSurface,
+
                   ),
                 ),
                 _buildDualDecimalText(
@@ -454,8 +449,8 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                           : '模式C：在非当前版本中取拟合定数下的Rating前35的谱面，在当前版本中取拟合定数下Rating前15的谱面'),
                   style: TextStyle(
                     fontSize: MediaQuery.of(context).size.width * 0.028,
-                    color: Colors.grey[600],
-                    
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+
                   ),
                 ),
               ],
@@ -470,9 +465,9 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
   Widget _buildSectionTitle(String title, BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.black, width: 2.0),
+        border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2.0),
         borderRadius: BorderRadius.circular(8.0),
-        color: Colors.grey[200],
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
       ),
       padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.02),
       child: Center(
@@ -481,7 +476,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
           style: TextStyle(
             fontSize: MediaQuery.of(context).size.width * 0.04,
             fontWeight: FontWeight.bold,
-            color: Colors.black,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
       ),
@@ -504,6 +499,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
     Color starsColor = Colors.white,
     bool useOfficialDiff = false, // 新增：标记是否使用了官方定数
   }) {
+    final brightness = Theme.of(context).brightness;
     return Container(
       decoration: BoxDecoration(
         color: cardColor,
@@ -534,7 +530,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                     width: coverSize,
                     height: coverSize,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.surface,
                       border: Border.all(color: Colors.black, width: 1.0),
                     ),
                     child: songId != null
@@ -564,7 +560,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                           style: TextStyle(
                             fontSize: dxFontSize,
                             fontWeight: FontWeight.bold,
-                            color: Colors.orange,
+                            color: AppColors.warningOrange(brightness),
                           ),
                         ),
                       if (!dxMode && !isUtage)
@@ -573,7 +569,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                           style: TextStyle(
                             fontSize: dxFontSize,
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade300,
+                            color: AppColors.linkBlue(brightness),
                           ),
                         ),
                       SizedBox(width: screenWidth * 0.01),
@@ -749,26 +745,27 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
   Widget _buildDualDecimalText(double value1, double value2,
       {int decimalPlaces1 = 4,
       int decimalPlaces2 = 2,
-      Color color = Colors.black}) {
+      Color? color}) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final resolvedColor = color ?? Theme.of(context).colorScheme.onSurface;
         double fontSize = MediaQuery.of(context).size.width * 0.04;
 
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildDecimalText(value1, context,
-                decimalPlaces: decimalPlaces1, color: color),
+                decimalPlaces: decimalPlaces1, color: resolvedColor),
             Text(
               '/',
               style: TextStyle(
                 fontSize: fontSize,
                 fontWeight: FontWeight.bold,
-                color: color,
+                color: resolvedColor,
               ),
             ),
             _buildDecimalText(value2, context,
-                decimalPlaces: decimalPlaces2, color: color),
+                decimalPlaces: decimalPlaces2, color: resolvedColor),
           ],
         );
       },
@@ -883,7 +880,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
       Color cardColor;
       // 对于6位数ID的歌曲，使用粉色
       if (songId.toString().length == 6) {
-        cardColor = Color(0xFFFFB3D1); // 加深的粉色
+        cardColor = AppColors.utageCard; // 加深的粉色
       } else {
         cardColor = _getCardColor(levelIndex);
       }
@@ -982,7 +979,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
         }
       },
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.blue,
+        backgroundColor: AppColors.linkBlue(Theme.of(context).brightness),
         padding: EdgeInsets.symmetric(vertical: 12.0),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8.0),

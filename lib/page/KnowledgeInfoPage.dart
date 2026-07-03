@@ -4,6 +4,7 @@ import '../service/KnowledgeInfoService.dart';
 import '../entity/KnowledgeEntity.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/ColorUtil.dart';
+import '../utils/AppTheme.dart';
 import '../utils/CoverUtil.dart';
 import '../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../manager/DivingFish/UserPlayDataManager.dart';
@@ -127,6 +128,7 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
   // 构建游戏卡片（曲绘在左，数据在右）
   Widget _buildGameCard({
     required Color cardColor,
+    required Brightness brightness,
     String songName = '未知歌曲',
     double achievementRate = 0.0,
     double difficulty = 0.0,
@@ -148,7 +150,7 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
         width: cardWidth,
         decoration: BoxDecoration(
           color: cardColor,
-          border: Border.all(color: Colors.black, width: 2.0),
+          border: Border.all(color: AppColors.tableBorder(brightness), width: 2.0),
           borderRadius: BorderRadius.circular(8.0),
         ),
         padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.02),
@@ -173,14 +175,14 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
                   width: coverSize,
                   height: coverSize,
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: Colors.black, width: 1.0),
+                    color: Theme.of(context).colorScheme.surface,
+                    border: Border.all(color: AppColors.tableBorder(brightness), width: 1.0),
                   ),
                   child: songId != null
                       ? CoverUtil.buildCoverWidgetWithContext(context, songId.toString(), coverSize)
                       : Center(
                           child: Text('曲绘',
-                              style: TextStyle(fontSize: coverSize * 0.24)),
+                              style: TextStyle(fontSize: coverSize * 0.24, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                         ),
                 ),
                 SizedBox(width: screenWidth * 0.02),
@@ -222,7 +224,7 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
                               style: TextStyle(
                                 fontSize: dxFontSize,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.orange,
+                                color: AppColors.warningOrange(brightness),
                               ),
                             ),
                           if (!dxMode && !isUtage)
@@ -231,7 +233,7 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
                               style: TextStyle(
                                 fontSize: dxFontSize,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.blue.shade300,
+                                color: AppColors.linkBlue(brightness),
                               ),
                             ),
                           SizedBox(width: screenWidth * 0.01),
@@ -282,20 +284,11 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
     );
   }
 
-  // 自定义常量
-  final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
-  final Color themeColor = Colors.blue;
-  final double borderRadiusSmall = 8.0;
-  final BoxShadow defaultShadow = BoxShadow(
-    color: Colors.grey.withOpacity(0.5),
-    spreadRadius: 2,
-    blurRadius: 5,
-    offset: Offset(0, 3),
-  );
-
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
+    final double borderRadiusSmall = 8.0;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -316,7 +309,7 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -327,7 +320,7 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
                         child: Text(
                           '知识详情',
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -348,18 +341,18 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
+                    boxShadow: [AppColors.defaultShadow(brightness)],
                   ),
                   child: _isLoading
-                      ? Center(child: CircularProgressIndicator())
+                      ? Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.onSurface))
                       : _errorMessage.isNotEmpty
                           ? Center(
                               child: Text(_errorMessage,
-                                  style: TextStyle(color: Colors.red)))
+                                  style: TextStyle(color: AppColors.errorRed(brightness))))
                           : _knowledgeItem == null
-                              ? Center(child: Text('未找到知识详情'))
+                              ? Center(child: Text('未找到知识详情', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)))
                               : Padding(
                                   padding: const EdgeInsets.all(16.0),
                                   child: SingleChildScrollView(
@@ -375,8 +368,8 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
                                             decoration: BoxDecoration(
                                               color: _knowledgeItem!.category ==
                                                       KnowledgeItem.tagCategory
-                                                  ? Colors.blue
-                                                  : Colors.green,
+                                                  ? AppColors.linkBlue(brightness)
+                                                  : AppColors.successGreen(brightness),
                                               borderRadius:
                                                   BorderRadius.circular(8),
                                             ),
@@ -395,7 +388,7 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
                                           style: TextStyle(
                                             fontSize: 24,
                                             fontWeight: FontWeight.bold,
-                                            color: textPrimaryColor,
+                                            color: Theme.of(context).colorScheme.onSurface,
                                             height: 1.2, // 最小行高
                                           ),
                                           softWrap: true,
@@ -430,7 +423,7 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
                                                     ),
                                                     CodeConfig(
                                                       style: TextStyle(
-                                                        color: Colors.black87,
+                                                        color: Theme.of(context).colorScheme.onSurface,
                                                       ),
                                                     ),
                                                   ],
@@ -454,7 +447,7 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
                                                 style: TextStyle(
                                                   fontSize: 18,
                                                   fontWeight: FontWeight.bold,
-                                                  color: textPrimaryColor,
+                                                  color: Theme.of(context).colorScheme.onSurface,
                                                 ),
                                               ),
                                               SizedBox(height: 12),
@@ -521,6 +514,7 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
                                                   // 构建游戏卡片
                                                   return _buildGameCard(
                                                     cardColor: cardColor,
+                                                    brightness: brightness,
                                                     songName: songInfo?.title ?? '歌曲 ${song.id}',
                                                     achievementRate: achievementRate,
                                                     difficulty: difficulty,

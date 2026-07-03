@@ -9,6 +9,7 @@ import 'package:my_first_flutter_app/constant/CacheKeyConstant.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 
 class KaleidXScopeInfoPageBLACK extends StatefulWidget {
   const KaleidXScopeInfoPageBLACK({
@@ -36,7 +37,6 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
   Song? _specialSong11753; // 隐藏歌曲
 
   // 自定义常量
-  final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
   late double _borderRadiusSmall;
   late double _defaultShadowBlurRadius;
   late double _defaultShadowOffset;
@@ -196,11 +196,12 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
 
   // 构建解锁方法区域
   Widget _buildUnlockSection() {
+    final brightness = Theme.of(context).brightness;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(_borderRadiusSmall),
-        border: Border.all(color: Colors.grey[300]!, width: 1),
+        border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
       ),
       padding: EdgeInsets.all(_paddingM),
       child: Column(
@@ -211,7 +212,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
             style: TextStyle(
               fontSize: _textSizeL,
               fontWeight: FontWeight.bold,
-              color: textPrimaryColor,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           SizedBox(height: _paddingS),
@@ -227,7 +228,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
             text: TextSpan(
               style: TextStyle(
                 fontSize: _textSizeS,
-                color: Colors.grey[600],
+                color: AppColors.greyHint(brightness),
               ),
               children: [
                 TextSpan(text: '完成'),
@@ -252,14 +253,14 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
             '完成下方曲目池内的11首歌曲（全部游玩）',
             style: TextStyle(
               fontSize: _textSizeS,
-              color: Colors.grey[600],
+              color: AppColors.greyHint(brightness),
             ),
           ),
           Text(
             '可：跳过（Track Skip）/不可：段位认定和宴会场',
             style: TextStyle(
               fontSize: _textSizeS,
-              color: Colors.grey[600],
+              color: AppColors.greyHint(brightness),
             ),
           ),
           SizedBox(height: _paddingS),
@@ -275,21 +276,21 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
             '第一首：所有区域歌曲',
             style: TextStyle(
               fontSize: _textSizeS,
-              color: Colors.grey[600],
+              color: AppColors.greyHint(brightness),
             ),
           ),
           Text(
             '第二首：所有区域内的完美挑战曲',
             style: TextStyle(
               fontSize: _textSizeS,
-              color: Colors.grey[600],
+              color: AppColors.greyHint(brightness),
             ),
           ),
           Text(
             '第三首：固定，即为隐藏歌曲',
             style: TextStyle(
               fontSize: _textSizeS,
-              color: Colors.grey[600],
+              color: AppColors.greyHint(brightness),
             ),
           ),
           SizedBox(height: _paddingS),
@@ -298,7 +299,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
             style: TextStyle(
               fontSize: _textSizeM,
               fontWeight: FontWeight.bold,
-              color: textPrimaryColor,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           _buildSpecialSongCard(11752),
@@ -308,7 +309,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
             style: TextStyle(
               fontSize: _textSizeM,
               fontWeight: FontWeight.bold,
-              color: textPrimaryColor,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           _buildSpecialSongCard(11753),
@@ -319,6 +320,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
 
   // 挑战进度区域
   Widget _buildChallengeProgress() {
+    final brightness = Theme.of(context).brightness;
     final challenge = blackService.KaleidXScopeInfoServiceBLACK.blackGateChallenge;
     final String name = challenge['name'] as String;
     final List<dynamic> phases = challenge['phases'] as List<dynamic>;
@@ -326,9 +328,9 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(_borderRadiusSmall),
-        border: Border.all(color: Colors.grey[300]!, width: 1),
+        border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
       ),
       padding: EdgeInsets.all(_paddingM),
       child: Column(
@@ -339,7 +341,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
             style: TextStyle(
               fontSize: _textSizeL,
               fontWeight: FontWeight.bold,
-              color: textPrimaryColor,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           SizedBox(height: _paddingS),
@@ -349,7 +351,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
             height: _progressBarHeight,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(_progressBarHeight / 2),
-              border: Border.all(color: Colors.grey[300]!, width: 1),
+              border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
             ),
             child: Row(
               children: phases.map((phase) {
@@ -393,7 +395,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
                       '${startDate}${endDate != null ? ' - $endDate' : ' - 后续'}:',
                       style: TextStyle(
                         fontSize: _textSizeS,
-                        color: Colors.grey[600],
+                        color: AppColors.greyHint(brightness),
                       ),
                     ),
                     SizedBox(width: _paddingXS),
@@ -411,7 +413,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
                       style: TextStyle(
                         fontSize: _textSizeS,
                         fontWeight: FontWeight.bold,
-                        color: textPrimaryColor,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -426,6 +428,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
 
   // 获取难度颜色
   Color _getDifficultyColor(String type) {
+    final brightness = Theme.of(context).brightness;
     switch (type) {
       case 'BASIC':
         return Colors.green;
@@ -438,12 +441,13 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
       case 'Re:MASTER':
         return Colors.red;
       default:
-        return Colors.grey;
+        return AppColors.greyHint(brightness);
     }
   }
 
   // 获取难度文字颜色（用于无背景填充时）
   Color _getDifficultyTextColor(String type) {
+    final brightness = Theme.of(context).brightness;
     switch (type) {
       case 'BASIC':
         return Colors.green;
@@ -456,21 +460,22 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
       case 'Re:MASTER':
         return Colors.red;
       default:
-        return Colors.grey;
+        return AppColors.greyHint(brightness);
     }
   }
 
   // 构建特殊歌曲卡片
   Widget _buildSpecialSongCard(int songId) {
+    final brightness = Theme.of(context).brightness;
     final Song? song = songId == 11752 ? _specialSong11752 : _specialSong11753;
 
     if (song == null) {
       return Container(
         height: 50 * (MediaQuery.of(context).size.width / 375.0),
         decoration: BoxDecoration(
-          color: Colors.grey[100],
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(_borderRadiusSmall),
-          border: Border.all(color: Colors.grey[300]!, width: 1),
+          border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
         ),
         child: Center(child: CircularProgressIndicator()),
       );
@@ -490,9 +495,9 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
         },
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.grey[100],
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
-            border: Border.all(color: Colors.grey[300]!, width: 1),
+            border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
           ),
           padding: EdgeInsets.all(_paddingXS),
           child: Row(
@@ -522,7 +527,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
                       '${_getTypeDisplay(song.type)} | ${StringUtil.formatVersion2(song.basicInfo.from)}',
                       style: TextStyle(
                         fontSize: _textSizeXS,
-                        color: Colors.grey[600],
+                        color: AppColors.greyHint(brightness),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -532,7 +537,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
                       _getDsDisplay(song.ds),
                       style: TextStyle(
                         fontSize: _textSizeXS,
-                        color: Colors.grey[600],
+                        color: AppColors.greyHint(brightness),
                       ),
                     ),
                   ],
@@ -545,6 +550,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
 
   // 渲染歌曲卡片列表
   Widget _buildSongList() {
+    final brightness = Theme.of(context).brightness;
     if (_songs.isEmpty) {
       return Center(child: Text('暂无歌曲数据'));
     }
@@ -582,7 +588,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
               style: TextStyle(
                 fontSize: _textSizeL,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[700],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -604,7 +610,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
                       });
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _isMarkMode ? Colors.green : Colors.grey[300],
+                      backgroundColor: _isMarkMode ? Colors.green : AppColors.tableBorder(brightness),
                       foregroundColor: _isMarkMode ? Colors.white : Colors.black,
                       padding: EdgeInsets.symmetric(
                         horizontal: _paddingM,
@@ -688,10 +694,10 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
               },
               child: Container(
                 decoration: BoxDecoration(
-                  color: isMarked ? Colors.lightGreen[100] : Colors.grey[100],
+                  color: isMarked ? Colors.lightGreen[100] : Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(_borderRadiusSmall),
                   border: Border.all(
-                    color: isMarked ? Colors.green : Colors.grey,
+                    color: isMarked ? Colors.green : AppColors.greyHint(brightness),
                     width: 1,
                   ),
                 ),
@@ -728,7 +734,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
                             '${_getTypeDisplay(song.type)} | ${StringUtil.formatVersion2(song.basicInfo.from)}',
                             style: TextStyle(
                               fontSize: _textSizeXS,
-                              color: Colors.grey[600],
+                              color: AppColors.greyHint(brightness),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -738,7 +744,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
                             _getDsDisplay(song.ds),
                             style: TextStyle(
                               fontSize: _textSizeXS,
-                              color: Colors.grey[600],
+                              color: AppColors.greyHint(brightness),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -758,14 +764,14 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(height: _paddingS),
-            Divider(color: Colors.grey[300], thickness: 1),
+            Divider(color: AppColors.tableBorder(brightness), thickness: 1),
             SizedBox(height: _paddingS),
             Text(
               'Track随机曲目',
               style: TextStyle(
                 fontSize: _textSizeXL,
                 fontWeight: FontWeight.bold,
-                color: textPrimaryColor,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             SizedBox(height: _paddingXS),
@@ -784,6 +790,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
 
   // 构建Track区域
   Widget _buildTrackSection(String title, List<Song> songs) {
+    final brightness = Theme.of(context).brightness;
     if (songs.isEmpty) {
       return Container();
     }
@@ -804,7 +811,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
               style: TextStyle(
                 fontSize: _textSizeL,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[700],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -837,10 +844,10 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
               },
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(_borderRadiusSmall),
                   border: Border.all(
-                    color: Colors.grey,
+                    color: AppColors.greyHint(brightness),
                     width: 1,
                   ),
                 ),
@@ -877,7 +884,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
                             '${_getTypeDisplay(song.type)} | ${StringUtil.formatVersion2(song.basicInfo.from)}',
                             style: TextStyle(
                               fontSize: _textSizeXS,
-                              color: Colors.grey[600],
+                              color: AppColors.greyHint(brightness),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -887,7 +894,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
                             _getDsDisplay(song.ds),
                             style: TextStyle(
                               fontSize: _textSizeXS,
-                              color: Colors.grey[600],
+                              color: AppColors.greyHint(brightness),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -907,6 +914,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     _initSizeParams(context);
 
     final double titleFontSize = 24.0 * (MediaQuery.of(context).size.width / 375.0);
@@ -924,7 +932,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -934,7 +942,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
                         child: Text(
                           _getGateTitle(),
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: titleFontSize,
                             fontWeight: FontWeight.bold,
                           ),

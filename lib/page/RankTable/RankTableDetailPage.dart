@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/service/RankTable/RankTableService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
@@ -183,6 +184,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
     _scaleFactor = screenWidth / 375.0;
     _paddingXS = 4.0 * _scaleFactor;
@@ -197,6 +199,9 @@ class _RankDetailPageState extends State<RankDetailPage> {
 
     final rankData = RankListService().getRankData(widget.rankName);
     final isNormalRank = ['初段', '二段', '三段', '四段', '五段', '六段', '七段', '八段', '九段', '十段'].contains(widget.rankName);
+    final textPrimaryColor = Theme.of(context).colorScheme.onSurface;
+    final cardBgColor = Theme.of(context).colorScheme.surface;
+    final cardShadow = AppColors.defaultShadow(brightness);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -212,7 +217,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: Color.fromARGB(255, 84, 97, 97)),
+                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -222,7 +227,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
                         child: Text(
                           widget.rankName,
                           style: TextStyle(
-                            color: Color.fromARGB(255, 84, 97, 97),
+                            color: textPrimaryColor,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -238,15 +243,9 @@ class _RankDetailPageState extends State<RankDetailPage> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: cardBgColor,
                     borderRadius: BorderRadius.circular(_borderRadiusSmall),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 5.0 * _scaleFactor,
-                        offset: Offset(2.0 * _scaleFactor, 2.0 * _scaleFactor),
-                      ),
-                    ],
+                    boxShadow: [cardShadow],
                   ),
                   child: _isLoading 
                     ? Center(child: CircularProgressIndicator())
@@ -264,13 +263,16 @@ class _RankDetailPageState extends State<RankDetailPage> {
   }
 
   Widget _buildContent(RankData rankData, bool isNormalRank) {
+    final brightness = Theme.of(context).brightness;
+    final textPrimaryColor = Theme.of(context).colorScheme.onSurface;
+    final subtitleColor = Theme.of(context).colorScheme.onSurfaceVariant;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           padding: EdgeInsets.symmetric(horizontal: _paddingM, vertical: _paddingS),
           decoration: BoxDecoration(
-            color: isNormalRank ? Color(0xFF8B4513) : Colors.purple,
+            color: isNormalRank ? AppColors.medalColor('bronze') : Colors.purple,
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
           ),
           child: Text(
@@ -278,7 +280,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
             style: TextStyle(
               fontSize: _textSizeL,
               fontWeight: FontWeight.bold,
-              color: isNormalRank ? Colors.white : Color(0xFFE6E6FA),
+              color: isNormalRank ? Colors.white : const Color(0xFFE6E6FA),
             ),
           ),
         ),
@@ -290,7 +292,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
           style: TextStyle(
             fontSize: _textSizeM,
             fontWeight: FontWeight.bold,
-            color: Colors.grey[700]!,
+            color: subtitleColor,
           ),
         ),
         SizedBox(height: _paddingXS),
@@ -366,6 +368,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
                                   style: TextStyle(
                                     fontSize: _textSizeM,
                                     fontWeight: FontWeight.bold,
+                                    color: textPrimaryColor,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -396,7 +399,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
                                 hasAchievement ? '达成率: ${achievementValue.toStringAsFixed(4)}%' : '未游玩',
                                 style: TextStyle(
                                   fontSize: _textSizeS,
-                                  color: hasAchievement && achievementValue >= 100 ? Colors.green : Colors.grey[600]!,
+                                  color: hasAchievement && achievementValue >= 100 ? AppColors.successGreen(brightness) : subtitleColor,
                                   fontWeight: hasAchievement && achievementValue >= 100 ? FontWeight.bold : FontWeight.normal,
                                 ),
                               ),
@@ -411,7 +414,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
                                   '预计最低扣血: $minDamage',
                                   style: TextStyle(
                                     fontSize: _textSizeS,
-                                    color: minDamage > 0 ? Colors.red : Colors.grey[500]!,
+                                    color: minDamage > 0 ? AppColors.errorRed(brightness) : AppColors.greyHint(brightness),
                                     fontWeight: minDamage > 0 ? FontWeight.bold : FontWeight.normal,
                                   ),
                                 );
@@ -428,14 +431,12 @@ class _RankDetailPageState extends State<RankDetailPage> {
           }).toList(),
         ),
         
-        // 计算预计结果
         () {
           final result = _calcResult(rankData);
           final totalAchievement = result['totalAchievement'] as double;
           final remainingHp = result['remainingHp'] as int;
           final isDead = result['isDead'] as bool;
           
-          // 检查四首是否都有成绩
           bool allHaveAchievement = true;
           for (int i = 0; i < 4; i++) {
             final a = _getAchievement(rankData.songIds[i], rankData.levelIndexes[i]);
@@ -456,14 +457,14 @@ class _RankDetailPageState extends State<RankDetailPage> {
                 style: TextStyle(
                   fontSize: _textSizeM,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey[700]!,
+                  color: subtitleColor,
                 ),
               ),
               SizedBox(height: _paddingXS),
               Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.black, width: 1.0),
+                  border: Border.all(color: AppColors.tableBorder(brightness), width: 1.0),
                   borderRadius: BorderRadius.circular(_borderRadiusSmall),
                 ),
                 padding: EdgeInsets.all(_paddingM),
@@ -486,7 +487,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
                             style: TextStyle(
                               fontSize: _textSizeL,
                               fontWeight: FontWeight.bold,
-                              color: totalAchievement >= 400 ? Colors.green : Colors.red,
+                              color: totalAchievement >= 400 ? AppColors.successGreen(brightness) : AppColors.errorRed(brightness),
                             ),
                           ),
                         ),
@@ -497,7 +498,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
                             style: TextStyle(
                               fontSize: _textSizeL,
                               fontWeight: FontWeight.bold,
-                              color: remainingHp > 0 ? Colors.green : Colors.red,
+                              color: remainingHp > 0 ? AppColors.successGreen(brightness) : AppColors.errorRed(brightness),
                             ),
                           ),
                         ),
@@ -508,7 +509,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
                             style: TextStyle(
                               fontSize: _textSizeL,
                               fontWeight: FontWeight.bold,
-                              color: isDead ? Colors.red : Colors.green,
+                              color: isDead ? AppColors.errorRed(brightness) : AppColors.successGreen(brightness),
                             ),
                           ),
                         ),
@@ -528,7 +529,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
           style: TextStyle(
             fontSize: _textSizeM,
             fontWeight: FontWeight.bold,
-            color: Colors.grey[700]!,
+            color: subtitleColor,
           ),
         ),
         SizedBox(height: _paddingXS),
@@ -536,7 +537,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.black, width: 1.0),
+            border: Border.all(color: AppColors.tableBorder(brightness), width: 1.0),
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
           ),
           padding: EdgeInsets.all(_paddingM),
@@ -554,9 +555,9 @@ class _RankDetailPageState extends State<RankDetailPage> {
               SizedBox(height: _paddingXS),
               Row(
                 children: [
-                  _buildStatValueCell('${rankData.initialHp}', Colors.green),
-                  _buildStatValueCell('-${rankData.greatDamage}', Colors.orange),
-                  _buildStatValueCell('-${rankData.goodDamage}', Colors.red),
+                  _buildStatValueCell('${rankData.initialHp}', AppColors.successGreen(brightness)),
+                  _buildStatValueCell('-${rankData.greatDamage}', AppColors.warningOrange(brightness)),
+                  _buildStatValueCell('-${rankData.goodDamage}', AppColors.errorRed(brightness)),
                   _buildStatValueCell('-${rankData.missDamage}', Colors.redAccent),
                   _buildStatValueCell('+${rankData.healAmount}', Colors.lightGreen),
                 ],
@@ -569,11 +570,12 @@ class _RankDetailPageState extends State<RankDetailPage> {
   }
 
   Widget _buildStatCell(String label) {
+    final brightness = Theme.of(context).brightness;
     return Expanded(
       child: Text(
         label,
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: _textSizeM),
+        style: TextStyle(fontSize: _textSizeM, color: Theme.of(context).colorScheme.onSurface),
       ),
     );
   }
@@ -593,12 +595,13 @@ class _RankDetailPageState extends State<RankDetailPage> {
   }
 
   Widget _buildEmptyContent() {
+    final brightness = Theme.of(context).brightness;
     return Center(
       child: Text(
         '未找到段位数据',
         style: TextStyle(
           fontSize: _textSizeM,
-          color: Colors.grey[500]!,
+          color: AppColors.greyHint(brightness),
         ),
       ),
     );
@@ -616,14 +619,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
   }
 
   Color _getDifficultyBorderColor(int levelIndex) {
-    switch (levelIndex) {
-      case 0: return Colors.green;
-      case 1: return Color(0xFFFFCC00);
-      case 2: return Colors.pink;
-      case 3: return Colors.purple;
-      case 4: return Colors.purple.shade200;
-      default: return Colors.grey;
-    }
+    return AppColors.difficultyForegroundByIndex(levelIndex);
   }
 
   Widget _buildSongTypeTag(String? type) {
@@ -633,10 +629,10 @@ class _RankDetailPageState extends State<RankDetailPage> {
     if (type != null) {
       if (type.toLowerCase() == 'dx') {
         tagText = 'DX';
-        tagColor = Colors.orange;
+        tagColor = AppColors.warningOrange(Theme.of(context).brightness);
       } else if (type.toLowerCase() == 'sd') {
         tagText = 'ST';
-        tagColor = Colors.blue;
+        tagColor = AppColors.linkBlue(Theme.of(context).brightness);
       }
     }
     

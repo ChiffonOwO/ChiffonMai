@@ -176,6 +176,104 @@ class FavoriteFolderService {
     }
   }
 
+  /// 批量从收藏夹中移除谱面
+  /// 返回实际移除的数量
+  Future<int> removeChartsFromFolder(
+      String folderId, List<String> uniqueKeys) async {
+    if (!_loaded) await loadFolders();
+    try {
+      final folder = _folders.firstWhere((f) => f.id == folderId);
+      final before = folder.charts.length;
+      folder.charts.removeWhere((c) => uniqueKeys.contains(c.uniqueKey));
+      final removed = before - folder.charts.length;
+      if (removed > 0) {
+        folder.updatedAt = DateTime.now().millisecondsSinceEpoch;
+        await _saveFolders();
+      }
+      return removed;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// 批量将谱面从一个收藏夹移动到另一个
+  /// 返回成功移动的数量
+  Future<int> moveChartsBetweenFolders(
+      String sourceId, String targetId, List<String> uniqueKeys) async {
+    if (!_loaded) await loadFolders();
+    if (sourceId == targetId) return 0;
+    try {
+      final source = _folders.firstWhere((f) => f.id == sourceId);
+      final target = _folders.firstWhere((f) => f.id == targetId);
+      int moved = 0;
+      final chartsToMove = source.charts
+          .where((c) => uniqueKeys.contains(c.uniqueKey))
+          .toList();
+      for (final chart in chartsToMove) {
+        final exists = target.charts.any((c) => c.uniqueKey == chart.uniqueKey);
+        if (!exists) {
+          target.charts.add(chart);
+          moved++;
+        }
+      }
+      if (moved > 0) {
+        source.charts.removeWhere((c) => uniqueKeys.contains(c.uniqueKey));
+        source.updatedAt = DateTime.now().millisecondsSinceEpoch;
+        target.updatedAt = DateTime.now().millisecondsSinceEpoch;
+        await _saveFolders();
+      }
+      return moved;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// 更新收藏夹中谱面的成绩信息
+  Future<void> updateChartAchievement(
+      String folderId, String uniqueKey, double? achievement, int? playCount) async {
+    if (!_loaded) await loadFolders();
+    try {
+      final folder = _folders.firstWhere((f) => f.id == folderId);
+      final idx = folder.charts.indexWhere((c) => c.uniqueKey == uniqueKey);
+      if (idx >= 0) {
+        folder.charts[idx] = folder.charts[idx].copyWith(
+          achievement: achievement,
+          playCount: playCount,
+        );
+        folder.updatedAt = DateTime.now().millisecondsSinceEpoch;
+        await _saveFolders();
+      }
+    } catch (_) {
+      // 静默失败
+    }
+  }
+
+  /// 对谱面列表排序
+  List<FavoriteChart> sortCharts(
+      List<FavoriteChart> charts, FavoriteSortOption sortBy) {
+    final sorted = List<FavoriteChart>.from(charts);
+    switch (sortBy) {
+      case FavoriteSortOption.byDsDesc:
+        sorted.sort((a, b) => b.ds.compareTo(a.ds));
+        break;
+      case FavoriteSortOption.byDsAsc:
+        sorted.sort((a, b) => a.ds.compareTo(b.ds));
+        break;
+      case FavoriteSortOption.byDateNewest:
+        sorted.sort((a, b) => b.addedAt.compareTo(a.addedAt));
+        break;
+      case FavoriteSortOption.byDateOldest:
+        sorted.sort((a, b) => a.addedAt.compareTo(b.addedAt));
+        break;
+      case FavoriteSortOption.byTitle:
+        sorted.sort((a, b) => a.songTitle
+            .toLowerCase()
+            .compareTo(b.songTitle.toLowerCase()));
+        break;
+    }
+    return sorted;
+  }
+
   /// 清除所有数据
   Future<void> clearAll() async {
     _folders = [];

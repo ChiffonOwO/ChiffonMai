@@ -5,6 +5,7 @@ import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 
 class RandomChartPage extends StatefulWidget {
   const RandomChartPage({super.key});
@@ -272,6 +273,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
 
     // 统一管理的尺寸变量
@@ -288,14 +290,8 @@ class _RandomChartPageState extends State<RandomChartPage> {
     final gridItemSpacing = screenWidth * 0.03; // 网格项间距
 
     // 自定义常量
-    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
     final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = BoxShadow(
-      color: Colors.grey.withOpacity(0.5),
-      spreadRadius: 2,
-      blurRadius: 5,
-      offset: Offset(0, 3),
-    );
+    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
 
     return Scaffold(
         backgroundColor: Colors.transparent,
@@ -315,7 +311,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -326,7 +322,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                         child: Text(
                           '随机抽歌',
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -344,7 +340,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
                     boxShadow: [defaultShadow],
                   ),
@@ -357,7 +353,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                         Container(
                           padding: EdgeInsets.all(cardPadding),
                           decoration: BoxDecoration(
-                            color: Colors.grey[100],
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(borderRadius),
                           ),
                           child: Column(
@@ -382,7 +378,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                         '抽取数量',
                                         style: TextStyle(
                                           fontSize: textSizeSmall,
-                                          color: Colors.grey,
+                                          color: AppColors.greyHint(brightness),
                                         ),
                                       ),
                                       SizedBox(width: spacingSmall),
@@ -403,7 +399,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                                 decoration: BoxDecoration(
                                                   shape: BoxShape.circle,
                                                   color: _drawCount == i
-                                                      ? Colors.blue
+                                                      ? AppColors.linkBlue(brightness)
                                                       : Colors.grey[200],
                                                 ),
                                                 child: Center(
@@ -417,7 +413,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                                           : FontWeight.normal,
                                                       color: _drawCount == i
                                                           ? Colors.white
-                                                          : Colors.black,
+                                                          : Theme.of(context).colorScheme.onSurface,
                                                     ),
                                                   ),
                                                 ),
@@ -439,7 +435,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                           '版本筛选',
                                           style: TextStyle(
                                             fontSize: textSizeSmall,
-                                            color: Colors.grey,
+                                            color: AppColors.greyHint(brightness),
                                           ),
                                         ),
                                         SizedBox(height: spacingSmall),
@@ -451,7 +447,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                                 vertical: spacingSmall),
                                             decoration: BoxDecoration(
                                               border: Border.all(
-                                                  color: Colors.grey),
+                                                  color: AppColors.tableBorder(brightness)),
                                               borderRadius: BorderRadius.circular(
                                                   borderRadius),
                                             ),
@@ -487,7 +483,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                           '类型筛选',
                                           style: TextStyle(
                                             fontSize: textSizeSmall,
-                                            color: Colors.grey,
+                                            color: AppColors.greyHint(brightness),
                                           ),
                                         ),
                                         SizedBox(height: spacingSmall),
@@ -499,7 +495,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                                 vertical: spacingSmall),
                                             decoration: BoxDecoration(
                                               border: Border.all(
-                                                  color: Colors.grey),
+                                                  color: AppColors.tableBorder(brightness)),
                                               borderRadius: BorderRadius.circular(
                                                   borderRadius),
                                             ),
@@ -535,7 +531,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                           '定数范围',
                                           style: TextStyle(
                                             fontSize: textSizeSmall,
-                                            color: Colors.grey,
+                                            color: AppColors.greyHint(brightness),
                                           ),
                                         ),
                                         SizedBox(height: spacingSmall),
@@ -607,7 +603,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                           '快捷选项',
                                           style: TextStyle(
                                             fontSize: textSizeSmall,
-                                            color: Colors.grey,
+                                            color: AppColors.greyHint(brightness),
                                           ),
                                         ),
                                         SizedBox(height: spacingSmall),
@@ -636,8 +632,8 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                                   });
                                                 },
                                                 style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Colors.lightBlue[200],
-                                                  foregroundColor: Colors.blue[800],
+                                                  backgroundColor: AppColors.linkBlue(brightness).withValues(alpha: 0.3),
+                                                  foregroundColor: AppColors.linkBlue(brightness),
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius:
                                                         BorderRadius.circular(
@@ -676,8 +672,8 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                                   });
                                                 },
                                                 style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Colors.lightBlue[200],
-                                                  foregroundColor: Colors.blue[800],
+                                                  backgroundColor: AppColors.linkBlue(brightness).withValues(alpha: 0.3),
+                                                  foregroundColor: AppColors.linkBlue(brightness),
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius:
                                                         BorderRadius.circular(
@@ -705,7 +701,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                   ElevatedButton(
                                     onPressed: _isDrawing ? null : _drawSongs,
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blue,
+                                      backgroundColor: AppColors.linkBlue(brightness),
                                       padding: EdgeInsets.symmetric(
                                           vertical: spacingMedium),
                                       shape: RoundedRectangleBorder(
@@ -765,7 +761,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                         Container(
                           padding: EdgeInsets.all(cardPadding),
                           decoration: BoxDecoration(
-                            color: Colors.grey[100],
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(borderRadius),
                           ),
                           child: Column(
@@ -793,7 +789,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                           margin: EdgeInsets.symmetric(
                                               horizontal: gridItemSpacing / 2),
                                           decoration: BoxDecoration(
-                                            color: Colors.grey[200],
+                                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                             borderRadius: BorderRadius.circular(
                                                 borderRadius),
                                           ),
@@ -871,7 +867,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                                                   textSizeSmall *
                                                                       0.8,
                                                               color:
-                                                                  Colors.grey,
+                                                                  AppColors.greyHint(brightness),
                                                             ),
                                                           ),
                                                         ],
@@ -906,7 +902,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                         Container(
                           padding: EdgeInsets.all(cardPadding),
                           decoration: BoxDecoration(
-                            color: Colors.grey[100],
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(borderRadius),
                           ),
                           child: Column(
@@ -945,7 +941,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                                 '${DateTime.now().toString().substring(0, 16)}',
                                                 style: TextStyle(
                                                   fontSize: textSizeSmall,
-                                                  color: Colors.grey,
+                                                  color: AppColors.greyHint(brightness),
                                                 ),
                                               ),
                                               IconButton(
@@ -983,7 +979,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
                                                 },
                                                 child: Container(
                                                   decoration: BoxDecoration(
-                                                    color: Colors.grey[200],
+                                                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                             borderRadius),

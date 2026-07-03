@@ -11,6 +11,7 @@ import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonCacheUtil.dart';
 import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import '../SongInfoPage.dart';
 
 class GuessSongByOpenLettersPage extends StatefulWidget {
@@ -389,7 +390,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+          border: Border(bottom: BorderSide(color: AppColors.tableBorder(Theme.of(context).brightness))),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -440,7 +441,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                   // 作者
                   Text(
                     song.basicInfo.artist,
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -475,15 +476,9 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
             margin: const EdgeInsets.symmetric(vertical: 8),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isGuessed ? Colors.green[50] : Colors.white,
+              color: isGuessed ? Colors.green[50] : Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
+              boxShadow: [AppColors.defaultShadow(Theme.of(context).brightness)],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -513,14 +508,14 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: isGuessed ? FontWeight.bold : FontWeight.normal,
-                          color: isGuessed ? Colors.green : Colors.black,
+                          color: isGuessed ? Colors.green : Theme.of(context).colorScheme.onSurface,
                         ),
                         textAlign: _isGameOver || isGuessed ? TextAlign.left : TextAlign.center,
                       ),
                     ),
                     // 显示可点击指示
                     if (_isGameOver || isGuessed)
-                      const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                      Icon(Icons.arrow_forward_ios, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ],
                 ),
               ],
@@ -541,15 +536,9 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
         margin: const EdgeInsets.symmetric(vertical: 8),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 4,
-              offset: Offset(0, 2),
-            ),
-          ],
+          boxShadow: [AppColors.defaultShadow(Theme.of(context).brightness)],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -559,7 +548,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
               style: TextStyle(
                 fontSize: screenWidth * 0.035,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 8),
@@ -611,7 +600,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                         '${song.basicInfo.artist} | ${song.basicInfo.genre}',
                         style: TextStyle(
                           fontSize: screenWidth * 0.03,
-                          color: Colors.grey,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -620,7 +609,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                         '${song.ds.length > 3 ? song.ds[3].toString() : '-'} | ${song.ds.length > 4 ? song.ds[4].toString() : '-'} | ${StringUtil.formatVersion2(song.basicInfo.from)}',
                         style: TextStyle(
                           fontSize: screenWidth * 0.03,
-                          color: Colors.grey,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -628,7 +617,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                   ),
                 ),
                 // 可点击指示
-                const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                Icon(Icons.arrow_forward_ios, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ],
             ),
           ],
@@ -738,6 +727,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
           contentPadding: EdgeInsets.all(8.0), // 减小对话框内边距
           content: StatefulBuilder(
             builder: (BuildContext context, StateSetter setState) {
+              final brightness = Theme.of(context).brightness;
               return SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -808,7 +798,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: Color.fromARGB(255, 84, 97, 97),
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -843,7 +833,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: Color.fromARGB(255, 84, 97, 97),
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -865,7 +855,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                               const SizedBox(height: 8),
                               Text(
                                 '过滤日语+除空格以外的非英文字符在歌名中的占比大于等于此值的歌曲',
-                                style: TextStyle(fontSize: 14, color: Colors.grey),
+                                style: TextStyle(fontSize: 14, color: AppColors.greyHint(brightness)),
                                 textAlign: TextAlign.center,
                               ),
                             ],
@@ -901,7 +891,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Text(
                           '没有找到符合条件的乐曲！请检查设置！',
-                          style: TextStyle(color: Colors.red, fontSize: 14),
+                          style: TextStyle(color: AppColors.errorRed(Theme.of(context).brightness), fontSize: 14),
                         ),
                       ),
                   ],
@@ -981,17 +971,13 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
 
     // 自定义常量
-    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
     final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = BoxShadow(
-      color: Colors.black12,
-      blurRadius: 5.0,
-      offset: Offset(2.0, 2.0),
-    );
+    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -1012,7 +998,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -1023,7 +1009,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                         child: Text(
                           '猜歌（开字母）',
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1041,7 +1027,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
                     boxShadow: [defaultShadow],
                   ),
@@ -1074,7 +1060,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                                               Container(
                                                 padding: const EdgeInsets.all(16),
                                                 decoration: BoxDecoration(
-                                              color: Colors.blue[50],
+                                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                               borderRadius:
                                                   BorderRadius.circular(8),
                                             ),
@@ -1110,14 +1096,14 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                                                               '今日统计: 正确${_stats['correct']} | 错误${_stats['wrong']}',
                                                               style: TextStyle(
                                                                   fontSize: screenWidth * 0.04,
-                                                                  color: Colors.black
+                                                                  color: Theme.of(context).colorScheme.onSurface
                                                               ),
                                                             ),
                                                             Text(
                                                               '正确率${_stats['accuracy'].toStringAsFixed(1)}% | 平均用时${_stats['avgTime'].toStringAsFixed(1)}秒',
                                                               style: TextStyle(
                                                                   fontSize: screenWidth * 0.04,
-                                                                  color: Colors.black
+                                                                  color: Theme.of(context).colorScheme.onSurface
                                                               ),
                                                             ),
                                                           ],
@@ -1126,9 +1112,9 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                                                       const SizedBox(width: 4),
                                                       IconButton(
                                                         padding: EdgeInsets.zero,
-                                                        icon: const Icon(
+                                                        icon: Icon(
                                                             Icons.refresh,
-                                                            color: Color.fromARGB(255, 84, 97, 97),
+                                                            color: Theme.of(context).colorScheme.onSurface,
                                                             size: 20),
                                                         onPressed: () async {
                                                           await _cacheUtil.resetStats('6');
@@ -1171,7 +1157,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                                                     borderRadius:
                                                         BorderRadius.circular(8),
                                                     border: Border.all(
-                                                        color: Colors.grey[300]!),
+                                                        color: AppColors.tableBorder(brightness)),
                                                   ),
                                                   child: Row(
                                                     children: [
@@ -1212,7 +1198,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                                                     borderRadius:
                                                         BorderRadius.circular(8),
                                                     border: Border.all(
-                                                        color: Colors.grey[300]!),
+                                                        color: AppColors.tableBorder(brightness)),
                                                   ),
                                                   child: TextField(
                                                     controller: _answerController,
@@ -1231,15 +1217,9 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                                                   Container(
                                                     decoration: BoxDecoration(
                                                       borderRadius: BorderRadius.circular(8),
-                                                      border: Border.all(color: Colors.grey[300]!),
-                                                      color: Colors.white,
-                                                      boxShadow: [
-                                                        BoxShadow(
-                                                          color: Colors.black.withOpacity(0.2),
-                                                          blurRadius: 10,
-                                                          offset: Offset(0, 5),
-                                                        ),
-                                                      ],
+                                                      border: Border.all(color: AppColors.tableBorder(brightness)),
+                                                      color: Theme.of(context).colorScheme.surface,
+                                                      boxShadow: [AppColors.defaultShadow(brightness)],
                                                     ),
                                                     constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.3),
                                                     child: ListView.builder(
@@ -1275,29 +1255,26 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                                               children: [
                                                 // 规则按钮
                                                 IconButton(
-                                                  icon: const Icon(
+                                                  icon: Icon(
                                                       Icons.info_outline,
-                                                      color: Color.fromARGB(
-                                                          255, 84, 97, 97),
+                                                      color: Theme.of(context).colorScheme.onSurface,
                                                       size: 24),
                                                   onPressed: _showRulesDialog,
                                                 ),
                                                 const SizedBox(width: 8),
                                                 // 设置按钮
                                                 IconButton(
-                                                  icon: const Icon(
+                                                  icon: Icon(
                                                       Icons.settings,
-                                                      color: Color.fromARGB(
-                                                          255, 84, 97, 97),
+                                                      color: Theme.of(context).colorScheme.onSurface,
                                                       size: 24),
                                                   onPressed: _showSettingsDialog,
                                                 ),
                                                 const SizedBox(width: 8),
                                                 // 刷新按钮
                                                 IconButton(
-                                                  icon: const Icon(Icons.refresh,
-                                                      color: Color.fromARGB(
-                                                          255, 84, 97, 97),
+                                                  icon: Icon(Icons.refresh,
+                                                      color: Theme.of(context).colorScheme.onSurface,
                                                       size: 24),
                                                   onPressed: _startNewGame,
                                                 ),
@@ -1309,8 +1286,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                                                         ? Icons.sort_by_alpha
                                                         : Icons
                                                             .sort_by_alpha_outlined,
-                                                    color: Color.fromARGB(
-                                                        255, 84, 97, 97),
+                                                    color: Theme.of(context).colorScheme.onSurface,
                                                     size: 24,
                                                   ),
                                                   onPressed: () {
@@ -1354,7 +1330,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                                               margin: const EdgeInsets.only(top: 20),
                                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
                                               decoration: BoxDecoration(
-                                                color: Colors.grey[50],
+                                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                                 borderRadius: BorderRadius.circular(8),
                                               ),
                                               child: Column(

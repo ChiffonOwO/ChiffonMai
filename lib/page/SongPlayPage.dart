@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/service/SongPlayService.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:flutter/services.dart';
@@ -298,14 +299,11 @@ class _SongPlayPageState extends State<SongPlayPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 自定义常量
-    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
+    final brightness = Theme.of(context).brightness;
+    final Color textPrimaryColor = Theme.of(context).colorScheme.onSurface;
+    final Color cardBgColor = Theme.of(context).colorScheme.surface.withOpacity(0.9);
+    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
     final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = BoxShadow(
-      color: Colors.black12,
-      blurRadius: 5.0,
-      offset: Offset(2.0, 2.0),
-    );
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -354,7 +352,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: cardBgColor,
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
                     boxShadow: [defaultShadow],
                   ),
@@ -377,7 +375,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
                             child: Icon(
                               Icons.music_off,
                               size: 100,
-                              color: Colors.grey,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                           SizedBox(height: 20),
@@ -394,7 +392,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
                                 borderRadius: BorderRadius.circular(16),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
+                                    color: brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2),
                                     blurRadius: 8,
                                     offset: Offset(0, 4),
                                   ),
@@ -432,7 +430,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
                               _artist.isNotEmpty ? _artist : '未知曲师',
                               style: TextStyle(
                                 fontSize: 16,
-                                color: Colors.grey,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ),
@@ -463,8 +461,8 @@ class _SongPlayPageState extends State<SongPlayPage> {
                                           Duration(milliseconds: seekPosition));
                                     }
                                   },
-                                  activeColor: Colors.blue,
-                                  inactiveColor: Colors.grey,
+                                  activeColor: AppColors.linkBlue(brightness),
+                                  inactiveColor: AppColors.greyHint(brightness),
                                 ),
                                 // 时间显示
                                 Row(
@@ -493,7 +491,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
                                 style: TextStyle(fontSize: 18),
                               ),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
+                                backgroundColor: AppColors.linkBlue(brightness),
                                 foregroundColor: Colors.white,
                                 padding: EdgeInsets.symmetric(
                                   horizontal: 48,

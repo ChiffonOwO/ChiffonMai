@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 
 class SingleRatingCalculator extends StatefulWidget {
@@ -132,6 +133,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
     }
   }
 
+  // ignore: unused_element
   // 显示错误对话框
   void _showError(String message) {
     showDialog(
@@ -160,10 +162,9 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
       {"label": "99.0%", "multiplier": 0.208, "completion": 99.0},
     ];
 
+    // ignore: unused_local_variable
     final bodyFontSize = MediaQuery.of(context).size.width * 0.04;
     final smallFontSize = MediaQuery.of(context).size.width * 0.035;
-    final Color textPrimaryColor = const Color.fromARGB(255, 84, 97, 97);
-
     final List<Widget> rows = [];
     for (final tier in tiers) {
       final multiplier = tier["multiplier"] as double;
@@ -198,6 +199,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
@@ -216,13 +218,8 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
     final buttonFontSize = screenWidth * 0.045; // 按钮字体大小为屏幕宽度的4.5%
     
     // 自定义常量
-    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
     final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = BoxShadow(
-      color: Colors.black12,
-      blurRadius: 5.0,
-      offset: Offset(2.0, 2.0),
-    );
+    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -247,7 +244,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                     children: [
                       // 返回按钮
                       IconButton(
-                        icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                        icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                         onPressed: () {
                           Navigator.of(context).pop();
                         },
@@ -258,7 +255,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                           child: Text(
                             '单曲Rating计算',
                             style: TextStyle(
-                              color: textPrimaryColor,
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontSize: titleFontSize,
                               fontWeight: FontWeight.bold,
                             ),
@@ -281,7 +278,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                         Container(
                           margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
+                            color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                             borderRadius: BorderRadius.circular(borderRadiusSmall),
                             boxShadow: [defaultShadow],
                           ),
@@ -296,7 +293,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                                   style: TextStyle(
                                     fontSize: subtitleFontSize,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
+                                    color: AppColors.linkBlue(brightness),
                                   ),
                                 ),
                                 SizedBox(height: smallSpacing),
@@ -319,7 +316,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                                       _difficultyError!,
                                       style: TextStyle(
                                         fontSize: smallFontSize,
-                                        color: Colors.red,
+                                        color: AppColors.errorRed(brightness),
                                       ),
                                     ),
                                   ),
@@ -331,7 +328,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                                   style: TextStyle(
                                     fontSize: subtitleFontSize,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
+                                    color: AppColors.linkBlue(brightness),
                                   ),
                                 ),
                                 SizedBox(height: smallSpacing),
@@ -354,7 +351,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                                       _completionError!,
                                       style: TextStyle(
                                         fontSize: smallFontSize,
-                                        color: Colors.red,
+                                        color: AppColors.errorRed(brightness),
                                       ),
                                     ),
                                   ),
@@ -470,7 +467,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                         Container(
                           margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
+                            color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                             borderRadius: BorderRadius.circular(borderRadiusSmall),
                             boxShadow: [defaultShadow],
                           ),
@@ -485,7 +482,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                                   style: TextStyle(
                                     fontSize: subtitleFontSize,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
+                                    color: AppColors.linkBlue(brightness),
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
@@ -494,7 +491,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                                   style: TextStyle(
                                     fontSize: subtitleFontSize,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
+                                    color: AppColors.linkBlue(brightness),
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
@@ -502,7 +499,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
 
                                 // 表格
                                 Table(
-                                  border: TableBorder.all(color: Colors.grey),
+                                  border: TableBorder.all(color: AppColors.tableBorder(brightness)),
                                   children: [
                                     // 表头
                                     TableRow(

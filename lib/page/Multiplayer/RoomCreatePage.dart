@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/GameType.dart';
 import 'package:my_first_flutter_app/manager/MultiplayerManager.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartByInfoService.dart';
 import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
 
@@ -148,7 +150,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
   }
 
   /// 构建模式专属设置区域
-  Widget _buildModeSpecificSettings(double scaleFactor) {
+  Widget _buildModeSpecificSettings(double scaleFactor, Brightness brightness) {
     if (!_needsModeSettings) return const SizedBox.shrink();
 
     return Column(
@@ -166,7 +168,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
         Container(
           padding: EdgeInsets.all(12 * scaleFactor),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(8 * scaleFactor),
           ),
           child: Column(
@@ -181,6 +183,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                   divisions: 100,
                   suffix: '%',
                   scaleFactor: scaleFactor,
+                  brightness: brightness,
                   onChanged: (v) => setState(() => _blurLevel = v.toInt()),
                 ),
               // 播放时长 (音频片段模式)
@@ -193,6 +196,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                   divisions: 29,
                   suffix: ' 秒',
                   scaleFactor: scaleFactor,
+                  brightness: brightness,
                   onChanged: (v) => setState(() => _playDuration = v.toInt()),
                 ),
               // 歌曲数量 (开字母模式)
@@ -205,6 +209,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                   divisions: 9,
                   suffix: ' 首',
                   scaleFactor: scaleFactor,
+                  brightness: brightness,
                   onChanged: (v) => setState(() => _songCount = v.toInt()),
                 ),
                 SizedBox(height: 12 * scaleFactor),
@@ -216,6 +221,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                   divisions: 100,
                   suffix: '%',
                   scaleFactor: scaleFactor,
+                  brightness: brightness,
                   onChanged: (v) => setState(() => _nonEnglishCharThreshold = v.toInt()),
                 ),
               ],
@@ -234,6 +240,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
     required int divisions,
     required String suffix,
     required double scaleFactor,
+    required Brightness brightness,
     required ValueChanged<double> onChanged,
   }) {
     return Column(
@@ -248,7 +255,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
               style: TextStyle(
                 fontSize: 14 * scaleFactor,
                 fontWeight: FontWeight.bold,
-                color: const Color.fromARGB(255, 84, 97, 97),
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ],
@@ -267,6 +274,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
     final scaleFactor = screenWidth / 375.0;
     final paddingS = 8.0 * scaleFactor;
@@ -291,7 +299,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                   children: [
                     IconButton(
                       icon: Icon(Icons.arrow_back,
-                          color: const Color.fromARGB(255, 84, 97, 97)),
+                          color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     Expanded(
@@ -299,7 +307,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                         child: Text(
                           '创建房间',
                           style: TextStyle(
-                            color: const Color.fromARGB(255, 84, 97, 97),
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -317,15 +325,9 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                   margin:
                       EdgeInsets.fromLTRB(paddingS, 0, paddingS, paddingL),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 5.0 * scaleFactor,
-                        offset: Offset(2.0 * scaleFactor, 2.0 * scaleFactor),
-                      ),
-                    ],
+                    boxShadow: [AppConstants.defaultShadow(brightness)],
                   ),
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator())
@@ -348,7 +350,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                                 padding: EdgeInsets.symmetric(
                                     horizontal: paddingM, vertical: paddingS),
                                 decoration: BoxDecoration(
-                                  color: const Color.fromARGB(255, 84, 97, 97),
+                                  color: Theme.of(context).colorScheme.onSurface,
                                   borderRadius:
                                       BorderRadius.circular(borderRadiusSmall),
                                 ),
@@ -370,7 +372,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                                         type.name,
                                         style: TextStyle(
                                           fontSize: 16 * scaleFactor,
-                                          color: Colors.black,
+                                          color: Theme.of(context).colorScheme.onSurface,
                                         ),
                                       ),
                                     );
@@ -390,7 +392,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                                   _gameType.description,
                                   style: TextStyle(
                                     fontSize: 13 * scaleFactor,
-                                    color: Colors.grey[600],
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                                     fontStyle: FontStyle.italic,
                                   ),
                                 ),
@@ -461,7 +463,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                               Container(
                                 padding: EdgeInsets.all(paddingM),
                                 decoration: BoxDecoration(
-                                  color: Colors.grey[50],
+                                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                   borderRadius:
                                       BorderRadius.circular(borderRadiusSmall),
                                 ),
@@ -491,7 +493,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                               ),
 
                               // ======== 模式专属设置 ========
-                              _buildModeSpecificSettings(scaleFactor),
+                              _buildModeSpecificSettings(scaleFactor, brightness),
 
                               // ======== 重置按钮 ========
                               SizedBox(height: paddingL * 1.2),
@@ -513,10 +515,10 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                                     });
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.grey[300],
+                                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                                   ),
-                                  child: const Text('重置所有设置',
-                                      style: TextStyle(color: Colors.black)),
+                                  child: Text('重置所有设置',
+                                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
                                 ),
                               ),
 
@@ -526,7 +528,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                                 onPressed: _isCreating ? null : _handleCreateRoom,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor:
-                                      const Color.fromARGB(255, 84, 97, 97),
+                                      Theme.of(context).colorScheme.onSurface,
                                   padding: EdgeInsets.symmetric(
                                       vertical: 16 * scaleFactor),
                                   minimumSize: Size(

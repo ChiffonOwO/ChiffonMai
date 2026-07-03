@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'AppTheme.dart';
 
 class TextStyleUtil {
   // ========== 字重常量定义 ==========
@@ -82,10 +83,14 @@ class TextStyleUtil {
   // ========== 提示文字样式 ==========
 
   // 提示文字样式（常规）
-  static TextStyle get hintStyle => GoogleFonts.notoSansSc(
+  // ignore: deprecated_member_use_from_same_package
+  static TextStyle get hintStyle => hintStyleForTheme(Brightness.light);
+
+  /// 主题感知的提示文字样式
+  static TextStyle hintStyleForTheme(Brightness brightness) => GoogleFonts.notoSansSc(
         fontSize: 14,
         fontWeight: regular,
-        color: Colors.grey,
+        color: AppColors.greyHint(brightness),
       );
 
   // ========== 按钮文字样式 ==========
@@ -316,37 +321,56 @@ class TextStyleUtil {
 
   // ========== 预设颜色样式 ==========
 
-  // 灰色提示文字 (12px)
-  static TextStyle get greyHint =>
-      GoogleFonts.notoSansSc(fontSize: 12, color: Colors.grey);
+  // 灰色提示文字 (12px) — 已弃用，请使用 greyHintForTheme
+  static TextStyle get greyHint => greyHintForTheme(Brightness.light);
 
-  // 灰色提示文字 (14px)
-  static TextStyle get greyHint14 =>
-      GoogleFonts.notoSansSc(fontSize: 14, color: Colors.grey);
+  // 灰色提示文字 (14px) — 已弃用，请使用 greyHint14ForTheme
+  static TextStyle get greyHint14 => greyHint14ForTheme(Brightness.light);
 
-  // 白色文字 (12px)
-  static TextStyle get whiteSmall =>
-      GoogleFonts.notoSansSc(fontSize: 12, color: Colors.white);
+  /// 主题感知的灰色提示文字 (12px)
+  static TextStyle greyHintForTheme(Brightness brightness) =>
+      GoogleFonts.notoSansSc(fontSize: 12, color: AppColors.greyHint(brightness));
 
-  // 白色文字 (14px)
-  static TextStyle get whiteMedium =>
-      GoogleFonts.notoSansSc(fontSize: 14, color: Colors.white);
+  /// 主题感知的灰色提示文字 (14px)
+  static TextStyle greyHint14ForTheme(Brightness brightness) =>
+      GoogleFonts.notoSansSc(fontSize: 14, color: AppColors.greyHint(brightness));
 
-  // 白色文字 (16px)
-  static TextStyle get whiteLarge =>
-      GoogleFonts.notoSansSc(fontSize: 16, color: Colors.white);
+  // 白色文字 (12px) — 已弃用，请使用 onPrimaryTextSmall
+  static TextStyle get whiteSmall => whiteSmallForTheme(Brightness.light);
 
-  // 黑色粗体文字
-  static TextStyle get blackBold =>
-      GoogleFonts.notoSansSc(fontSize: 16, fontWeight: bold, color: Colors.black);
+  // 白色文字 (14px) — 已弃用，请使用 onPrimaryTextMedium
+  static TextStyle get whiteMedium => whiteMediumForTheme(Brightness.light);
+
+  // 白色文字 (16px) — 已弃用，请使用 onPrimaryTextLarge
+  static TextStyle get whiteLarge => whiteLargeForTheme(Brightness.light);
+
+  // 黑色粗体文字 — 已弃用，请使用 primaryTextBold
+  static TextStyle get blackBold => primaryTextBold(Brightness.light);
+
+  /// 主题感知的浅色文字 (12px) — 适用于深色背景
+  static TextStyle whiteSmallForTheme(Brightness brightness) =>
+      GoogleFonts.notoSansSc(fontSize: 12, color: brightness == Brightness.dark ? const Color(0xFFE0E0E0) : Colors.white);
+
+  /// 主题感知的浅色文字 (14px) — 适用于深色背景
+  static TextStyle whiteMediumForTheme(Brightness brightness) =>
+      GoogleFonts.notoSansSc(fontSize: 14, color: brightness == Brightness.dark ? const Color(0xFFE0E0E0) : Colors.white);
+
+  /// 主题感知的浅色文字 (16px) — 适用于深色背景
+  static TextStyle whiteLargeForTheme(Brightness brightness) =>
+      GoogleFonts.notoSansSc(fontSize: 16, color: brightness == Brightness.dark ? const Color(0xFFE0E0E0) : Colors.white);
+
+  /// 主题感知的主色粗体文字
+  static TextStyle primaryTextBold(Brightness brightness) =>
+      GoogleFonts.notoSansSc(fontSize: 16, fontWeight: bold, color: AppColors.primaryText(brightness));
 
   // ========== 数字样式 ==========
 
   // 数字样式 - 用于显示分数、评级等
+  // color 请使用 AppColors.primaryText(brightness) 以适配暗色模式
   static TextStyle numberStyle({
     double? fontSize,
     FontWeight fontWeight = bold,
-    Color color = Colors.black,
+    Color? color,
   }) {
     return GoogleFonts.notoSansSc(
       fontSize: fontSize,

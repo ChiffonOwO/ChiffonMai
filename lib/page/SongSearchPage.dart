@@ -10,6 +10,7 @@ import 'dart:async';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
 import 'package:my_first_flutter_app/constant/GenreListConstant.dart';
 
@@ -382,6 +383,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                     style: TextStyle(
                       fontSize: screenWidth * 0.035,
                       fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   if (selectedLevelText.isNotEmpty)
@@ -392,7 +394,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                           selectedLevelText,
                           style: TextStyle(
                             fontSize: screenWidth * 0.03,
-                            color: Colors.grey,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
@@ -485,6 +487,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                     style: TextStyle(
                       fontSize: screenWidth * 0.035,
                       fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   if (selectedVersionsText.isNotEmpty)
@@ -495,7 +498,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                           selectedVersionsText,
                           style: TextStyle(
                             fontSize: screenWidth * 0.03,
-                            color: Colors.grey,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
@@ -569,6 +572,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                     style: TextStyle(
                       fontSize: screenWidth * 0.035,
                       fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   if (selectedGenresText.isNotEmpty)
@@ -579,7 +583,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                           selectedGenresText,
                           style: TextStyle(
                             fontSize: screenWidth * 0.03,
-                            color: Colors.grey,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
@@ -655,6 +659,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                     style: TextStyle(
                       fontSize: screenWidth * 0.035,
                       fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   if (selectedTagsText.isNotEmpty)
@@ -665,7 +670,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                           selectedTagsText,
                           style: TextStyle(
                             fontSize: screenWidth * 0.03,
-                            color: Colors.grey,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
@@ -696,7 +701,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                     child: Padding(
                       padding: EdgeInsets.all(screenHeight * 0.02),
                       child: CircularProgressIndicator(
-                        color: Color.fromARGB(255, 84, 97, 97),
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   )
@@ -708,7 +713,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                             '暂无标签数据',
                             style: TextStyle(
                               fontSize: screenWidth * 0.03,
-                              color: Colors.grey,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ),
@@ -740,7 +745,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                   style: TextStyle(
                                     fontSize: screenWidth * 0.032,
                                     fontWeight: FontWeight.bold,
-                                    color: Color.fromARGB(255, 84, 97, 97),
+                                    color: Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -781,43 +786,34 @@ class _SongSearchPageState extends State<SongSearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
 
-    // 自定义常量
-    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
+    final Color textPrimaryColor = Theme.of(context).colorScheme.onSurface;
+    final Color cardBgColor = Theme.of(context).colorScheme.surface.withOpacity(0.9);
+    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
     final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = BoxShadow(
-      color: Colors.grey.withOpacity(0.5),
-      spreadRadius: 2,
-      blurRadius: 5,
-      offset: Offset(0, 3),
-    );
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false, // 防止键盘弹出时调整布局
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          // 背景
           CommonWidgetUtil.buildCommonBgWidget(),
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
 
-          // 页面内容
           Column(
             children: [
-              // 标题栏
               Container(
                 padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
                 child: Row(
                   children: [
-                    // 返回按钮
                     IconButton(
                       icon: Icon(Icons.arrow_back, color: textPrimaryColor),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
                     ),
-                    // 标题
                     Expanded(
                       child: Center(
                         child: Text(
@@ -830,18 +826,16 @@ class _SongSearchPageState extends State<SongSearchPage> {
                         ),
                       ),
                     ),
-                    // 占位，保持标题居中
                     SizedBox(width: 48),
                   ],
                 ),
               ),
 
-              // 主内容区域
               Expanded(
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: cardBgColor,
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
                     boxShadow: [defaultShadow],
                   ),
@@ -931,7 +925,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                             '找到 $_totalItems 首乐曲，每页 15 首',
                                             style: TextStyle(
                                               fontSize: smallFontSize,
-                                              color: Colors.grey,
+                                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                                             ),
                                             overflow: TextOverflow.ellipsis,
                                           ),
@@ -959,14 +953,12 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                               vertical: screenHeight * 0.005,
                                             ),
                                             minimumSize: Size(screenWidth * 0.15, 30),
-                                            backgroundColor: Colors.redAccent,
+                                            backgroundColor: AppColors.errorRed(brightness),
                                             foregroundColor: Colors.white,
                                           ),
                                           child: Text(
                                             '重置',
-                                            style: TextStyle(
-                                              fontSize: tinyFontSize,
-                                            ),
+                                            style: TextStyle(fontSize: tinyFontSize),
                                           ),
                                         ),
                                         SizedBox(width: screenWidth * 0.01),
@@ -1007,14 +999,12 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                     child: Column(
                                       children: [
                                         CircularProgressIndicator(
-                                          color:
-                                              Color.fromARGB(255, 84, 97, 97),
+                                          color: Theme.of(context).colorScheme.onSurface,
                                         ),
                                         SizedBox(height: screenHeight * 0.02),
                                         Text(
                                           '正在搜索...',
-                                          style:
-                                              TextStyle(fontSize: baseFontSize),
+                                          style: TextStyle(fontSize: baseFontSize, color: Theme.of(context).colorScheme.onSurfaceVariant),
                                         ),
                                       ],
                                     ),
@@ -1029,7 +1019,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                       children: [
                                         Icon(
                                           Icons.error_outline,
-                                          color: Colors.red,
+                                          color: AppColors.errorRed(brightness),
                                           size: screenWidth * 0.12,
                                         ),
                                         SizedBox(height: screenHeight * 0.02),
@@ -1037,7 +1027,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                           _errorMessage!,
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
-                                            color: Colors.red,
+                                            color: AppColors.errorRed(brightness),
                                             fontSize: baseFontSize,
                                           ),
                                         ),
@@ -1045,7 +1035,6 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                     ),
                                   ),
                                 )
-                              // 无结果状态
                               else if (_allSearchResults.isEmpty &&
                                   _searchController.text.isNotEmpty)
                                 Center(
@@ -1054,7 +1043,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                     child: Text(
                                       '未找到匹配的歌曲',
                                       style: TextStyle(
-                                        color: Colors.grey,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                                         fontSize: baseFontSize,
                                       ),
                                     ),
@@ -1078,7 +1067,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                     child: Text(
                                       '请输入搜索关键词',
                                       style: TextStyle(
-                                        color: Colors.grey,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                                         fontSize: baseFontSize,
                                       ),
                                     ),
@@ -1093,15 +1082,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
                       if (_totalPages > 1)
                         Container(
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.8),
+                            color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                             borderRadius: BorderRadius.circular(8.0),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black12,
-                                blurRadius: 3.0,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
+                            boxShadow: [AppColors.defaultShadow(brightness)],
                           ),
                           margin: EdgeInsets.all(padding),
                           padding: EdgeInsets.symmetric(
@@ -1124,7 +1107,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                 '$_currentPage / $_totalPages',
                                 style: TextStyle(
                                   fontSize: smallFontSize,
-                                  color: Colors.grey,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 ),
                               ),
 
@@ -1153,6 +1136,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
 
   // 构建歌曲项
   Widget _buildSongItem(dynamic song) {
+    final brightness = Theme.of(context).brightness;
 
     // 生成匹配信息
     List<Map<String, String>> matchInfo = _getMatchInfo(song);
@@ -1173,19 +1157,18 @@ class _SongSearchPageState extends State<SongSearchPage> {
         margin: const EdgeInsets.only(bottom: 6),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(color: brightness == Brightness.dark ? Colors.grey.shade700 : Colors.grey.shade200),
           borderRadius: BorderRadius.circular(8),
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surface,
         ),
         child: Row(
           children: [
-            // 曲绘
             Container(
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                border: Border.all(color: Colors.grey.shade200),
+                color: brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade100,
+                border: Border.all(color: brightness == Brightness.dark ? Colors.grey.shade700 : Colors.grey.shade200),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: CoverUtil.buildCoverWidget(song.id, 80),
@@ -1215,7 +1198,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
               //             '曲绘',
               //             style: TextStyle(
               //               fontSize: 14,
-              //               color: Colors.grey,
+              //               color: Theme.of(context).colorScheme.onSurfaceVariant,
               //             ),
               //           ),
               //         );
@@ -1239,9 +1222,10 @@ class _SongSearchPageState extends State<SongSearchPage> {
                       Expanded(
                         child: Text(
                           song.basicInfo.title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1249,25 +1233,23 @@ class _SongSearchPageState extends State<SongSearchPage> {
                       const SizedBox(width: 8),
                       Text(
                         'ID: ${song.id}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
 
-                  // 第二行：类型、版本、流派
                   Row(
                     children: [
-                      // ST/DX/UTAGE 显示
                       Text(
                         song.id.toString().length == 6 ? 'UTAGE' : (song.type == 'SD' ? 'ST' : 'DX'),
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: song.id.toString().length == 6 ? Color(0xFFFF6B8B) : (song.type == 'SD' ? Colors.blue : Colors.orange),
+                          color: song.id.toString().length == 6 ? const Color(0xFFFF6B8B) : (song.type == 'SD' ? AppColors.linkBlue(brightness) : AppColors.warningOrange(brightness)),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -1275,9 +1257,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
                       Expanded(
                         child: Text(
                           '${StringUtil.formatVersion(song.basicInfo.from)} | ${song.basicInfo.genre}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            color: Colors.grey,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1295,9 +1277,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Text(
                                   '${info['type']}：${info['value']}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
-                                    color: Colors.blue,
+                                    color: AppColors.linkBlue(brightness),
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                   maxLines: 1,
@@ -1306,7 +1288,6 @@ class _SongSearchPageState extends State<SongSearchPage> {
                           .toList(),
                     ),
                   
-                  // 标签信息（多行显示）
                   if (tagInfoList.isNotEmpty)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1315,9 +1296,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Text(
                                   tagInfo,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
-                                    color: Colors.blue,
+                                    color: AppColors.linkBlue(brightness),
                                   ),
                                 ),
                               ))

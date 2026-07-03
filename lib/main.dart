@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:my_first_flutter_app/page/HomePage.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/ThemeManager.dart';
+import 'package:my_first_flutter_app/service/ConnectivityService.dart';
 
 void main() {
   GoogleFonts.config.allowRuntimeFetching = true;
@@ -17,10 +20,20 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   bool _fontsLoaded = false;
+  bool _themeLoaded = false;
 
   @override
   void initState() {
     super.initState();
+    _initTheme();
+    ConnectivityService().start();
+  }
+
+  Future<void> _initTheme() async {
+    await ThemeManager().loadThemePreference();
+    if (mounted) {
+      setState(() => _themeLoaded = true);
+    }
   }
 
   void _loadFonts() {
@@ -32,59 +45,50 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  /// 构建包含字体配置的 ThemeData
+  ThemeData _buildThemeWithFonts(ThemeData base) {
+    if (!_fontsLoaded) return base;
+    return base.copyWith(
+      textTheme: GoogleFonts.notoSansScTextTheme(
+        base.textTheme,
+      ),
+      primaryTextTheme: GoogleFonts.notoSansScTextTheme(
+        base.primaryTextTheme,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: HomePage(onFirstFrameRendered: _loadFonts),
-      theme: ThemeData(
-          fontFamily: _fontsLoaded 
-              ? GoogleFonts.notoSansSc(fontWeight: FontWeight.w400).fontFamily 
-              : null,
-          textTheme: _fontsLoaded ? TextTheme(
-            displayLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
-            displayMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
-            displaySmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
-            headlineLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
-            headlineMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
-            headlineSmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
-            titleLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
-            titleMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
-            titleSmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
-            bodyLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w400),
-            bodyMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w400),
-            bodySmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w400),
-            labelLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
-            labelMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w500),
-            labelSmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w500),
-          ) : null,
-          primaryTextTheme: _fontsLoaded ? TextTheme(
-            displayLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
-            displayMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
-            displaySmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
-            headlineLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
-            headlineMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
-            headlineSmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w700),
-            titleLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
-            titleMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
-            titleSmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
-            bodyLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w400),
-            bodyMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w400),
-            bodySmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w400),
-            labelLarge: GoogleFonts.notoSansSc(fontWeight: FontWeight.w600),
-            labelMedium: GoogleFonts.notoSansSc(fontWeight: FontWeight.w500),
-            labelSmall: GoogleFonts.notoSansSc(fontWeight: FontWeight.w500),
-          ) : null,
-        ),
-        builder: (context, child) {
-          return MediaQuery(
-            data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
-            child: DefaultTextStyle(
-              style: _fontsLoaded ? GoogleFonts.notoSansSc() : const TextStyle(),
-              child: child!,
-            ),
-          );
-        },
+    if (!_themeLoaded) {
+      return const MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(body: Center(child: CircularProgressIndicator())),
+      );
+    }
+
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeManager().notifier,
+      builder: (context, themeMode, _) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: HomePage(onFirstFrameRendered: _loadFonts),
+          theme: _buildThemeWithFonts(AppTheme.lightTheme()),
+          darkTheme: _buildThemeWithFonts(AppTheme.darkTheme()),
+          themeMode: themeMode,
+          builder: (context, child) {
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
+              child: DefaultTextStyle(
+                style: _fontsLoaded
+                    ? GoogleFonts.notoSansSc()
+                    : const TextStyle(),
+                child: child!,
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

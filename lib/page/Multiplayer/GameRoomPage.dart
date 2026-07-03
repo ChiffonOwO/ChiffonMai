@@ -16,6 +16,8 @@ import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartByInfoService.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/GameSeedUtil.dart';
 import 'package:my_first_flutter_app/utils/LuoXueSongUtil.dart';
@@ -767,9 +769,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
           margin: const EdgeInsets.symmetric(vertical: 4),
           decoration: BoxDecoration(
-            color: isCurrentPlayer ? Colors.green[100] : (player.isHost ? Colors.blue[100] : Colors.grey[100]),
+            color: isCurrentPlayer ? AppColors.successGreen(Theme.of(context).brightness).withOpacity(0.1) : (player.isHost ? AppColors.linkBlue(Theme.of(context).brightness).withOpacity(0.1) : Theme.of(context).colorScheme.surfaceContainerHighest),
             borderRadius: BorderRadius.circular(8),
-            border: isCurrentPlayer ? Border.all(color: Colors.green, width: 2) : null,
+            border: isCurrentPlayer ? Border.all(color: AppColors.successGreen(Theme.of(context).brightness), width: 2) : null,
           ),
           child: Row(
             children: [
@@ -786,14 +788,14 @@ class _GameRoomPageState extends State<GameRoomPage> {
                           ),
                         ),
                         if (isCurrentPlayer)
-                          const Padding(
-                            padding: EdgeInsets.only(left: 8),
-                            child: Text('(我)', style: TextStyle(fontSize: 12, color: Colors.green)),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: Text('(我)', style: TextStyle(fontSize: 12, color: AppColors.successGreen(Theme.of(context).brightness))),
                           ),
                         if (player.isHost)
-                          const Padding(
-                            padding: EdgeInsets.only(left: 8),
-                            child: Text('(房主)', style: TextStyle(fontSize: 12, color: Colors.blue)),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: Text('(房主)', style: TextStyle(fontSize: 12, color: AppColors.linkBlue(Theme.of(context).brightness))),
                           ),
                       ],
                     ),
@@ -840,7 +842,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
     );
   }
 
-  Widget _buildGameArea() {
+  Widget _buildGameArea(Brightness brightness) {
     if (_gameState == null) {
       return const Center(child: Text('等待游戏开始...'));
     }
@@ -876,7 +878,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
                   ElevatedButton(
                     onPressed: _handleRestartGame,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromARGB(255, 84, 97, 97),
+                      backgroundColor: Theme.of(context).colorScheme.onSurface,
                     ),
                     child: const Text('开始新一轮', style: TextStyle(color: Colors.white)),
                   ),
@@ -884,9 +886,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
                   ElevatedButton(
                     onPressed: _handleSettleGame,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[300],
+                      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                     ),
-                    child: const Text('结算游戏', style: TextStyle(color: Colors.black)),
+                    child: Text('结算游戏', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
                   ),
                 ],
               ),
@@ -928,7 +930,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
             ElevatedButton(
               onPressed: _handleNextRound,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color.fromARGB(255, 84, 97, 97),
+                backgroundColor: Theme.of(context).colorScheme.onSurface,
               ),
               child: const Text('下一轮', style: TextStyle(color: Colors.white)),
             ),
@@ -982,7 +984,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
             style: TextStyle(
               fontSize: 16, 
               fontWeight: FontWeight.bold,
-              color: _remainingTime <= 10 ? Colors.red : Colors.black,
+              color: _remainingTime <= 10 ? AppColors.errorRed(brightness) : Theme.of(context).colorScheme.onSurface,
             ),
           ),
         
@@ -993,7 +995,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: (_gameState!.maxGuesses - _gameState!.currentGuesses) <= 3 ? Colors.orange : Colors.black,
+              color: (_gameState!.maxGuesses - _gameState!.currentGuesses) <= 3 ? AppColors.warningOrange(brightness) : Theme.of(context).colorScheme.onSurface,
             ),
           ),
         
@@ -1019,10 +1021,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
                 children: [
                   // 规则按钮
                   IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                         Icons.info_outline,
-                        color: Color.fromARGB(
-                            255, 84, 97, 97),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         size: 24),
                     onPressed: _showRulesDialog,
                   ),
@@ -1033,8 +1034,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
                       _isAscending
                           ? Icons.sort_by_alpha
                           : Icons.sort_by_alpha_outlined,
-                      color: const Color.fromARGB(
-                          255, 84, 97, 97),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       size: 24,
                     ),
                     onPressed: () {
@@ -1047,10 +1047,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
                   // 投降按钮
                   TextButton(
                     onPressed: _handleSurrender,
-                    child: const Text('投降',
+                    child: Text('投降',
                         style: TextStyle(
-                            color: Color.fromARGB(
-                                255, 84, 97, 97))),
+                            color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   ),
                 ],
               ),
@@ -1099,7 +1098,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
   Widget _buildSearchResults() {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: AppColors.tableBorder(Theme.of(context).brightness)),
         borderRadius: BorderRadius.circular(8),
       ),
       constraints: const BoxConstraints(maxHeight: 300),
@@ -1122,7 +1121,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+          border: Border(bottom: BorderSide(color: AppColors.tableBorder(Theme.of(context).brightness))),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -1169,14 +1168,14 @@ class _GameRoomPageState extends State<GameRoomPage> {
                   ),
                   Text(
                     song.basicInfo.artist,
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (aliasText.isNotEmpty)
                     Text(
                       aliasText,
-                      style: TextStyle(fontSize: 14, color: Colors.blue),
+                      style: TextStyle(fontSize: 14, color: AppColors.linkBlue(Theme.of(context).brightness)),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1246,15 +1245,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
           margin: const EdgeInsets.symmetric(vertical: 8),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            boxShadow: [AppConstants.defaultShadow(Theme.of(context).brightness)],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1262,7 +1255,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
               // 左上角显示提交者信息
               Text(
                 '${guess.playerNickname}提交了第$guessNumber个猜测结果',
-                style: const TextStyle(fontSize: 14, color: Colors.grey),
+                style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
               const SizedBox(height: 12),
 
@@ -1665,7 +1658,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
                     '${_targetSong!.basicInfo.artist} | ${_targetSong!.basicInfo.genre}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1674,7 +1667,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
                     '${_targetSong!.ds.length > 3 ? _targetSong!.ds[3].toString() : '-'} | ${_targetSong!.ds.length > 4 ? _targetSong!.ds[4].toString() : '-'} | ${StringUtil.formatVersion2(_targetSong!.basicInfo.from)}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1706,7 +1699,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
             margin: const EdgeInsets.symmetric(vertical: 4),
             decoration: BoxDecoration(
-              color: index < 3 ? Colors.yellow[50] : Colors.grey[50],
+              color: index < 3 ? Colors.yellow[50] : Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -1853,9 +1846,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
           ),
           const SizedBox(height: 8),
           if (!isGameOver)
-            const Text(
+            Text(
               '根据截取的曲绘部分猜歌名',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
+              style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
         ],
       ),
@@ -1908,7 +1901,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
             const SizedBox(height: 8),
             Text(
               '模糊程度: $effectiveBlur%',
-              style: const TextStyle(fontSize: 14, color: Colors.grey),
+              style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ],
         ],
@@ -2127,6 +2120,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
     final scaleFactor = screenWidth / 375.0;
     final paddingS = 8.0 * scaleFactor;
@@ -2153,7 +2147,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: Color.fromARGB(255, 84, 97, 97)),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: _showLeaveRoomConfirmDialog,
                     ),
                     // 标题
@@ -2162,7 +2156,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
                         child: Text(
                           '多人猜歌游戏',
                           style: TextStyle(
-                            color: Color.fromARGB(255, 84, 97, 97),
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -2201,15 +2195,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(paddingS, 0, paddingS, paddingL),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 5.0 * scaleFactor,
-                        offset: Offset(2.0 * scaleFactor, 2.0 * scaleFactor),
-                      ),
-                    ],
+                    boxShadow: [AppConstants.defaultShadow(brightness)],
                   ),
                   child: SingleChildScrollView(
                     padding: EdgeInsets.all(paddingM),
@@ -2221,7 +2209,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
                           Container(
                             padding: EdgeInsets.symmetric(vertical: paddingS, horizontal: paddingM),
                             decoration: BoxDecoration(
-                              color: const Color.fromARGB(255, 84, 97, 97),
+                              color: Theme.of(context).colorScheme.onSurface,
                               borderRadius: BorderRadius.circular(borderRadiusSmall),
                             ),
                             child: Row(
@@ -2281,12 +2269,12 @@ class _GameRoomPageState extends State<GameRoomPage> {
                             ElevatedButton(
                               onPressed: _handleStartGame,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color.fromARGB(255, 84, 97, 97),
+                                backgroundColor: Theme.of(context).colorScheme.onSurface,
                               ),
                               child: const Text('开始游戏', style: TextStyle(color: Colors.white)),
                             ),
                           SizedBox(height: paddingL * 1.5),
-                          _buildGameArea(),
+                          _buildGameArea(brightness),
                         ],
                       ),
                     ),

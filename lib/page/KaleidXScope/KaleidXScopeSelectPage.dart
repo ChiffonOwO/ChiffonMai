@@ -5,6 +5,7 @@ import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPageBLUE.
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPageWHITE.dart';
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPagePURPLE.dart';
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPageYELLOW.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 
 class KaleidXScopeSelectPage extends StatefulWidget {
   const KaleidXScopeSelectPage({super.key});
@@ -25,6 +26,7 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     // 获取设备尺寸
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
@@ -34,16 +36,9 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
     final double _paddingS = 8.0 * scaleFactor;
     final double _paddingL = 16.0 * scaleFactor;
     final double borderRadiusSmall = 8.0 * scaleFactor;
-    final double shadowBlurRadius = 5.0 * scaleFactor;
-    final double shadowOffset = 2.0 * scaleFactor;
 
     // 自定义常量
-    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
-    final BoxShadow defaultShadow = BoxShadow(
-      color: Colors.black12,
-      blurRadius: shadowBlurRadius,
-      offset: Offset(shadowOffset, shadowOffset),
-    );
+    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
 
     // 计算图片宽度，留出边距
     final imageWidth = screenWidth - (_paddingS * 4); // 左右各2*_paddingS的边距
@@ -70,7 +65,7 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -81,7 +76,7 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
                         child: Text(
                           'KALEIDXSCOPE',
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
                           ),
@@ -99,7 +94,7 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
                     boxShadow: [defaultShadow],
                   ),
@@ -175,7 +170,7 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
                                             item['title']!,
                                             style: TextStyle(
                                               fontSize: 12,
-                                              color: Colors.grey[600],
+                                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                                             ),
                                           ),
                                         ),

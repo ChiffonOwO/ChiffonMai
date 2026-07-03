@@ -7,22 +7,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:media_scanner/media_scanner.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
-
-// 应用常量类：集中管理所有硬编码的配置值
-class AppConstants {
-  // 阴影常量
-  static const BoxShadow defaultShadow = BoxShadow(
-    color: Colors.black12,
-    blurRadius: 5.0,
-    offset: Offset(2.0, 2.0),
-  );
-
-  // 颜色常量
-  static const Color buttonBackgroundColor = Color.fromARGB(210, 227, 232, 125);
-  static const Color buttonBorderColor = Color.fromARGB(199, 192, 133, 100);
-  static const Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
-  static const Color textSecondaryColor = Color.fromARGB(255, 109, 125, 125);
-}
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/AppConstants.dart';
 
 // 版本数据模型
 class VersionData {
@@ -148,17 +134,16 @@ class ImagePreviewDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 获取屏幕高度并计算对话框高度为屏幕高度的0.3倍
+    final brightness = Theme.of(context).brightness;
     final screenHeight = MediaQuery.of(context).size.height;
     final dialogHeight = screenHeight * 0.3;
     
     return Dialog(
-      backgroundColor: Colors.white.withOpacity(0.9),
+      backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0.9),
       child: SizedBox(
         height: dialogHeight,
         child: Stack(
           children: [
-            // 放大图片
             Center(
               child: InteractiveViewer(
                 maxScale: 5.0,
@@ -167,10 +152,10 @@ class ImagePreviewDialog extends StatelessWidget {
                   fit: BoxFit.contain,
                   height: dialogHeight,
                   errorBuilder: (context, error, stackTrace) {
-                    return const Center(
+                    return Center(
                       child: Text(
                         '图片加载失败',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                       ),
                     );
                   },
@@ -178,24 +163,22 @@ class ImagePreviewDialog extends StatelessWidget {
               ),
             ),
 
-            // 保存按钮
             Positioned(
               bottom: 20,
               right: 20,
               child: FloatingActionButton(
                 onPressed: () => _saveImage(context),
-                backgroundColor: Colors.blue,
+                backgroundColor: AppColors.linkBlue(brightness),
                 child: const Icon(Icons.save_alt),
               ),
             ),
 
-            // 关闭按钮
             Positioned(
               top: 20,
               right: 20,
               child: IconButton(
                 onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close, color: Colors.black, size: 30),
+                icon: Icon(Icons.close, color: Theme.of(context).colorScheme.onSurface, size: 30),
               ),
             ),
           ],
@@ -281,47 +264,40 @@ class _VersionViewState extends State<VersionView> {
 
   @override
   Widget build(BuildContext context) {
-    // 获取屏幕尺寸
+    final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
     
-    // 字体大小
-    final titleFontSize = screenWidth * 0.06; // 标题字体大小为屏幕宽度的6%
-    final tableHeaderFontSize = screenWidth * 0.035; // 表头字体大小为屏幕宽度的3.5%
-    final tableContentFontSize = screenWidth * 0.03; // 表格内容字体大小为屏幕宽度的3%
+    final titleFontSize = screenWidth * 0.06;
+    final tableHeaderFontSize = screenWidth * 0.035;
+    final tableContentFontSize = screenWidth * 0.03;
     
-    // 图片大小
-    final imageContainerSize = screenWidth * 0.15; // 图片容器大小为屏幕宽度的15%
-    final imageSize = screenWidth * 0.12; // 图片大小为屏幕宽度的12%
+    final imageContainerSize = screenWidth * 0.15;
+    final imageSize = screenWidth * 0.12;
     
-    // 自定义常量
-    final Color textPrimaryColor = AppConstants.textPrimaryColor;
+    final textPrimaryColor = Theme.of(context).colorScheme.onSurface;
+    final cardBgColor = Theme.of(context).colorScheme.surface.withOpacity(0.9);
+    final defaultShadow = AppConstants.defaultShadow(brightness);
     final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = AppConstants.defaultShadow;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          // 背景
           CommonWidgetUtil.buildCommonBgWidget(),
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
 
-          // 页面内容
           Column(
             children: [
-              // 标题栏
               Container(
                 padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
                 child: Row(
                   children: [
-                    // 返回按钮
                     IconButton(
                       icon: Icon(Icons.arrow_back, color: textPrimaryColor),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
                     ),
-                    // 标题
                     Expanded(
                       child: Center(
                         child: Text(
@@ -334,18 +310,17 @@ class _VersionViewState extends State<VersionView> {
                         ),
                       ),
                     ),
-                    // 版本切换按钮
                     ElevatedButton(
                       onPressed: _toggleVersion,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _isJapaneseVersion ? Colors.blue : Colors.green,
+                        backgroundColor: _isJapaneseVersion ? AppColors.linkBlue(brightness) : AppColors.successGreen(brightness),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                       child: Text(
                         _isJapaneseVersion ? '日服' : '国服',
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
@@ -355,12 +330,11 @@ class _VersionViewState extends State<VersionView> {
                 ),
               ),
 
-              // 主内容区域
               Expanded(
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: cardBgColor,
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
                     boxShadow: [defaultShadow],
                   ),
@@ -371,10 +345,16 @@ class _VersionViewState extends State<VersionView> {
                       final column2Width = tableWidth * 0.35;
                       final column3Width = tableWidth * 0.35;
                       
+                      final headerTextColor = Theme.of(context).colorScheme.onSurface;
+                      final contentTextColor = Theme.of(context).colorScheme.onSurfaceVariant;
+                      final placeholderBgColor = AppColors.scaffoldBackground(brightness) == Colors.transparent
+                          ? AppColors.tableBorder(brightness)
+                          : AppColors.greyHint(brightness).withValues(alpha: 0.2);
+                      
                       return SingleChildScrollView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         child: DataTable(
-                          columnSpacing: 0, // 清除默认列间距， ourselves控制宽度
+                          columnSpacing: 0,
                           columns: [
                             DataColumn(
                               label: SizedBox(
@@ -385,7 +365,7 @@ class _VersionViewState extends State<VersionView> {
                                     child: Text(
                                       '版本名称',
                                       style: TextStyle(
-                                        color: Colors.black,
+                                        color: headerTextColor,
                                         fontWeight: FontWeight.bold,
                                         fontSize: tableHeaderFontSize,
                                       ),
@@ -401,7 +381,7 @@ class _VersionViewState extends State<VersionView> {
                                   child: Text(
                                     '版本图',
                                     style: TextStyle(
-                                      color: Colors.black,
+                                      color: headerTextColor,
                                       fontWeight: FontWeight.bold,
                                       fontSize: tableHeaderFontSize,
                                     ),
@@ -416,7 +396,7 @@ class _VersionViewState extends State<VersionView> {
                                   child: Text(
                                     '版本代号',
                                     style: TextStyle(
-                                      color: Colors.black,
+                                      color: headerTextColor,
                                       fontWeight: FontWeight.bold,
                                       fontSize: tableHeaderFontSize,
                                     ),
@@ -426,7 +406,6 @@ class _VersionViewState extends State<VersionView> {
                             ),
                           ],
                       rows: (_isJapaneseVersion ? _japaneseVersionList : _chineseVersionList).map((version) {
-                        // 对于国服版本，使用formatVersion2格式化显示
                         String displayName = _isJapaneseVersion ? version.name : StringUtil.formatVersion2(version.name);
                         
                         return DataRow(cells: [
@@ -435,7 +414,7 @@ class _VersionViewState extends State<VersionView> {
                               width: column1Width,
                               child: Align(
                                 alignment: Alignment.centerLeft,
-                                child: Text(displayName, style: TextStyle(fontSize: tableContentFontSize)),
+                                child: Text(displayName, style: TextStyle(fontSize: tableContentFontSize, color: contentTextColor)),
                               )
                             ),
                           ),
@@ -469,16 +448,16 @@ class _VersionViewState extends State<VersionView> {
                                               return Container(
                                                 width: imageSize,
                                                 height: imageSize,
-                                                color: Colors.grey[200],
-                                                child: Center(child: Text('图片缺失', style: TextStyle(fontSize: tableContentFontSize))),
+                                                color: placeholderBgColor,
+                                                child: Center(child: Text('图片缺失', style: TextStyle(fontSize: tableContentFontSize, color: contentTextColor))),
                                               );
                                             },
                                           )
                                         : Container(
                                             width: imageSize,
                                             height: imageSize,
-                                            color: Colors.grey[200],
-                                            child: Center(child: Text('暂无图片', style: TextStyle(fontSize: tableContentFontSize))),
+                                            color: placeholderBgColor,
+                                            child: Center(child: Text('暂无图片', style: TextStyle(fontSize: tableContentFontSize, color: contentTextColor))),
                                           ),
                                   ),
                                 ),
@@ -488,7 +467,7 @@ class _VersionViewState extends State<VersionView> {
                           DataCell(
                             SizedBox(
                               width: column3Width,
-                              child: Center(child: Text(version.code, style: TextStyle(fontSize: tableContentFontSize))),
+                              child: Center(child: Text(version.code, style: TextStyle(fontSize: tableContentFontSize, color: contentTextColor))),
                             ),
                           ),
                         ]);

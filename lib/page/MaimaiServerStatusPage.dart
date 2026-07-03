@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/service/MaimaiServerStatusService.dart';
 import 'package:my_first_flutter_app/entity/AWMC/MaimaiServerStatusEntity.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 
 // 服务器状态页面
@@ -63,6 +65,7 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
     
@@ -70,13 +73,8 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
     final titleFontSize = screenWidth * 0.06;
     
     // 自定义常量
-    final Color textPrimaryColor = const Color.fromARGB(255, 84, 97, 97);
     final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = const BoxShadow(
-      color: Colors.black12,
-      blurRadius: 5.0,
-      offset: Offset(2.0, 2.0),
-    );
+    final BoxShadow defaultShadow = AppConstants.defaultShadow(brightness);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -96,7 +94,7 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -107,7 +105,7 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
                         child: Text(
                           '服务器状态',
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: titleFontSize,
                             fontWeight: FontWeight.bold,
                           ),
@@ -125,7 +123,7 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
                     boxShadow: [defaultShadow],
                   ),
@@ -138,7 +136,7 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
                                 children: [
                                   Text(
                                     _errorMessage,
-                                    style: TextStyle(color: Colors.red),
+                                    style: TextStyle(color: AppColors.errorRed(brightness)),
                                     textAlign: TextAlign.center,
                                   ),
                                   ElevatedButton(
@@ -414,7 +412,7 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
             if (heartbeat != null)
               Text(
                 '最后更新: ${heartbeat.time}',
-                style: TextStyle(fontSize: smallFontSize, color: Colors.grey),
+                style: TextStyle(fontSize: smallFontSize, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             
             // 第四行：延迟和在线率（左对齐）
@@ -461,7 +459,7 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
             if (heartbeat != null && heartbeat.msg.isNotEmpty)
               Text(
                 '消息: ${heartbeat.msg}',
-                style: TextStyle(fontSize: smallFontSize, color: Colors.grey),
+                style: TextStyle(fontSize: smallFontSize, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
           ],
         ),

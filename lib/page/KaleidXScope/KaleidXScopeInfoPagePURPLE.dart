@@ -8,6 +8,7 @@ import 'package:my_first_flutter_app/service/KaleidXScope/KaleidXScopeSelectServ
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 
 class KaleidXScopeInfoPagePURPLE extends StatefulWidget {
   const KaleidXScopeInfoPagePURPLE({
@@ -32,7 +33,6 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
   Song? _specialSong11749;
 
   // 自定义常量
-  final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
   late double _borderRadiusSmall;
   late double _defaultShadowBlurRadius;
   late double _defaultShadowOffset;
@@ -155,15 +155,16 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
 
   // 构建挑战进度区域
   Widget _buildChallengeProgress() {
+    final brightness = Theme.of(context).brightness;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 解锁方法说明区域
         Container(
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
-            border: Border.all(color: Colors.grey[300]!, width: 1),
+            border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
           ),
           padding: EdgeInsets.all(_paddingM),
           child: Column(
@@ -174,7 +175,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                 style: TextStyle(
                   fontSize: _textSizeL,
                   fontWeight: FontWeight.bold,
-                  color: textPrimaryColor,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               SizedBox(height: _paddingS),
@@ -190,7 +191,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                 text: TextSpan(
                   style: TextStyle(
                     fontSize: _textSizeS,
-                    color: Colors.grey[600],
+                    color: AppColors.greyHint(brightness),
                   ),
                   children: [
                     TextSpan(text: '完成'),
@@ -215,14 +216,14 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                 '设置[アウル]为队长，单人连续游玩3首 / 双人连续游玩4首下方曲目池中的歌曲。不限难度，不能重复',
                 style: TextStyle(
                   fontSize: _textSizeS,
-                  color: Colors.grey[600],
+                  color: AppColors.greyHint(brightness),
                 ),
               ),
               Text(
                 '可：选择/不可：跳过，段位认定和宴会场',
                 style: TextStyle(
                   fontSize: _textSizeS,
-                  color: Colors.grey[600],
+                  color: AppColors.greyHint(brightness),
                 ),
               ),
               SizedBox(height: _paddingS),
@@ -238,21 +239,21 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                 '第一首：所有区域歌曲',
                 style: TextStyle(
                   fontSize: _textSizeS,
-                  color: Colors.grey[600],
+                  color: AppColors.greyHint(brightness),
                 ),
               ),
               Text(
                 '第二首：所有区域内的完美挑战曲',
                 style: TextStyle(
                   fontSize: _textSizeS,
-                  color: Colors.grey[600],
+                  color: AppColors.greyHint(brightness),
                 ),
               ),
               Text(
                 '第三首：固定，即为隐藏歌曲',
                 style: TextStyle(
                   fontSize: _textSizeS,
-                  color: Colors.grey[600],
+                  color: AppColors.greyHint(brightness),
                 ),
               ),
               SizedBox(height: _paddingS),
@@ -261,7 +262,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                 style: TextStyle(
                   fontSize: _textSizeM,
                   fontWeight: FontWeight.bold,
-                  color: textPrimaryColor,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               _buildSpecialSongCard(11749),
@@ -273,7 +274,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
         // 紫门挑战
         _buildChallengeSection(purpleService.KaleidXScopeInfoServicePURPLE.purpleGateChallenge),
         SizedBox(height: _paddingL),
-        Divider(color: Colors.grey[300], thickness: 1),
+        Divider(color: AppColors.tableBorder(brightness), thickness: 1),
         SizedBox(height: _paddingS),
       ],
     );
@@ -281,15 +282,16 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
 
   // 构建单个挑战区域
   Widget _buildChallengeSection(Map<String, dynamic> challenge) {
+    final brightness = Theme.of(context).brightness;
     final String name = challenge['name'];
     final List<dynamic> phases = challenge['phases'];
     final double progressBarFontSize = 10.0 * (MediaQuery.of(context).size.width / 375.0);
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(_borderRadiusSmall),
-        border: Border.all(color: Colors.grey[300]!, width: 1),
+        border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
       ),
       padding: EdgeInsets.all(_paddingM),
       child: Column(
@@ -300,7 +302,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
             style: TextStyle(
               fontSize: _textSizeL,
               fontWeight: FontWeight.bold,
-              color: textPrimaryColor,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           SizedBox(height: _paddingS),
@@ -310,7 +312,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
             height: _progressBarHeight,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(_progressBarHeight / 2),
-              border: Border.all(color: Colors.grey[300]!, width: 1),
+              border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
             ),
             child: Row(
               children: phases.map((phase) {
@@ -356,7 +358,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                     '${startDate}${endDate != null ? ' - $endDate' : ' - 后续'}:',
                     style: TextStyle(
                       fontSize: _textSizeS,
-                      color: Colors.grey[600],
+                      color: AppColors.greyHint(brightness),
                     ),
                   ),
                   SizedBox(width: _paddingS),
@@ -374,7 +376,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                     style: TextStyle(
                       fontSize: _textSizeS,
                       fontWeight: FontWeight.bold,
-                      color: textPrimaryColor,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                 ],
@@ -388,15 +390,16 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
 
   // 构建特殊歌曲卡片
   Widget _buildSpecialSongCard(int songId) {
+    final brightness = Theme.of(context).brightness;
     final Song? song = songId == 11749 ? _specialSong11749 : null;
 
     if (song == null) {
       return Container(
         height: 50 * (MediaQuery.of(context).size.width / 375.0),
         decoration: BoxDecoration(
-          color: Colors.grey[100],
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(_borderRadiusSmall),
-          border: Border.all(color: Colors.grey[300]!, width: 1),
+          border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
         ),
         child: Center(child: CircularProgressIndicator()),
       );
@@ -416,9 +419,9 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
         },
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.grey[100],
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
-            border: Border.all(color: Colors.grey[300]!, width: 1),
+            border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
           ),
           padding: EdgeInsets.all(_paddingXS),
           child: Row(
@@ -448,7 +451,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                       '${_getTypeDisplay(song.type)} | ${StringUtil.formatVersion2(song.basicInfo.from)}',
                       style: TextStyle(
                         fontSize: _textSizeXS,
-                        color: Colors.grey[600],
+                        color: AppColors.greyHint(brightness),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -458,7 +461,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                       _getDsDisplay(song.ds),
                       style: TextStyle(
                         fontSize: _textSizeXS,
-                        color: Colors.grey[600],
+                        color: AppColors.greyHint(brightness),
                       ),
                     ),
                   ],
@@ -471,6 +474,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
 
   // 渲染歌曲卡片列表
   Widget _buildSongList() {
+    final brightness = Theme.of(context).brightness;
     if (_songs.isEmpty) {
       return Center(child: Text('暂无歌曲数据'));
     }
@@ -503,7 +507,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
               style: TextStyle(
                 fontSize: _textSizeL,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[700],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -537,10 +541,10 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
               },
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(_borderRadiusSmall),
                   border: Border.all(
-                    color: Colors.grey,
+                    color: AppColors.greyHint(brightness),
                     width: 1,
                   ),
                 ),
@@ -577,7 +581,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                             '${_getTypeDisplay(song.type)} | ${StringUtil.formatVersion2(song.basicInfo.from)}',
                             style: TextStyle(
                               fontSize: _textSizeXS,
-                              color: Colors.grey[600],
+                              color: AppColors.greyHint(brightness),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -587,7 +591,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                             _getDsDisplay(song.ds),
                             style: TextStyle(
                               fontSize: _textSizeXS,
-                              color: Colors.grey[600],
+                              color: AppColors.greyHint(brightness),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -607,14 +611,14 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(height: _paddingS),
-            Divider(color: Colors.grey[300], thickness: 1),
+            Divider(color: AppColors.tableBorder(brightness), thickness: 1),
             SizedBox(height: _paddingS),
             Text(
               'Track随机曲目',
               style: TextStyle(
                 fontSize: _textSizeXL,
                 fontWeight: FontWeight.bold,
-                color: textPrimaryColor,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             SizedBox(height: _paddingXS),
@@ -633,6 +637,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
 
   // 构建Track区域
   Widget _buildTrackSection(String title, List<Song> songs) {
+    final brightness = Theme.of(context).brightness;
     if (songs.isEmpty) {
       return Container();
     }
@@ -653,7 +658,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
               style: TextStyle(
                 fontSize: _textSizeL,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[700],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -686,10 +691,10 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
               },
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(_borderRadiusSmall),
                   border: Border.all(
-                    color: Colors.grey,
+                    color: AppColors.greyHint(brightness),
                     width: 1,
                   ),
                 ),
@@ -726,7 +731,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                             '${_getTypeDisplay(song.type)} | ${StringUtil.formatVersion2(song.basicInfo.from)}',
                             style: TextStyle(
                               fontSize: _textSizeXS,
-                              color: Colors.grey[600],
+                              color: AppColors.greyHint(brightness),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -736,7 +741,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                             _getDsDisplay(song.ds),
                             style: TextStyle(
                               fontSize: _textSizeXS,
-                              color: Colors.grey[600],
+                              color: AppColors.greyHint(brightness),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -756,6 +761,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     _initSizeParams(context);
 
     final double titleFontSize = 24.0 * (MediaQuery.of(context).size.width / 375.0);
@@ -773,7 +779,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                 child: Row(
                   children: [
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -783,7 +789,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                         child: Text(
                           _getGateTitle(),
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: titleFontSize,
                             fontWeight: FontWeight.bold,
                           ),

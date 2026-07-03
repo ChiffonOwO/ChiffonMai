@@ -3,6 +3,7 @@ import 'package:markdown_widget/markdown_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import '../utils/CommonWidgetUtil.dart';
+import '../utils/AppTheme.dart';
 
 /// 关于本APP页面
 class AboutAppPage extends StatefulWidget {
@@ -15,34 +16,32 @@ class AboutAppPage extends StatefulWidget {
 class _AboutAppPageState extends State<AboutAppPage> {
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
-    final Color textPrimaryColor = const Color.fromARGB(255, 84, 97, 97);
+    final Color textPrimaryColor = Theme.of(context).colorScheme.onSurface;
+    final Color cardBgColor = Theme.of(context).colorScheme.surface.withOpacity(0.9);
+    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          // 背景层
           CommonWidgetUtil.buildCommonBgWidget(),
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
 
-          // 页面内容
           Column(
             children: [
-              // 标题栏
               Container(
                 padding: const EdgeInsets.fromLTRB(16, 48, 16, 8),
                 child: Row(
                   children: [
-                    // 返回按钮
                     IconButton(
                       icon: Icon(Icons.arrow_back, color: textPrimaryColor),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
                     ),
-                    // 标题
                     Expanded(
                       child: Center(
                         child: Text(
@@ -55,7 +54,6 @@ class _AboutAppPageState extends State<AboutAppPage> {
                         ),
                       ),
                     ),
-                    // 占位按钮（保持标题居中）
                     IconButton(
                       icon: const Icon(Icons.arrow_back, color: Colors.transparent),
                       onPressed: null,
@@ -64,20 +62,13 @@ class _AboutAppPageState extends State<AboutAppPage> {
                 ),
               ),
 
-              // 主内容区域
               Expanded(
                 child: Container(
                   margin: const EdgeInsets.fromLTRB(4, 0, 4, 10),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: cardBgColor,
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 5.0,
-                        offset: Offset(2.0, 2.0),
-                      ),
-                    ],
+                    boxShadow: [defaultShadow],
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
@@ -102,7 +93,7 @@ class _AboutAppPageState extends State<AboutAppPage> {
                               ),
                               CodeConfig(
                                 style: TextStyle(
-                                  color: Colors.black87,
+                                  color: Theme.of(context).colorScheme.onSurface,
                                   fontSize: screenWidth * 0.03,
                                 ),
                               ),

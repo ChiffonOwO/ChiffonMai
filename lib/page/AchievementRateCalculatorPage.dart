@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/AppConstants.dart';
 
 class AchievementRateCalculator extends StatefulWidget {
   const AchievementRateCalculator({super.key});
@@ -257,6 +259,7 @@ class _AchievementRateCalculatorState
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
@@ -269,14 +272,8 @@ class _AchievementRateCalculatorState
     int totalM = _tapM + _holdM + _slideM + _touchM;
     
     // 自定义常量
-    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
     final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = BoxShadow(
-      color: Colors.grey.withOpacity(0.5),
-      spreadRadius: 2,
-      blurRadius: 5,
-      offset: Offset(0, 3),
-    );
+    final BoxShadow defaultShadow = AppConstants.defaultShadow(brightness);
 
     return Scaffold(
       backgroundColor: Colors.transparent, // 透明背景
@@ -297,7 +294,7 @@ class _AchievementRateCalculatorState
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -308,7 +305,7 @@ class _AchievementRateCalculatorState
                         child: Text(
                           '达成率计算器',
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -326,7 +323,7 @@ class _AchievementRateCalculatorState
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
                     boxShadow: [defaultShadow],
                   ),
@@ -359,7 +356,7 @@ class _AchievementRateCalculatorState
                         child: ElevatedButton(
                           onPressed: _calculateAchievementRate,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
+                            backgroundColor: AppColors.linkBlue(brightness),
                             foregroundColor: Colors.white,
                             padding: EdgeInsets.symmetric(vertical: screenHeight * 0.02), // 垂直 padding 为屏幕高度的2%
                             textStyle: TextStyle(
@@ -395,7 +392,7 @@ class _AchievementRateCalculatorState
       style: TextStyle(
         fontSize: screenWidth * 0.05, // 字体大小为屏幕宽度的5%
         fontWeight: FontWeight.bold,
-        color: Colors.blue,
+        color: AppColors.linkBlue(Theme.of(context).brightness),
       ),
       textAlign: TextAlign.center,
     );
@@ -406,12 +403,12 @@ class _AchievementRateCalculatorState
       int totalCp, int totalP, int totalG, int totalGo, int totalM) {
     return Table(
       border: TableBorder( // 调整边框样式，确保颜色完全填充
-        horizontalInside: BorderSide(color: Colors.grey),
-        verticalInside: BorderSide(color: Colors.grey),
-        top: BorderSide(color: Colors.grey),
-        bottom: BorderSide(color: Colors.grey),
-        left: BorderSide(color: Colors.grey),
-        right: BorderSide(color: Colors.grey),
+        horizontalInside: BorderSide(color: AppColors.tableBorder(Theme.of(context).brightness)),
+        verticalInside: BorderSide(color: AppColors.tableBorder(Theme.of(context).brightness)),
+        top: BorderSide(color: AppColors.tableBorder(Theme.of(context).brightness)),
+        bottom: BorderSide(color: AppColors.tableBorder(Theme.of(context).brightness)),
+        left: BorderSide(color: AppColors.tableBorder(Theme.of(context).brightness)),
+        right: BorderSide(color: AppColors.tableBorder(Theme.of(context).brightness)),
       ),
       defaultVerticalAlignment: TableCellVerticalAlignment.middle,
       children: [
@@ -548,7 +545,7 @@ class _AchievementRateCalculatorState
             Expanded(
               flex: 1,
               child: Container(
-                color: Colors.blue[100],
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 padding: EdgeInsets.all(screenWidth * 0.03), // padding 为屏幕宽度的3%
                 child: Text(
                   'Break总数:',
@@ -567,8 +564,8 @@ class _AchievementRateCalculatorState
                   vertical: screenHeight * 0.015, // 垂直 padding 为屏幕高度的1.5%
                 ),
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey),
-                  color: Colors.white,
+                  border: Border.all(color: AppColors.tableBorder(Theme.of(context).brightness)),
+                  color: Theme.of(context).colorScheme.surface,
                 ),
                 child: Text(
                   (_breakP + _break50 + _break100 + _break80 + _break60 + _break50g + _breakGo + _breakM).toString(),
@@ -589,6 +586,7 @@ class _AchievementRateCalculatorState
   Widget _buildTableCell(String text, {Color? color, double fontSize = 12.0}) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Container(
       color: color,
@@ -599,6 +597,7 @@ class _AchievementRateCalculatorState
         style: TextStyle(
           fontWeight: FontWeight.bold,
           fontSize: screenWidth * 0.025, // 字体大小为屏幕宽度的2.5%
+          color: isDark ? Colors.black87 : null,
         ),
       ),
     );
@@ -608,6 +607,7 @@ class _AchievementRateCalculatorState
   Widget _buildNumberInputCell(int value, Function(int) onChanged, TextEditingController controller, {Color? color}) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Container(
       color: color, // 添加颜色参数
@@ -628,6 +628,7 @@ class _AchievementRateCalculatorState
         textAlign: TextAlign.center,
         style: TextStyle(
           fontSize: screenWidth * 0.025, // 字体大小为屏幕宽度的2.5%
+          color: isDark ? Colors.black87 : null,
         ),
         onTap: () {
           if (value == 0) {
@@ -685,7 +686,7 @@ class _AchievementRateCalculatorState
             height: screenHeight * 0.05, // 设置固定高度
             padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02), // 水平 padding 为屏幕宽度的2%
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey),
+              border: Border.all(color: AppColors.tableBorder(Theme.of(context).brightness)),
             ),
             child: TextField(
               controller: controller,

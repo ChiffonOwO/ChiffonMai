@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/AppConstants.dart';
 
 class AchievementFullReverseCalculator extends StatefulWidget {
   const AchievementFullReverseCalculator({super.key});
@@ -138,6 +140,7 @@ class _AchievementFullReverseCalculatorState
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
@@ -150,13 +153,7 @@ class _AchievementFullReverseCalculatorState
     int totalM = _tapM + _holdM + _slideM + _touchM + _breakM;
 
     // 自定义常量
-    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
     final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = BoxShadow(
-      color: Colors.black12,
-      blurRadius: 5.0,
-      offset: Offset(2.0, 2.0),
-    );
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -177,7 +174,7 @@ class _AchievementFullReverseCalculatorState
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -188,7 +185,7 @@ class _AchievementFullReverseCalculatorState
                         child: Text(
                           '达成率反推',
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -206,9 +203,9 @@ class _AchievementFullReverseCalculatorState
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
+                    boxShadow: [AppConstants.defaultShadow(brightness)],
                   ),
                   child: SingleChildScrollView(
                     padding: EdgeInsets.all(screenWidth * 0.04), // padding 为屏幕宽度的4%
@@ -234,8 +231,8 @@ class _AchievementFullReverseCalculatorState
                               child: ElevatedButton(
                                 onPressed: _resetAll,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.grey,
-                                  foregroundColor: Colors.white,
+                                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                  foregroundColor: Theme.of(context).colorScheme.onSurface,
                                   padding: EdgeInsets.symmetric(vertical: screenHeight * 0.015), // 垂直 padding 为屏幕高度的1.5%
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
@@ -259,9 +256,9 @@ class _AchievementFullReverseCalculatorState
                           Container(
                             padding: EdgeInsets.all(screenWidth * 0.03), // padding 为屏幕宽度的3%
                             decoration: BoxDecoration(
-                              color: Colors.grey[100],
+                              color: Theme.of(context).colorScheme.surface,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.blue.shade200),
+                              border: Border.all(color: AppColors.linkBlue(Theme.of(context).brightness)),
                             ),
                             child: Text(
                               _resultText!,
@@ -288,7 +285,7 @@ class _AchievementFullReverseCalculatorState
     return ElevatedButton(
       onPressed: _calculating ? null : _calculateFullReverse,
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.blue,
+        backgroundColor: AppColors.linkBlue(Theme.of(context).brightness),
         foregroundColor: Colors.white,
         padding: EdgeInsets.symmetric(vertical: screenHeight * 0.015), // 垂直 padding 为屏幕高度的1.5%
         shape: RoundedRectangleBorder(
@@ -554,7 +551,7 @@ class _AchievementFullReverseCalculatorState
       style: TextStyle(
         fontSize: screenWidth * 0.05, // 字体大小为屏幕宽度的5%
         fontWeight: FontWeight.bold,
-        color: Colors.blue,
+        color: AppColors.linkBlue(Theme.of(context).brightness),
       ),
       textAlign: TextAlign.center,
     );
@@ -565,12 +562,12 @@ class _AchievementFullReverseCalculatorState
       int totalCp, int totalP, int totalG, int totalGo, int totalM) {
     return Table(
       border: TableBorder(
-        horizontalInside: BorderSide(color: Colors.grey),
-        verticalInside: BorderSide(color: Colors.grey),
-        top: BorderSide(color: Colors.grey),
-        bottom: BorderSide(color: Colors.grey),
-        left: BorderSide(color: Colors.grey),
-        right: BorderSide(color: Colors.grey),
+        horizontalInside: BorderSide(color: AppColors.tableBorder(Theme.of(context).brightness)),
+        verticalInside: BorderSide(color: AppColors.tableBorder(Theme.of(context).brightness)),
+        top: BorderSide(color: AppColors.tableBorder(Theme.of(context).brightness)),
+        bottom: BorderSide(color: AppColors.tableBorder(Theme.of(context).brightness)),
+        left: BorderSide(color: AppColors.tableBorder(Theme.of(context).brightness)),
+        right: BorderSide(color: AppColors.tableBorder(Theme.of(context).brightness)),
       ),
       defaultVerticalAlignment: TableCellVerticalAlignment.middle,
       children: [
@@ -756,6 +753,7 @@ class _AchievementFullReverseCalculatorState
   Widget _buildTableCell(String text, {Color? color, double fontSize = 12.0}) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Container(
       color: color,
@@ -766,6 +764,7 @@ class _AchievementFullReverseCalculatorState
         style: TextStyle(
           fontWeight: FontWeight.bold,
           fontSize: screenWidth * 0.025, // 字体大小为屏幕宽度的2.5%
+          color: isDark ? Colors.black87 : null,
         ),
       ),
     );
@@ -777,6 +776,7 @@ class _AchievementFullReverseCalculatorState
       {Color? color}) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Container(
       color: color, // 添加颜色参数
@@ -797,6 +797,7 @@ class _AchievementFullReverseCalculatorState
         textAlign: TextAlign.center,
         style: TextStyle(
           fontSize: screenWidth * 0.025, // 字体大小为屏幕宽度的2.5%
+          color: isDark ? Colors.black87 : null,
         ),
         onTap: () {
           if (value == 0) {

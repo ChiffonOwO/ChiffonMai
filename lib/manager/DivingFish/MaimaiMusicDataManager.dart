@@ -9,6 +9,7 @@ import '../../constant/CacheKeyConstant.dart';
 import '../../constant/CacheTimestampConstant.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../MaidataManager.dart';
+import '../../service/ConnectivityService.dart';
 
 class MaimaiMusicDataManager {
   static final MaimaiMusicDataManager _instance = MaimaiMusicDataManager._internal();
@@ -40,6 +41,13 @@ class MaimaiMusicDataManager {
 
   Future<bool> fetchAndUpdateMusicData({List<String>? maidataTexts}) async {
     try {
+      // 离线检查
+      final isOnline = await ConnectivityService().hasConnection();
+      if (!isOnline) {
+        debugPrint('离线模式：跳过获取音乐数据，使用缓存');
+        return false;
+      }
+
       final response = await http.get(Uri.parse(_apiUrl));
       
       if (response.statusCode == 200) {

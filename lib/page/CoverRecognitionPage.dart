@@ -9,6 +9,8 @@ import 'package:permission_handler/permission_handler.dart';
 import '../service/CoverRecognitionService.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/CoverUtil.dart';
+import '../utils/AppTheme.dart';
+import '../utils/AppConstants.dart';
 import 'SongInfoPage.dart';
 
 /// 曲绘识别页面
@@ -76,16 +78,16 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        decoration: BoxDecoration(
+          color: Theme.of(ctx).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         ),
         padding: const EdgeInsets.symmetric(vertical: 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(width: 40, height: 4,
-              decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+              decoration: BoxDecoration(color: AppColors.tableBorder(Theme.of(context).brightness), borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 16),
             const Text('选择图片来源', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
@@ -170,8 +172,9 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final sw = MediaQuery.of(context).size.width;
-    final c = const Color.fromARGB(255, 84, 97, 97);
+    final c = Theme.of(context).colorScheme.onSurface;
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: false,
@@ -185,9 +188,9 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
               child: Container(
                 margin: const EdgeInsets.fromLTRB(8, 0, 8, 10),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.9),
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5.0, offset: Offset(2.0, 2.0))],
+                  boxShadow: [AppConstants.defaultShadow(brightness)],
                 ),
                 child: ClipRRect(borderRadius: BorderRadius.circular(12), child: _buildContent(sw, c)),
               ),
@@ -245,7 +248,7 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
       Text('为 $_precomputeTotal 张曲绘计算特征', style: TextStyle(color: c.withValues(alpha: 0.6), fontSize: sw * 0.032)),
       const SizedBox(height: 16),
       LinearProgressIndicator(value: p, minHeight: 6, borderRadius: BorderRadius.circular(3),
-        backgroundColor: Colors.grey.shade200, valueColor: AlwaysStoppedAnimation<Color>(c)),
+        backgroundColor: Theme.of(context).colorScheme.surface, valueColor: AlwaysStoppedAnimation<Color>(c)),
       const SizedBox(height: 8),
       Text('$_precomputeCurrent / $_precomputeTotal', style: TextStyle(color: c.withValues(alpha: 0.5), fontSize: sw * 0.03)),
       const SizedBox(height: 8),
@@ -269,7 +272,7 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
       width: sw * 0.65, height: sw * 0.65,
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(12),
         border: Border.all(color: c.withValues(alpha: 0.3), width: 2),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(1, 1))]),
+        boxShadow: [AppConstants.defaultShadow(Theme.of(context).brightness)]),
       child: ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.file(File(_photoPath!), fit: BoxFit.cover)),
     ),
     const SizedBox(height: 10),
@@ -284,7 +287,8 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
     final title = _result!['songTitle'] as String? ?? '';
     final artist = _result!['artist'] as String? ?? '';
     final lowConf = _result!['lowConfidence'] as bool? ?? false;
-    final mc = sim >= 80 ? Colors.green : sim >= 60 ? Colors.orange : Colors.red;
+    final brightness = Theme.of(context).brightness;
+    final mc = sim >= 80 ? AppColors.successGreen(brightness) : sim >= 60 ? AppColors.warningOrange(brightness) : AppColors.errorRed(brightness);
     return Column(children: [
       const SizedBox(height: 8),
 
@@ -295,16 +299,16 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
           margin: const EdgeInsets.only(bottom: 12),
           padding: EdgeInsets.all(sw * 0.03),
           decoration: BoxDecoration(
-            color: Colors.red.withValues(alpha: 0.08),
+            color: AppColors.errorRed(brightness).withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+            border: Border.all(color: AppColors.errorRed(brightness).withValues(alpha: 0.3)),
           ),
           child: Row(children: [
-            const Icon(Icons.warning_amber, color: Colors.red, size: 22),
+            Icon(Icons.warning_amber, color: AppColors.errorRed(brightness), size: 22),
             const SizedBox(width: 8),
             Expanded(
               child: Text('匹配度过低，可能不是曲绘照片，请重新框选裁剪区域后再试',
-                  style: TextStyle(color: Colors.red.shade700, fontSize: sw * 0.03)),
+                  style: TextStyle(color: AppColors.errorRed(brightness), fontSize: sw * 0.03)),
             ),
           ]),
         ),
@@ -319,7 +323,7 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
             c: c,
             label: '输入图片',
             imageProvider: _photoPath != null ? FileImage(File(_photoPath!)) : null,
-            borderColor: Colors.grey.shade400,
+            borderColor: AppColors.tableBorder(Theme.of(context).brightness),
           ),
           // 中间箭头
           Padding(
@@ -368,7 +372,8 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
   }
 
   Widget _buildSimBadge(double sw, String label, double value) {
-    final color = value >= 80 ? Colors.green : value >= 55 ? Colors.orange : Colors.red;
+    final brightness = Theme.of(context).brightness;
+    final color = value >= 80 ? AppColors.successGreen(brightness) : value >= 55 ? AppColors.warningOrange(brightness) : AppColors.errorRed(brightness);
     return Container(
       padding: EdgeInsets.symmetric(horizontal: sw * 0.025, vertical: sw * 0.008),
       decoration: BoxDecoration(
@@ -377,7 +382,7 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Text('$label ', style: TextStyle(fontSize: sw * 0.026, color: Colors.grey.shade600)),
+        Text('$label ', style: TextStyle(fontSize: sw * 0.026, color: Theme.of(context).colorScheme.onSurfaceVariant)),
         Text('${value.toStringAsFixed(2)}%', style: TextStyle(fontSize: sw * 0.028, fontWeight: FontWeight.bold, color: color)),
       ]),
     );
@@ -405,16 +410,16 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
             border: Border.all(color: borderColor, width: isMatch ? 3 : 1.5),
             boxShadow: isMatch
                 ? [BoxShadow(color: borderColor.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2))]
-                : [const BoxShadow(color: Colors.black12, blurRadius: 3, offset: Offset(0, 1))],
+                : [AppConstants.defaultShadow(Theme.of(context).brightness)],
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(isMatch ? 7 : 8.5),
             child: imageProvider != null
                 ? Image(image: imageProvider, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade200,
-                        child: Center(child: Icon(Icons.broken_image, size: sw * 0.08, color: Colors.grey))))
-                : Container(color: Colors.grey.shade200,
-                    child: Center(child: Icon(Icons.image, size: sw * 0.08, color: Colors.grey))),
+                    errorBuilder: (_, __, ___) => Container(color: Theme.of(context).colorScheme.surface,
+                        child: Center(child: Icon(Icons.broken_image, size: sw * 0.08, color: AppColors.greyHint(Theme.of(context).brightness)))))
+                : Container(color: Theme.of(context).colorScheme.surface,
+                    child: Center(child: Icon(Icons.image, size: sw * 0.08, color: AppColors.greyHint(Theme.of(context).brightness)))),
           ),
         ),
       ],
@@ -422,6 +427,7 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
   }
 
   Widget _buildTop10List(double sw, Color c) {
+    final brightness = Theme.of(context).brightness;
     final matches = (_result!['topMatches'] as List<dynamic>?) ?? [];
     if (matches.isEmpty) return const SizedBox.shrink();
 
@@ -440,8 +446,8 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
     if (validMatches.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200)),
+      decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Theme.of(context).colorScheme.surface)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(
           padding: EdgeInsets.fromLTRB(sw * 0.04, sw * 0.03, sw * 0.04, sw * 0.02),
@@ -459,7 +465,7 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
           final artist = m['artist'] as String? ?? '';
           final best = i == 0;
           return Container(
-            color: best ? Colors.green.withValues(alpha: 0.06) : (i.isOdd ? Colors.grey.shade100 : Colors.white),
+            color: best ? AppColors.successGreen(brightness).withValues(alpha: 0.06) : Theme.of(context).colorScheme.surface,
             child: ListTile(
               dense: true,
               onTap: () {
@@ -475,29 +481,29 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
                 height: sw * 0.12,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: best ? Colors.green : Colors.grey.shade300, width: best ? 2 : 1),
+                  border: Border.all(color: best ? AppColors.successGreen(brightness) : AppColors.tableBorder(brightness), width: best ? 2 : 1),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(5),
                   child: Image.asset(
                     CoverUtil.buildCoverPath(sid),
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Icon(Icons.broken_image, size: sw * 0.05, color: Colors.grey),
+                    errorBuilder: (_, __, ___) => Icon(Icons.broken_image, size: sw * 0.05, color: AppColors.greyHint(brightness)),
                   ),
                 ),
               ),
               title: Text(title.isNotEmpty ? title : '歌曲 #$sid',
                   style: TextStyle(fontSize: sw * 0.032, fontWeight: best ? FontWeight.bold : FontWeight.normal),
                   maxLines: 1, overflow: TextOverflow.ellipsis),
-              subtitle: artist.isNotEmpty ? Text(artist, style: TextStyle(fontSize: sw * 0.025, color: Colors.grey), maxLines: 1) : null,
+              subtitle: artist.isNotEmpty ? Text(artist, style: TextStyle(fontSize: sw * 0.025, color: AppColors.greyHint(brightness)), maxLines: 1) : null,
               trailing: Container(
                 padding: EdgeInsets.symmetric(horizontal: sw * 0.02, vertical: sw * 0.006),
                 decoration: BoxDecoration(
-                  color: sim >= 80 ? Colors.green.shade50 : sim >= 60 ? Colors.orange.shade50 : Colors.grey.shade100,
+                  color: sim >= 80 ? AppColors.successGreen(brightness).withValues(alpha: 0.1) : sim >= 60 ? AppColors.warningOrange(brightness).withValues(alpha: 0.1) : Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: sim >= 80 ? Colors.green.shade200 : sim >= 60 ? Colors.orange.shade200 : Colors.grey.shade300)),
+                  border: Border.all(color: sim >= 80 ? AppColors.successGreen(brightness).withValues(alpha: 0.25) : sim >= 60 ? AppColors.warningOrange(brightness).withValues(alpha: 0.25) : AppColors.tableBorder(brightness))),
                 child: Text('${sim.toStringAsFixed(2)}%', style: TextStyle(fontSize: sw * 0.026, fontWeight: FontWeight.w600,
-                    color: sim >= 80 ? Colors.green.shade700 : sim >= 60 ? Colors.orange.shade700 : Colors.grey.shade600)),
+                    color: sim >= 80 ? AppColors.successGreen(brightness) : sim >= 60 ? AppColors.warningOrange(brightness) : Theme.of(context).colorScheme.onSurfaceVariant)),
               ),
             ),
           );
@@ -536,7 +542,7 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
           : Icon(icon, size: sw * 0.042),
       label: Text(label, style: TextStyle(fontSize: sw * 0.032)),
       style: ElevatedButton.styleFrom(
-        backgroundColor: primary ? c : Colors.white,
+        backgroundColor: primary ? c : Theme.of(context).colorScheme.surface,
         foregroundColor: primary ? Colors.white : c,
         padding: EdgeInsets.symmetric(horizontal: sw * 0.05, vertical: sw * 0.028),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
@@ -548,13 +554,14 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
   Widget _buildCacheInfo(double sw, Color c) => FutureBuilder<bool>(
     future: _service.isHashCacheValid(),
     builder: (_, snap) {
+      final brightness = Theme.of(context).brightness;
       final ok = snap.data ?? false;
       return Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         Icon(ok ? Icons.check_circle_outline : Icons.info_outline,
-            size: sw * 0.032, color: ok ? Colors.green : Colors.orange),
+            size: sw * 0.032, color: ok ? AppColors.successGreen(brightness) : AppColors.warningOrange(brightness)),
         const SizedBox(width: 4),
         Text(ok ? '曲绘索引就绪' : '索引未建立',
-            style: TextStyle(fontSize: sw * 0.026, color: ok ? Colors.green : Colors.orange)),
+            style: TextStyle(fontSize: sw * 0.026, color: ok ? AppColors.successGreen(brightness) : AppColors.warningOrange(brightness))),
         if (ok) ...[
           const SizedBox(width: 8),
           GestureDetector(
@@ -829,6 +836,7 @@ class _ImageCropPageState extends State<_ImageCropPage> {
                           imageRect: _imageRect,
                           cropRect: _cropRect,
                           handleSize: _handleSize,
+                          handleBorderColor: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -859,11 +867,13 @@ class _CropOverlayPainter extends CustomPainter {
   final Rect imageRect;
   final Rect cropRect;
   final double handleSize;
+  final Color handleBorderColor;
 
   _CropOverlayPainter({
     required this.imageRect,
     required this.cropRect,
     required this.handleSize,
+    required this.handleBorderColor,
   });
 
   @override
@@ -894,7 +904,7 @@ class _CropOverlayPainter extends CustomPainter {
 
     // 四角手柄
     final handle = Paint()..color = Colors.white..style = PaintingStyle.fill;
-    final handleBorder = Paint()..color = const Color.fromARGB(255, 84, 97, 97)..style = PaintingStyle.stroke..strokeWidth = 1.5;
+    final handleBorder = Paint()..color = handleBorderColor..style = PaintingStyle.stroke..strokeWidth = 1.5;
     for (final corner in [
       cropRect.topLeft, cropRect.topRight, cropRect.bottomLeft, cropRect.bottomRight,
     ]) {

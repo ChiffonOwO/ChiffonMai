@@ -5,9 +5,11 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import '../../service/Best50/Best50ConvertToImgService.dart';
 import '../../manager/DivingFish/UserBest50Manager.dart';
 import '../../manager/DivingFish/MaimaiMusicDataManager.dart';
@@ -465,6 +467,8 @@ class _B50PageState extends State<B50Page> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+
     if (_isLoading) {
       return Scaffold(
         backgroundColor: Colors.transparent,
@@ -510,11 +514,11 @@ class _B50PageState extends State<B50Page> {
               bottom: MediaQuery.of(context).size.height * 0.03,
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                   borderRadius: BorderRadius.circular(12.0),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black12,
+                      color: brightness == Brightness.dark ? Colors.black.withValues(alpha: 0.3) : Colors.black12,
                       blurRadius: 8.0,
                       offset: Offset(2.0, 2.0),
                     ),
@@ -527,14 +531,14 @@ class _B50PageState extends State<B50Page> {
                       Icon(
                         Icons.refresh,
                         size: 64,
-                        color: Colors.grey,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                       SizedBox(height: 16),
                       Text(
                         '暂无Best50数据',
                         style: TextStyle(
                           fontSize: 18,
-                          color: Colors.grey,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                       SizedBox(height: 8),
@@ -542,7 +546,7 @@ class _B50PageState extends State<B50Page> {
                         '请返回首页点击"刷新数据"按钮获取',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -551,7 +555,7 @@ class _B50PageState extends State<B50Page> {
                 ),
               ),
             ),
-            const Positioned(
+            Positioned(
               top: 60,
               left: 0,
               right: 0,
@@ -559,7 +563,7 @@ class _B50PageState extends State<B50Page> {
                 child: Text(
                   "Best50查询",
                   style: TextStyle(
-                    color: Color.fromARGB(255, 84, 97, 97),
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 2,
@@ -579,7 +583,7 @@ class _B50PageState extends State<B50Page> {
                   padding: EdgeInsets.all(16),
                   color: Colors.transparent,
                   child: Icon(Icons.arrow_back,
-                      color: Color.fromARGB(255, 84, 97, 97), size: 28),
+                      color: Theme.of(context).colorScheme.onSurface, size: 28),
                 ),
               ),
             ),
@@ -588,14 +592,9 @@ class _B50PageState extends State<B50Page> {
       );
     }
 
-    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
+    final Color textPrimaryColor = Theme.of(context).colorScheme.onSurface;
     final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = BoxShadow(
-      color: Colors.grey.withOpacity(0.5),
-      spreadRadius: 2,
-      blurRadius: 5,
-      offset: Offset(0, 3),
-    );
+    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -636,7 +635,7 @@ class _B50PageState extends State<B50Page> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
                     boxShadow: [defaultShadow],
                   ),
@@ -676,6 +675,145 @@ class _B50PageState extends State<B50Page> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  // Best50 历史快照
+  static const String _snapshotKey = 'b50_snapshots';
+  List<Map<String, dynamic>> _snapshots = [];
+
+  Future<void> _loadSnapshots() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString(_snapshotKey);
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        _snapshots = (json.decode(jsonStr) as List).map((e) => e as Map<String, dynamic>).toList();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveSnapshot() async {
+    if (_b50Data == null) return;
+    try {
+      await _loadSnapshots();
+      final now = DateTime.now();
+      final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
+          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+      _snapshots.insert(0, {
+        'date': dateStr,
+        'timestamp': now.millisecondsSinceEpoch,
+        'rating': _b50Data!['rating'] ?? 0,
+        'charts': {'sd': _sdSongs, 'dx': _dxSongs},
+      });
+      // 最多保留 10 条
+      if (_snapshots.length > 10) _snapshots = _snapshots.take(10).toList();
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_snapshotKey, json.encode(_snapshots));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Best50 记录已保存 ($dateStr)'), duration: Duration(seconds: 1)));
+      }
+    } catch (e) {
+      debugPrint('保存快照失败: $e');
+    }
+  }
+
+  Future<void> _deleteSnapshot(int index) async {
+    try {
+      _snapshots.removeAt(index);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_snapshotKey, json.encode(_snapshots));
+    } catch (_) {}
+  }
+
+  void _showSnapshotDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final dialogBrightness = Theme.of(ctx).brightness;
+          return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.history, size: 22, color: Theme.of(ctx).colorScheme.onSurface),
+              SizedBox(width: 8),
+              Text('Best50 历史记录'),
+            ],
+          ),
+          content: SizedBox(
+            width: MediaQuery.of(context).size.width * 0.85,
+            child: _snapshots.isEmpty
+                ? Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text('暂无保存的记录，点击"保存当前记录"按钮保存', style: TextStyle(color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _snapshots.length,
+                    itemBuilder: (ctx, i) {
+                      final s = _snapshots[i];
+                      return Container(
+                        margin: EdgeInsets.only(bottom: 6),
+                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.tableBorder(dialogBrightness)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.bookmark, color: AppColors.linkBlue(dialogBrightness), size: 18),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('Rating: ${s['rating']}',
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  Text(s['date'] ?? '',
+                                    style: TextStyle(fontSize: 11, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+                                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                                ],
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () async {
+                                Navigator.pop(ctx);
+                                final charts = s['charts'];
+                                setState(() {
+                                  _b50Data = {'rating': s['rating'], 'charts': charts};
+                                  _sdSongs = List<Map<String, dynamic>>.from(charts['sd'] ?? []);
+                                  _dxSongs = List<Map<String, dynamic>>.from(charts['dx'] ?? []);
+                                });
+                              },
+                              child: Padding(
+                                padding: EdgeInsets.all(6),
+                                child: Icon(Icons.remove_red_eye, size: 18, color: AppColors.linkBlue(dialogBrightness)),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () async {
+                                await _deleteSnapshot(i);
+                                setDialogState(() {});
+                              },
+                              child: Padding(
+                                padding: EdgeInsets.all(6),
+                                child: Icon(Icons.delete_outline, size: 18, color: AppColors.errorRed(dialogBrightness)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text('关闭')),
+          ],
+        );},
       ),
     );
   }
@@ -754,7 +892,7 @@ class _B50PageState extends State<B50Page> {
 
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.black, width: 2.0),
+        border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2.0),
         borderRadius: BorderRadius.circular(8.0),
       ),
       padding: EdgeInsets.all(12.0),
@@ -768,7 +906,7 @@ class _B50PageState extends State<B50Page> {
                   style: TextStyle(
                     fontSize: MediaQuery.of(context).size.width * 0.05,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 SizedBox(height: 8.0),
@@ -779,7 +917,7 @@ class _B50PageState extends State<B50Page> {
                         rating.toString(),
                         TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.05,
-                          color: Colors.black,
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -787,7 +925,7 @@ class _B50PageState extends State<B50Page> {
                         ' (平均${ratingAverage.toStringAsFixed(1)})',
                         TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.035,
-                          color: Colors.black,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -805,7 +943,7 @@ class _B50PageState extends State<B50Page> {
                           style: TextStyle(
                             fontSize: MediaQuery.of(context).size.width * 0.038,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         SizedBox(height: 4.0),
@@ -816,7 +954,7 @@ class _B50PageState extends State<B50Page> {
                                 best35Sum.toString(),
                                 TextStyle(
                                   fontSize: MediaQuery.of(context).size.width * 0.04,
-                                  color: Colors.black,
+                                  color: Theme.of(context).colorScheme.onSurface,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -824,7 +962,7 @@ class _B50PageState extends State<B50Page> {
                                 ' (平均${best35Average.toStringAsFixed(1)})',
                                 TextStyle(
                                   fontSize: MediaQuery.of(context).size.width * 0.028,
-                                  color: Colors.black,
+                                  color: Theme.of(context).colorScheme.onSurface,
                                 ),
                               ),
                             ],
@@ -840,7 +978,7 @@ class _B50PageState extends State<B50Page> {
                           style: TextStyle(
                             fontSize: MediaQuery.of(context).size.width * 0.038,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         SizedBox(height: 4.0),
@@ -851,7 +989,7 @@ class _B50PageState extends State<B50Page> {
                                 best15Sum.toString(),
                                 TextStyle(
                                   fontSize: MediaQuery.of(context).size.width * 0.04,
-                                  color: Colors.black,
+                                  color: Theme.of(context).colorScheme.onSurface,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -859,7 +997,7 @@ class _B50PageState extends State<B50Page> {
                                 ' (平均${best15Average.toStringAsFixed(1)})',
                                 TextStyle(
                                   fontSize: MediaQuery.of(context).size.width * 0.028,
-                                  color: Colors.black,
+                                  color: Theme.of(context).colorScheme.onSurface,
                                 ),
                               ),
                             ],
@@ -882,7 +1020,7 @@ class _B50PageState extends State<B50Page> {
                         style: TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.045,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       SizedBox(height: 4.0),
@@ -893,7 +1031,7 @@ class _B50PageState extends State<B50Page> {
                               rating.toString(),
                               TextStyle(
                                 fontSize: MediaQuery.of(context).size.width * 0.04,
-                                color: Colors.black,
+                                color: Theme.of(context).colorScheme.onSurface,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -901,7 +1039,7 @@ class _B50PageState extends State<B50Page> {
                               '(平均${ratingAverage.toStringAsFixed(1)})',
                               TextStyle(
                                 fontSize: MediaQuery.of(context).size.width * 0.03,
-                                color: Colors.black,
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
                           ],
@@ -913,7 +1051,7 @@ class _B50PageState extends State<B50Page> {
                         style: TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.04,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       RichText(
@@ -923,7 +1061,7 @@ class _B50PageState extends State<B50Page> {
                               best35Sum.toString(),
                               TextStyle(
                                 fontSize: MediaQuery.of(context).size.width * 0.04,
-                                color: Colors.black,
+                                color: Theme.of(context).colorScheme.onSurface,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -931,7 +1069,7 @@ class _B50PageState extends State<B50Page> {
                               '(平均${best35Average.toStringAsFixed(1)})',
                               TextStyle(
                                 fontSize: MediaQuery.of(context).size.width * 0.03,
-                                color: Colors.black,
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
                           ],
@@ -943,7 +1081,7 @@ class _B50PageState extends State<B50Page> {
                         style: TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.04,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       RichText(
@@ -953,7 +1091,7 @@ class _B50PageState extends State<B50Page> {
                               best15Sum.toString(),
                               TextStyle(
                                 fontSize: MediaQuery.of(context).size.width * 0.04,
-                                color: Colors.black,
+                                color: Theme.of(context).colorScheme.onSurface,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -961,7 +1099,7 @@ class _B50PageState extends State<B50Page> {
                               '(平均${best15Average.toStringAsFixed(1)})',
                               TextStyle(
                                 fontSize: MediaQuery.of(context).size.width * 0.03,
-                                color: Colors.black,
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
                           ],
@@ -979,7 +1117,7 @@ class _B50PageState extends State<B50Page> {
                         style: TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.035,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       _buildDualDecimalText(
@@ -990,7 +1128,7 @@ class _B50PageState extends State<B50Page> {
                         style: TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.035,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       _buildDualDecimalText(
@@ -1001,7 +1139,7 @@ class _B50PageState extends State<B50Page> {
                         style: TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.035,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       _buildDualDecimalText(
@@ -1016,25 +1154,27 @@ class _B50PageState extends State<B50Page> {
 
   // 构建标签统计区域
   Widget _buildTagStatsSection(BuildContext context) {
+    final tagBrightness = Theme.of(context).brightness;
+
     if (_isLoadingTags) {
       return Container(
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.black, width: 2.0),
+          border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2.0),
           borderRadius: BorderRadius.circular(8.0),
         ),
         padding: EdgeInsets.all(16.0),
         child: Center(
           child: CircularProgressIndicator(
-            color: Color.fromARGB(255, 84, 97, 97),
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
       );
     }
-    
+
     if (_tagStats.isEmpty) {
       return Container(
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.black, width: 2.0),
+          border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2.0),
           borderRadius: BorderRadius.circular(8.0),
         ),
         padding: EdgeInsets.all(16.0),
@@ -1043,23 +1183,23 @@ class _B50PageState extends State<B50Page> {
             '暂无标签数据',
             style: TextStyle(
               fontSize: MediaQuery.of(context).size.width * 0.035,
-              color: Colors.grey,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ),
       );
     }
-    
+
     // 分组颜色映射
     Map<String, Color> groupColors = {
-      '配置': Colors.blue,
+      '配置': AppColors.linkBlue(tagBrightness),
       '评价': Colors.amber[700]!,
-      '难度': Colors.indigo,
+      '难度': AppColors.linkBlue(tagBrightness),
     };
-    
+
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.black, width: 2.0),
+        border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2.0),
         borderRadius: BorderRadius.circular(8.0),
       ),
       padding: EdgeInsets.all(12.0),
@@ -1071,19 +1211,19 @@ class _B50PageState extends State<B50Page> {
             style: TextStyle(
               fontSize: MediaQuery.of(context).size.width * 0.04,
               fontWeight: FontWeight.bold,
-              color: Colors.black,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           SizedBox(height: 8.0),
           ..._tagStats.entries.map((groupEntry) {
             String groupName = groupEntry.key;
             Map<String, int> tagCounts = groupEntry.value;
-            Color groupColor = groupColors[groupName] ?? Colors.grey;
-            
+            Color groupColor = groupColors[groupName] ?? Theme.of(context).colorScheme.onSurfaceVariant;
+
             // 对组内标签按数量降序排序
             List<MapEntry<String, int>> sortedTags = tagCounts.entries.toList()
               ..sort((a, b) => b.value.compareTo(a.value));
-            
+
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1110,7 +1250,7 @@ class _B50PageState extends State<B50Page> {
                 ...sortedTags.map((tagEntry) {
                   double percentage = (tagEntry.value / 50) * 100;
                   Color barColor = groupColor.withOpacity(0.7);
-                  
+
                   return Padding(
                     padding: EdgeInsets.only(bottom: 4.0),
                     child: Row(
@@ -1121,7 +1261,7 @@ class _B50PageState extends State<B50Page> {
                             tagEntry.key,
                             style: TextStyle(
                               fontSize: MediaQuery.of(context).size.width * 0.03,
-                              color: Colors.black,
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -1132,7 +1272,7 @@ class _B50PageState extends State<B50Page> {
                           child: Container(
                             height: 20.0,
                             decoration: BoxDecoration(
-                              color: Colors.grey[200],
+                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
                               borderRadius: BorderRadius.circular(10.0),
                             ),
                             child: FractionallySizedBox(
@@ -1154,7 +1294,7 @@ class _B50PageState extends State<B50Page> {
                             '${tagEntry.value}(${(percentage).toStringAsFixed(0)}%)',
                             style: TextStyle(
                               fontSize: MediaQuery.of(context).size.width * 0.03,
-                              color: Colors.black,
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                             textAlign: TextAlign.right,
                           ),
@@ -1175,9 +1315,9 @@ class _B50PageState extends State<B50Page> {
   Widget _buildSectionTitle(String title, BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.black, width: 2.0),
+        border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2.0),
         borderRadius: BorderRadius.circular(8.0),
-        color: Colors.grey[200],
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
       ),
       padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
       child: Center(
@@ -1186,7 +1326,7 @@ class _B50PageState extends State<B50Page> {
           style: TextStyle(
             fontSize: MediaQuery.of(context).size.width * 0.04,
             fontWeight: FontWeight.bold,
-            color: Colors.black,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
       ),
@@ -1195,14 +1335,15 @@ class _B50PageState extends State<B50Page> {
 
   // 构建"查看剩余"卡片
   Widget _buildRemainingCard(Map<String, dynamic> remainingInfo) {
+    final remainingBrightness = Theme.of(context).brightness;
     double ds = remainingInfo['ds'] ?? 0.0;
     int count = remainingInfo['count'] ?? 0;
-    
+
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.black, width: 2.0),
+        border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2.0),
         borderRadius: BorderRadius.circular(8.0),
-        color: Colors.grey[100],
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
       ),
       child: TextButton(
         onPressed: () {
@@ -1218,21 +1359,21 @@ class _B50PageState extends State<B50Page> {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.music_note, color: Colors.blue, size: MediaQuery.of(context).size.width * 0.06),
+            Icon(Icons.music_note, color: AppColors.linkBlue(remainingBrightness), size: MediaQuery.of(context).size.width * 0.06),
             SizedBox(height: 4.0),
             Text(
               '剩余$count首',
               style: TextStyle(
                 fontSize: MediaQuery.of(context).size.width * 0.03,
                 fontWeight: FontWeight.bold,
-                color: Colors.black,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             Text(
               '${ds.toStringAsFixed(1)}',
               style: TextStyle(
                 fontSize: MediaQuery.of(context).size.width * 0.028,
-                color: Colors.blue,
+                color: AppColors.linkBlue(remainingBrightness),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1278,7 +1419,7 @@ class _B50PageState extends State<B50Page> {
                         style: TextStyle(
                           fontSize: MediaQuery.of(context).size.width * 0.04,
                           fontWeight: FontWeight.bold,
-                          color: isDxMode ? Colors.orange : Colors.blue.shade300,
+                          color: isDxMode ? AppColors.warningOrange(Theme.of(context).brightness) : AppColors.linkBlue(Theme.of(context).brightness),
                         ),
                       ),
                       SizedBox(width: 8.0),
@@ -1331,6 +1472,7 @@ class _B50PageState extends State<B50Page> {
     int? songId,
     Color starsColor = Colors.white,
   }) {
+    final gameBrightness = Theme.of(context).brightness;
     return Container(
       decoration: BoxDecoration(
         color: cardColor,
@@ -1361,7 +1503,7 @@ class _B50PageState extends State<B50Page> {
                     width: coverSize,
                     height: coverSize,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.surface,
                       border: Border.all(color: Colors.black, width: 1.0),
                     ),
                     child: songId != null
@@ -1391,7 +1533,7 @@ class _B50PageState extends State<B50Page> {
                           style: TextStyle(
                             fontSize: dxFontSize,
                             fontWeight: FontWeight.bold,
-                            color: Colors.orange,
+                            color: AppColors.warningOrange(gameBrightness),
                           ),
                         ),
                       if (!dxMode && !isUtage)
@@ -1400,7 +1542,7 @@ class _B50PageState extends State<B50Page> {
                           style: TextStyle(
                             fontSize: dxFontSize,
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade300,
+                            color: AppColors.linkBlue(gameBrightness),
                           ),
                         ),
                       SizedBox(width: screenWidth * 0.01),
@@ -1532,19 +1674,17 @@ class _B50PageState extends State<B50Page> {
         Text(
           integerPart,
           style: TextStyle(
-            fontSize: MediaQuery.of(context).size.width * 0.04,
+            fontSize: MediaQuery.of(context).size.width * 0.045,
             fontWeight: FontWeight.w800,
             color: color,
-            
           ),
         ),
         Text(
           '$decimalPart$percentageSymbol',
           style: TextStyle(
-            fontSize: MediaQuery.of(context).size.width * 0.03,
+            fontSize: MediaQuery.of(context).size.width * 0.035,
             fontWeight: FontWeight.w800,
             color: color,
-            
           ),
         ),
       ],
@@ -1554,27 +1694,28 @@ class _B50PageState extends State<B50Page> {
   Widget _buildDualDecimalText(double value1, double value2,
       {int decimalPlaces1 = 4,
       int decimalPlaces2 = 2,
-      Color color = Colors.black}) {
+      Color? color}) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final resolvedColor = color ?? Theme.of(context).colorScheme.onSurface;
         double fontSize = MediaQuery.of(context).size.width * 0.04;
 
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildDecimalText(value1, context,
-                decimalPlaces: decimalPlaces1, color: color),
+                decimalPlaces: decimalPlaces1, color: resolvedColor),
             Text(
               '/',
               style: TextStyle(
                 fontSize: fontSize,
                 fontWeight: FontWeight.bold,
-                color: color,
-                
+                color: resolvedColor,
+
               ),
             ),
             _buildDecimalText(value2, context,
-                decimalPlaces: decimalPlaces2, color: color),
+                decimalPlaces: decimalPlaces2, color: resolvedColor),
           ],
         );
       },
@@ -1635,7 +1776,7 @@ class _B50PageState extends State<B50Page> {
 
       Color cardColor;
       if (songId.toString().length == 6) {
-        cardColor = Color(0xFFFFB3D1);
+        cardColor = AppColors.utageCard;
       } else {
         cardColor = ColorUtil.getCardColor(levelIndex);
       }
@@ -1699,11 +1840,55 @@ class _B50PageState extends State<B50Page> {
   }
 
   Widget _buildActionButtons() {
-    return Row(
+    final actionBrightness = Theme.of(context).brightness;
+    return Column(
       children: [
-        Expanded(
-          child: ElevatedButton(
-            onPressed: () async {
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _saveSnapshot(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.linkBlue(actionBrightness),
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(Icons.save, color: Colors.white, size: 18),
+                  SizedBox(width: 6),
+                  Text('保存当前记录', style: TextStyle(fontSize: MediaQuery.of(context).size.width * 0.033,
+                      color: Colors.white, fontWeight: FontWeight.bold)),
+                ]),
+              ),
+            ),
+            SizedBox(width: 8),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () async {
+                  await _loadSnapshots();
+                  _showSnapshotDialog();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.linkBlue(actionBrightness),
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(Icons.history, color: Colors.white, size: 18),
+                  SizedBox(width: 6),
+                  Text('历史记录', style: TextStyle(fontSize: MediaQuery.of(context).size.width * 0.033,
+                      color: Colors.white, fontWeight: FontWeight.bold)),
+                ]),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () async {
               debugPrint('=== EXPORT BUTTON CLICKED ===');
               try {
                 await _exportToImage();
@@ -1712,7 +1897,7 @@ class _B50PageState extends State<B50Page> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
+              backgroundColor: AppColors.linkBlue(actionBrightness),
               padding: EdgeInsets.symmetric(vertical: 12.0),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8.0),
@@ -1740,7 +1925,7 @@ class _B50PageState extends State<B50Page> {
           child: ElevatedButton(
             onPressed: _toggleTheoreticalMode,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _isTheoreticalMode ? Colors.orange : Colors.green,
+              backgroundColor: _isTheoreticalMode ? AppColors.warningOrange(actionBrightness) : AppColors.successGreen(actionBrightness),
               padding: EdgeInsets.symmetric(vertical: 12.0),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8.0),
@@ -1764,6 +1949,8 @@ class _B50PageState extends State<B50Page> {
           ),
         ),
       ],
+    ),
+    ],
     );
   }
 

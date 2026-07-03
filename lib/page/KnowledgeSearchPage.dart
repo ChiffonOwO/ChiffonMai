@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../service/KnowledgeSearchService.dart';
 import '../entity/KnowledgeEntity.dart';
+import '../utils/AppTheme.dart';
+import '../utils/AppConstants.dart';
 import '../utils/CommonWidgetUtil.dart';
 import 'KnowledgeInfoPage.dart';
 
@@ -94,18 +96,11 @@ class _KnowledgeSearchPageState extends State<KnowledgeSearchPage> {
   }
 
   // 自定义常量
-  final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
   final Color themeColor = Colors.blue;
   final double borderRadiusSmall = 8.0;
-  final BoxShadow defaultShadow = BoxShadow(
-    color: Colors.grey.withOpacity(0.5),
-    spreadRadius: 2,
-    blurRadius: 5,
-    offset: Offset(0, 3),
-  );
-
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
@@ -127,7 +122,7 @@ class _KnowledgeSearchPageState extends State<KnowledgeSearchPage> {
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -138,7 +133,7 @@ class _KnowledgeSearchPageState extends State<KnowledgeSearchPage> {
                         child: Text(
                           '舞萌百科',
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -147,7 +142,7 @@ class _KnowledgeSearchPageState extends State<KnowledgeSearchPage> {
                     ),
                     // 刷新按钮
                     IconButton(
-                      icon: Icon(Icons.refresh, color: textPrimaryColor),
+                      icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: _clearCacheAndReload,
                       tooltip: '清除缓存并刷新数据',
                     ),
@@ -160,9 +155,9 @@ class _KnowledgeSearchPageState extends State<KnowledgeSearchPage> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
+                    boxShadow: [AppConstants.defaultShadow(brightness)],
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -172,7 +167,7 @@ class _KnowledgeSearchPageState extends State<KnowledgeSearchPage> {
                         Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey[300]!),
+                            border: Border.all(color: AppColors.tableBorder(brightness)),
                           ),
                           child: Row(
                             children: [
@@ -201,7 +196,7 @@ class _KnowledgeSearchPageState extends State<KnowledgeSearchPage> {
                           child: _isLoading
                               ? Center(child: CircularProgressIndicator())
                               : _errorMessage.isNotEmpty
-                                  ? Center(child: Text(_errorMessage, style: TextStyle(color: Colors.red)))
+                                  ? Center(child: Text(_errorMessage, style: TextStyle(color: AppColors.errorRed(brightness))))
                                   : _searchResults.isEmpty
                                       ? Center(child: Text('未找到相关知识'))
                                       : ListView.builder(
@@ -236,7 +231,7 @@ class _KnowledgeSearchPageState extends State<KnowledgeSearchPage> {
                                                           decoration: BoxDecoration(
                                                             color: item.category == KnowledgeItem.tagCategory
                                                                 ? Colors.blue
-                                                                : Colors.green,
+                                                                : AppColors.successGreen(brightness),
                                                             borderRadius: BorderRadius.circular(4),
                                                           ),
                                                           child: Text(
@@ -252,7 +247,7 @@ class _KnowledgeSearchPageState extends State<KnowledgeSearchPage> {
                                                         style: TextStyle(
                                                           fontSize: 18,
                                                           fontWeight: FontWeight.bold,
-                                                          color: textPrimaryColor,
+                                                          color: Theme.of(context).colorScheme.onSurface,
                                                         ),
                                                       ),
                                                       SizedBox(height: 8),
@@ -261,7 +256,7 @@ class _KnowledgeSearchPageState extends State<KnowledgeSearchPage> {
                                                       if (item.content != null)
                                                         Text(
                                                           item.content!,
-                                                          style: TextStyle(color: Colors.grey[700]),
+                                                          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                                                           maxLines: 3,
                                                           overflow: TextOverflow.ellipsis,
                                                         ),

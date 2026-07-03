@@ -4,7 +4,8 @@ import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import '../service/UserScoreSearchService.dart';
 import '../manager/DivingFish/MaimaiMusicDataManager.dart';
-import 'HomePage.dart';
+import 'package:my_first_flutter_app/utils/AppConstants.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'SongInfoPage.dart';
 import '../utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
@@ -321,6 +322,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
           continue;
         }
         for (final ds in song.ds) {
+          if (ds <= 0) continue;
           levels.add(_getLevelDisplay(ds));
         }
       }
@@ -351,6 +353,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        final brightness = Theme.of(context).brightness;
         return FutureBuilder<List<String>>(
           future: _getLevelOptions(),
           builder: (context, snapshot) {
@@ -424,7 +427,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                           ],
                         ),
                         SizedBox(height: 8),
-                        Text('最多一位小数，留空表示默认值', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text('最多一位小数，留空表示默认值', style: TextStyle(fontSize: 12, color: AppColors.secondaryText(brightness))),
                         SizedBox(height: 16),
                         Text('快捷选项:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                         SizedBox(height: 8),
@@ -440,8 +443,8 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey[100],
-                                foregroundColor: Colors.black,
+                                backgroundColor: AppColors.buttonBackground(brightness),
+                                foregroundColor: AppColors.primaryText(brightness),
                                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                 textStyle: TextStyle(fontSize: 12),
                               ),
@@ -467,11 +470,11 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                     String minText = minController.text.trim();
                     String maxText = maxController.text.trim();
                     String range = '';
-                    
+
                     if (minText.isNotEmpty || maxText.isNotEmpty) {
                       range = '$minText-$maxText';
                     }
-                    
+
                     setState(() {
                       _filterConditions['定数筛选'] = range;
                       _currentPage = 1;
@@ -545,6 +548,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        final brightness = Theme.of(context).brightness;
         // 达成率快捷选项
         List<Map<String, String>> quickOptions = [
           {'label': 'SSS+', 'min': '100.5', 'max': '101'},
@@ -605,7 +609,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                       ],
                     ),
                     SizedBox(height: 8),
-                    Text('最多四位小数，留空表示默认值', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text('最多四位小数，留空表示默认值', style: TextStyle(fontSize: 12, color: AppColors.secondaryText(brightness))),
                     SizedBox(height: 16),
                     Text('快捷选项:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                     SizedBox(height: 8),
@@ -621,8 +625,8 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                             });
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey[100],
-                            foregroundColor: Colors.black,
+                            backgroundColor: AppColors.buttonBackground(brightness),
+                            foregroundColor: AppColors.primaryText(brightness),
                             padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                             textStyle: TextStyle(fontSize: 12),
                           ),
@@ -648,11 +652,11 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                 String minText = minController.text.trim();
                 String maxText = maxController.text.trim();
                 String range = '';
-                
+
                 if (minText.isNotEmpty || maxText.isNotEmpty) {
                   range = '$minText-$maxText';
                 }
-                
+
                 setState(() {
                   _filterConditions['达成率筛选'] = range;
                   _currentPage = 1; // 筛选条件变化时，切换到第1页
@@ -871,22 +875,22 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   }
   
   // 构建星数统计项
-  Widget _buildStarStatItem(String label, int value, String stars) {
+  Widget _buildStarStatItem(String label, int value, String stars, Brightness brightness) {
     Color textColor = _getStarsColor(stars);
-    
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: AppColors.tableBorder(brightness)),
         borderRadius: BorderRadius.circular(6),
-        color: Colors.grey[50],
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: 10),
+            style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurface),
             textAlign: TextAlign.center,
           ),
           SizedBox(height: 2),
@@ -921,20 +925,20 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   }
   
   // 构建统计项
-  Widget _buildStatItem(String label, int value) {
+  Widget _buildStatItem(String label, int value, Brightness brightness) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: AppColors.tableBorder(brightness)),
         borderRadius: BorderRadius.circular(6),
-        color: Colors.grey[50],
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: 10),
+            style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurface),
             textAlign: TextAlign.center,
           ),
           SizedBox(height: 2),
@@ -943,7 +947,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: Colors.blue,
+              color: AppColors.linkBlue(brightness),
             ),
             textAlign: TextAlign.center,
           ),
@@ -955,6 +959,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final brightness = Theme.of(context).brightness;
     // ignore: unused_local_variable
     final stats =  _calculateStats();
     
@@ -980,7 +985,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: AppConstants.textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -991,7 +996,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                         child: Text(
                           '成绩查询',
                           style: TextStyle(
-                            color: AppConstants.textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1009,14 +1014,14 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16), // 进一步减小上边距，从4减小到0
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9), // 增加白色不透明度，使背景更深
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-                    boxShadow: const [AppConstants.defaultShadow],
+                    boxShadow: [AppConstants.defaultShadow(brightness)],
                   ),
                   child: _isLoading
                       ? Center(child: CircularProgressIndicator())
                       : _userPlayData == null
-                          ? Center(child: Text('没有找到缓存数据'))
+                          ? Center(child: Text('没有找到缓存数据', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)))
                           : Column(
                               children: [
                                 // 可滚动内容区域
@@ -1028,7 +1033,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                         Container(
                                           padding: EdgeInsets.all(8),
                                           decoration: BoxDecoration(
-                                            border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+                                            border: Border(bottom: BorderSide(color: AppColors.tableBorder(brightness))),
                                           ),
                                           child: Column(
                                             children: [
@@ -1036,11 +1041,11 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                               Row(
                                                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                                 children: [
-                                                  Expanded(child: _buildStatItem('总谱面数', _stats!['total']!)),
+                                                  Expanded(child: _buildStatItem('总谱面数', _stats!['total']!, brightness)),
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStatItem('SSS+', _stats!['sssp']!)),
+                                                  Expanded(child: _buildStatItem('SSS+', _stats!['sssp']!, brightness)),
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStatItem('SSS', _stats!['sss']!)),
+                                                  Expanded(child: _buildStatItem('SSS', _stats!['sss']!, brightness)),
                                                   SizedBox(width: 8),
                                                 ],
                                               ),
@@ -1049,13 +1054,13 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                               Row(
                                                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                                 children: [
-                                                  Expanded(child: _buildStatItem('FC/FC+', _stats!['fc']!)),
+                                                  Expanded(child: _buildStatItem('FC/FC+', _stats!['fc']!, brightness)),
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStatItem('AP/AP+', _stats!['ap']!)),
+                                                  Expanded(child: _buildStatItem('AP/AP+', _stats!['ap']!, brightness)),
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStatItem('FS/FS+', _stats!['fs']!)),
+                                                  Expanded(child: _buildStatItem('FS/FS+', _stats!['fs']!, brightness)),
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStatItem('FDX/FDX+', _stats!['fdx']!)),
+                                                  Expanded(child: _buildStatItem('FDX/FDX+', _stats!['fdx']!, brightness)),
                                                 ],
                                               ),
                                               SizedBox(height: 8),
@@ -1063,15 +1068,15 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                               Row(
                                                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                                 children: [
-                                                  Expanded(child: _buildStarStatItem('✦ 5', _stats!['star5']!, '✦ 5')),
+                                                  Expanded(child: _buildStarStatItem('✦ 5', _stats!['star5']!, '✦ 5', brightness)),
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStarStatItem('✦ 4', _stats!['star4']!, '✦ 4')),
+                                                  Expanded(child: _buildStarStatItem('✦ 4', _stats!['star4']!, '✦ 4', brightness)),
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStarStatItem('✦ 3', _stats!['star3']!, '✦ 3')), 
+                                                  Expanded(child: _buildStarStatItem('✦ 3', _stats!['star3']!, '✦ 3', brightness)),
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStarStatItem('✦ 2', _stats!['star2']!, '✦ 2')),
+                                                  Expanded(child: _buildStarStatItem('✦ 2', _stats!['star2']!, '✦ 2', brightness)),
                                                   SizedBox(width: 8),
-                                                  Expanded(child: _buildStarStatItem('✦ 1', _stats!['star1']!, '✦ 1')),
+                                                  Expanded(child: _buildStarStatItem('✦ 1', _stats!['star1']!, '✦ 1', brightness)),
                                                 ],
                                               ),
                                             ],
@@ -1082,7 +1087,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                         Container(
                                           padding: EdgeInsets.all(8),
                                           decoration: BoxDecoration(
-                                            border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+                                            border: Border(bottom: BorderSide(color: AppColors.tableBorder(brightness))),
                                           ),
                                           child: Wrap(
                                             spacing: _buttonHorizontalSpacing, // 水平间距
@@ -1091,49 +1096,55 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                               ElevatedButton(
                                                 onPressed: _showSortDialog,
                                                 style: ElevatedButton.styleFrom(
+                                                  backgroundColor: AppColors.buttonBackground(brightness),
+                                                  foregroundColor: AppColors.primaryText(brightness),
                                                   shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(_buttonBorderRadius), // 圆角
+                                                    borderRadius: BorderRadius.circular(_buttonBorderRadius),
+                                                    side: BorderSide(color: AppColors.buttonBorder(brightness)),
                                                   ),
-                                                  fixedSize: Size(_buttonWidth, _buttonHeight), // 按钮尺寸
-                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8), // 调整内边距
+                                                  fixedSize: Size(_buttonWidth, _buttonHeight),
+                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                                                 ),
                                                 child: Column(
                                                   mainAxisAlignment: MainAxisAlignment.center,
                                                   children: [
                                                     Text('排序方式', 
-                                                      style: TextStyle(fontSize: _buttonFontSize),
+                                                      style: TextStyle(fontSize: _buttonFontSize, color: AppColors.primaryText(brightness)),
                                                       maxLines: 1,
                                                     ),
                                                     SizedBox(height: 2),
-                                                    Text(_currentSortBy, 
-                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.black),
+                                                    Text(_currentSortBy,
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: AppColors.secondaryText(brightness)),
                                                       maxLines: 1,
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
                                                   ],
-                                                ), // 文字尺寸
+                                                ),
                                               ),
                                               ElevatedButton(
                                                 onPressed: _showVersionFilterDialog,
                                                 style: ElevatedButton.styleFrom(
+                                                  backgroundColor: AppColors.buttonBackground(brightness),
+                                                  foregroundColor: AppColors.primaryText(brightness),
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(_buttonBorderRadius),
+                                                    side: BorderSide(color: AppColors.buttonBorder(brightness)),
                                                   ),
                                                   fixedSize: Size(_buttonWidth, _buttonHeight),
-                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8), // 调整内边距
+                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                                                 ),
                                                 child: Column(
                                                   mainAxisAlignment: MainAxisAlignment.center,
                                                   children: [
                                                     Text('版本筛选', 
-                                                      style: TextStyle(fontSize: _buttonFontSize),
+                                                      style: TextStyle(fontSize: _buttonFontSize, color: AppColors.primaryText(brightness)),
                                                       maxLines: 1,
                                                     ),
                                                     SizedBox(height: 2),
                                                     Text(_filterConditions['版本筛选'] != null && _filterConditions['版本筛选']!.isNotEmpty
                                                         ? _formatVersion(_filterConditions['版本筛选']!)
-                                                        : '', 
-                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.black),
+                                                        : '',
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: AppColors.secondaryText(brightness)),
                                                       maxLines: 1,
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
@@ -1143,22 +1154,25 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                               ElevatedButton(
                                                 onPressed: _showDsFilterDialog,
                                                 style: ElevatedButton.styleFrom(
+                                                  backgroundColor: AppColors.buttonBackground(brightness),
+                                                  foregroundColor: AppColors.primaryText(brightness),
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(_buttonBorderRadius),
+                                                    side: BorderSide(color: AppColors.buttonBorder(brightness)),
                                                   ),
                                                   fixedSize: Size(_buttonWidth, _buttonHeight),
-                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8), // 调整内边距
+                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                                                 ),
                                                 child: Column(
                                                   mainAxisAlignment: MainAxisAlignment.center,
                                                   children: [
                                                     Text('定数筛选', 
-                                                      style: TextStyle(fontSize: _buttonFontSize),
+                                                      style: TextStyle(fontSize: _buttonFontSize, color: AppColors.primaryText(brightness)),
                                                       maxLines: 1,
                                                     ),
                                                     SizedBox(height: 2),
-                                                    Text(_filterConditions['定数筛选'] ?? '', 
-                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.black),
+                                                    Text(_filterConditions['定数筛选'] ?? '',
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: AppColors.secondaryText(brightness)),
                                                       maxLines: 1,
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
@@ -1168,22 +1182,25 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                               ElevatedButton(
                                                 onPressed: _showDifficultyFilterDialog,
                                                 style: ElevatedButton.styleFrom(
+                                                  backgroundColor: AppColors.buttonBackground(brightness),
+                                                  foregroundColor: AppColors.primaryText(brightness),
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(_buttonBorderRadius),
+                                                    side: BorderSide(color: AppColors.buttonBorder(brightness)),
                                                   ),
                                                   fixedSize: Size(_buttonWidth, _buttonHeight),
-                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8), // 调整内边距
+                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                                                 ),
                                                 child: Column(
                                                   mainAxisAlignment: MainAxisAlignment.center,
                                                   children: [
                                                     Text('难度筛选', 
-                                                      style: TextStyle(fontSize: _buttonFontSize),
+                                                      style: TextStyle(fontSize: _buttonFontSize, color: AppColors.primaryText(brightness)),
                                                       maxLines: 1,
                                                     ),
                                                     SizedBox(height: 2),
-                                                    Text(_filterConditions['难度筛选'] ?? '', 
-                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.black),
+                                                    Text(_filterConditions['难度筛选'] ?? '',
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: AppColors.secondaryText(brightness)),
                                                       maxLines: 1,
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
@@ -1193,22 +1210,25 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                               ElevatedButton(
                                                 onPressed: _showAchievementFilterDialog,
                                                 style: ElevatedButton.styleFrom(
+                                                  backgroundColor: AppColors.buttonBackground(brightness),
+                                                  foregroundColor: AppColors.primaryText(brightness),
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(_buttonBorderRadius),
+                                                    side: BorderSide(color: AppColors.buttonBorder(brightness)),
                                                   ),
                                                   fixedSize: Size(_buttonWidth, _buttonHeight),
-                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8), // 调整内边距
+                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                                                 ),
                                                 child: Column(
                                                   mainAxisAlignment: MainAxisAlignment.center,
                                                   children: [
                                                     Text('达成率筛选', 
-                                                      style: TextStyle(fontSize: _buttonFontSize),
+                                                      style: TextStyle(fontSize: _buttonFontSize, color: AppColors.primaryText(brightness)),
                                                       maxLines: 1,
                                                     ),
                                                     SizedBox(height: 2),
-                                                    Text(_filterConditions['达成率筛选'] ?? '', 
-                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.black),
+                                                    Text(_filterConditions['达成率筛选'] ?? '',
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: AppColors.secondaryText(brightness)),
                                                       maxLines: 1,
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
@@ -1218,22 +1238,25 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                               ElevatedButton(
                                                 onPressed: _showComboFilterDialog,
                                                 style: ElevatedButton.styleFrom(
+                                                  backgroundColor: AppColors.buttonBackground(brightness),
+                                                  foregroundColor: AppColors.primaryText(brightness),
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius: BorderRadius.circular(_buttonBorderRadius),
+                                                    side: BorderSide(color: AppColors.buttonBorder(brightness)),
                                                   ),
                                                   fixedSize: Size(_buttonWidth, _buttonHeight),
-                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8), // 调整内边距
+                                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                                                 ),
                                                 child: Column(
                                                   mainAxisAlignment: MainAxisAlignment.center,
                                                   children: [
                                                     Text('连击/同步筛选', 
-                                                      style: TextStyle(fontSize: _buttonFontSize),
+                                                      style: TextStyle(fontSize: _buttonFontSize, color: AppColors.primaryText(brightness)),
                                                       maxLines: 1,
                                                     ),
                                                     SizedBox(height: 2),
-                                                    Text(_filterConditions['连击/同步筛选'] ?? '', 
-                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: Colors.black),
+                                                    Text(_filterConditions['连击/同步筛选'] ?? '',
+                                                      style: TextStyle(fontSize: _buttonFontSize * 0.8, color: AppColors.secondaryText(brightness)),
                                                       maxLines: 1,
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
@@ -1248,7 +1271,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                         Container(
                                           padding: EdgeInsets.all(8),
                                           decoration: BoxDecoration(
-                                            border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+                                            border: Border(bottom: BorderSide(color: AppColors.tableBorder(brightness))),
                                           ),
                                           child: Row(
                                             children: [
@@ -1272,12 +1295,13 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                           shape: RoundedRectangleBorder(
                                                             borderRadius: BorderRadius.circular(4),
                                                           ),
-                                                          backgroundColor: _selectedButtonIndex == 0 ? Colors.blue : null,
+                                                          backgroundColor: _selectedButtonIndex == 0 ? AppColors.linkBlue(brightness) : AppColors.buttonBackground(brightness),
+                                                          foregroundColor: _selectedButtonIndex == 0 ? Colors.white : AppColors.primaryText(brightness),
                                                         ),
-                                                        child: Text('评级', 
+                                                        child: Text('评级',
                                                           style: TextStyle(
-                                                            fontSize: _smallButtonFontSize, 
-                                                            color: _selectedButtonIndex == 0 ? Colors.white : Colors.black,
+                                                            fontSize: _smallButtonFontSize,
+                                                            color: _selectedButtonIndex == 0 ? Colors.white : AppColors.primaryText(brightness),
                                                           ),
                                                         ),
                                                       ),
@@ -1294,12 +1318,13 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                           shape: RoundedRectangleBorder(
                                                             borderRadius: BorderRadius.circular(4),
                                                           ),
-                                                          backgroundColor: _selectedButtonIndex == 1 ? Colors.blue : null,
+                                                          backgroundColor: _selectedButtonIndex == 1 ? AppColors.linkBlue(brightness) : AppColors.buttonBackground(brightness),
+                                                          foregroundColor: _selectedButtonIndex == 1 ? Colors.white : AppColors.primaryText(brightness),
                                                         ),
-                                                        child: Text('连击', 
+                                                        child: Text('连击',
                                                           style: TextStyle(
-                                                            fontSize: _smallButtonFontSize, 
-                                                            color: _selectedButtonIndex == 1 ? Colors.white : Colors.black,
+                                                            fontSize: _smallButtonFontSize,
+                                                            color: _selectedButtonIndex == 1 ? Colors.white : AppColors.primaryText(brightness),
                                                           ),
                                                         ),
                                                       ),
@@ -1316,12 +1341,13 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                           shape: RoundedRectangleBorder(
                                                             borderRadius: BorderRadius.circular(4),
                                                           ),
-                                                          backgroundColor: _selectedButtonIndex == 2 ? Colors.blue : null,
+                                                          backgroundColor: _selectedButtonIndex == 2 ? AppColors.linkBlue(brightness) : AppColors.buttonBackground(brightness),
+                                                          foregroundColor: _selectedButtonIndex == 2 ? Colors.white : AppColors.primaryText(brightness),
                                                         ),
-                                                        child: Text('同步', 
+                                                        child: Text('同步',
                                                           style: TextStyle(
-                                                            fontSize: _smallButtonFontSize, 
-                                                            color: _selectedButtonIndex == 2 ? Colors.white : Colors.black,
+                                                            fontSize: _smallButtonFontSize,
+                                                            color: _selectedButtonIndex == 2 ? Colors.white : AppColors.primaryText(brightness),
                                                           ),
                                                         ),
                                                       ),
@@ -1338,12 +1364,13 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                           shape: RoundedRectangleBorder(
                                                             borderRadius: BorderRadius.circular(4),
                                                           ),
-                                                          backgroundColor: _selectedButtonIndex == 3 ? Colors.blue : null,
+                                                          backgroundColor: _selectedButtonIndex == 3 ? AppColors.linkBlue(brightness) : AppColors.buttonBackground(brightness),
+                                                          foregroundColor: _selectedButtonIndex == 3 ? Colors.white : AppColors.primaryText(brightness),
                                                         ),
-                                                        child: Text('得分', 
+                                                        child: Text('得分',
                                                           style: TextStyle(
-                                                            fontSize: _smallButtonFontSize, 
-                                                            color: _selectedButtonIndex == 3 ? Colors.white : Colors.black,
+                                                            fontSize: _smallButtonFontSize,
+                                                            color: _selectedButtonIndex == 3 ? Colors.white : AppColors.primaryText(brightness),
                                                           ),
                                                         ),
                                                       ),
@@ -1360,12 +1387,13 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                           shape: RoundedRectangleBorder(
                                                             borderRadius: BorderRadius.circular(4),
                                                           ),
-                                                          backgroundColor: _selectedButtonIndex == 4 ? Colors.blue : null,
+                                                          backgroundColor: _selectedButtonIndex == 4 ? AppColors.linkBlue(brightness) : AppColors.buttonBackground(brightness),
+                                                          foregroundColor: _selectedButtonIndex == 4 ? Colors.white : AppColors.primaryText(brightness),
                                                         ),
-                                                        child: Text('星数', 
+                                                        child: Text('星数',
                                                           style: TextStyle(
-                                                            fontSize: _smallButtonFontSize, 
-                                                            color: _selectedButtonIndex == 4 ? Colors.white : Colors.black,
+                                                            fontSize: _smallButtonFontSize,
+                                                            color: _selectedButtonIndex == 4 ? Colors.white : AppColors.primaryText(brightness),
                                                           ),
                                                         ),
                                                       ),
@@ -1382,12 +1410,13 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                                           shape: RoundedRectangleBorder(
                                                             borderRadius: BorderRadius.circular(4),
                                                           ),
-                                                          backgroundColor: _selectedButtonIndex == 5 ? Colors.blue : null,
+                                                          backgroundColor: _selectedButtonIndex == 5 ? AppColors.linkBlue(brightness) : AppColors.buttonBackground(brightness),
+                                                          foregroundColor: _selectedButtonIndex == 5 ? Colors.white : AppColors.primaryText(brightness),
                                                         ),
-                                                        child: Text('定数', 
+                                                        child: Text('定数',
                                                           style: TextStyle(
-                                                            fontSize: _smallButtonFontSize, 
-                                                            color: _selectedButtonIndex == 5 ? Colors.white : Colors.black,
+                                                            fontSize: _smallButtonFontSize,
+                                                            color: _selectedButtonIndex == 5 ? Colors.white : AppColors.primaryText(brightness),
                                                           ),
                                                         ),
                                                       ),
@@ -1400,7 +1429,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                               Container(
                                                 child: Row(
                                                   children: [
-                                                    Text('每页显示 ', style: TextStyle(fontSize: 12)), // 减小字体大小
+                                                    Text('每页显示 ', style: TextStyle(fontSize: 12, color: AppColors.primaryText(brightness))),
                                                     Container(
                                                       width: screenWidth * 0.1, // 减小输入框宽度，从0.12减小到0.1
                                                       height: 24, // 固定高度，减小输入框高度
@@ -1438,7 +1467,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                 Container(
                                   padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                                   decoration: BoxDecoration(
-                                    border: Border(top: BorderSide(color: Colors.grey[300]!)),
+                                    border: Border(top: BorderSide(color: AppColors.tableBorder(brightness))),
                                   ),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -1449,11 +1478,13 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                             : null,
                                         style: ElevatedButton.styleFrom(
                                           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                          backgroundColor: AppColors.buttonBackground(brightness),
+                                          foregroundColor: AppColors.primaryText(brightness),
                                         ),
-                                        child: Text('上一页', style: TextStyle(color: Colors.black, fontSize: 12)),
+                                        child: Text('上一页', style: TextStyle(color: AppColors.primaryText(brightness), fontSize: 12)),
                                       ),
                                       SizedBox(width: 8),
-                                      Text('$_currentPage / ${_getTotalPages()}', style: TextStyle(color: Colors.black, fontSize: 14)),
+                                      Text('$_currentPage / ${_getTotalPages()}', style: TextStyle(color: AppColors.primaryText(brightness), fontSize: 14)),
                                       SizedBox(width: 8),
                                       ElevatedButton(
                                         onPressed: _currentPage < _getTotalPages()
@@ -1461,8 +1492,10 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                             : null,
                                         style: ElevatedButton.styleFrom(
                                           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                          backgroundColor: AppColors.buttonBackground(brightness),
+                                          foregroundColor: AppColors.primaryText(brightness),
                                         ),
-                                        child: Text('下一页', style: TextStyle(color: Colors.black, fontSize: 12)),
+                                        child: Text('下一页', style: TextStyle(color: AppColors.primaryText(brightness), fontSize: 12)),
                                       ),
                                       SizedBox(width: 8),
                                       ElevatedButton(
@@ -1472,7 +1505,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                           });
                                         },
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: _isCoverMode ? Colors.blue : Colors.green,
+                                          backgroundColor: _isCoverMode ? AppColors.linkBlue(brightness) : AppColors.successGreen(brightness),
                                           padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                         ),
                                         child: Text(
@@ -1767,6 +1800,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   
   // 构建列表卡片（参考Best50Page的卡片样式）
   Widget _buildListCard(Map<String, dynamic> song) {
+    final brightness = Theme.of(context).brightness;
     double screenWidth = MediaQuery.of(context).size.width;
     int songId = int.tryParse(song['song_id']?.toString() ?? '0') ?? 0;
     int levelIndex = song['level_index'] ?? 0;
@@ -1869,7 +1903,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                         style: TextStyle(
                           fontSize: dxFontSize,
                           fontWeight: FontWeight.bold,
-                          color: Colors.orange,
+                          color: AppColors.warningOrange(brightness),
                         ),
                       ),
                     if (!dxMode && !isUtage)
@@ -1878,7 +1912,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                         style: TextStyle(
                           fontSize: dxFontSize,
                           fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade300,
+                          color: AppColors.linkBlue(brightness),
                         ),
                       ),
                     SizedBox(width: screenWidth * 0.01),

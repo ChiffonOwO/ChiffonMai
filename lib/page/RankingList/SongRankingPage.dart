@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/constant/CacheKeyConstant.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/service/RankingList/SongRankingService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
@@ -75,6 +76,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
+        final dialogBrightness = Theme.of(context).brightness;
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
@@ -83,13 +85,13 @@ class _SongRankingPageState extends State<SongRankingPage> {
                   Icon(
                     Icons.info_outline,
                     size: 24,
-                    color: Colors.yellow[700],
+                    color: AppColors.warningOrange(dialogBrightness),
                   ),
                   SizedBox(width: 8),
                   Text(
                     '免责声明',
                     style: TextStyle(
-                      color: Colors.yellow[800],
+                      color: AppColors.warningOrange(dialogBrightness),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -103,7 +105,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                       '本排行榜数据仅供参考和娱乐使用，不代表任何官方立场或权威性排名。排名数据基于玩家自愿上传的游戏数据，可能存在误差或延迟。请理性看待排名结果，享受游戏乐趣。',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey[700],
+                        color: AppColors.greyHint(dialogBrightness),
                         height: 1.6,
                       ),
                     ),
@@ -135,7 +137,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                   child: Text('知道了'),
                 ),
               ],
-              backgroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -529,24 +531,24 @@ class _SongRankingPageState extends State<SongRankingPage> {
     }
   }
 
-  Widget _buildRankingItem(RankingEntry entry, bool isCurrentUser) {
+  Widget _buildRankingItem(RankingEntry entry, bool isCurrentUser, Brightness brightness) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
-        color: isCurrentUser ? Colors.blue[50] : null,
+        border: Border(bottom: BorderSide(color: AppColors.tableBorder(brightness))),
+        color: isCurrentUser ? AppColors.linkBlue(brightness).withValues(alpha: 0.08) : null,
       ),
       child: Row(
         children: [
           SizedBox(
             width: 40,
             child: Center(
-              child: _buildRankBadge(entry.rank),
+              child: _buildRankBadge(entry.rank, brightness),
             ),
           ),
-          
+
           SizedBox(width: 12),
-          
+
           Expanded(
             child: Row(
               children: [
@@ -556,8 +558,10 @@ class _SongRankingPageState extends State<SongRankingPage> {
                   margin: EdgeInsets.only(right: 6),
                   decoration: BoxDecoration(
                     color: entry.dataSource == 'shuiyu'
-                        ? Colors.blue[100]
-                        : Colors.purple[100],
+                        ? AppColors.linkBlue(brightness).withValues(alpha: 0.12)
+                        : (brightness == Brightness.dark
+                            ? Colors.purple.withValues(alpha: 0.2)
+                            : const Color(0xFFE1BEE7)),
                     borderRadius: BorderRadius.circular(3),
                   ),
                   child: Text(
@@ -565,8 +569,10 @@ class _SongRankingPageState extends State<SongRankingPage> {
                     style: TextStyle(
                       fontSize: 10,
                       color: entry.dataSource == 'shuiyu'
-                          ? Colors.blue[700]
-                          : Colors.purple[700],
+                          ? AppColors.linkBlue(brightness)
+                          : (brightness == Brightness.dark
+                              ? const Color(0xFFCE93D8)
+                              : const Color(0xFF7B1FA2)),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -577,7 +583,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.w500,
-                      color: isCurrentUser ? Theme.of(context).primaryColor : null,
+                      color: isCurrentUser ? AppColors.linkBlue(brightness) : null,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -585,7 +591,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
               ],
             ),
           ),
-          
+
           SizedBox(
             width: 130,
             child: Column(
@@ -597,8 +603,8 @@ class _SongRankingPageState extends State<SongRankingPage> {
                     // DX分数排行榜显示星星等级
                     if (widget.rankingType == RankingType.dxScore)
                       Container(
-                        padding: _isHighStarLevel(entry.dxScore) 
-                            ? EdgeInsets.symmetric(horizontal: 6, vertical: 2) 
+                        padding: _isHighStarLevel(entry.dxScore)
+                            ? EdgeInsets.symmetric(horizontal: 6, vertical: 2)
                             : EdgeInsets.zero,
                         decoration: _isHighStarLevel(entry.dxScore)
                             ? BoxDecoration(
@@ -610,8 +616,8 @@ class _SongRankingPageState extends State<SongRankingPage> {
                           _calculateStarsBonus(entry.dxScore),
                           style: TextStyle(
                             fontSize: 12,
-                            color: _isHighStarLevel(entry.dxScore) 
-                                ? Colors.black 
+                            color: _isHighStarLevel(entry.dxScore)
+                                ? Colors.black
                                 : _getStarsColor(entry.dxScore),
                             fontWeight: _isHighStarLevel(entry.dxScore) ? FontWeight.bold : FontWeight.normal,
                           ),
@@ -620,7 +626,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                     if (widget.rankingType == RankingType.dxScore)
                       SizedBox(width: 8),
                     // AP/AP+ 标签
-                    if (widget.rankingType == RankingType.achievementRate && 
+                    if (widget.rankingType == RankingType.achievementRate &&
                         (entry.fc?.toLowerCase() == 'ap' || entry.fc?.toLowerCase() == 'app'))
                       Container(
                         padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -646,7 +652,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -656,7 +662,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                   _formatUpdateTime(entry.updateTime),
                   style: TextStyle(
                     fontSize: 10,
-                    color: Colors.grey,
+                    color: AppColors.greyHint(brightness),
                   ),
                 ),
               ],
@@ -667,7 +673,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
     );
   }
 
-  Widget _buildRankBadge(int rank) {
+  Widget _buildRankBadge(int rank, Brightness brightness) {
     if (rank == 1) {
       return Container(
         width: 28,
@@ -728,7 +734,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
         style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          color: Colors.grey[600],
+          color: AppColors.greyHint(brightness),
         ),
       );
     }
@@ -737,6 +743,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
   
 
   Widget _buildTypeBadge(String type) {
+    final brightness = Theme.of(context).brightness;
     bool isUtage = widget.songId.length == 6;
 
     if (isUtage) {
@@ -754,7 +761,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
         style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.bold,
-          color: Colors.orange,
+          color: AppColors.warningOrange(brightness),
         ),
       );
     } else {
@@ -763,7 +770,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
         style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.bold,
-          color: Colors.blue,
+          color: AppColors.linkBlue(brightness),
         ),
       );
     }
@@ -771,9 +778,10 @@ class _SongRankingPageState extends State<SongRankingPage> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
-    final title = widget.rankingType == RankingType.achievementRate 
-        ? '达成率排行榜' 
+    final title = widget.rankingType == RankingType.achievementRate
+        ? '达成率排行榜'
         : 'DX分数排行榜';
 
     return Scaffold(
@@ -790,7 +798,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: Color.fromARGB(255, 84, 97, 97)),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -800,7 +808,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                         child: Text(
                           title,
                           style: TextStyle(
-                            color: Color.fromARGB(255, 84, 97, 97),
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -809,7 +817,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                     ),
                     // 免责声明按钮
                     IconButton(
-                      icon: Icon(Icons.info_outline, color: Color.fromARGB(255, 84, 97, 97)),
+                      icon: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: _showDisclaimer,
                     ),
                   ],
@@ -821,14 +829,10 @@ class _SongRankingPageState extends State<SongRankingPage> {
                 margin: EdgeInsets.fromLTRB(8, 0, 8, 8),
                 height: 120,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 5,
-                      offset: Offset(2, 2),
-                    ),
+                    AppColors.defaultShadow(brightness),
                   ],
                 ),
                 child: Row(
@@ -875,7 +879,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                 StringUtil.formatVersion2(widget.from),
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey[600],
+                                  color: AppColors.greyHint(brightness),
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -937,14 +941,10 @@ class _SongRankingPageState extends State<SongRankingPage> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 8, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 5,
-                        offset: Offset(2, 2),
-                      ),
+                      AppColors.defaultShadow(brightness),
                     ],
                   ),
                   child: _isLoading 
@@ -959,14 +959,14 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                       Icon(
                                         Icons.emoji_events_outlined,
                                         size: 64,
-                                        color: Colors.grey[300],
+                                        color: AppColors.greyHint(brightness),
                                       ),
                                       SizedBox(height: 16),
                                       Text(
                                         '榜上无人哦，快来抢沙发！',
                                         style: TextStyle(
                                           fontSize: 18,
-                                          color: Colors.grey[500],
+                                          color: AppColors.greyHint(brightness),
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -982,7 +982,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                     itemBuilder: (context, index) {
                                       RankingEntry entry = _rankingList[index];
                                       bool isCurrentUser = entry.playerId == _currentPlayerId;
-                                      return _buildRankingItem(entry, isCurrentUser);
+                                      return _buildRankingItem(entry, isCurrentUser, brightness);
                                     },
                                   ),
                                 ),
@@ -991,19 +991,19 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                     decoration: BoxDecoration(
                                       border: Border(top: BorderSide(color: Theme.of(context).primaryColor)),
-                                      color: Colors.blue[50],
+                                      color: AppColors.linkBlue(brightness).withValues(alpha: 0.08),
                                     ),
                                     child: Row(
                                       children: [
                                         SizedBox(
                                           width: 40,
                                           child: Center(
-                                            child: _buildRankBadge(_currentUserEntry!.rank),
+                                            child: _buildRankBadge(_currentUserEntry!.rank, brightness),
                                           ),
                                         ),
-                                        
+
                                         SizedBox(width: 12),
-                                        
+
                                         Expanded(
                                           child: Row(
                                             children: [
@@ -1013,8 +1013,10 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                                 margin: EdgeInsets.only(right: 6),
                                                 decoration: BoxDecoration(
                                                   color: _currentUserEntry!.dataSource == 'shuiyu'
-                                                      ? Colors.blue[100]
-                                                      : Colors.purple[100],
+                                                      ? AppColors.linkBlue(brightness).withValues(alpha: 0.12)
+                                                      : (brightness == Brightness.dark
+                                                          ? Colors.purple.withValues(alpha: 0.2)
+                                                          : const Color(0xFFE1BEE7)),
                                                   borderRadius: BorderRadius.circular(3),
                                                 ),
                                                 child: Text(
@@ -1022,8 +1024,10 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                                   style: TextStyle(
                                                     fontSize: 10,
                                                     color: _currentUserEntry!.dataSource == 'shuiyu'
-                                                        ? Colors.blue[700]
-                                                        : Colors.purple[700],
+                                                        ? AppColors.linkBlue(brightness)
+                                                        : (brightness == Brightness.dark
+                                                            ? const Color(0xFFCE93D8)
+                                                            : const Color(0xFF7B1FA2)),
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
@@ -1034,7 +1038,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                                   style: TextStyle(
                                                     fontSize: 14,
                                                     fontWeight: FontWeight.bold,
-                                                    color: Theme.of(context).primaryColor,
+                                                    color: AppColors.linkBlue(brightness),
                                                   ),
                                                   overflow: TextOverflow.ellipsis,
                                                 ),
@@ -1042,7 +1046,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                             ],
                                           ),
                                         ),
-                                        
+
                                         SizedBox(
                                           width: 150,
                                           child: Column(
@@ -1053,14 +1057,14 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                                 Container(
                                                   padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                   decoration: BoxDecoration(
-                                                    color: Colors.orange[100],
+                                                    color: AppColors.warningOrange(brightness).withValues(alpha: 0.12),
                                                     borderRadius: BorderRadius.circular(4),
                                                   ),
                                                   child: Text(
                                                     '您的此谱面游玩数据存在异常，请检查!',
                                                     style: TextStyle(
                                                       fontSize: 10,
-                                                      color: Colors.orange[800],
+                                                      color: AppColors.warningOrange(brightness),
                                                       fontWeight: FontWeight.bold,
                                                     ),
                                                     textAlign: TextAlign.right,
@@ -1073,8 +1077,8 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                                     // DX分数排行榜显示星星等级
                                                     if (widget.rankingType == RankingType.dxScore)
                                                       Container(
-                                                        padding: _isHighStarLevel(_currentUserEntry!.dxScore) 
-                                                            ? EdgeInsets.symmetric(horizontal: 6, vertical: 2) 
+                                                        padding: _isHighStarLevel(_currentUserEntry!.dxScore)
+                                                            ? EdgeInsets.symmetric(horizontal: 6, vertical: 2)
                                                             : EdgeInsets.zero,
                                                         decoration: _isHighStarLevel(_currentUserEntry!.dxScore)
                                                             ? BoxDecoration(
@@ -1086,8 +1090,8 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                                           _calculateStarsBonus(_currentUserEntry!.dxScore),
                                                           style: TextStyle(
                                                             fontSize: 12,
-                                                            color: _isHighStarLevel(_currentUserEntry!.dxScore) 
-                                                                ? Colors.black 
+                                                            color: _isHighStarLevel(_currentUserEntry!.dxScore)
+                                                                ? Colors.black
                                                                 : _getStarsColor(_currentUserEntry!.dxScore),
                                                             fontWeight: _isHighStarLevel(_currentUserEntry!.dxScore) ? FontWeight.bold : FontWeight.normal,
                                                           ),
@@ -1095,7 +1099,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                                       ),
                                                     if (widget.rankingType == RankingType.dxScore)
                                                       SizedBox(width: 8),
-                                                    if (widget.rankingType == RankingType.achievementRate && 
+                                                    if (widget.rankingType == RankingType.achievementRate &&
                                                         (_currentUserEntry!.fc?.toLowerCase() == 'ap' || _currentUserEntry!.fc?.toLowerCase() == 'app'))
                                                       Container(
                                                         padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -1121,7 +1125,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                                       style: TextStyle(
                                                         fontSize: 16,
                                                         fontWeight: FontWeight.bold,
-                                                        color: Colors.black87,
+                                                        color: Theme.of(context).colorScheme.onSurface,
                                                       ),
                                                     ),
                                                   ],
@@ -1132,7 +1136,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                                   _formatUpdateTime(_currentUserEntry!.updateTime),
                                                   style: TextStyle(
                                                     fontSize: 10,
-                                                    color: Colors.grey,
+                                                    color: AppColors.greyHint(brightness),
                                                   ),
                                                 ),
                                             ],

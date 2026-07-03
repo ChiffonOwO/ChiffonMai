@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/service/RankTable/RankTableService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/page/RankTable/RankTableDetailPage.dart';
@@ -25,6 +26,7 @@ class _RankListPageState extends State<RankListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
     _scaleFactor = screenWidth / 375.0;
     _paddingXS = 4.0 * _scaleFactor;
@@ -33,6 +35,10 @@ class _RankListPageState extends State<RankListPage> {
     _paddingL = 16.0 * _scaleFactor;
     _borderRadiusSmall = 8.0 * _scaleFactor;
     _textSizeM = 12.0 * _scaleFactor;
+
+    final textPrimaryColor = Theme.of(context).colorScheme.onSurface;
+    final cardBgColor = Theme.of(context).colorScheme.surface;
+    final cardShadow = AppColors.defaultShadow(brightness);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -48,7 +54,7 @@ class _RankListPageState extends State<RankListPage> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: Color.fromARGB(255, 84, 97, 97)),
+                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -58,7 +64,7 @@ class _RankListPageState extends State<RankListPage> {
                         child: Text(
                           '段位表',
                           style: TextStyle(
-                            color: Color.fromARGB(255, 84, 97, 97),
+                            color: textPrimaryColor,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -74,15 +80,9 @@ class _RankListPageState extends State<RankListPage> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: cardBgColor,
                     borderRadius: BorderRadius.circular(_borderRadiusSmall),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 5.0 * _scaleFactor,
-                        offset: Offset(2.0 * _scaleFactor, 2.0 * _scaleFactor),
-                      ),
-                    ],
+                    boxShadow: [cardShadow],
                   ),
                   child: SingleChildScrollView(
                     padding: EdgeInsets.all(_paddingM),
@@ -94,7 +94,7 @@ class _RankListPageState extends State<RankListPage> {
                           style: TextStyle(
                             fontSize: _textSizeM,
                             fontWeight: FontWeight.bold,
-                            color: Colors.grey[700]!,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                         ),
                         SizedBox(height: _paddingXS),
@@ -108,14 +108,16 @@ class _RankListPageState extends State<RankListPage> {
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: _selectedRank == rank
-                                      ? Colors.blue
-                                      : Colors.grey[100]!,
-                                  foregroundColor: Colors.black,
+                                      ? AppColors.linkBlue(brightness)
+                                      : (brightness == Brightness.dark
+                                          ? const Color(0xFF2A2A3A)
+                                          : Colors.grey[100]!),
+                                  foregroundColor: Theme.of(context).colorScheme.onSurface,
                                   minimumSize: Size(double.infinity, 56 * _scaleFactor),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(_borderRadiusSmall),
                                     side: BorderSide(
-                                      color: isNormalRank ? Color(0xFF8B4513) : Colors.purple,
+                                      color: isNormalRank ? AppColors.medalColor('bronze') : Colors.purple,
                                       width: 1,
                                     ),
                                   ),
@@ -134,7 +136,7 @@ class _RankListPageState extends State<RankListPage> {
                                     Container(
                                       padding: EdgeInsets.symmetric(horizontal: _paddingM, vertical: _paddingXS),
                                       decoration: BoxDecoration(
-                                        color: isNormalRank ? Color(0xFF8B4513) : Colors.purple,
+                                        color: isNormalRank ? AppColors.medalColor('bronze') : Colors.purple,
                                         borderRadius: BorderRadius.circular(_borderRadiusSmall),
                                       ),
                                       child: Text(
@@ -142,7 +144,7 @@ class _RankListPageState extends State<RankListPage> {
                                         style: TextStyle(
                                           fontSize: _textSizeM,
                                           fontWeight: FontWeight.bold,
-                                          color: isNormalRank ? Colors.white : Color(0xFFE6E6FA),
+                                          color: isNormalRank ? Colors.white : const Color(0xFFE6E6FA),
                                         ),
                                       ),
                                     ),

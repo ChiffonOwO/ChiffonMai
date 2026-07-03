@@ -78,6 +78,11 @@ class UserPlayDataManager {
     }
   }
 
+  /// 恢复缓存数据（用于对比好友战绩后恢复本地数据不被覆盖）
+  Future<void> restoreCache(Map<String, dynamic> data) async {
+    await _saveToCache(data);
+  }
+
   // 清除缓存
   Future<void> clearCache() async {
     try {

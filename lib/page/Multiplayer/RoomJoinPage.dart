@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/AppConstants.dart';
 
 class RoomJoinPage extends StatefulWidget {
   const RoomJoinPage({super.key});
@@ -41,6 +43,7 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
     final scaleFactor = screenWidth / 375.0;
     final paddingS = 8.0 * scaleFactor;
@@ -67,7 +70,7 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: Color.fromARGB(255, 84, 97, 97)),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -78,7 +81,7 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
                         child: Text(
                           '加入房间',
                           style: TextStyle(
-                            color: Color.fromARGB(255, 84, 97, 97),
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -96,15 +99,9 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(paddingS, 0, paddingS, paddingL),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 5.0 * scaleFactor,
-                        offset: Offset(2.0 * scaleFactor, 2.0 * scaleFactor),
-                      ),
-                    ],
+                    boxShadow: [AppConstants.defaultShadow(brightness)],
                   ),
                   child: SingleChildScrollView(
                     padding: EdgeInsets.all(paddingM),
@@ -115,7 +112,7 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
                           Container(
                             padding: EdgeInsets.all(paddingM),
                             decoration: BoxDecoration(
-                              color: Colors.blue[50],
+                              color: AppColors.linkBlue(brightness).withOpacity(0.1),
                               borderRadius: BorderRadius.circular(borderRadiusSmall),
                             ),
                             child: Column(
@@ -129,7 +126,7 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
                                 SizedBox(height: paddingS),
                                 Text(
                                   '房间ID格式: abc123',
-                                  style: TextStyle(fontSize: 12 * scaleFactor, color: Colors.grey),
+                                  style: TextStyle(fontSize: 12 * scaleFactor, color: Theme.of(context).colorScheme.onSurfaceVariant),
                                 ),
                               ],
                             ),
@@ -153,7 +150,7 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
                           ElevatedButton(
                             onPressed: _handleJoin,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color.fromARGB(255, 84, 97, 97),
+                              backgroundColor: Theme.of(context).colorScheme.onSurface,
                               padding: EdgeInsets.symmetric(vertical: 16 * scaleFactor),
                               minimumSize: Size(double.infinity, 50 * scaleFactor),
                             ),
@@ -171,7 +168,7 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
                           SizedBox(height: paddingS),
                           Text(
                             '创建房间后，房主会获得一个房间ID。\n请让房主将房间ID发送给你，\n然后在此输入加入游戏。',
-                            style: TextStyle(fontSize: 12 * scaleFactor, color: Colors.grey),
+                            style: TextStyle(fontSize: 12 * scaleFactor, color: Theme.of(context).colorScheme.onSurfaceVariant),
                             textAlign: TextAlign.center,
                           ),
                         ],

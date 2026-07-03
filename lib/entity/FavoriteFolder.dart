@@ -9,6 +9,10 @@ class FavoriteChart {
   final double ds;
   final String songType;
   final int addedAt;
+  /// 用户在该谱面的最佳达成率（可选，来自玩家数据）
+  final double? achievement;
+  /// 用户游玩该谱面的次数（可选，来自玩家数据）
+  final int? playCount;
 
   FavoriteChart({
     required this.songId,
@@ -18,6 +22,8 @@ class FavoriteChart {
     required this.ds,
     this.songType = '',
     int? addedAt,
+    this.achievement,
+    this.playCount,
   }) : addedAt = addedAt ?? DateTime.now().millisecondsSinceEpoch;
 
   factory FavoriteChart.fromJson(Map<String, dynamic> json) {
@@ -29,11 +35,13 @@ class FavoriteChart {
       ds: (json['ds'] ?? 0.0).toDouble(),
       songType: json['songType'] ?? '',
       addedAt: json['addedAt'],
+      achievement: json['achievement']?.toDouble(),
+      playCount: json['playCount'],
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
+    final map = <String, dynamic>{
       'songId': songId,
       'levelIndex': levelIndex,
       'songTitle': songTitle,
@@ -42,10 +50,28 @@ class FavoriteChart {
       'songType': songType,
       'addedAt': addedAt,
     };
+    if (achievement != null) map['achievement'] = achievement;
+    if (playCount != null) map['playCount'] = playCount;
+    return map;
   }
 
   /// 生成唯一键用于去重：songId + '_' + levelIndex
   String get uniqueKey => '${songId}_$levelIndex';
+
+  /// 创建带有更新成绩信息的副本
+  FavoriteChart copyWith({double? achievement, int? playCount}) {
+    return FavoriteChart(
+      songId: songId,
+      levelIndex: levelIndex,
+      songTitle: songTitle,
+      level: level,
+      ds: ds,
+      songType: songType,
+      addedAt: addedAt,
+      achievement: achievement ?? this.achievement,
+      playCount: playCount ?? this.playCount,
+    );
+  }
 
   @override
   bool operator ==(Object other) =>
@@ -57,6 +83,15 @@ class FavoriteChart {
 
   @override
   int get hashCode => Object.hash(songId, levelIndex);
+}
+
+/// 排序选项
+enum FavoriteSortOption {
+  byDsDesc,    // 定数 高→低
+  byDsAsc,     // 定数 低→高
+  byDateNewest, // 添加时间 新→旧
+  byDateOldest, // 添加时间 旧→新
+  byTitle,      // 按歌名 A-Z
 }
 
 /// 收藏夹

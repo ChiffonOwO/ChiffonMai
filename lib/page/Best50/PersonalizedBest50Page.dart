@@ -14,6 +14,7 @@ import '../../utils/CoverUtil.dart';
 import '../../constant/VersionListConstant.dart';
 import '../../service/Best50/PersonalizedBest50ConvertToImgService.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 
 class PersonalizedBest50Page extends StatefulWidget {
   const PersonalizedBest50Page({super.key});
@@ -436,15 +437,9 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
       );
     }
 
-    // 自定义常量
-    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
+    final brightness = Theme.of(context).brightness;
+
     final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = BoxShadow(
-      color: Colors.grey.withOpacity(0.5),
-      spreadRadius: 2,
-      blurRadius: 5,
-      offset: Offset(0, 3),
-    );
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -465,7 +460,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -476,7 +471,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                         child: Text(
                           '个性化Best50',
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: MediaQuery.of(context).size.width * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -494,9 +489,9 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
+                    boxShadow: [AppColors.defaultShadow(brightness)],
                   ),
                   child: SingleChildScrollView(
                     padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.03),
@@ -507,7 +502,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                         ElevatedButton(
                           onPressed: _showTypeSelectionDialog,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
+                            backgroundColor: AppColors.linkBlue(brightness),
                             padding: EdgeInsets.symmetric(vertical: 12.0),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8.0),
@@ -870,7 +865,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
 
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.black, width: 2.0),
+        border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2.0),
         borderRadius: BorderRadius.circular(8.0),
       ),
       padding: EdgeInsets.all(12.0),
@@ -890,7 +885,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
               style: TextStyle(
                 fontSize: MediaQuery.of(context).size.width * 0.045,
                 fontWeight: FontWeight.bold,
-                color: Colors.black,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           SizedBox(height: 8.0),
@@ -904,7 +899,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                       '总谱面数',
                       style: TextStyle(
                         fontSize: MediaQuery.of(context).size.width * 0.035,
-                        color: Colors.black,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     Text(
@@ -912,7 +907,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                       style: TextStyle(
                         fontSize: MediaQuery.of(context).size.width * 0.04,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -926,7 +921,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                       '总RA值',
                       style: TextStyle(
                         fontSize: MediaQuery.of(context).size.width * 0.035,
-                        color: Colors.black,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     Text(
@@ -934,7 +929,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                       style: TextStyle(
                         fontSize: MediaQuery.of(context).size.width * 0.04,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -948,7 +943,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                       '平均RA值',
                       style: TextStyle(
                         fontSize: MediaQuery.of(context).size.width * 0.035,
-                        color: Colors.black,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     Text(
@@ -956,7 +951,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                       style: TextStyle(
                         fontSize: MediaQuery.of(context).size.width * 0.04,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -970,7 +965,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                       '平均达成率',
                       style: TextStyle(
                         fontSize: MediaQuery.of(context).size.width * 0.035,
-                        color: Colors.black,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     Text(
@@ -978,7 +973,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                       style: TextStyle(
                         fontSize: MediaQuery.of(context).size.width * 0.04,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -1002,7 +997,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
         }
       },
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.blue,
+        backgroundColor: AppColors.linkBlue(Theme.of(context).brightness),
         padding: EdgeInsets.symmetric(vertical: 12.0),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8.0),
@@ -1038,7 +1033,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
             Icon(
               Icons.refresh,
               size: 64,
-              color: Colors.grey,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             SizedBox(height: 16),
             Text(
@@ -1053,7 +1048,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                               : '暂无${_options.firstWhere((option) => option['value'] == _selectedType)['label']!}数据',
               style: TextStyle(
                 fontSize: 18,
-                color: Colors.grey,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -1062,7 +1057,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
               '请返回首页点击"刷新数据"按钮获取',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -1124,7 +1119,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
       Color cardColor;
       // 对于6位数ID的歌曲，使用粉色
       if (songId.toString().length == 6) {
-        cardColor = Color(0xFFFF99C2); // 进一步加深的粉色
+        cardColor = AppColors.utageCard; // 进一步加深的粉色
       } else {
         cardColor = ColorUtil.getCardColor(levelIndex);
       }
@@ -1178,6 +1173,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     int? songId,
     Color starsColor = Colors.white,
   }) {
+    final brightness = Theme.of(context).brightness;
     return Container(
       decoration: BoxDecoration(
         color: cardColor,
@@ -1210,7 +1206,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                     width: coverSize,
                     height: coverSize,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.surface,
                       border: Border.all(color: Colors.black, width: 1.0),
                     ),
                     child: songId != null
@@ -1240,7 +1236,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                           style: TextStyle(
                             fontSize: dxFontSize,
                             fontWeight: FontWeight.bold,
-                            color: Colors.orange,
+                            color: AppColors.warningOrange(brightness),
                           ),
                         ),
                       if (!dxMode && !isUtage)
@@ -1249,7 +1245,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                           style: TextStyle(
                             fontSize: dxFontSize,
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade300,
+                            color: AppColors.linkBlue(brightness),
                           ),
                         ),
                       SizedBox(width: screenWidth * 0.01),

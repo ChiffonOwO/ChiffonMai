@@ -27,7 +27,7 @@ class ApiUrls {
   
   // Maidata 服务器地址
   static const String MaidataServerBaseUrl = 'http://47.93.46.104';
-  static const String MaidataServerPortUrl = 'http://47.93.46.104:8888';
+  static const String MaidataServerPortUrl = 'http://47.93.46.104';
   
   // 落雪 OAuth 相关地址
   static const String LuoXueBaseUrl = 'https://maimai.lxns.net';

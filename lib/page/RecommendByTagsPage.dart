@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
 import 'package:my_first_flutter_app/entity/RecommendationResult.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
@@ -120,19 +121,12 @@ class _RecommendByTagsState extends State<RecommendByTags> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
     
-    // 自定义常量
-    final Color textPrimaryColor = Color.fromARGB(255, 84, 97, 97);
     final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = BoxShadow(
-      color: Colors.grey.withOpacity(0.5),
-      spreadRadius: 2,
-      blurRadius: 5,
-      offset: Offset(0, 3),
-    );
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -153,7 +147,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -164,7 +158,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                         child: Text(
                           '根据标签推荐',
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -182,9 +176,9 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
+                    boxShadow: [AppColors.defaultShadow(brightness)],
                   ),
                   child: Column(
                     children: [
@@ -195,7 +189,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                           vertical: screenHeight * 0.01, // 垂直 padding 为屏幕高度的1%
                         ),
                         decoration: BoxDecoration(
-                          border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                          border: Border(bottom: BorderSide(color: AppColors.tableBorder(brightness))),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -208,12 +202,12 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: _currentTab == 'Best55' 
-                                    ? const Color.fromARGB(255, 84, 97, 97) 
-                                    : Colors.grey.shade200,
-                                foregroundColor: _currentTab == 'Best55' 
-                                    ? Colors.white 
-                                    : const Color.fromARGB(255, 84, 97, 97),
+                                backgroundColor: _currentTab == 'Best55'
+                                    ? Theme.of(context).colorScheme.onSurface
+                                    : Theme.of(context).colorScheme.surface,
+                                foregroundColor: _currentTab == 'Best55'
+                                    ? (brightness == Brightness.dark ? const Color(0xFF1E1E2E) : Colors.white)
+                                    : Theme.of(context).colorScheme.onSurface,
                               ),
                               child: const Text('Best55推荐'),
                             ),
@@ -226,12 +220,12 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: _currentTab == 'Best15' 
-                                    ? const Color.fromARGB(255, 84, 97, 97) 
-                                    : Colors.grey.shade200,
-                                foregroundColor: _currentTab == 'Best15' 
-                                    ? Colors.white 
-                                    : const Color.fromARGB(255, 84, 97, 97),
+                                backgroundColor: _currentTab == 'Best15'
+                                    ? Theme.of(context).colorScheme.onSurface
+                                    : Theme.of(context).colorScheme.surface,
+                                foregroundColor: _currentTab == 'Best15'
+                                    ? (brightness == Brightness.dark ? const Color(0xFF1E1E2E) : Colors.white)
+                                    : Theme.of(context).colorScheme.onSurface,
                               ),
                               child: const Text('Best15推荐'),
                             ),
@@ -255,21 +249,21 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                                     child: Column(
                                       children: [
                                         CircularProgressIndicator(
-                                          color: Color.fromARGB(255, 84, 97, 97),
+                                          color: Theme.of(context).colorScheme.onSurface,
                                         ),
                                         SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
-                                        Text('正在计算推荐结果...'),
+                                        Text('正在计算推荐结果...', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                                         SizedBox(height: screenHeight * 0.01), // 间距为屏幕高度的1%
                                         Text(
                                           _currentLoadingTip,
                                           textAlign: TextAlign.center,
-                                          style: TextStyle(fontSize: screenWidth * 0.035),
+                                          style: TextStyle(fontSize: screenWidth * 0.035, color: Theme.of(context).colorScheme.onSurfaceVariant),
                                         ),
                                         SizedBox(height: screenHeight * 0.01), // 间距为屏幕高度的1%
                                         Text(
                                           '此功能计算量较大，可能会出现卡顿，请耐心等待',
                                           textAlign: TextAlign.center,
-                                          style: TextStyle(fontSize: screenWidth * 0.035),
+                                          style: TextStyle(fontSize: screenWidth * 0.035, color: Theme.of(context).colorScheme.onSurfaceVariant),
                                         ),
                                       ],
                                     ),
@@ -284,14 +278,14 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                                       children: [
                                         Icon(
                                           Icons.error_outline,
-                                          color: Colors.red,
+                                          color: AppColors.errorRed(brightness),
                                           size: screenWidth * 0.12, // 图标大小为屏幕宽度的12%
                                         ),
                                         SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
                                         Text(
                                           _errorMessage!,
                                           textAlign: TextAlign.center,
-                                          style: const TextStyle(color: Colors.red),
+                                          style: TextStyle(color: AppColors.errorRed(brightness)),
                                         ),
                                         SizedBox(height: screenHeight * 0.02), // 间距为屏幕高度的2%
                                         ElevatedButton(
@@ -304,12 +298,12 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                                 )
                               // 展示推荐结果
                               else
-                                _buildRecommendationContent(),
+                                _buildRecommendationContent(brightness),
                             ],
                           ),
                         ),
                       ),
-                      
+
                       // 分页组件 - 固定在滚动区域下方
                       if (!_isLoading && _errorMessage == null)
                         Container(
@@ -318,7 +312,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                             horizontal: screenWidth * 0.04, // 水平 padding 为屏幕宽度的4%
                           ),
                           decoration: BoxDecoration(
-                            border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                            border: Border(top: BorderSide(color: AppColors.tableBorder(brightness))),
                           ),
                           child: _buildPagination(),
                         ),
@@ -334,22 +328,22 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   }
 
   // 构建推荐内容
-  Widget _buildRecommendationContent() {
+  Widget _buildRecommendationContent(Brightness brightness) {
     // 根据当前选中的标签获取推荐结果
     List<RecommendationResult> results = _recommendations[_currentTab] ?? [];
-    
+
     // 计算分页
     int totalItems = results.length;
     //int totalPages = (totalItems / _pageSize).ceil();
     int startIndex = (_currentPage - 1) * _pageSize;
     int endIndex = min(startIndex + _pageSize, totalItems);
     List<RecommendationResult> paginatedResults = [];
-    
+
     if (startIndex < totalItems) {
       paginatedResults = results.sublist(startIndex, endIndex);
     }
-    
-    return _buildRecommendationSection('${_currentTab}推荐', paginatedResults);
+
+    return _buildRecommendationSection(brightness, '${_currentTab}推荐', paginatedResults);
   }
   
   // 构建分页组件
@@ -410,10 +404,10 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   }
 
   // 构建推荐区域
-  Widget _buildRecommendationSection(String title, List<RecommendationResult> results) {
+  Widget _buildRecommendationSection(Brightness brightness, String title, List<RecommendationResult> results) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -423,11 +417,11 @@ class _RecommendByTagsState extends State<RecommendByTags> {
           style: TextStyle(
             fontSize: screenWidth * 0.045, // 字体大小为屏幕宽度的4.5%
             fontWeight: FontWeight.bold,
-            color: Color.fromARGB(255, 84, 97, 97),
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         SizedBox(height: screenHeight * 0.015), // 间距为屏幕高度的1.5%
-        
+
         // 推荐结果列表
         if (results.isEmpty)
           Padding(
@@ -435,22 +429,22 @@ class _RecommendByTagsState extends State<RecommendByTags> {
             child: Text(
               '暂无推荐结果',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey),
+              style: TextStyle(color: AppColors.greyHint(brightness)),
             ),
           )
         else
           Column(
-            children: results.map((result) => _buildRecommendationItem(result)).toList(),
+            children: results.map((result) => _buildRecommendationItem(brightness, result)).toList(),
           ),
       ],
     );
   }
 
   // 构建单个推荐项
-  Widget _buildRecommendationItem(RecommendationResult result) {
+  Widget _buildRecommendationItem(Brightness brightness, RecommendationResult result) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
+
     return GestureDetector(
       onTap: () {
         // 导航到SongInfoPage
@@ -468,9 +462,9 @@ class _RecommendByTagsState extends State<RecommendByTags> {
         margin: EdgeInsets.only(bottom: screenHeight * 0.015), // 底部 margin 为屏幕高度的1.5%
         padding: EdgeInsets.all(screenWidth * 0.03), // padding 为屏幕宽度的3%
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(color: AppColors.tableBorder(brightness)),
           borderRadius: BorderRadius.circular(8),
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surface,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -485,6 +479,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: screenWidth * 0.04, // 字体大小为屏幕宽度的4%
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                 ),
@@ -492,26 +487,27 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                   result.level,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Color.fromARGB(255, 84, 97, 97),
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: screenWidth * 0.035, // 字体大小为屏幕宽度的3.5%
                   ),
                 ),
               ],
             ),
             SizedBox(height: screenHeight * 0.01), // 间距为屏幕高度的1%
-            
+
             // 定数、相似度
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('定数: ${result.ds}'),
-                Text('相似度: ${(result.similarity * 100).toStringAsFixed(1)}%'),
+                Text('定数: ${result.ds}', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                Text('相似度: ${(result.similarity * 100).toStringAsFixed(1)}%', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ],
             ),
             SizedBox(height: screenHeight * 0.01), // 间距为屏幕高度的1%
             // 最低达成率
-            Text('当前:${result.nowAchievement.toStringAsFixed(4)}%→目标:${result.minAchievement.toStringAsFixed(4)}%'),
-            
+            Text('当前:${result.nowAchievement.toStringAsFixed(4)}%→目标:${result.minAchievement.toStringAsFixed(4)}%',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+
             // 提升Rating信息
             if (result.ableRiseTotalRating == true)
             Padding(
@@ -519,7 +515,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
               child: Text(
                 'Rating提升: ' + result.riseTotalRating,
                 style: TextStyle(
-                  color: Colors.green,
+                  color: AppColors.successGreen(brightness),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -530,7 +526,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
               child: Text(
                 result.riseTotalRating,
                 style: TextStyle(
-                  color: Colors.grey,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.normal,
                 ),
               ),

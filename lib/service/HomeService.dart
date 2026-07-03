@@ -8,6 +8,7 @@ import 'package:my_first_flutter_app/manager/LuoXue/LuoXueSongsManager.dart';
 import 'package:my_first_flutter_app/manager/KnowledgeManager.dart';
 import 'package:my_first_flutter_app/manager/MaidataManager.dart';
 import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
+import 'package:my_first_flutter_app/service/ConnectivityService.dart';
 
 /// 首页服务类：处理首页相关的数据初始化和业务逻辑
 class HomeService {
@@ -40,7 +41,19 @@ class HomeService {
     required Function(String) onProgress,
   }) async {
     final startTime = DateTime.now();
-    
+
+    // 检查网络连接
+    final isOnline = await ConnectivityService().hasConnection();
+    if (!isOnline) {
+      final duration = DateTime.now().difference(startTime);
+      debugPrint('离线模式：跳过后台数据初始化，使用缓存数据');
+      return HomeInitResult(
+        success: true,
+        duration: duration,
+        durationStr: '${duration.inMilliseconds}ms（离线模式）',
+      );
+    }
+
     try {
       // 第一阶段：初始化基础管理器（必须串行）
       onProgress('正在加载歌曲别名数据库...');

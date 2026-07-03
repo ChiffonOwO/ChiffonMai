@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/service/RankingList/SpecialRankingListService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import '../SongInfoPage.dart';
 
 class SpecialRankingListPage extends StatefulWidget {
@@ -243,197 +244,89 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
   }
 
   void _showRankingTypeDialog() {
+    final brightness = Theme.of(context).brightness;
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Text('选择排行榜类型'),
+          title: Text('选择排行榜类型', style: TextStyle(color: AppColors.primaryText(brightness))),
+          backgroundColor: AppColors.cardBackground(brightness),
           content: SizedBox(
             width: double.maxFinite,
             child: ListView(
               shrinkWrap: true,
               children: [
-                ListTile(
-                  title: const Text('绝赞数排行榜',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('按谱面绝赞数量排名'),
-                  trailing: _currentRankingType == RankingType.breakCount
-                      ? const Icon(Icons.check, color: Colors.blue)
-                      : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _currentRankingType = RankingType.breakCount;
-                    });
-                    _loadRanking();
-                  },
+                _buildDialogTile(
+                  brightness,
+                  '绝赞数排行榜',
+                  '按谱面绝赞数量排名',
+                  RankingType.breakCount,
                 ),
-                ListTile(
-                  title: const Text('定数差值排行榜',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('拟合定数与官方定数差值排名'),
-                  trailing: _currentRankingType == RankingType.difficultyDiff
-                      ? const Icon(Icons.check, color: Colors.blue)
-                      : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _currentRankingType = RankingType.difficultyDiff;
-                    });
-                    _loadRanking();
-                  },
+                _buildDialogTile(
+                  brightness,
+                  '定数差值排行榜',
+                  '拟合定数与官方定数差值排名',
+                  RankingType.difficultyDiff,
                 ),
-                ListTile(
-                  title: const Text('MASTER/RE:MASTER定数差值排行榜',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('只统计MASTER/RE:MASTER难度'),
-                  trailing: _currentRankingType == RankingType.masterDiff
-                      ? const Icon(Icons.check, color: Colors.blue)
-                      : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _currentRankingType = RankingType.masterDiff;
-                    });
-                    _loadRanking();
-                  },
+                _buildDialogTile(
+                  brightness,
+                  'MASTER/RE:MASTER定数差值排行榜',
+                  '只统计MASTER/RE:MASTER难度',
+                  RankingType.masterDiff,
                 ),
-                ListTile(
-                  title: const Text('EXPERT定数差值排行榜',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('只统计EXPERT难度'),
-                  trailing: _currentRankingType == RankingType.expertDiff
-                      ? const Icon(Icons.check, color: Colors.blue)
-                      : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _currentRankingType = RankingType.expertDiff;
-                    });
-                    _loadRanking();
-                  },
+                _buildDialogTile(
+                  brightness,
+                  'EXPERT定数差值排行榜',
+                  '只统计EXPERT难度',
+                  RankingType.expertDiff,
                 ),
-                ListTile(
-                  title: const Text('反向定数差值排行榜',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('拟合定数-官方定数最小的前100位'),
-                  trailing: _currentRankingType == RankingType.reverseDiff
-                      ? const Icon(Icons.check, color: Colors.blue)
-                      : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _currentRankingType = RankingType.reverseDiff;
-                    });
-                    _loadRanking();
-                  },
+                _buildDialogTile(
+                  brightness,
+                  '反向定数差值排行榜',
+                  '拟合定数-官方定数最小的前100位',
+                  RankingType.reverseDiff,
                 ),
-                ListTile(
-                  title: const Text('反向MASTER/RE:MASTER定数差值排行榜',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('只统计MASTER/RE:MASTER难度'),
-                  trailing: _currentRankingType == RankingType.reverseMasterDiff
-                      ? const Icon(Icons.check, color: Colors.blue)
-                      : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _currentRankingType = RankingType.reverseMasterDiff;
-                    });
-                    _loadRanking();
-                  },
+                _buildDialogTile(
+                  brightness,
+                  '反向MASTER/RE:MASTER定数差值排行榜',
+                  '只统计MASTER/RE:MASTER难度',
+                  RankingType.reverseMasterDiff,
                 ),
-                ListTile(
-                  title: const Text('反向EXPERT定数差值排行榜',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('只统计EXPERT难度'),
-                  trailing: _currentRankingType == RankingType.reverseExpertDiff
-                      ? const Icon(Icons.check, color: Colors.blue)
-                      : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _currentRankingType = RankingType.reverseExpertDiff;
-                    });
-                    _loadRanking();
-                  },
+                _buildDialogTile(
+                  brightness,
+                  '反向EXPERT定数差值排行榜',
+                  '只统计EXPERT难度',
+                  RankingType.reverseExpertDiff,
                 ),
-                ListTile(
-                  title: const Text('样本总数排行榜',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('玩家样本总量排名'),
-                  trailing: _currentRankingType == RankingType.sampleCount
-                      ? const Icon(Icons.check, color: Colors.blue)
-                      : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _currentRankingType = RankingType.sampleCount;
-                    });
-                    _loadRanking();
-                  },
+                _buildDialogTile(
+                  brightness,
+                  '样本总数排行榜',
+                  '玩家样本总量排名',
+                  RankingType.sampleCount,
                 ),
-                ListTile(
-                  title: const Text('物量排行榜',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('五种note总数排名'),
-                  trailing: _currentRankingType == RankingType.noteCount
-                      ? const Icon(Icons.check, color: Colors.blue)
-                      : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _currentRankingType = RankingType.noteCount;
-                    });
-                    _loadRanking();
-                  },
+                _buildDialogTile(
+                  brightness,
+                  '物量排行榜',
+                  '五种note总数排名',
+                  RankingType.noteCount,
                 ),
-                ListTile(
-                  title: const Text('平均达成率排行榜',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('按平均达成率排名'),
-                  trailing: _currentRankingType == RankingType.avgAchievement
-                      ? const Icon(Icons.check, color: Colors.blue)
-                      : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _currentRankingType = RankingType.avgAchievement;
-                    });
-                    _loadRanking();
-                  },
+                _buildDialogTile(
+                  brightness,
+                  '平均达成率排行榜',
+                  '按平均达成率排名',
+                  RankingType.avgAchievement,
                 ),
-                ListTile(
-                  title: const Text('MASTER/RE:MASTER平均达成率排行榜',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('只统计MASTER/RE:MASTER难度'),
-                  trailing:
-                      _currentRankingType == RankingType.masterAvgAchievement
-                          ? const Icon(Icons.check, color: Colors.blue)
-                          : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _currentRankingType = RankingType.masterAvgAchievement;
-                    });
-                    _loadRanking();
-                  },
+                _buildDialogTile(
+                  brightness,
+                  'MASTER/RE:MASTER平均达成率排行榜',
+                  '只统计MASTER/RE:MASTER难度',
+                  RankingType.masterAvgAchievement,
                 ),
-                ListTile(
-                  title: const Text('EXPERT平均达成率排行榜',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('只统计EXPERT难度'),
-                  trailing:
-                      _currentRankingType == RankingType.expertAvgAchievement
-                          ? const Icon(Icons.check, color: Colors.blue)
-                          : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _currentRankingType = RankingType.expertAvgAchievement;
-                    });
-                    _loadRanking();
-                  },
+                _buildDialogTile(
+                  brightness,
+                  'EXPERT平均达成率排行榜',
+                  '只统计EXPERT难度',
+                  RankingType.expertAvgAchievement,
                 ),
               ],
             ),
@@ -443,7 +336,24 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
     );
   }
 
-  Widget _buildRankBadge(int rank) {
+  Widget _buildDialogTile(Brightness brightness, String title, String subtitle, RankingType type) {
+    return ListTile(
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryText(brightness))),
+      subtitle: Text(subtitle, style: TextStyle(color: AppColors.secondaryText(brightness))),
+      trailing: _currentRankingType == type
+          ? Icon(Icons.check, color: AppColors.linkBlue(brightness))
+          : null,
+      onTap: () {
+        Navigator.pop(context);
+        setState(() {
+          _currentRankingType = type;
+        });
+        _loadRanking();
+      },
+    );
+  }
+
+  Widget _buildRankBadge(int rank, Brightness brightness) {
     Color badgeColor;
     String badgeText;
 
@@ -467,10 +377,10 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
           alignment: Alignment.center,
           child: Text(
             rank.toString(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Colors.grey,
+              color: AppColors.secondaryText(brightness),
             ),
           ),
         );
@@ -495,22 +405,26 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
     );
   }
 
-  Widget _buildTypeTag(String type, String songId) {
+  Widget _buildTypeTag(String type, String songId, Brightness brightness) {
     bool isUtage = songId.length == 6;
 
     if (isUtage) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: Colors.red.shade100,
+          color: brightness == Brightness.dark
+              ? Colors.red.withValues(alpha: 0.2)
+              : Colors.red.shade100,
           borderRadius: BorderRadius.circular(4),
         ),
-        child: const Text(
+        child: Text(
           'UT',
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.bold,
-            color: Colors.red,
+            color: brightness == Brightness.dark
+                ? Colors.red[300]
+                : Colors.red,
           ),
         ),
       );
@@ -518,15 +432,19 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: Colors.orange.shade100,
+          color: brightness == Brightness.dark
+              ? Colors.orange.withValues(alpha: 0.2)
+              : Colors.orange.shade100,
           borderRadius: BorderRadius.circular(4),
         ),
-        child: const Text(
+        child: Text(
           'DX',
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.bold,
-            color: Colors.orange,
+            color: brightness == Brightness.dark
+                ? Colors.orange[300]
+                : Colors.orange,
           ),
         ),
       );
@@ -534,15 +452,19 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: Colors.blue.shade100,
+          color: brightness == Brightness.dark
+              ? Colors.blue.withValues(alpha: 0.2)
+              : Colors.blue.shade100,
           borderRadius: BorderRadius.circular(4),
         ),
-        child: const Text(
+        child: Text(
           'ST',
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.bold,
-            color: Colors.blue,
+            color: brightness == Brightness.dark
+                ? Colors.blue[300]
+                : Colors.blue,
           ),
         ),
       );
@@ -550,39 +472,66 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
   }
 
   Widget _buildDifficultyTag(
-      String difficultyLabel, int difficultyIndex, String songId) {
+      String difficultyLabel, int difficultyIndex, String songId, Brightness brightness) {
     Color bgColor;
     Color textColor;
 
-    // UTAGE歌曲使用红色样式
     if (songId.length == 6) {
-      bgColor = Colors.red.shade100;
-      textColor = Colors.red;
+      bgColor = brightness == Brightness.dark
+          ? Colors.red.withValues(alpha: 0.2)
+          : Colors.red.shade100;
+      textColor = brightness == Brightness.dark
+          ? Colors.red[300]!
+          : Colors.red;
     } else {
       switch (difficultyIndex) {
-        case 0: // BASIC
-          bgColor = Colors.green.shade100;
-          textColor = Colors.green.shade700;
+        case 0:
+          bgColor = brightness == Brightness.dark
+              ? Colors.green.withValues(alpha: 0.2)
+              : Colors.green.shade100;
+          textColor = brightness == Brightness.dark
+              ? Colors.green[300]!
+              : Colors.green.shade700;
           break;
-        case 1: // ADVANCED
-          bgColor = Colors.orange.shade100;
-          textColor = Colors.orange.shade700;
+        case 1:
+          bgColor = brightness == Brightness.dark
+              ? Colors.orange.withValues(alpha: 0.2)
+              : Colors.orange.shade100;
+          textColor = brightness == Brightness.dark
+              ? Colors.orange[300]!
+              : Colors.orange.shade700;
           break;
-        case 2: // EXPERT
-          bgColor = Colors.red.shade100;
-          textColor = Colors.red;
+        case 2:
+          bgColor = brightness == Brightness.dark
+              ? Colors.red.withValues(alpha: 0.2)
+              : Colors.red.shade100;
+          textColor = brightness == Brightness.dark
+              ? Colors.red[300]!
+              : Colors.red;
           break;
-        case 3: // MASTER
-          bgColor = Colors.purple.shade100;
-          textColor = Colors.purple.shade700;
+        case 3:
+          bgColor = brightness == Brightness.dark
+              ? Colors.purple.withValues(alpha: 0.2)
+              : Colors.purple.shade100;
+          textColor = brightness == Brightness.dark
+              ? Colors.purple[200]!
+              : Colors.purple.shade700;
           break;
-        case 4: // RE:MASTER
-          bgColor = Colors.purple.shade100;
-          textColor = Colors.purple.shade300;
+        case 4:
+          bgColor = brightness == Brightness.dark
+              ? Colors.purple.withValues(alpha: 0.2)
+              : Colors.purple.shade100;
+          textColor = brightness == Brightness.dark
+              ? Colors.purple[200]!
+              : Colors.purple.shade300;
           break;
         default:
-          bgColor = Colors.grey.shade100;
-          textColor = Colors.grey.shade700;
+          bgColor = brightness == Brightness.dark
+              ? Colors.grey.withValues(alpha: 0.2)
+              : Colors.grey.shade100;
+          textColor = brightness == Brightness.dark
+              ? Colors.grey[400]!
+              : Colors.grey.shade700;
       }
     }
 
@@ -605,7 +554,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final textPrimaryColor = const Color.fromARGB(255, 84, 97, 97);
+    final brightness = Theme.of(context).brightness;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -621,7 +570,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
+                      icon: Icon(Icons.arrow_back, color: AppColors.primaryText(brightness)),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -631,7 +580,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                         child: Text(
                           '特殊排行榜',
                           style: TextStyle(
-                            color: textPrimaryColor,
+                            color: AppColors.primaryText(brightness),
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
                           ),
@@ -641,8 +590,8 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                     ElevatedButton(
                       onPressed: _loadRanking,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey[200],
-                        foregroundColor: textPrimaryColor,
+                        backgroundColor: AppColors.buttonBackground(brightness),
+                        foregroundColor: AppColors.primaryText(brightness),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 8),
                         textStyle: const TextStyle(fontSize: 12),
@@ -650,11 +599,11 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          Icon(Icons.refresh, size: 16),
-                          SizedBox(width: 4),
-                          Text('刷新'),
+                          Icon(Icons.refresh, size: 16, color: AppColors.primaryText(brightness)),
+                          const SizedBox(width: 4),
+                          Text('刷新', style: TextStyle(color: AppColors.primaryText(brightness))),
                         ],
                       ),
                     ),
@@ -668,8 +617,8 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                 child: ElevatedButton(
                   onPressed: _showRankingTypeDialog,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[100],
-                    foregroundColor: textPrimaryColor,
+                    backgroundColor: AppColors.buttonBackground(brightness),
+                    foregroundColor: AppColors.primaryText(brightness),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -681,10 +630,10 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                     children: [
                       Text(
                         _getRankingTypeName(_currentRankingType),
-                        style: const TextStyle(fontSize: 14),
+                        style: TextStyle(fontSize: 14, color: AppColors.primaryText(brightness)),
                       ),
                       const SizedBox(width: 8),
-                      const Icon(Icons.arrow_drop_down, size: 20),
+                      Icon(Icons.arrow_drop_down, size: 20, color: AppColors.primaryText(brightness)),
                     ],
                   ),
                 ),
@@ -695,15 +644,9 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                 child: Container(
                   margin: const EdgeInsets.fromLTRB(8, 0, 8, 16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.cardBackgroundTranslucent(brightness),
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 5.0,
-                        offset: Offset(2.0, 2.0),
-                      ),
-                    ],
+                    boxShadow: [AppColors.defaultShadow(brightness)],
                   ),
                   child: _isLoading
                       ? Center(
@@ -712,7 +655,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                             children: [
                               const CircularProgressIndicator(),
                               const SizedBox(height: 16),
-                              const Text('正在加载...'),
+                              Text('正在加载...', style: TextStyle(color: AppColors.primaryText(brightness))),
                             ],
                           ),
                         )
@@ -727,15 +670,15 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
                                         children: [
-                                          const Icon(Icons.error_outline,
-                                              size: 48, color: Colors.red),
+                                          Icon(Icons.error_outline,
+                                              size: 48, color: AppColors.errorRed(brightness)),
                                           const SizedBox(height: 16),
                                           Text(
                                             _errorMessage!,
                                             textAlign: TextAlign.center,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                                 fontSize: 16,
-                                                color: Colors.red),
+                                                color: AppColors.errorRed(brightness)),
                                           ),
                                           const SizedBox(height: 16),
                                           ElevatedButton(
@@ -759,22 +702,23 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                               size: 48,
                                               color: _isRecalculating
                                                   ? Colors.purple
-                                                  : Colors.grey,
+                                                  : AppColors.secondaryText(brightness),
                                             ),
                                             const SizedBox(height: 16),
                                             Text(
                                               _isRecalculating
                                                   ? '正在重新计算排行数据...'
                                                   : '暂无排行数据',
-                                              style:
-                                                  const TextStyle(fontSize: 16),
+                                              style: TextStyle(
+                                                  fontSize: 16,
+                                                  color: AppColors.primaryText(brightness)),
                                             ),
                                             if (_isRecalculating) ...[
-                                              const Text(
+                                              Text(
                                                 '解析maidata中，请耐心等待',
                                                 style: TextStyle(
                                                     fontSize: 14,
-                                                    color: Colors.grey),
+                                                    color: AppColors.secondaryText(brightness)),
                                               ),
                                               const SizedBox(height: 20),
                                               SizedBox(
@@ -782,7 +726,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                 child: LinearProgressIndicator(
                                                   value: _progress / 100,
                                                   backgroundColor:
-                                                      Colors.grey[200],
+                                                      AppColors.buttonBackground(brightness),
                                                   valueColor:
                                                       const AlwaysStoppedAnimation<
                                                           Color>(Colors.purple),
@@ -791,17 +735,17 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                               const SizedBox(height: 8),
                                               Text(
                                                 '$_progress%',
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                     fontSize: 14,
-                                                    color: Colors.grey),
+                                                    color: AppColors.secondaryText(brightness)),
                                               ),
                                             ] else ...[
                                               const SizedBox(height: 8),
-                                              const Text(
+                                              Text(
                                                 '获取数据后点击右上角刷新按钮生成',
                                                 style: TextStyle(
                                                     fontSize: 12,
-                                                    color: Colors.grey),
+                                                    color: AppColors.secondaryText(brightness)),
                                               ),
                                             ],
                                           ],
@@ -840,9 +784,9 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                   border: index <
                                                           _rankingList.length -
                                                               1
-                                                      ? const Border(
+                                                      ? Border(
                                                           bottom: BorderSide(
-                                                            color: Colors.grey,
+                                                            color: AppColors.tableBorder(brightness),
                                                             width: 0.5,
                                                           ),
                                                         )
@@ -851,7 +795,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                 child: Row(
                                                   children: [
                                                     // 排名
-                                                    _buildRankBadge(entry.rank),
+                                                    _buildRankBadge(entry.rank, brightness),
                                                     const SizedBox(width: 12),
 
                                                     // 封面
@@ -880,7 +824,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                               _buildTypeTag(
                                                                   entry
                                                                       .songType,
-                                                                  entry.songId),
+                                                                  entry.songId, brightness),
                                                               const SizedBox(
                                                                   width: 6),
                                                               Expanded(
@@ -888,14 +832,13 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                                   entry
                                                                       .songTitle,
                                                                   style:
-                                                                      const TextStyle(
+                                                                      TextStyle(
                                                                     fontSize:
                                                                         14,
                                                                     fontWeight:
                                                                         FontWeight
                                                                             .bold,
-                                                                    color: Colors
-                                                                        .black,
+                                                                    color: AppColors.primaryText(brightness),
                                                                   ),
                                                                   maxLines: 1,
                                                                   overflow:
@@ -914,7 +857,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                                       .difficultyLabel,
                                                                   entry
                                                                       .difficultyIndex,
-                                                                  entry.songId),
+                                                                  entry.songId, brightness),
                                                               const SizedBox(
                                                                   width: 8),
                                                               Text(
@@ -922,9 +865,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                                 style:
                                                                     TextStyle(
                                                                   fontSize: 12,
-                                                                  color: Colors
-                                                                          .grey[
-                                                                      700],
+                                                                  color: AppColors.secondaryText(brightness),
                                                                 ),
                                                               ),
                                                             ],
@@ -942,9 +883,9 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                         vertical: 6,
                                                       ),
                                                       decoration: BoxDecoration(
-                                                        color:
-                                                            _getRankingValueColor()
-                                                                .shade50,
+                                                        color: brightness == Brightness.dark
+                                                            ? _getRankingValueColor().withValues(alpha: 0.15)
+                                                            : _getRankingValueColor().shade50,
                                                         borderRadius:
                                                             BorderRadius
                                                                 .circular(8),
@@ -964,7 +905,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                                   FontWeight
                                                                       .bold,
                                                               color:
-                                                                  _getRankingValueColor(),
+                                                                  AppColors.primaryText(brightness),
                                                             ),
                                                           ),
                                                           Text(
@@ -972,8 +913,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                             style: TextStyle(
                                                               fontSize: 10,
                                                               color:
-                                                                  _getRankingValueColor()
-                                                                      .shade400,
+                                                                  AppColors.secondaryText(brightness),
                                                             ),
                                                           ),
                                                         ],
@@ -995,14 +935,18 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 16, vertical: 10),
                                   decoration: BoxDecoration(
-                                    color: Colors.purple.shade50,
+                                    color: brightness == Brightness.dark
+                                        ? Colors.purple.withValues(alpha: 0.15)
+                                        : Colors.purple.shade50,
                                     borderRadius: const BorderRadius.only(
                                       topLeft: Radius.circular(12),
                                       topRight: Radius.circular(12),
                                     ),
                                     border: Border(
                                       bottom: BorderSide(
-                                          color: Colors.purple.shade200,
+                                          color: brightness == Brightness.dark
+                                              ? Colors.purple.withValues(alpha: 0.3)
+                                              : Colors.purple.shade200,
                                           width: 1),
                                     ),
                                   ),
@@ -1015,7 +959,9 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                           strokeWidth: 2,
                                           valueColor:
                                               AlwaysStoppedAnimation<Color>(
-                                                  Colors.purple.shade400),
+                                                  brightness == Brightness.dark
+                                                      ? Colors.purple[300]!
+                                                      : Colors.purple.shade400),
                                         ),
                                       ),
                                       const SizedBox(width: 10),
@@ -1024,7 +970,9 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                           '正在重新计算... $_progress%',
                                           style: TextStyle(
                                               fontSize: 13,
-                                              color: Colors.purple.shade700),
+                                              color: brightness == Brightness.dark
+                                                  ? Colors.purple[200]
+                                                  : Colors.purple.shade700),
                                         ),
                                       ),
                                       SizedBox(
@@ -1032,10 +980,14 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                         child: LinearProgressIndicator(
                                           value: _progress / 100,
                                           backgroundColor:
-                                              Colors.purple.shade100,
+                                              brightness == Brightness.dark
+                                                  ? Colors.purple.withValues(alpha: 0.2)
+                                                  : Colors.purple.shade100,
                                           valueColor:
                                               AlwaysStoppedAnimation<Color>(
-                                                  Colors.purple.shade400),
+                                                  brightness == Brightness.dark
+                                                      ? Colors.purple[300]!
+                                                      : Colors.purple.shade400),
                                         ),
                                       ),
                                     ],

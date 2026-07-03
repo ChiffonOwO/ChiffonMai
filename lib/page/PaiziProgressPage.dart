@@ -13,6 +13,8 @@ import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CollectionsImageUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/page/Collection/CollectionInfoPage.dart';
 
@@ -278,6 +280,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     // 初始化尺寸参数
     final screenWidth = MediaQuery.of(context).size.width;
     _scaleFactor = screenWidth / 375.0;
@@ -310,7 +313,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                   children: [
                     // 返回按钮
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: Color.fromARGB(255, 84, 97, 97)),
+                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
                       onPressed: () {
                         Navigator.of(context).pop();
                       },
@@ -321,7 +324,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                         child: Text(
                           '牌子进度',
                           style: TextStyle(
-                            color: Color.fromARGB(255, 84, 97, 97),
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: screenWidth * 0.06,
                             fontWeight: FontWeight.bold,
                           ),
@@ -339,14 +342,10 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(_borderRadiusSmall),
                     boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 5.0 * _scaleFactor,
-                        offset: Offset(2.0 * _scaleFactor, 2.0 * _scaleFactor),
-                      ),
+                      AppConstants.defaultShadow(brightness),
                     ],
                   ),
                   child: _isLoading
@@ -365,7 +364,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue,
+                                    backgroundColor: AppColors.linkBlue(brightness),
                                     foregroundColor: Colors.white,
                                     padding: EdgeInsets.symmetric(vertical: _paddingS),
                                     shape: RoundedRectangleBorder(
@@ -415,14 +414,14 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
           style: TextStyle(
             fontSize: _textSizeM,
             fontWeight: FontWeight.bold,
-            color: Colors.grey[700]!,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         SizedBox(height: _paddingXS),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey[100]!,
-            foregroundColor: Colors.grey[700]!,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
             minimumSize: Size(double.infinity, 40 * _scaleFactor),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -443,7 +442,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
           style: TextStyle(
             fontSize: _textSizeM,
             fontWeight: FontWeight.bold,
-            color: Colors.grey[700]!,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         SizedBox(height: _paddingXS),
@@ -454,11 +453,11 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
             return ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: _selectedTitleType == type
-                    ? Colors.blue
-                    : Colors.grey[100]!,
+                    ? AppColors.linkBlue(Theme.of(context).brightness)
+                    : Theme.of(context).colorScheme.surface,
                 foregroundColor: _selectedTitleType == type
                     ? Colors.white
-                    : Colors.grey[700]!,
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
                 minimumSize: Size(64 * _scaleFactor, 40 * _scaleFactor),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -489,7 +488,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
           style: TextStyle(
             fontSize: _textSizeM,
             fontWeight: FontWeight.bold,
-            color: Colors.grey[700]!,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         SizedBox(height: _paddingXS),
@@ -501,10 +500,10 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: _selectedDifficulty == diff
                     ? _getDifficultyColor(diff)
-                    : Colors.grey[100]!,
+                    : Theme.of(context).colorScheme.surface,
                 foregroundColor: _selectedDifficulty == diff
                     ? Colors.white
-                    : Colors.grey[700]!,
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
                 minimumSize: Size(80 * _scaleFactor, 40 * _scaleFactor),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -579,8 +578,8 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _selectedFirstChar == char
-                          ? Colors.blue
-                          : Colors.grey[100]!,
+                          ? AppColors.linkBlue(Theme.of(context).brightness)
+                          : Theme.of(context).colorScheme.surface,
                       alignment: Alignment.center,
                       padding: EdgeInsets.all(4),
                       minimumSize: Size(50, 50),
@@ -609,7 +608,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: _selectedFirstChar == char ? Colors.white : Colors.grey[700],
+                          color: _selectedFirstChar == char ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -631,7 +630,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
           '暂无数据',
           style: TextStyle(
             fontSize: _textSizeM,
-            color: Colors.grey[500]!,
+            color: AppColors.greyHint(Theme.of(context).brightness),
           ),
         ),
       );
@@ -649,7 +648,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
           '当前难度没有匹配的歌曲',
           style: TextStyle(
             fontSize: _textSizeM,
-            color: Colors.grey[500]!,
+            color: AppColors.greyHint(Theme.of(context).brightness),
           ),
         ),
       );
@@ -727,8 +726,8 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                 Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: Colors.grey[200]!,
-                    border: Border.all(color: Colors.black, width: 1),
+                    color: Theme.of(context).colorScheme.surface,
+                    border: Border.all(color: AppColors.tableBorder(Theme.of(context).brightness), width: 1),
                     borderRadius: BorderRadius.circular(_borderRadiusSmall),
                   ),
                   padding: EdgeInsets.symmetric(vertical: _paddingXS, horizontal: _paddingM),
@@ -738,7 +737,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: _textSizeM,
-                      color: Colors.black,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -805,10 +804,10 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                       },
                       child: Container(
                         decoration: BoxDecoration(
-                          color: isCompleted ? Colors.lightGreen[100]! : Colors.grey[100]!,
+                          color: isCompleted ? Colors.lightGreen[100]! : Theme.of(context).colorScheme.surface,
                           borderRadius: BorderRadius.circular(_borderRadiusSmall),
                           border: Border.all(
-                            color: isCompleted ? Colors.green : Colors.grey[300]!,
+                            color: isCompleted ? Colors.green : AppColors.tableBorder(Theme.of(context).brightness),
                             width: 1,
                           ),
                         ),
@@ -838,6 +837,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                                     style: TextStyle(
                                       fontSize: _textSizeS,
                                       fontWeight: FontWeight.w500,
+                                      color: isCompleted ? Colors.black87 : null,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -847,7 +847,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                                     '${StringUtil.formatSongType(songType)} / ${songDs.isNotEmpty ? songDs : '-'}',
                                     style: TextStyle(
                                       fontSize: _textSizeXS,
-                                      color: Colors.grey[600]!,
+                                      color: isCompleted ? Colors.black54 : Theme.of(context).colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                   SizedBox(height: 2),
@@ -933,7 +933,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                     style: TextStyle(
                       fontSize: _textSizeL,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey[700]!,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -943,7 +943,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                 Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.black, width: 1.0),
+                    border: Border.all(color: AppColors.tableBorder(Theme.of(context).brightness), width: 1.0),
                     borderRadius: BorderRadius.circular(_borderRadiusSmall),
                   ),
                   padding: EdgeInsets.all(_paddingM),
@@ -956,7 +956,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                         style: TextStyle(
                           fontSize: _textSizeL,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       SizedBox(height: _paddingS),
@@ -971,7 +971,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                                   '总歌曲数',
                                   style: TextStyle(
                                     fontSize: _textSizeM,
-                                    color: Colors.black,
+                                    color: Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                                 Text(
@@ -979,7 +979,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                                   style: TextStyle(
                                     fontSize: _textSizeL,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.black,
+                                    color: Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                               ],
@@ -993,7 +993,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                                   '已完成',
                                   style: TextStyle(
                                     fontSize: _textSizeM,
-                                    color: Colors.black,
+                                    color: Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                                 Text(
@@ -1001,7 +1001,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                                   style: TextStyle(
                                     fontSize: _textSizeL,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.black,
+                                    color: Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                               ],
@@ -1015,7 +1015,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                                   '未完成',
                                   style: TextStyle(
                                     fontSize: _textSizeM,
-                                    color: Colors.black,
+                                    color: Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                                 Text(
@@ -1023,7 +1023,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                                   style: TextStyle(
                                     fontSize: _textSizeL,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.black,
+                                    color: Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                               ],
@@ -1037,7 +1037,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                                   '完成率',
                                   style: TextStyle(
                                     fontSize: _textSizeM,
-                                    color: Colors.black,
+                                    color: Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                                 Text(
@@ -1045,7 +1045,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                                   style: TextStyle(
                                     fontSize: _textSizeL,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.black,
+                                    color: Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                               ],
@@ -1059,7 +1059,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                                   '平均达成率',
                                   style: TextStyle(
                                     fontSize: _textSizeM,
-                                    color: Colors.black,
+                                    color: Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                                 Text(
@@ -1067,7 +1067,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                                   style: TextStyle(
                                     fontSize: _textSizeL,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.black,
+                                    color: Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                               ],
@@ -1089,8 +1089,8 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                       // 筛选模式切换按钮
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey[200]!,
-                          foregroundColor: Colors.black,
+                          backgroundColor: Theme.of(context).colorScheme.surface,
+                          foregroundColor: Theme.of(context).colorScheme.onSurface,
                           minimumSize: Size(100 * _scaleFactor, 36 * _scaleFactor),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -1116,8 +1116,8 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                       // 分割线显示模式切换按钮
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey[200]!,
-                          foregroundColor: Colors.black,
+                          backgroundColor: Theme.of(context).colorScheme.surface,
+                          foregroundColor: Theme.of(context).colorScheme.onSurface,
                           minimumSize: Size(100 * _scaleFactor, 36 * _scaleFactor),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -1137,8 +1137,8 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                       // 显示模式切换按钮
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey[200]!,
-                          foregroundColor: Colors.black,
+                          backgroundColor: Theme.of(context).colorScheme.surface,
+                          foregroundColor: Theme.of(context).colorScheme.onSurface,
                           minimumSize: Size(100 * _scaleFactor, 36 * _scaleFactor),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -1230,8 +1230,8 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: Colors.grey[200]!,
-            border: Border.all(color: Colors.black, width: 1),
+            color: Theme.of(context).colorScheme.surface,
+            border: Border.all(color: AppColors.tableBorder(Theme.of(context).brightness), width: 1),
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
           ),
           padding: EdgeInsets.symmetric(vertical: _paddingXS, horizontal: _paddingM),
@@ -1241,7 +1241,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: _textSizeM,
-              color: Colors.black,
+              color: Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -1455,7 +1455,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                     SizedBox(height: 12.0),
                     Text(
                       _currentLoadingTip,
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                       textAlign: TextAlign.center,
                     ),
                   ],

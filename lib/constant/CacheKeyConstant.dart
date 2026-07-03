@@ -104,6 +104,9 @@ class CacheKeyConstant {
   static const String coverHashCache = 'cover_hash_cache_v5';
   static const String coverHashCacheTimestamp = 'cover_hash_cache_timestamp_v5';
 
+  // 主题设置
+  static const String themeMode = 'theme_mode';
+
   // Maimai Score Hub 探针同步相关
   static const String probeAuthToken = 'probe_auth_token';
   static const String probeFriendCode = 'probe_friend_code';

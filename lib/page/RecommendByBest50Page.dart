@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/AppTheme.dart';
 
 class RecommendBySchool extends StatefulWidget {
   const RecommendBySchool({super.key});
@@ -10,6 +11,7 @@ class RecommendBySchool extends StatefulWidget {
 class _RecommendBySchoolState extends State<RecommendBySchool> {
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: false, // 防止键盘弹出时挤压背景
@@ -44,7 +46,7 @@ class _RecommendBySchoolState extends State<RecommendBySchool> {
           ),
 
           // 页面标题
-          const Positioned(
+          Positioned(
             top: 60,
             left: 0,
             right: 0,
@@ -52,7 +54,7 @@ class _RecommendBySchoolState extends State<RecommendBySchool> {
               child: Text(
                 "根据流派推荐",
                 style: TextStyle(
-                  color: Color.fromARGB(255, 84, 97, 97),
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 2,
@@ -66,8 +68,8 @@ class _RecommendBySchoolState extends State<RecommendBySchool> {
             top: 40,
             left: 10,
             child: IconButton(
-              icon: const Icon(Icons.arrow_back,
-                  color: Color.fromARGB(255, 84, 97, 97), size: 24),
+              icon: Icon(Icons.arrow_back,
+                  color: Theme.of(context).colorScheme.onSurface, size: 24),
               onPressed: () {
                 Navigator.pop(context);
               },
