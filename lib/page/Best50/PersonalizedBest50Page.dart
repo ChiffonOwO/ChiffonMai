@@ -1119,7 +1119,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
       Color cardColor;
       // 对于6位数ID的歌曲，使用粉色
       if (songId.toString().length == 6) {
-        cardColor = AppColors.utageCard; // 进一步加深的粉色
+        cardColor = AppColors.utageCard(); // 进一步加深的粉色
       } else {
         cardColor = ColorUtil.getCardColor(levelIndex);
       }

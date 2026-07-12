@@ -293,11 +293,35 @@ class AppColors {
   }
 
   /// utage（6位ID歌曲）主题色
-  static const Color utageAccent = Color(0xFFFF69B4);
-  static const Color utageCard = Color(0xFFFFB3D1);
-  static const Color utageBackground = Color(0xFFFFE6F0);
-  static const Color utageDeep = Color(0xFFFF1493);
-  static const Color utageTag = Color(0xFFFF6B8B);
+  static Color utageAccent({Brightness brightness = Brightness.light}) {
+    return brightness == Brightness.dark
+        ? const Color(0xFFFF85B9)
+        : const Color(0xFFFF69B4);
+  }
+
+  static Color utageCard({Brightness brightness = Brightness.light}) {
+    return brightness == Brightness.dark
+        ? const Color(0xFF5C3545)
+        : const Color(0xFFFFB3D1);
+  }
+
+  static Color utageBackground({Brightness brightness = Brightness.light}) {
+    return brightness == Brightness.dark
+        ? const Color(0xFF3D2028)
+        : const Color(0xFFFFE6F0);
+  }
+
+  static Color utageDeep({Brightness brightness = Brightness.light}) {
+    return brightness == Brightness.dark
+        ? const Color(0xFFFF5BA0)
+        : const Color(0xFFFF1493);
+  }
+
+  static Color utageTag({Brightness brightness = Brightness.light}) {
+    return brightness == Brightness.dark
+        ? const Color(0xFFFF85A8)
+        : const Color(0xFFFF6B8B);
+  }
 
   /// 成就徽章前景色
   static Color achievementForeground(String type) {

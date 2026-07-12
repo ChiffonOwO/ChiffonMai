@@ -1776,7 +1776,7 @@ class _B50PageState extends State<B50Page> {
 
       Color cardColor;
       if (songId.toString().length == 6) {
-        cardColor = AppColors.utageCard;
+        cardColor = AppColors.utageCard();
       } else {
         cardColor = ColorUtil.getCardColor(levelIndex);
       }

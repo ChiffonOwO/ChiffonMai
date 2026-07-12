@@ -673,7 +673,7 @@ class _FriendComparePageState extends State<FriendComparePage> {
     final brightness = Theme.of(context).brightness;
     final isUtage = item.songId.toString().length == 6;
     final diffName = isUtage ? 'UTAGE' : diffNames[item.levelIndex.clamp(0, 4)];
-    final accentColor = isUtage ? AppColors.utageAccent : ColorUtil.getCardColor(item.levelIndex);
+    final accentColor = isUtage ? AppColors.utageAccent(brightness: brightness) : ColorUtil.getCardColor(item.levelIndex);
 
     Color myColor;
     Color friendColor;

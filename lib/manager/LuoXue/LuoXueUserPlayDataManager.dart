@@ -97,36 +97,48 @@ class LuoXueUserPlayDataManager {
         debugPrint('❌ 未获取到玩家成绩');
         return null;
       }
-      
+
       debugPrint('🔄 开始转换 ${luoxueScores.length} 条成绩...');
-      
+
       // 分批转换，避免阻塞主线程
       List<RecordItem> recordItems = [];
       const batchSize = 50;
-      
+
       for (int i = 0; i < luoxueScores.length; i += batchSize) {
         int end = i + batchSize;
         if (end > luoxueScores.length) {
           end = luoxueScores.length;
         }
-        
+
         List<LuoXueScore> batch = luoxueScores.sublist(i, end);
-        
+
         // 转换当前批次
         for (LuoXueScore score in batch) {
           RecordItem recordItem = await LuoXueToDivingFishUtil.toRecordItemAsync(score);
           recordItems.add(recordItem);
         }
-        
+
         // 让出主线程
         await Future.delayed(Duration(milliseconds: 5));
       }
-      
+
       debugPrint('✅ 成功转换 ${recordItems.length} 条 RecordItem');
-      
+
+      // 获取玩家信息（包含昵称）
+      String nickname = '';
+      try {
+        final playerInfo = await getPlayerInfo();
+        if (playerInfo != null && playerInfo.name.isNotEmpty) {
+          nickname = playerInfo.name;
+          debugPrint('✅ 获取到落雪玩家昵称: $nickname');
+        }
+      } catch (e) {
+        debugPrint('⚠️ 获取玩家信息失败，昵称将为空: $e');
+      }
+
       // 更新缓存
-      await _updateRecordItemCache(recordItems);
-      
+      await _updateRecordItemCache(recordItems, nickname: nickname);
+
       return recordItems;
     } catch (e) {
       print('获取并转换玩家成绩异常: $e');
@@ -135,14 +147,14 @@ class LuoXueUserPlayDataManager {
   }
   
   /// 更新 RecordItem 相关缓存
-  Future<void> _updateRecordItemCache(List<RecordItem> recordItems) async {
+  Future<void> _updateRecordItemCache(List<RecordItem> recordItems, {String nickname = ''}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       // 构建缓存数据结构（与水鱼数据源格式保持一致）
       Map<String, dynamic> cacheData = {
         'additional_rating': 0,
-        'nickname': '',
+        'nickname': nickname,
         'plate': '',
         'rating': 0,
         'records': recordItems.map((item) => item.toJson()).toList(),

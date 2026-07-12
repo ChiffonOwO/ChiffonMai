@@ -243,13 +243,19 @@ class MultiplayerCloudBaseService {
   }
 
   void _handleRoomCreated(Map<String, dynamic> payload) {
-    RoomEntity room = RoomEntity.fromJson(payload['room']);
+    final roomData = payload['room'];
+    debugPrint('[DEBUG][CloudService] ====== 房间创建响应 ======');
+    debugPrint('[DEBUG][CloudService] 服务器返回的room数据中的game_type字段: ${roomData?['game_type']}');
+    debugPrint('[DEBUG][CloudService] 服务器返回的room数据中的gameType字段: ${roomData?['gameType']}');
+
+    RoomEntity room = RoomEntity.fromJson(roomData);
     String? previousRoomId = currentRoomId;
     currentRoomId = room.roomId;
-    
+
     debugPrint('[DEBUG][CloudService] ====== 房间创建 ======');
     debugPrint('[DEBUG][CloudService] 房间ID: ${room.roomId}');
     debugPrint('[DEBUG][CloudService] 房间码: ${room.roomCode}');
+    debugPrint('[DEBUG][CloudService] 游戏类型: ${room.gameType.name} (${room.gameType.description})');
     debugPrint('[DEBUG][CloudService] 之前的房间ID: $previousRoomId');
     debugPrint('[DEBUG][CloudService] 房间创建者ID: ${room.creatorId}');
     debugPrint('[DEBUG][CloudService] 当前玩家ID: $currentPlayerId');
@@ -359,7 +365,11 @@ class MultiplayerCloudBaseService {
   }
 
   void _handleRoomUpdated(Map<String, dynamic> payload) {
-    RoomEntity room = RoomEntity.fromJson(payload['room']);
+    final roomData = payload['room'];
+    debugPrint('[DEBUG][CloudService] ====== 房间更新 ======');
+    debugPrint('[DEBUG][CloudService] 服务器返回的game_type: ${roomData?['game_type']}, gameType: ${roomData?['gameType']}');
+
+    RoomEntity room = RoomEntity.fromJson(roomData);
     
     debugPrint('[DEBUG][CloudService] ====== 房间更新 ======');
     debugPrint('[DEBUG][CloudService] 收到更新的房间ID: ${room.roomId}');
@@ -476,8 +486,9 @@ class MultiplayerCloudBaseService {
         return;
       }
 
+      debugPrint('[DEBUG][CloudService] 发送创建房间请求 - gameType: ${gameType.name}');
       await _wsBroadcast.sendCreateRoom({
-        'gameType': gameType.name,
+        'gameType': gameType.apiKey,
         'maxPlayers': maxPlayers,
         'timeLimit': timeLimit,
         'maxGuesses': maxGuesses,
@@ -753,14 +764,19 @@ class MultiplayerCloudBaseService {
   }
   
   void _handleRoomInfo(Map<String, dynamic> payload) {
-    RoomEntity room = RoomEntity.fromJson(payload['room']);
-    
+    final roomData = payload['room'];
+    debugPrint('[DEBUG][CloudService] ====== 房间信息(room_info) ======');
+    debugPrint('[DEBUG][CloudService] game_type: ${roomData?['game_type']}, gameType: ${roomData?['gameType']}');
+
+    RoomEntity room = RoomEntity.fromJson(roomData);
+
     if (room.roomId.isEmpty) {
       debugPrint('[DEBUG][CloudService] 房间信息更新失败：房间ID为空');
       return;
     }
-    
+
     _rooms[room.roomId] = room;
+    debugPrint('[DEBUG][CloudService] 解析后的游戏类型: ${room.gameType.name}');
     _controller.add(MultiplayerEvent.roomUpdated(room: room));
   }
   

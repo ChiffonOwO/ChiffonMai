@@ -1203,43 +1203,35 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
           // 记录播放开始时间
           final playStartTime = DateTime.now();
           
-          // 使用定时器来更新进度和控制播放时长
-          _playbackTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
-            if (_isPlaying) {
-              // 计算已播放时间
-              final elapsed = DateTime.now().difference(playStartTime).inMilliseconds / 1000;
-              
-              setState(() {
-                _currentPosition = elapsed;
-                _elapsedTime = elapsed.toInt();
-              });
-              
-              // 检查是否达到播放时长
-              if (elapsed >= _currentPlayDuration) {
-                timer.cancel();
-                _handlePlaybackComplete();
-              }
-            } else {
+          // 使用定时器作为安全兜底（仅在播放器回调失效时触发结束检查）
+          _playbackTimer = Timer.periodic(Duration(milliseconds: 250), (timer) {
+            if (!_isPlaying) {
               timer.cancel();
+              return;
+            }
+            // 仅检查播放时长是否超限，不更新进度条位置
+            final elapsed = DateTime.now().difference(playStartTime).inMilliseconds / 1000;
+            if (elapsed >= _currentPlayDuration + 0.5) {
+              timer.cancel();
+              _handlePlaybackComplete();
             }
           });
-          
-          // 监听播放器位置变化，确保进度条与实际播放同步
+
+          // 监听播放器位置变化，由此唯一更新进度条
           _positionSubscription = _audioPlayer!.onPositionChanged.listen((position) {
-            if (_isPlaying) {
-              // 计算相对于片段开始的位置
-              final relativePosition = position.inMilliseconds / 1000 - _audioStartTime!;
-              if (relativePosition >= 0) {
-                setState(() {
-                  _currentPosition = relativePosition;
-                  _elapsedTime = relativePosition.toInt();
-                });
-                
-                // 检查是否达到播放时长
-                if (relativePosition >= _currentPlayDuration) {
-                  _playbackTimer?.cancel();
-                  _handlePlaybackComplete();
-                }
+            if (!_isPlaying) return;
+            // 计算相对于片段开始的位置
+            final relativePosition = position.inMilliseconds / 1000 - _audioStartTime!;
+            if (relativePosition >= 0) {
+              setState(() {
+                _currentPosition = relativePosition;
+                _elapsedTime = relativePosition.toInt();
+              });
+
+              // 检查是否达到播放时长
+              if (relativePosition >= _currentPlayDuration) {
+                _playbackTimer?.cancel();
+                _handlePlaybackComplete();
               }
             }
           });

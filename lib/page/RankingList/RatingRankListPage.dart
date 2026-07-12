@@ -387,7 +387,7 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBackground(brightness),
+      backgroundColor: AppColors.cardBackground(brightness),
       appBar: AppBar(
         title: const Text('Rating 排行榜'),
         centerTitle: true,
@@ -495,7 +495,7 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
           // 排行榜列表
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? Center(child: CircularProgressIndicator(color: AppColors.primaryText(brightness)))
                 : _rankList.isEmpty
                     ? _buildEmptyState(brightness)
                     : ListView.builder(

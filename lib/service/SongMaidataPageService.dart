@@ -78,14 +78,21 @@ class SongMaidataPageService {
   Future<List<MatchResult>> findAllMatches() async {
     List<MatchResult> allMatches = [];
     Set<String> addedIds = {};
-    
+
     try {
-      final response = await http.get(Uri.parse('${ApiUrls.MaidataServerPortUrl}/index.json'));
-      
-      if (response.statusCode == 200) {
-        Map<String, dynamic> indexData = Map<String, dynamic>.from(
-          (await compute(_parseJson, response.body)) as Map,
-        );
+      // 优先使用MaidataManager中缓存的index数据
+      Map<String, dynamic> indexData = await MaidataManager().getIndex();
+      if (indexData.isEmpty) {
+        // 缓存未命中，从服务器拉取
+        final response = await http.get(Uri.parse('${ApiUrls.MaidataServerPortUrl}/index.json'));
+        if (response.statusCode == 200) {
+          indexData = Map<String, dynamic>.from(
+            (await compute(_parseJson, response.body)) as Map,
+          );
+        }
+      }
+
+      if (indexData.isNotEmpty) {
         
         String originalTitle = songTitle;
         String sanitizedTitle = _sanitizeTitle(originalTitle);
@@ -226,16 +233,32 @@ class SongMaidataPageService {
   Future<String?> fetchMaidata({
     required void Function(List<String>) onInoteParsed,
   }) async {
-    // 首先检查全量缓存
+    // 首先检查全量缓存（用app的songId直接查询）
     await MaidataManager().initialize();
     if (MaidataManager().isCacheReady) {
       String? fullCacheContent = MaidataManager().getMaidata(songId);
       if (fullCacheContent != null) {
-        debugPrint('[DEBUG][Maidata] 使用全量缓存内容');
+        debugPrint('[DEBUG][Maidata] 使用全量缓存内容(songId直接命中)');
         List<String> inoteList = _parseInoteList(fullCacheContent);
         onInoteParsed(inoteList);
         return fullCacheContent;
       }
+
+      // 用songId直接查询失败，尝试通过歌曲标题在index中查找shortId
+      debugPrint('[DEBUG][Maidata] songId直接查询失败，尝试通过index匹配shortId...');
+      await MaidataManager().getIndex(); // 确保index已加载
+      List<String> matchingShortIds = MaidataManager().findShortIdsForTitle(songTitle);
+      if (matchingShortIds.isNotEmpty) {
+        debugPrint('[DEBUG][Maidata] index中找到 ${matchingShortIds.length} 个匹配: $matchingShortIds');
+        String? indexCacheContent = MaidataManager().getMaidataByShortIds(matchingShortIds);
+        if (indexCacheContent != null) {
+          debugPrint('[DEBUG][Maidata] 使用全量缓存内容(通过index+shortId命中)');
+          List<String> inoteList = _parseInoteList(indexCacheContent);
+          onInoteParsed(inoteList);
+          return indexCacheContent;
+        }
+      }
+      debugPrint('[DEBUG][Maidata] index匹配也失败，全量缓存中找不到此歌曲');
     }
     
     // 其次检查独立缓存
@@ -577,7 +600,7 @@ class SongMaidataPageService {
         return null;
       }
       
-      List<String> folders = _parseFolderList(response.body);
+      List<String> folders = _parseFolderList(_decodeResponse(response));
       debugPrint('[DEBUG][Maidata] 找到 ${folders.length} 个文件夹');
       
       if (folders.isEmpty) {

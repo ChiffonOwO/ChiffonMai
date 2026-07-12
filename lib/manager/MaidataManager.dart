@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../api/ApiUrls.dart';
 import '../constant/CacheKeyConstant.dart';
 import '../constant/CacheTimestampConstant.dart';
+import 'package:jp_transliterate/jp_transliterate.dart';
 
 class MaidataManager {
   static final MaidataManager _instance = MaidataManager._internal();
@@ -138,6 +139,7 @@ class MaidataManager {
   }
 
   Map<String, String> _cachedMaidata = {};
+  Map<String, dynamic>? _indexData;
   bool _isInitialized = false;
 
   Future<void> initialize() async {
@@ -237,6 +239,9 @@ class MaidataManager {
     } catch (e) {
       debugPrint('[DEBUG][MaidataManager] 保存缓存失败: $e');
     }
+
+    // 同时刷新index缓存，确保shortId映射是最新的
+    _fetchAndCacheIndex();
   }
 
   /// 获取单个maidata.txt并返回 (songId, content) 或 null
@@ -263,8 +268,9 @@ class MaidataManager {
       final response = await http.get(Uri.parse(path));
       
       if (response.statusCode == 200) {
+        String decodedBody = _decodeContent(response.bodyBytes);
         RegExp linkRegex = RegExp(r'<a\s+href="([^"]+)/?"');
-        Iterable<Match> matches = linkRegex.allMatches(response.body);
+        Iterable<Match> matches = linkRegex.allMatches(decodedBody);
         
         for (Match match in matches) {
           String folder = match.group(1)!;
@@ -429,14 +435,142 @@ class MaidataManager {
     return result;
   }
 
+  // ========== index.json 缓存，用于 songId → shortId 映射 ==========
+
+  /// 获取缓存的index数据（shortId → title 映射），如果缓存过期则从服务器拉取
+  Future<Map<String, dynamic>> getIndex() async {
+    if (_indexData != null && _indexData!.isNotEmpty) {
+      return _indexData!;
+    }
+    await _loadIndexFromCache();
+    if (_indexData != null && _indexData!.isNotEmpty) {
+      return _indexData!;
+    }
+    await _fetchAndCacheIndex();
+    return _indexData ?? {};
+  }
+
+  Future<void> _loadIndexFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedData = prefs.getString(CacheKeyConstant.maidataIndexCache);
+      final timestamp = prefs.getInt(CacheKeyConstant.maidataIndexCacheTimestamp);
+      if (cachedData != null && timestamp != null) {
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (now - timestamp < CacheTimestampConstant.maidataFullCacheMillis) {
+          _indexData = Map<String, dynamic>.from(json.decode(cachedData) as Map);
+          debugPrint('[DEBUG][MaidataManager] 已加载index缓存，共 ${_indexData!.length} 条');
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('[DEBUG][MaidataManager] 加载index缓存失败: $e');
+    }
+  }
+
+  Future<void> _fetchAndCacheIndex() async {
+    try {
+      final response = await http.get(Uri.parse('${ApiUrls.MaidataServerPortUrl}/index.json'));
+      if (response.statusCode == 200) {
+        String content = _decodeContent(response.bodyBytes);
+        _indexData = Map<String, dynamic>.from(json.decode(content) as Map);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(CacheKeyConstant.maidataIndexCache, json.encode(_indexData));
+        await prefs.setInt(CacheKeyConstant.maidataIndexCacheTimestamp, DateTime.now().millisecondsSinceEpoch);
+        debugPrint('[DEBUG][MaidataManager] index.json已缓存，共 ${_indexData!.length} 条');
+      }
+    } catch (e) {
+      debugPrint('[DEBUG][MaidataManager] 获取index.json失败: $e');
+    }
+  }
+
+  /// 根据歌曲标题在index中查找所有匹配的shortId
+  List<String> findShortIdsForTitle(String title) {
+    if (_indexData == null) return [];
+    final sanitized = title
+        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
+        .replaceAll(RegExp(r'\s+'), '')
+        .toUpperCase();
+    List<String> result = [];
+    for (var entry in _indexData!.entries) {
+      dynamic value = entry.value;
+      String indexTitle = '';
+      if (value is String) {
+        indexTitle = value;
+      } else if (value is Map) {
+        indexTitle = (value['title'] ?? value['name'] ?? '').toString();
+      }
+      String sanitizedIndexTitle = indexTitle
+          .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
+          .replaceAll(RegExp(r'\s+'), '')
+          .toUpperCase();
+      if (sanitizedIndexTitle == sanitized ||
+          sanitizedIndexTitle.contains(sanitized) ||
+          sanitized.contains(sanitizedIndexTitle)) {
+        result.add(entry.key);
+      }
+    }
+    return result;
+  }
+
+  /// 根据歌曲标题在index中查找所有匹配的shortId（含日语音读回退）
+  Future<List<String>> findShortIdsForTitleKana(String title) async {
+    // 先尝试简单匹配
+    List<String> result = findShortIdsForTitle(title);
+    if (result.isNotEmpty) return result;
+
+    // 简单匹配失败，尝试jp_transliterate日语音读
+    try {
+      final katakanaTitle = await _tryTransliterate(title);
+      if (katakanaTitle != null && katakanaTitle != title) {
+        final katakanaResult = findShortIdsForTitle(katakanaTitle);
+        if (katakanaResult.isNotEmpty) {
+          debugPrint('[MaidataManager] 日语音读匹配成功: "$title" -> "$katakanaTitle", 找到 ${katakanaResult.length} 个shortId');
+          return katakanaResult;
+        }
+      }
+    } catch (e) {
+      debugPrint('[MaidataManager] 日语音读匹配异常: $e');
+    }
+
+    return [];
+  }
+
+  Future<String?> _tryTransliterate(String title) async {
+    if (JpTransliterate.isKanji(input: title)) {
+      final data = await JpTransliterate.transliterate(kanji: title);
+      String katakana = data.katakana;
+      if (katakana.isNotEmpty) {
+        // 清理片假名结果以便匹配
+        return katakana
+            .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
+            .replaceAll(RegExp(r'\s+'), '')
+            .toUpperCase();
+      }
+    }
+    return null;
+  }
+
+  /// 尝试通过多个shortId查找maidata（用于fallback）
+  String? getMaidataByShortIds(List<String> shortIds) {
+    for (final sid in shortIds) {
+      String? content = getMaidata(sid);
+      if (content != null) return content;
+    }
+    return null;
+  }
+
   Future<void> clearCache() async {
     _cachedMaidata.clear();
+    _indexData = null;
     _isInitialized = false;
-    
+
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.remove(CacheKeyConstant.maidataFullCache);
       await prefs.remove(CacheKeyConstant.maidataFullCacheTimestamp);
+      await prefs.remove(CacheKeyConstant.maidataIndexCache);
+      await prefs.remove(CacheKeyConstant.maidataIndexCacheTimestamp);
       debugPrint('[DEBUG][MaidataManager] 缓存已清空');
     } catch (e) {
       debugPrint('[DEBUG][MaidataManager] 清空缓存失败: $e');

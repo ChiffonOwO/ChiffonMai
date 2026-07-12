@@ -26,6 +26,7 @@ import '../widgets/OfflineBanner.dart';
 import '../widgets/QuickSearchBar.dart';
 import 'DifficultyDistributionPage.dart';import '../manager/DivingFish/UserPlayDataManager.dart';
 import '../manager/DivingFish/MaimaiMusicDataManager.dart';
+import '../manager/MaidataManager.dart';
 import '../manager/DivingFish/DiffMusicDataManager.dart';
 import '../manager/SongAliasManager.dart';
 import '../manager/DivingFish/UserBest50Manager.dart';
@@ -372,6 +373,7 @@ class _HomePageState extends State<HomePage> {
     ]),
     ButtonCategory(name: '系统', items: [
       ButtonItem(icon: Icons.file_upload_sharp, title: '刷新数据', subtitle: '刷新你的舞萌数据'),
+      ButtonItem(icon: Icons.cleaning_services, title: '刷新Maidata', subtitle: '手动刷新所有maidata数据'),
       if (_isDivingFishLoggedIn)
         ButtonItem(icon: Icons.logout, title: '登出账号', subtitle: '清除水鱼登录状态')
       else
@@ -458,6 +460,13 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ],
               ),
+            ),
+
+          // 层级3.6：右上角主题切换按钮
+            Positioned(
+              top: screenHeight * 0.07,
+              right: screenWidth * 0.02,
+              child: _buildThemeToggleButton(context),
             ),
 
           // 层级4：左侧头像选择器
@@ -965,9 +974,16 @@ class _HomePageState extends State<HomePage> {
   }
 
   // 显示刷新数据对话框
-  void _showRefreshDataDialog(BuildContext context) {
+  Future<void> _showRefreshDataDialog(BuildContext context) async {
     final brightness = Theme.of(context).brightness;
-    final TextEditingController qqController = TextEditingController(text: _cachedQQ);
+    
+    // 水鱼：读取登录状态和绑定的QQ号
+    final prefsForBind = await SharedPreferences.getInstance();
+    final jwt = prefsForBind.getString(CacheKeyConstant.probeDivingFishToken) ?? '';
+    final bindQQ = prefsForBind.getString(CacheKeyConstant.probeDivingFishBindQQ) ?? '';
+    final bool isDivingFishLoggedIn = jwt.isNotEmpty && bindQQ.isNotEmpty;
+    
+    final TextEditingController qqController = TextEditingController(text: bindQQ.isNotEmpty ? bindQQ : _cachedQQ);
     final TextEditingController authCodeController = TextEditingController();
     bool isRefreshing = false;
     int progress = 0;
@@ -1064,15 +1080,32 @@ class _HomePageState extends State<HomePage> {
                       ),
                     if (!isRefreshing) SizedBox(height: 12),
                     
-                    // 水鱼数据源：QQ号输入
+                    // 水鱼数据源：QQ号输入（需登录后自动填充）
                     if (!isRefreshing && _currentDataSource == DataSource.shuiyu)
-                      TextField(
-                        controller: qqController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: '请输入QQ号',
-                          hintText: '例如:1919810',
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            controller: qqController,
+                            keyboardType: TextInputType.number,
+                            enabled: false,
+                            decoration: InputDecoration(
+                              labelText: isDivingFishLoggedIn ? '已绑定QQ号' : '请先登录水鱼账号',
+                              hintText: isDivingFishLoggedIn ? bindQQ : '登录后自动填充',
+                              suffixIcon: isDivingFishLoggedIn
+                                  ? Icon(Icons.check_circle, color: Colors.green)
+                                  : Icon(Icons.warning_amber, color: Colors.orange),
+                            ),
+                          ),
+                          if (!isDivingFishLoggedIn)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                '请先在「水鱼数据同步」中登录水鱼账号，再进行数据刷新',
+                                style: TextStyle(fontSize: 12, color: AppColors.warningOrange(brightness)),
+                              ),
+                            ),
+                        ],
                       ),
                     
                     // 落雪数据源：授权相关
@@ -1187,6 +1220,12 @@ class _HomePageState extends State<HomePage> {
                 if (!isRefreshing)
                   TextButton(
                     onPressed: () async {
+                      // 水鱼数据源：检查是否已登录
+                      if (_currentDataSource == DataSource.shuiyu && !isDivingFishLoggedIn) {
+                        Fluttertoast.showToast(msg: '请先登录水鱼账号后再刷新数据');
+                        return;
+                      }
+                      
                       final isOnline = await ConnectivityService().hasConnection();
                       if (!isOnline) {
                         if (context.mounted) {
@@ -2480,6 +2519,41 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // 右上角主题快捷切换按钮
+  Widget _buildThemeToggleButton(BuildContext context) {
+    final currentMode = ThemeManager().themeMode;
+    final isDark = currentMode == ThemeMode.dark;
+    return GestureDetector(
+      onTap: () {
+        if (isDark) {
+          ThemeManager().setThemeMode(ThemeMode.light);
+        } else {
+          ThemeManager().setThemeMode(ThemeMode.dark);
+        }
+      },
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Icon(
+          isDark ? Icons.dark_mode : Icons.light_mode,
+          size: 20,
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
+      ),
+    );
+  }
+
   // 显示主题切换对话框
   void _showThemeDialog() {
     final currentMode = ThemeManager().themeMode;
@@ -2821,6 +2895,69 @@ class _HomePageState extends State<HomePage> {
           }
           if (item.title == '刷新数据') {
             _showRefreshDataDialog(context);
+          }
+          if (item.title == '刷新Maidata') {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('确认刷新'),
+                content: const Text('将清除所有maidata缓存并从服务器重新拉取全部maidata数据，耗时可能较长。\n\n确定要刷新吗？'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('取消'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: const Text('确认刷新'),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed == true) {
+              // 显示加载对话框
+              if (mounted) {
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (ctx) => const AlertDialog(
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('正在刷新Maidata...'),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              try {
+                // 清除所有maidata缓存
+                await MaidataManager().clearCache();
+                await MaimaiMusicDataManager().clearAddedSongsCache();
+                final prefs = await SharedPreferences.getInstance();
+                final keys = prefs.getKeys();
+                for (final key in keys) {
+                  if (key.startsWith(CacheKeyConstant.maidataCachePrefix)) {
+                    await prefs.remove(key);
+                  }
+                }
+                // 重新拉取全量maidata
+                await MaimaiMusicDataManager().refreshDataWithSmartMaidata();
+                // 关闭加载对话框
+                if (mounted) Navigator.of(context).pop();
+                if (mounted) {
+                  Fluttertoast.showToast(msg: 'Maidata刷新成功');
+                }
+              } catch (e) {
+                debugPrint('[HomePage] 刷新Maidata失败: $e');
+                if (mounted) Navigator.of(context).pop();
+                if (mounted) {
+                  Fluttertoast.showToast(msg: '刷新失败: $e');
+                }
+              }
+            }
           }
           if (item.title == '成绩查询') {
             Navigator.push(

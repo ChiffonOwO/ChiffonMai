@@ -255,7 +255,7 @@ class _DifficultyDistributionPageState
                     return Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
-                        '${_buckets[i].dsMin.toInt()}',
+                        _buckets[i].label,
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
@@ -301,7 +301,7 @@ class _DifficultyDistributionPageState
                   if (groupIndex >= _buckets.length) return null;
                   final bucket = _buckets[groupIndex];
                   return BarTooltipItem(
-                    '定数 ${bucket.dsMin.toInt()}~${(bucket.dsMax - 1).toInt()}\n共 ${bucket.totalCount} 首\n已玩 ${bucket.playedCount} 首',
+                    '定数 ${bucket.label}\n共 ${bucket.totalCount} 首\n已玩 ${bucket.playedCount} 首',
                     const TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -365,7 +365,7 @@ class _DifficultyDistributionPageState
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
-                    '定数 ${bucket.dsMin.toInt()}~${(bucket.dsMax - 1).toInt()} $suffix (共 ${bucket.totalCount} 首)',
+                    '定数 ${bucket.label} $suffix (共 ${bucket.totalCount} 首)',
                     style: const TextStyle(
                         fontSize: 16, fontWeight: FontWeight.bold),
                   ),

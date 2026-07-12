@@ -14,6 +14,7 @@ import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/AppConstants.dart';
+import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
 
 class PersonalizedScorePage extends StatefulWidget {
   const PersonalizedScorePage({super.key});
@@ -39,6 +40,13 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
   // 谱师相关
   Map<String, int>? _charterCounts;
   String? _selectedCharter;
+
+  // 版本相关
+  String? _selectedVersion;
+
+  // 曲师相关
+  Map<String, int>? _artistCounts;
+  String? _selectedArtist;
 
   String? _selectedLevel;
   String? _selectedTitleType;
@@ -108,6 +116,9 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
       // 获取谱师列表
       _charterCounts = await _service.getCharterCounts();
 
+      // 获取曲师列表
+      _artistCounts = await _service.getArtistCounts();
+
       // 更新等级选项
       await _updateLevelOptions();
       // 设置保存的等级选项
@@ -120,7 +131,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
 
       // 设置保存的模式
       final savedMode = savedOptions['mode'] as String;
-      _mode = ['level', 'charter'].contains(savedMode) ? savedMode : 'level';
+      _mode = ['level', 'charter', 'version', 'artist'].contains(savedMode) ? savedMode : 'level';
 
       // 设置保存的谱师（如果谱师存在）
       final savedCharter = savedOptions['charter'] as String;
@@ -128,6 +139,22 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
         _selectedCharter = savedCharter;
       } else if (_charterCounts != null && _charterCounts!.isNotEmpty) {
         _selectedCharter = _charterCounts!.keys.first;
+      }
+
+      // 设置保存的版本
+      final savedVersion = savedOptions['version'] as String;
+      if (savedVersion.isNotEmpty && VersionListConstant.standardVersions.contains(savedVersion)) {
+        _selectedVersion = savedVersion;
+      } else if (VersionListConstant.standardVersions.isNotEmpty) {
+        _selectedVersion = VersionListConstant.standardVersions.first;
+      }
+
+      // 设置保存的曲师
+      final savedArtist = savedOptions['artist'] as String;
+      if (savedArtist.isNotEmpty && _artistCounts != null && _artistCounts!.containsKey(savedArtist)) {
+        _selectedArtist = savedArtist;
+      } else if (_artistCounts != null && _artistCounts!.isNotEmpty) {
+        _selectedArtist = _artistCounts!.keys.first;
       }
 
       // 设置保存的显示模式
@@ -154,6 +181,8 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
       showListMode: _showListMode,
       mode: _mode,
       charter: _selectedCharter,
+      version: _selectedVersion,
+      artist: _selectedArtist,
     );
     super.dispose();
   }
@@ -189,13 +218,29 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
     });
 
     try {
+      // 清除记录缓存，确保每次变更筛选条件都重新加载最新游玩数据
+      _service.clearRecordsCache();
+
       List<Map<String, dynamic>> result;
       
       if (_mode == 'level') {
-        // 等级模式
         if (_selectedLevel == null) return;
         result = await _service.getSongsByLevel(
           _selectedLevel!,
+          _selectedTitleType!,
+          _selectedDifficulty!,
+        );
+      } else if (_mode == 'version') {
+        if (_selectedVersion == null) return;
+        result = await _service.getSongsByVersion(
+          _selectedVersion!,
+          _selectedTitleType!,
+          _selectedDifficulty!,
+        );
+      } else if (_mode == 'artist') {
+        if (_selectedArtist == null) return;
+        result = await _service.getSongsByArtist(
+          _selectedArtist!,
           _selectedTitleType!,
           _selectedDifficulty!,
         );
@@ -416,16 +461,16 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
           ),
           onPressed: () => _showModeDialog(),
           child: Text(
-            _mode == 'level' ? '等级' : '谱师',
+            _mode == 'level' ? '等级' : _mode == 'charter' ? '谱师' : _mode == 'version' ? '版本' : '曲师',
             style: TextStyle(fontSize: _textSizeM),
           ),
         ),
 
         SizedBox(height: _paddingM),
 
-        // 选择等级/谱师
+        // 选择等级/谱师/版本/曲师
         Text(
-          _mode == 'level' ? '选择等级' : '选择谱师',
+          _mode == 'level' ? '选择等级' : _mode == 'charter' ? '选择谱师' : _mode == 'version' ? '选择版本' : '选择曲师',
           style: TextStyle(
             fontSize: _textSizeM,
             fontWeight: FontWeight.bold,
@@ -442,11 +487,25 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
               borderRadius: BorderRadius.circular(_borderRadiusSmall),
             ),
           ),
-          onPressed: () => _mode == 'level' ? _showLevelDialog() : _showCharterDialog(),
+          onPressed: () {
+            if (_mode == 'level') {
+              _showLevelDialog();
+            } else if (_mode == 'charter') {
+              _showCharterDialog();
+            } else if (_mode == 'version') {
+              _showVersionDialog();
+            } else {
+              _showArtistDialog();
+            }
+          },
           child: Text(
-            _mode == 'level' 
+            _mode == 'level'
                 ? (_selectedLevel != null ? 'Lv.${_selectedLevel}' : '请选择等级')
-                : (_selectedCharter != null ? _selectedCharter! : '请选择谱师'),
+                : _mode == 'charter'
+                    ? (_selectedCharter != null ? _selectedCharter! : '请选择谱师')
+                    : _mode == 'version'
+                        ? (_selectedVersion != null ? StringUtil.formatVersion2(_selectedVersion!) : '请选择版本')
+                        : (_selectedArtist != null ? _selectedArtist! : '请选择曲师'),
             style: TextStyle(fontSize: _textSizeM),
           ),
         ),
@@ -587,10 +646,43 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                       _mode = 'charter';
                       _cachedSongsWithStatus = null;
                     });
-                    // 如果没有选中的谱师，设置默认谱师
                     if (_selectedCharter == null && _charterCounts != null && _charterCounts!.isNotEmpty) {
                       setState(() {
                         _selectedCharter = _charterCounts!.keys.first;
+                      });
+                    }
+                    await _loadSongsWithStatus();
+                  },
+                ),
+                ListTile(
+                  title: Center(child: Text('版本')),
+                  selected: _mode == 'version',
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    setState(() {
+                      _mode = 'version';
+                      _cachedSongsWithStatus = null;
+                    });
+                    if (_selectedVersion == null && VersionListConstant.standardVersions.isNotEmpty) {
+                      setState(() {
+                        _selectedVersion = VersionListConstant.standardVersions.first;
+                      });
+                    }
+                    await _loadSongsWithStatus();
+                  },
+                ),
+                ListTile(
+                  title: Center(child: Text('曲师')),
+                  selected: _mode == 'artist',
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    setState(() {
+                      _mode = 'artist';
+                      _cachedSongsWithStatus = null;
+                    });
+                    if (_selectedArtist == null && _artistCounts != null && _artistCounts!.isNotEmpty) {
+                      setState(() {
+                        _selectedArtist = _artistCounts!.keys.first;
                       });
                     }
                     await _loadSongsWithStatus();
@@ -646,6 +738,109 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                     Navigator.of(context).pop();
                     setState(() {
                       _selectedCharter = entry.key;
+                      _cachedSongsWithStatus = null;
+                    });
+                    await _loadSongsWithStatus();
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text('取消'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 显示版本选择对话框
+  void _showVersionDialog() {
+    final versions = VersionListConstant.versionOrderList;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Center(child: Text('选择版本')),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: versions.map((version) {
+                return ListTile(
+                  title: Center(child: Text(StringUtil.formatVersion2(version))),
+                  selected: _selectedVersion == version,
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    setState(() {
+                      _selectedVersion = version;
+                      _cachedSongsWithStatus = null;
+                    });
+                    await _loadSongsWithStatus();
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text('取消'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 显示曲师选择对话框
+  void _showArtistDialog() {
+    if (_artistCounts == null || _artistCounts!.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('提示'),
+            content: Text('没有找到曲师数据'),
+            actions: [
+              TextButton(
+                child: Text('确定'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
+
+    // 按出现次数排序
+    List<MapEntry<String, int>> sortedArtists = _artistCounts!.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('选择曲师'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: sortedArtists.map((entry) {
+                return ListTile(
+                  title: Text('${entry.key} (${entry.value}首)'),
+                  selected: _selectedArtist == entry.key,
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    setState(() {
+                      _selectedArtist = entry.key;
                       _cachedSongsWithStatus = null;
                     });
                     await _loadSongsWithStatus();
@@ -743,7 +938,10 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
     if (_cachedSongsWithStatus == null || _cachedSongsWithStatus!.isEmpty) {
       return Center(
         child: Text(
-          _mode == 'level' ? '当前等级没有匹配的歌曲' : '当前谱师没有匹配的歌曲',
+          _mode == 'level' ? '当前等级没有匹配的歌曲'
+              : _mode == 'charter' ? '当前谱师没有匹配的歌曲'
+              : _mode == 'version' ? '当前版本没有匹配的歌曲'
+              : '当前曲师没有匹配的歌曲',
           style: TextStyle(
             fontSize: _textSizeM,
             color: AppColors.greyHint(Theme.of(context).brightness),
@@ -977,8 +1175,12 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
     String title;
     if (_mode == 'level') {
       title = 'Lv.${_selectedLevel}(${difficultyName})的${_selectedTitleType}称号统计';
-    } else {
+    } else if (_mode == 'charter') {
       title = '谱师${_selectedCharter}(${difficultyName})的${_selectedTitleType}称号统计';
+    } else if (_mode == 'version') {
+      title = '版本${StringUtil.formatVersion2(_selectedVersion!)}(${difficultyName})的${_selectedTitleType}称号统计';
+    } else {
+      title = '曲师${_selectedArtist}(${difficultyName})的${_selectedTitleType}称号统计';
     }
 
     return Column(
@@ -1189,7 +1391,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
           // 过滤后无数据时显示提示
           Center(
             child: Text(
-              _filterMode == 'completed' ? '暂无已完成歌曲' : _filterMode == 'uncompleted' ? '暂无未完成歌曲' : (_mode == 'level' ? '当前等级没有匹配的歌曲' : '当前谱师没有匹配的歌曲'),
+              _filterMode == 'completed' ? '暂无已完成歌曲' : _filterMode == 'uncompleted' ? '暂无未完成歌曲' : (_mode == 'level' ? '当前等级没有匹配的歌曲' : _mode == 'charter' ? '当前谱师没有匹配的歌曲' : _mode == 'version' ? '当前版本没有匹配的歌曲' : '当前曲师没有匹配的歌曲'),
               style: TextStyle(
                 fontSize: _textSizeM,
                 color: AppColors.greyHint(Theme.of(context).brightness),
@@ -1477,6 +1679,8 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
         context,
         selectedLevel: _selectedLevel,
         selectedCharter: _selectedCharter,
+        selectedVersion: _selectedVersion,
+        selectedArtist: _selectedArtist,
         mode: _mode,
         selectedTitleType: _selectedTitleType,
         selectedDifficulty: _selectedDifficulty,

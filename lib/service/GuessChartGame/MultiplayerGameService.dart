@@ -100,7 +100,7 @@ class MultiplayerGameService {
     _sendMessage({
       'action': 'create_room',
       'payload': {
-        'gameType': gameType.name,
+        'gameType': gameType.apiKey,
         'maxPlayers': maxPlayers,
         'timeLimit': timeLimit,
         'maxGuesses': maxGuesses,

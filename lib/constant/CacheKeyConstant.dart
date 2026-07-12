@@ -8,6 +8,8 @@ class CacheKeyConstant {
   static const String maidataFullCacheTimestamp = 'maidata_full_cache_timestamp';
   static const String maidataAddedSongs = 'maidata_added_songs';
   static const String maidataAddedSongsTimestamp = 'maidata_added_songs_timestamp';
+  static const String maidataIndexCache = 'maidata_index_cache';
+  static const String maidataIndexCacheTimestamp = 'maidata_index_cache_timestamp';
   
   // 知识数据相关
   static const String knowledgeData = 'knowledge_data';

@@ -394,6 +394,8 @@ class PersonalizedScoreService {
   static const String _keyShowListMode = 'level_score_show_list_mode';
   static const String _keyMode = 'level_score_mode';
   static const String _keyCharter = 'level_score_charter';
+  static const String _keyVersion = 'level_score_version';
+  static const String _keyArtist = 'level_score_artist';
 
   // 保存用户选择的选项
   Future<void> saveSelectedOptions({
@@ -403,6 +405,8 @@ class PersonalizedScoreService {
     required bool showListMode,
     required String? mode,
     required String? charter,
+    String? version,
+    String? artist,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyLevel, level ?? '');
@@ -411,6 +415,8 @@ class PersonalizedScoreService {
     await prefs.setBool(_keyShowListMode, showListMode);
     await prefs.setString(_keyMode, mode ?? 'level');
     await prefs.setString(_keyCharter, charter ?? '');
+    await prefs.setString(_keyVersion, version ?? '');
+    await prefs.setString(_keyArtist, artist ?? '');
   }
 
   // 获取保存的用户选项
@@ -423,6 +429,8 @@ class PersonalizedScoreService {
       'showListMode': prefs.getBool(_keyShowListMode) ?? true,
       'mode': prefs.getString(_keyMode) ?? 'level',
       'charter': prefs.getString(_keyCharter) ?? '',
+      'version': prefs.getString(_keyVersion) ?? '',
+      'artist': prefs.getString(_keyArtist) ?? '',
     };
   }
 
@@ -435,5 +443,154 @@ class PersonalizedScoreService {
   bool _isMaidataSong(Song song) {
     if (song.cids.isEmpty) return false;
     return song.cids.every((cid) => cid == 0);
+  }
+
+  // 获取所有曲师及其谱面数量
+  Future<Map<String, int>> getArtistCounts() async {
+    try {
+      final songs = await getAllSongs();
+      if (songs == null) return {};
+
+      Map<String, int> artistCounts = {};
+      for (final song in songs) {
+        if (song.id.length == 6 && int.tryParse(song.id) != null) {
+          continue;
+        }
+        if (_isMaidataSong(song)) {
+          continue;
+        }
+        final artist = song.basicInfo.artist;
+        if (artist.isNotEmpty) {
+          artistCounts[artist] = (artistCounts[artist] ?? 0) + 1;
+        }
+      }
+
+      return artistCounts;
+    } catch (e) {
+      debugPrint('获取曲师列表时出错: $e');
+      return {};
+    }
+  }
+
+  // 根据曲师获取歌曲及其完成状态
+  Future<List<Map<String, dynamic>>> getSongsByArtist(
+    String artist,
+    String titleType,
+    int difficulty,
+  ) async {
+    await _initRecordsCache();
+
+    final songs = await getAllSongs();
+    if (songs == null) {
+      return [];
+    }
+
+    final result = <Map<String, dynamic>>[];
+
+    for (final song in songs) {
+      if (song.id.length == 6 && int.tryParse(song.id) != null) {
+        continue;
+      }
+      if (_isMaidataSong(song)) {
+        continue;
+      }
+
+      if (song.basicInfo.artist != artist) {
+        continue;
+      }
+
+      if (difficulty == -1) {
+        for (int i = 0; i < song.ds.length; i++) {
+          final completed = isSongCompletedSync(int.parse(song.id), i, titleType);
+          result.add({
+            'song': song,
+            'completed': completed,
+            'difficulty': i,
+          });
+        }
+      } else {
+        if (difficulty < song.ds.length) {
+          final completed = await isSongCompleted(int.parse(song.id), difficulty, titleType);
+          result.add({
+            'song': song,
+            'completed': completed,
+            'difficulty': difficulty,
+          });
+        }
+      }
+    }
+
+    result.sort((a, b) {
+      final songA = a['song'] as Song;
+      final songB = b['song'] as Song;
+      final diffA = a['difficulty'] as int;
+      final diffB = b['difficulty'] as int;
+      double dsA = songA.ds.length > diffA ? songA.ds[diffA] : -1;
+      double dsB = songB.ds.length > diffB ? songB.ds[diffB] : -1;
+      return dsB.compareTo(dsA);
+    });
+
+    return result;
+  }
+
+  // 根据版本获取歌曲及其完成状态
+  Future<List<Map<String, dynamic>>> getSongsByVersion(
+    String version,
+    String titleType,
+    int difficulty,
+  ) async {
+    await _initRecordsCache();
+
+    final songs = await getAllSongs();
+    if (songs == null) {
+      return [];
+    }
+
+    final result = <Map<String, dynamic>>[];
+
+    for (final song in songs) {
+      if (song.id.length == 6 && int.tryParse(song.id) != null) {
+        continue;
+      }
+      if (_isMaidataSong(song)) {
+        continue;
+      }
+
+      if (song.basicInfo.from != version) {
+        continue;
+      }
+
+      if (difficulty == -1) {
+        for (int i = 0; i < song.ds.length; i++) {
+          final completed = isSongCompletedSync(int.parse(song.id), i, titleType);
+          result.add({
+            'song': song,
+            'completed': completed,
+            'difficulty': i,
+          });
+        }
+      } else {
+        if (difficulty < song.ds.length) {
+          final completed = await isSongCompleted(int.parse(song.id), difficulty, titleType);
+          result.add({
+            'song': song,
+            'completed': completed,
+            'difficulty': difficulty,
+          });
+        }
+      }
+    }
+
+    result.sort((a, b) {
+      final songA = a['song'] as Song;
+      final songB = b['song'] as Song;
+      final diffA = a['difficulty'] as int;
+      final diffB = b['difficulty'] as int;
+      double dsA = songA.ds.length > diffA ? songA.ds[diffA] : -1;
+      double dsB = songB.ds.length > diffB ? songB.ds[diffB] : -1;
+      return dsB.compareTo(dsA);
+    });
+
+    return result;
   }
 }

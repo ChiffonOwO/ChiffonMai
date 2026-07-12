@@ -8,6 +8,25 @@ enum GameType {
 }
 
 extension GameTypeExtension on GameType {
+  /// 用于 API 通信的英文字段名 (info, cover, blurred, audio, alia, letters)
+  String get apiKey {
+    switch (this) {
+      case GameType.info:
+        return 'info';
+      case GameType.cover:
+        return 'cover';
+      case GameType.blurred:
+        return 'blurred';
+      case GameType.audio:
+        return 'audio';
+      case GameType.alia:
+        return 'alia';
+      case GameType.letters:
+        return 'letters';
+    }
+  }
+
+  /// 用于 UI 显示的中文名
   String get name {
     switch (this) {
       case GameType.info:

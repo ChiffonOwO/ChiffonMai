@@ -35,6 +35,7 @@ import 'package:my_first_flutter_app/service/RankingList/SongRankingService.dart
 import 'package:my_first_flutter_app/service/BiliSearchService.dart';
 import 'package:my_first_flutter_app/service/BiliRedisService.dart';
 import 'package:my_first_flutter_app/service/SongInfo/SongScoreShareService.dart';
+import 'package:my_first_flutter_app/service/SongInfo/SongInfoExportToImgService.dart';
 import 'package:my_first_flutter_app/service/ChartNoteService.dart';
 import 'package:my_first_flutter_app/entity/ChartNote.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
@@ -480,84 +481,96 @@ class _SongInfoPageState extends State<SongInfoPage> {
               MaidataData maidata = MaidataDecodeUtil.decode(maidataByShortId);
               debugPrint(
                   '[MaidataDecode] shortId解析出 ${maidata.charts.length} 个chart');
-              Map<int, List<int>> newNoteCounts = {};
-              Map<int, List<int>> newBreakCounts = {};
-              for (ChartData chart in maidata.charts) {
-                int index = chart.difficultyIndex - 2;
-                debugPrint(
-                    '[MaidataDecode][shortId] chart[$index] difficultyIndex=${chart.difficultyIndex}, stats=${chart.stats}, breakStats=${chart.breakStats}');
-
-                if (chart.stats != null) {
-                  NoteStats stats = chart.stats!;
-                  debugPrint(
-                      '[MaidataDecode][shortId] chart[$index] tap=${stats.tap}, hold=${stats.hold}, slide=${stats.slide}, touch=${stats.touch}, break=${stats.breakNote}');
-                }
-
-                if (chart.breakStats != null) {
-                  BreakStats breakStats = chart.breakStats!;
-                  debugPrint(
-                      '[MaidataDecode][shortId] chart[$index] trueZettaiTap=${breakStats.trueZettaiTap}, trueZettaiHold=${breakStats.trueZettaiHold}, protectedZettai=${breakStats.protectedZettai}, star=${breakStats.star}');
-                }
-
-                if (index >= 0 && index <= 5 && chart.stats != null) {
-                  NoteStats stats = chart.stats!;
-                  newNoteCounts[index] = [
-                    stats.tap,
-                    stats.hold,
-                    stats.slide,
-                    stats.touch,
-                    stats.breakNote,
-                  ];
-                  // 特殊处理6位数ID的UTAGE歌曲：只有一个难度(index=0)，但maidata中是index=5
-                  if (widget.songId.length == 6 && index == 5) {
-                    newNoteCounts[0] = [
-                      stats.tap,
-                      stats.hold,
-                      stats.slide,
-                      stats.touch,
-                      stats.breakNote,
-                    ];
-                  }
-                }
-                if (index >= 0 && index <= 5 && chart.breakStats != null) {
-                  BreakStats breakStats = chart.breakStats!;
-                  newBreakCounts[index] = [
-                    breakStats.trueZettaiTap,
-                    breakStats.trueZettaiHold,
-                    breakStats.protectedZettai,
-                    breakStats.star,
-                  ];
-                  // 特殊处理6位数ID的UTAGE歌曲：只有一个难度(index=0)，但maidata中是index=5
-                  if (widget.songId.length == 6 && index == 5) {
-                    newBreakCounts[0] = [
-                      breakStats.trueZettaiTap,
-                      breakStats.trueZettaiHold,
-                      breakStats.protectedZettai,
-                      breakStats.star,
-                    ];
-                  }
-                }
+              _applyMaidataParseResults(maidata);
+            }
+          }
+        }
+        // 尝试通过歌曲标题在index中查找shortId（仅当直接ID和shortId查询都未成功时）
+        if (!_maidataDecodedSuccessfully && _songData != null && _songData!['basic_info'] != null) {
+          final songTitle = _songData!['basic_info']['title'];
+          if (songTitle != null && songTitle is String && songTitle.isNotEmpty) {
+            debugPrint('[MaidataDecode] 主ID和shortId查询均失败，尝试通过标题"$songTitle"查找index...');
+            await MaidataManager().getIndex();
+            List<String> matchingShortIds = await MaidataManager().findShortIdsForTitleKana(songTitle);
+            if (matchingShortIds.isNotEmpty) {
+              debugPrint('[MaidataDecode] 标题匹配到 ${matchingShortIds.length} 个shortId: $matchingShortIds');
+              String? maidataByTitle = MaidataManager().getMaidataByShortIds(matchingShortIds);
+              if (maidataByTitle != null && maidataByTitle.isNotEmpty) {
+                debugPrint('[MaidataDecode] 通过标题索引找到maidata，长度: ${maidataByTitle.length}');
+                MaidataData maidata = MaidataDecodeUtil.decode(maidataByTitle);
+                debugPrint('[MaidataDecode] 标题索引解析出 ${maidata.charts.length} 个chart');
+                _applyMaidataParseResults(maidata);
               }
-
-              // 更新状态并刷新界面
-              if (newNoteCounts.isNotEmpty) {
-                setState(() {
-                  _maidataNoteCounts = newNoteCounts;
-                  _maidataDecodedSuccessfully = true;
-                });
-              }
-              if (newBreakCounts.isNotEmpty) {
-                setState(() {
-                  _maidataBreakCounts = newBreakCounts;
-                  _maidataDecodedSuccessfully = true;
-                });
-              }
+            } else {
+              debugPrint('[MaidataDecode] 标题"$songTitle"在index中未找到匹配');
             }
           }
         }
       }
     } catch (e) {
       // 静默处理，继续使用默认数据
+    }
+  }
+
+  /// 将解析后的MaidataData应用到状态中（提取物量统计和绝赞统计）
+  void _applyMaidataParseResults(MaidataData maidata) {
+    Map<int, List<int>> newNoteCounts = {};
+    Map<int, List<int>> newBreakCounts = {};
+    for (ChartData chart in maidata.charts) {
+      int index = chart.difficultyIndex - 2; // 转换为0-4
+
+      if (index >= 0 && index <= 5 && chart.stats != null) {
+        NoteStats stats = chart.stats!;
+        newNoteCounts[index] = [
+          stats.tap,
+          stats.hold,
+          stats.slide,
+          stats.touch,
+          stats.breakNote,
+        ];
+        // 特殊处理6位数ID的UTAGE歌曲：只有一个难度(index=0)，但maidata中是index=5
+        if (widget.songId.length == 6 && index == 5) {
+          newNoteCounts[0] = [
+            stats.tap,
+            stats.hold,
+            stats.slide,
+            stats.touch,
+            stats.breakNote,
+          ];
+        }
+      }
+      if (index >= 0 && index <= 5 && chart.breakStats != null) {
+        BreakStats breakStats = chart.breakStats!;
+        newBreakCounts[index] = [
+          breakStats.trueZettaiTap,
+          breakStats.trueZettaiHold,
+          breakStats.protectedZettai,
+          breakStats.star,
+        ];
+        // 特殊处理6位数ID的UTAGE歌曲：只有一个难度(index=0)，但maidata中是index=5
+        if (widget.songId.length == 6 && index == 5) {
+          newBreakCounts[0] = [
+            breakStats.trueZettaiTap,
+            breakStats.trueZettaiHold,
+            breakStats.protectedZettai,
+            breakStats.star,
+          ];
+        }
+      }
+    }
+
+    // 更新状态并刷新界面
+    if (newNoteCounts.isNotEmpty) {
+      setState(() {
+        _maidataNoteCounts = newNoteCounts;
+        _maidataDecodedSuccessfully = true;
+      });
+    }
+    if (newBreakCounts.isNotEmpty) {
+      setState(() {
+        _maidataBreakCounts = newBreakCounts;
+        _maidataDecodedSuccessfully = true;
+      });
     }
   }
 
@@ -1213,7 +1226,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
     // 对于6位数ID的歌曲，使用独特的粉色主题
     if (widget.songId.length == 6) {
-      return AppColors.utageBackground;
+      return AppColors.utageBackground(brightness: brightness);
     }
 
     // 对于只有1或2个难度的歌曲，所有难度的背景全部采用粉色
@@ -1234,7 +1247,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
     // 对于6位数ID的歌曲，使用独特的粉色主题
     if (widget.songId.length == 6) {
-      return AppColors.utageCard;
+      return AppColors.utageCard(brightness: brightness);
     }
 
     // 对于只有1或2个难度的歌曲，所有难度的背景全部采用粉色
@@ -1255,7 +1268,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
     // 对于6位数ID的歌曲，使用独特的粉色主题
     if (widget.songId.length == 6) {
-      return AppColors.utageAccent;
+      return AppColors.utageAccent(brightness: brightness);
     }
 
     // 对于只有1或2个难度的歌曲，所有难度的背景全部采用粉色
@@ -1891,8 +1904,12 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         ),
                       ),
                     ),
-                    // 占位，保持标题居中
-                    SizedBox(width: 48),
+                    // 导出歌曲信息按钮
+                    IconButton(
+                      icon: Icon(Icons.image_outlined, color: textPrimaryColor),
+                      tooltip: '导出歌曲信息',
+                      onPressed: _exportSongInfoToImage,
+                    ),
                   ],
                 ),
               ),
@@ -3794,14 +3811,13 @@ class _SongInfoPageState extends State<SongInfoPage> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline,
-                        size: 16, color: AppColors.warningOrange(brightness)),
+                    const Icon(Icons.info_outline,
+                        size: 16, color: Colors.white),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         '请在首页刷新数据以获取身份后再评分',
-                        style:
-                            TextStyle(fontSize: 13, color: AppColors.warningOrange(brightness)),
+                        style: const TextStyle(fontSize: 13, color: Colors.white),
                       ),
                     ),
                   ],
@@ -4357,14 +4373,14 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline,
-                            size: 16, color: AppColors.warningOrange(brightness)),
+                        const Icon(Icons.info_outline,
+                            size: 16, color: Colors.white),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             '请在首页刷新数据以获取评论身份',
-                            style: TextStyle(
-                                fontSize: 13, color: AppColors.warningOrange(brightness)),
+                            style: const TextStyle(
+                                fontSize: 13, color: Colors.white),
                           ),
                         ),
                       ],
@@ -4902,7 +4918,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                             style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
-                                color: AppColors.warningOrange(brightness))),
+                                color: Colors.white)),
                         const SizedBox(height: 8),
                         Row(
                           children: [
@@ -6204,6 +6220,127 @@ class _SongInfoPageState extends State<SongInfoPage> {
     }
   }
 
+  // 导出歌曲信息为图片
+  Future<void> _exportSongInfoToImage() async {
+    if (_songData == null) return;
+
+    // 显示加载对话框
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('正在生成曲目信息图片...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final basicInfo = _songData!['basic_info'];
+      final charts = _songData!['charts'];
+      final levels = _songData!['level'];
+      final ds = _songData!['ds'];
+      final songType = _songData!['type'] ?? 'SD';
+
+      final file = await SongInfoExportToImgService.convertToImage(
+        context,
+        songId: widget.songId,
+        basicInfo: basicInfo,
+        charts: charts,
+        levels: levels,
+        ds: ds,
+        songType: songType,
+        diffData: _diffData,
+        maidataNoteCounts: _maidataNoteCounts,
+        maidataBreakCounts: _maidataBreakCounts,
+        maidataDecodedSuccessfully: _maidataDecodedSuccessfully,
+      );
+
+      // 关闭加载对话框
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+
+      // 显示结果
+      final songTitle = basicInfo['title'] ?? '';
+      if (file != null) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 28),
+                SizedBox(width: 8),
+                Text('导出成功'),
+              ],
+            ),
+            content: Text(
+              '曲目信息图片已保存到相册\n\n'
+              '歌曲: $songTitle',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text('确定'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.error, color: Colors.red, size: 28),
+                SizedBox(width: 8),
+                Text('导出失败'),
+              ],
+            ),
+            content: Text('曲目信息图片生成失败，请检查存储权限后重试。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text('确定'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      // 关闭加载对话框
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+
+      debugPrint('曲目信息导出失败: $e');
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.error, color: Colors.red, size: 28),
+              SizedBox(width: 8),
+              Text('导出失败'),
+            ],
+          ),
+          content: Text('生成图片时发生错误：$e'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text('确定'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   // 保存封面到相册
   Future<void> _saveCoverToGallery(String songId, String title) async {
     try {
@@ -7300,9 +7437,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[200]!),
+              border: Border.all(color: AppColors.tableBorder(brightness)),
             ),
             child: Column(
               children: [
@@ -7313,15 +7450,16 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(ratingLabels[i],
-                              style: TextStyle(fontWeight: FontWeight.bold)),
+                              style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryText(brightness))),
                           Text(
-                              '${dist[i]} / ${total > 0 ? ((dist[i] / total) * 100).toStringAsFixed(2) : '0.00'}%'),
+                              '${dist[i]} / ${total > 0 ? ((dist[i] / total) * 100).toStringAsFixed(2) : '0.00'}%',
+                              style: TextStyle(color: AppColors.primaryText(brightness))),
                         ],
                       ),
                       SizedBox(height: 4),
                       LinearProgressIndicator(
                         value: dist[i] > 0 ? dist[i] / total : 0,
-                        backgroundColor: Colors.grey[200],
+                        backgroundColor: AppColors.tableBorder(brightness),
                         valueColor: AlwaysStoppedAnimation<Color>(
                             _getAccentColor(_currentDiffIndex, brightness)),
                         minHeight: 8,
@@ -7403,9 +7541,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[200]!),
+              border: Border.all(color: AppColors.tableBorder(brightness)),
             ),
             child: Column(
               children: [
@@ -7416,15 +7554,16 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(comboLabels[i],
-                              style: TextStyle(fontWeight: FontWeight.bold)),
+                              style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryText(brightness))),
                           Text(
-                              '${fcDist[i].toInt()} / ${total > 0 ? ((fcDist[i] / total) * 100).toStringAsFixed(2) : '0.00'}%'),
+                              '${fcDist[i].toInt()} / ${total > 0 ? ((fcDist[i] / total) * 100).toStringAsFixed(2) : '0.00'}%',
+                              style: TextStyle(color: AppColors.primaryText(brightness))),
                         ],
                       ),
                       SizedBox(height: 4),
                       LinearProgressIndicator(
                         value: fcDist[i] > 0 ? fcDist[i] / total : 0,
-                        backgroundColor: Colors.grey[200],
+                        backgroundColor: AppColors.tableBorder(brightness),
                         valueColor: AlwaysStoppedAnimation<Color>(
                             _getAccentColor(_currentDiffIndex, brightness)),
                         minHeight: 8,

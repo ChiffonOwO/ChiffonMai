@@ -880,7 +880,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
       Color cardColor;
       // 对于6位数ID的歌曲，使用粉色
       if (songId.toString().length == 6) {
-        cardColor = AppColors.utageCard; // 加深的粉色
+        cardColor = AppColors.utageCard(); // 加深的粉色
       } else {
         cardColor = _getCardColor(levelIndex);
       }

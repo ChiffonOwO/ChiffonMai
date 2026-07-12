@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/PlayerEntity.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/GameType.dart';
 
@@ -161,7 +162,7 @@ class RoomEntity {
   Map<String, dynamic> toJson() {
     return {
       'room_id': roomId,
-      'game_type': gameType.name,
+      'game_type': gameType.apiKey,
       'players': players.map((p) => p.toJson()).toList(),
       'status': status.name,
       'max_players': maxPlayers,
@@ -231,6 +232,7 @@ class RoomEntity {
 
   static GameType _parseGameType(String? type) {
     switch (type) {
+      // 英文字段名（API 通信标准）
       case 'info':
         return GameType.info;
       case 'cover':
@@ -243,7 +245,21 @@ class RoomEntity {
         return GameType.alia;
       case 'letters':
         return GameType.letters;
+      // 中文显示名（兼容旧版 / 服务端可能返回中文）
+      case '无提示猜歌':
+        return GameType.info;
+      case '曲绘猜歌':
+        return GameType.cover;
+      case '模糊曲绘':
+        return GameType.blurred;
+      case '歌曲片段':
+        return GameType.audio;
+      case '别名猜歌':
+        return GameType.alia;
+      case '开字母':
+        return GameType.letters;
       default:
+        debugPrint('[WARN][RoomEntity] 未知的游戏类型: $type，默认使用 info');
         return GameType.info;
     }
   }

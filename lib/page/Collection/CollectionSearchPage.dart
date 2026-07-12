@@ -22,8 +22,14 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
   
   String _selectedType = 'trophies';
   List<Collection> _searchResults = [];
+  List<Collection> _rawResults = []; // 未经过滤和排序的原始结果
   bool _isSearching = false;
   Timer? _debounceTimer;
+
+  // 筛选：仅显示需要歌曲要求的收藏品
+  bool _filterSongRequired = false;
+  // 排序：ID倒序（默认正序）
+  bool _sortDescending = false;
   
   // 自定义常量
   final Color themeColor = Colors.blue;
@@ -62,11 +68,13 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
         _selectedType,
       );
       setState(() {
-        _searchResults = results;
+        _rawResults = results;
+        _applyFilterAndSort();
       });
     } catch (e) {
       debugPrint('搜索出错: $e');
       setState(() {
+        _rawResults = [];
         _searchResults = [];
       });
     } finally {
@@ -74,6 +82,40 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
         _isSearching = false;
       });
     }
+  }
+
+  /// 应用筛选和排序，更新 _searchResults
+  void _applyFilterAndSort() {
+    List<Collection> results = List.from(_rawResults);
+
+    // 筛选：仅显示需要歌曲要求的收藏品
+    if (_filterSongRequired) {
+      results = results.where((c) {
+        if (c.required == null) return false;
+        return c.required!.any((req) => req.songs != null && req.songs!.isNotEmpty);
+      }).toList();
+    }
+
+    // 排序：按ID
+    results.sort((a, b) => _sortDescending ? b.id.compareTo(a.id) : a.id.compareTo(b.id));
+
+    _searchResults = results;
+  }
+
+  /// 切换筛选是否需要歌曲要求
+  void _toggleSongRequiredFilter() {
+    setState(() {
+      _filterSongRequired = !_filterSongRequired;
+      _applyFilterAndSort();
+    });
+  }
+
+  /// 切换ID排序方向
+  void _toggleSortOrder() {
+    setState(() {
+      _sortDescending = !_sortDescending;
+      _applyFilterAndSort();
+    });
   }
 
   // 防抖搜索
@@ -253,6 +295,51 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
                               ),
                             );
                           }).toList(),
+                        ),
+
+                        SizedBox(height: 8),
+                        // 筛选和排序控制栏
+                        Row(
+                          children: [
+                            // 筛选：仅显示需要歌曲要求的收藏品
+                            FilterChip(
+                              label: Text('有歌曲要求'),
+                              selected: _filterSongRequired,
+                              onSelected: (_) => _toggleSongRequiredFilter(),
+                              selectedColor: themeColor.withValues(alpha: 0.2),
+                              checkmarkColor: themeColor,
+                              labelStyle: TextStyle(
+                                fontSize: 13,
+                                color: _filterSongRequired
+                                    ? themeColor
+                                    : Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                            const Spacer(),
+                            // 排序：ID
+                            ActionChip(
+                              label: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'ID',
+                                    style: TextStyle(fontSize: 13),
+                                  ),
+                                  Icon(
+                                    _sortDescending
+                                        ? Icons.arrow_downward
+                                        : Icons.arrow_upward,
+                                    size: 16,
+                                  ),
+                                ],
+                              ),
+                              onPressed: _toggleSortOrder,
+                              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                              labelStyle: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
                         ),
 
                         SizedBox(height: 8),

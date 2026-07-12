@@ -580,27 +580,6 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
     );
   }
 
-  Widget _buildActionButton({
-    required String label,
-    required IconData icon,
-    required VoidCallback? onPressed,
-    required Color color,
-  }) {
-    return ElevatedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 14),
-      label: Text(label, style: const TextStyle(fontSize: 12)),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final themeColor = Theme.of(context).colorScheme.primary;
@@ -639,38 +618,63 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                         },
                       ),
                     ),
+                    // 操作菜单靠右
+                    if (!_isLoading && _maidataContent.isNotEmpty)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: PopupMenuButton<String>(
+                          icon: Icon(Icons.more_vert, color: textPrimaryColor),
+                          offset: const Offset(0, 40),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          onSelected: (value) {
+                            switch (value) {
+                              case 'copy':
+                                _copyToClipboard();
+                                break;
+                              case 'render':
+                                _navigateToChartPlay();
+                                break;
+                              case 'export':
+                                if (!_isExporting) _exportToZip();
+                                break;
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'copy',
+                              child: ListTile(
+                                leading: Icon(Icons.copy),
+                                title: Text('复制'),
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'render',
+                              child: ListTile(
+                                leading: Icon(Icons.play_circle_outline),
+                                title: Text('渲染'),
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'export',
+                              child: ListTile(
+                                leading: Icon(Icons.download),
+                                title: Text(_isExporting ? '导出中...' : '导出'),
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               ),
-              if (!_isLoading && _maidataContent.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _buildActionButton(
-                        label: '复制',
-                        icon: Icons.copy,
-                        onPressed: _copyToClipboard,
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildActionButton(
-                        label: '渲染',
-                        icon: Icons.play_circle_outline,
-                        onPressed: _navigateToChartPlay,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildActionButton(
-                        label: _isExporting ? '导出中...' : '导出',
-                        icon: Icons.download,
-                        onPressed: _isExporting ? null : _exportToZip,
-                        color: AppColors.successGreen(brightness),
-                      ),
-                    ],
-                  ),
-                ),
               Container(
                 margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                 padding: const EdgeInsets.all(12),

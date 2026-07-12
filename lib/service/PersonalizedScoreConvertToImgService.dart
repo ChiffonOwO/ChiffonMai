@@ -11,6 +11,7 @@ import 'package:media_scanner/media_scanner.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
+import 'package:my_first_flutter_app/utils/StringUtil.dart';
 
 class PersonalizedScoreConvertToImg {
   static GlobalKey _globalKey = GlobalKey();
@@ -19,6 +20,8 @@ class PersonalizedScoreConvertToImg {
     BuildContext context, {
     required String? selectedLevel,
     required String? selectedCharter,
+    required String? selectedVersion,
+    required String? selectedArtist,
     required String mode,
     required String? selectedTitleType,
     required int? selectedDifficulty,
@@ -49,6 +52,8 @@ class PersonalizedScoreConvertToImg {
         child: _buildExportImageWidget(
           selectedLevel: selectedLevel,
           selectedCharter: selectedCharter,
+          selectedVersion: selectedVersion,
+          selectedArtist: selectedArtist,
           mode: mode,
           selectedTitleType: selectedTitleType,
           selectedDifficulty: selectedDifficulty,
@@ -236,6 +241,8 @@ class PersonalizedScoreConvertToImg {
   static Widget _buildExportImageWidget({
     required String? selectedLevel,
     required String? selectedCharter,
+    required String? selectedVersion,
+    required String? selectedArtist,
     required String mode,
     required String? selectedTitleType,
     required int? selectedDifficulty,
@@ -327,8 +334,12 @@ class PersonalizedScoreConvertToImg {
     String titleText;
     if (mode == 'level') {
       titleText = '个性化成绩查询 - Lv.${selectedLevel ?? ''} ${selectedTitleType ?? ''}(${getDifficultyName(selectedDifficulty ?? -1)})';
-    } else {
+    } else if (mode == 'charter') {
       titleText = '个性化成绩查询 - 谱师:${selectedCharter ?? ''} ${selectedTitleType ?? ''}(${getDifficultyName(selectedDifficulty ?? -1)})';
+    } else if (mode == 'version') {
+      titleText = '个性化成绩查询 - 版本:${StringUtil.formatVersion2(selectedVersion ?? '')} ${selectedTitleType ?? ''}(${getDifficultyName(selectedDifficulty ?? -1)})';
+    } else {
+      titleText = '个性化成绩查询 - 曲师:${selectedArtist ?? ''} ${selectedTitleType ?? ''}(${getDifficultyName(selectedDifficulty ?? -1)})';
     }
 
     double titleFontSize = containerWidth * 0.035;
@@ -385,7 +396,7 @@ class PersonalizedScoreConvertToImg {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${mode == 'level' ? 'Lv.${selectedLevel ?? ''}' : '谱师:${selectedCharter ?? ''}'} ${selectedTitleType ?? ''}(${getDifficultyName(selectedDifficulty ?? -1)})统计',
+                    '${mode == 'level' ? 'Lv.${selectedLevel ?? ''}' : mode == 'charter' ? '谱师:${selectedCharter ?? ''}' : mode == 'version' ? '版本:${StringUtil.formatVersion2(selectedVersion ?? '')}' : '曲师:${selectedArtist ?? ''}'} ${selectedTitleType ?? ''}(${getDifficultyName(selectedDifficulty ?? -1)})统计',
                     style: TextStyle(
                       fontSize: sectionTitleFontSize,
                       fontWeight: FontWeight.bold,

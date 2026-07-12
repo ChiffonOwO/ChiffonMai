@@ -80,8 +80,8 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
     _progressBarHeight = 24.0 * scaleFactor;
   }
 
-  BoxShadow get defaultShadow => BoxShadow(
-        color: Colors.black12,
+  BoxShadow defaultShadow(Brightness brightness) => BoxShadow(
+        color: brightness == Brightness.dark ? Colors.black.withOpacity(0.3) : Colors.black12,
         blurRadius: _defaultShadowBlurRadius,
         offset: Offset(_defaultShadowOffset, _defaultShadowOffset),
       );
@@ -577,8 +577,8 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
         // 曲目池标题区域
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.black, width: 1),
+            color: Theme.of(context).colorScheme.surface,
+            border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
           ),
           padding: EdgeInsets.symmetric(horizontal: _paddingS, vertical: _paddingXS * 0.5),
@@ -800,8 +800,8 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
       children: [
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.black, width: 1),
+            color: Theme.of(context).colorScheme.surface,
+            border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
           ),
           padding: EdgeInsets.symmetric(horizontal: _paddingS, vertical: _paddingXS * 0.5),
@@ -957,9 +957,9 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
                 child: Container(
                   margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(_borderRadiusSmall),
-                    boxShadow: [defaultShadow],
+                    boxShadow: [defaultShadow(brightness)],
                   ),
                   child: _isLoading
                       ? Center(child: CircularProgressIndicator())

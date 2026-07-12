@@ -233,8 +233,8 @@ class DivingFishProbeManager {
       ));
 
       final requestBefore = DateTime.now();
-      final jobData = await _loginRequest(_friendCode!);
-      _log('  _loginRequest 耗时: ${DateTime.now().difference(requestBefore).inMilliseconds}ms');
+      var jobData = await _createDxnetJob(jobType: 'update_score');
+      _log('  _createDxnetJob(update_score) 耗时: ${DateTime.now().difference(requestBefore).inMilliseconds}ms');
 
       if (jobData == null) {
         _log('✗ Step 2 失败: jobData 为 null');
@@ -242,25 +242,81 @@ class DivingFishProbeManager {
       }
       _log('  jobData 完整响应: $jobData');
 
+      // ── 处理 needs_friendship：先建立好友关系 ──
+      if (jobData['_needsFriendship'] == true) {
+        _log('  需要先建立好友关系');
+        final friendRequestBefore = DateTime.now();
+
+        // Step 2a: 创建好友请求 job
+        _emit(onProgress, const SyncProgress(
+          stage: SyncStage.sendingFriendRequest,
+          message: 'Bot 正在发送好友申请...',
+        ));
+
+        final friendResult = await _createDxnetJob(jobType: 'send_friend_request');
+        if (friendResult == null || friendResult['_needsFriendship'] == true) {
+          _log('✗ Step 2a 失败: 创建好友请求 job 失败');
+          return SyncResult.failure('创建好友请求失败，请稍后重试');
+        }
+
+        final friendJobId = friendResult['jobId'] as String?;
+        _log('  好友请求 jobId: $friendJobId');
+        if (friendJobId == null) {
+          return SyncResult.failure('Hub 未返回好友请求任务 ID');
+        }
+
+        // Step 2b: 等待好友关系建立
+        final friendResult2 = await _pollUntilDone(
+          friendJobId,
+          timeout: const Duration(minutes: 5),
+          onProgress: onProgress,
+        );
+
+        if (_cancelled) {
+          _log('⊗ 用户取消（好友请求阶段）');
+          return SyncResult.cancelled();
+        }
+
+        if (friendResult2 == null) {
+          _log('✗ 好友请求超时');
+          return SyncResult.failure(
+            '好友请求超时——请在 NET / 机台上通过好友申请后重试',
+          );
+        }
+
+        final friendServerStatus = friendResult2.tryGet<String>('status') ?? '';
+        if (friendServerStatus == 'failed' || friendServerStatus == 'canceled') {
+          final errMsg = friendResult2.tryGet<String>('message') ?? '好友请求失败';
+          _log('✗ 好友请求终止: status=$friendServerStatus, msg=$errMsg');
+          return SyncResult.failure(errMsg);
+        }
+
+        _log('✓ 好友关系已建立，耗时 ${DateTime.now().difference(friendRequestBefore).inSeconds}s');
+
+        // Step 2c: 好友就绪后重试 update_score
+        _emit(onProgress, const SyncProgress(
+          stage: SyncStage.requesting,
+          message: '好友已添加，正在创建抓取任务...',
+        ));
+
+        jobData = await _createDxnetJob(
+          jobType: 'update_score',
+          friendshipJobId: friendJobId,
+        );
+
+        if (jobData == null || jobData['_needsFriendship'] == true) {
+          _log('✗ Step 2c 失败: 重试 update_score 失败');
+          return SyncResult.failure('创建抓取任务失败，请稍后重试');
+        }
+        _log('  jobData (retry) 完整响应: $jobData');
+      }
+
       final jobId = jobData['jobId'] as String?;
-      final reused = jobData['reused'] == true;
-      final idleUpdate = jobData['idleUpdate'] == true;
-      final message = jobData.tryGet<String>('message') ?? '';
       _log('  解析 jobId: $jobId');
-      _log('  是否复用: $reused, 是否后台更新: $idleUpdate');
-      _log('  Hub消息: "$message"');
 
       if (jobId == null) {
         _log('✗ Step 2 失败: jobId 为 null');
         return SyncResult.failure('Hub 未返回任务 ID');
-      }
-
-      if (reused) {
-        _log('  提示：检测到已有进行中任务，Hub 返回了复用任务');
-        _emit(onProgress, const SyncProgress(
-          stage: SyncStage.requesting,
-          message: '检测到已有进行中的任务，复用中...',
-        ));
       }
 
       _log('✓ 任务创建成功，jobId=$jobId');
@@ -332,7 +388,19 @@ class DivingFishProbeManager {
         // 完毕
         if (done || serverStatus == 'completed') {
           _log('✓ 抓取完成: 共轮询 $_pollCount 次, 总耗时 ${elapsed.inSeconds}s');
-          _log('  最后 status 响应: $status');
+          _log('════════════ 抓取完成 - 完整返回字段 ════════════');
+          _log('  done: $done');
+          _log('  status: $serverStatus');
+          _log('  stage: $stage');
+          _log('  message: $statusMsg');
+          _log('  scoreProgress:');
+          if (sp != null) {
+            _log('    totalDiffs: ${sp.tryGet<int>('totalDiffs')}');
+            _log('    completedDiffs: ${sp.tryGet<List>('completedDiffs')}');
+          }
+          _log('  ── 原始 JSON ──');
+          _log('  ${const JsonEncoder.withIndent('    ').convert(status)}');
+          _log('══════════════════════════════════════════════');
           break;
         }
 
@@ -386,14 +454,16 @@ class DivingFishProbeManager {
       }
       _log('  exportData 完整响应: $exportData');
 
-      final statusCode = exportData.tryGet<int>('status') ?? 0;
-      final exported = exportData.tryGet<int>('exported') ?? 0;
-      final scores = exportData.tryGet<int>('scores') ?? 0;
-      final exportMsg = (exportData.tryGet<Map<String, dynamic>>('response')
-              ?.tryGet<String>('message')) ?? '';
-      _log('  status=$statusCode, exported=$exported, scores=$scores, msg="$exportMsg"');
+      final exportJob = exportData.tryGet<Map<String, dynamic>>('job');
+      final exportResult = exportJob?.tryGet<Map<String, dynamic>>('result');
+      final divingFish = exportResult?.tryGet<Map<String, dynamic>>('divingFish');
+      final diveStatus = divingFish?.tryGet<String>('status') ?? '';
+      final exported = divingFish?.tryGet<int>('exported') ?? 0;
+      final scores = divingFish?.tryGet<int>('scores') ?? 0;
+      final exportMsg = divingFish?.tryGet<String>('message') ?? '';
+      _log('  diveStatus=$diveStatus, exported=$exported, scores=$scores, msg="$exportMsg"');
 
-      if (statusCode == 200) {
+      if (diveStatus == 'success') {
         await _cacheSyncState();
         _log('✓ 缓存同步状态完成');
         _log('══════════════════════════════════════════');
@@ -415,9 +485,9 @@ class DivingFishProbeManager {
           exportedCount: exported,
         );
       } else {
-        _log('✗ 水鱼导出失败: $exportMsg');
+        _log('✗ 水鱼导出失败 (diveStatus=$diveStatus): $exportMsg');
         return SyncResult.failure(
-          '水鱼导出失败：$exportMsg',
+          '水鱼导出失败：${exportMsg.isNotEmpty ? exportMsg : diveStatus}',
           friendCode: _friendCode,
         );
       }
@@ -450,11 +520,14 @@ class DivingFishProbeManager {
     return _loginByQr(qrCode);
   }
 
-  /// 仅创建抓取任务
-  /// 返回 Hub job 对象（含 jobId）
+  /// 创建抓取任务（POST /me/dxnet-jobs）
+  ///
+  /// 为当前已认证用户创建 update_score job。
+  /// 需要先调用 [loginByQr] 获得 token。
+  /// 返回 `{ jobId, job }`。
   Future<Map<String, dynamic>?> loginRequest(String friendCode) {
     _log('loginRequest 被调用 (friendCode: $friendCode)');
-    return _loginRequest(friendCode);
+    return _createDxnetJob(jobType: 'update_score');
   }
 
   /// 仅查询一次任务状态
@@ -672,7 +745,7 @@ class DivingFishProbeManager {
         },
         body: json.encode({
           'divingFishImportToken': importToken,
-          'autoExportDivingFish': true,
+          'autoUpdate': true,
         }),
       );
 
@@ -776,7 +849,7 @@ class DivingFishProbeManager {
   // 内部实现
   // ===========================================================================
 
-  /// POST /auth/login-by-qr
+  /// POST /auth/qr-login
   Future<Map<String, dynamic>?> _loginByQr(String qrCode) async {
     final url = ApiUrls.MaimaiHubLoginByQrUrl;
     final body = json.encode({'qrCode': qrCode});
@@ -811,22 +884,42 @@ class DivingFishProbeManager {
     }
   }
 
-  /// POST /auth/login-request
-  Future<Map<String, dynamic>?> _loginRequest(String friendCode) async {
-    final url = ApiUrls.MaimaiHubLoginRequestUrl;
-    final body = json.encode({
-      'friendCode': friendCode,
-      'skipUpdateScore': false,
-      'useIdleUpdate': false,
-    });
+  /// POST /me/dxnet-jobs (authorized)
+  ///
+  /// 为当前已认证用户创建 DXNet job。
+  /// [jobType] — "update_score" 或 "send_friend_request"
+  /// [friendshipJobId] — update_score 时可传入已完成的好友请求 job ID
+  ///
+  /// 成功 (201) 返回 `{ jobId, job }`。
+  /// needs_friendship (400) 返回 `{ _needsFriendship: true, ... }`。
+  /// 其他错误返回 null。
+  Future<Map<String, dynamic>?> _createDxnetJob({
+    required String jobType,
+    String? friendshipJobId,
+  }) async {
+    if (_authToken == null) {
+      _log('  ✗ _createDxnetJob: authToken 为 null');
+      return null;
+    }
+
+    final url = ApiUrls.MaimaiHubDxnetJobsUrl;
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $_authToken',
+    };
+    final bodyMap = <String, dynamic>{'jobType': jobType};
+    if (friendshipJobId != null) {
+      bodyMap['friendshipJobId'] = friendshipJobId;
+    }
+    final body = json.encode(bodyMap);
 
     _log('  POST $url');
-    _log('  Body: { "friendCode": "$friendCode", "skipUpdateScore": false, "useIdleUpdate": false }');
+    _log('  Body: $bodyMap');
 
     try {
       final response = await http.post(
         Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: body,
       );
 
@@ -834,9 +927,22 @@ class DivingFishProbeManager {
 
       if (response.statusCode == 201) {
         final data = json.decode(response.body) as Map<String, dynamic>;
-        _log('  ✓ 返回 jobId=${data['jobId']}, reused=${data['reused']}, '
-            'idleUpdate=${data['idleUpdate']}');
+        _log('  ✓ 返回 jobId=${data['jobId']}');
         return data;
+      }
+
+      if (response.statusCode == 400) {
+        final err = json.decode(response.body) as Map<String, dynamic>;
+        final code = err.tryGet<String>('code') ?? '';
+        _log('  ← 400 code=$code, message=${err['message']}');
+        if (code == 'needs_friendship') {
+          return {
+            '_needsFriendship': true,
+            'recommendedBotFriendCode': err.tryGet<String>('recommendedBotFriendCode'),
+            'message': err.tryGet<String>('message') ?? '',
+          };
+        }
+        return null;
       }
 
       _log('  ✗ 状态码异常: ${response.statusCode}');
@@ -849,29 +955,98 @@ class DivingFishProbeManager {
     }
   }
 
-  /// GET /auth/login-status?jobId=xxx
+  /// 简化版轮询：等待 job 完成或失败
+  ///
+  /// 使用 [_pollJobStatus] 轮询，适合作业链中的中间等待（如等待好友请求完成）。
+  /// [timeout] 最大等待时间，默认 5 分钟。
+  /// 返回最终 job 状态，超时返回 null。
+  Future<Map<String, dynamic>?> _pollUntilDone(
+    String jobId, {
+    Duration timeout = const Duration(minutes: 5),
+    void Function(SyncProgress)? onProgress,
+  }) async {
+    final startTime = DateTime.now();
+    String? lastStage;
+
+    while (!_cancelled) {
+      _pollCount++;
+
+      if (DateTime.now().difference(startTime) > timeout) {
+        _log('  _pollUntilDone 超时: jobId=$jobId, 耗时 ${DateTime.now().difference(startTime).inSeconds}s');
+        return null;
+      }
+
+      final status = await _pollJobStatus(jobId);
+      if (status == null) return null;
+
+      final serverStatus = status.tryGet<String>('status') ?? '';
+      final stage = status.tryGet<String>('stage') ?? '';
+      final done = status.tryGet<bool>('done') ?? false;
+
+      if (stage != lastStage) {
+        lastStage = stage;
+        _log('  _pollUntilDone: stage=$stage, status=$serverStatus');
+        if (onProgress != null) {
+          final progress = _mapStage(stage, status);
+          if (progress != null) onProgress(progress);
+        }
+      }
+
+      if (serverStatus == 'failed' || serverStatus == 'canceled' ||
+          done || serverStatus == 'completed') {
+        return status;
+      }
+
+      await Future.delayed(_pollInterval);
+    }
+
+    return null; // cancelled
+  }
+
+  /// GET /me/dxnet-jobs/{jobId} (authorized)
+  ///
+  /// 使用带认证的 job 端点获取完整 Job 对象（含 stage / scoreProgress），
+  /// 并补充兼容字段 [done]（由 status 推导）和 [message]（映射自 error）。
   Future<Map<String, dynamic>?> _pollJobStatus(String jobId) async {
-    final uri = Uri.parse(ApiUrls.MaimaiHubLoginStatusUrl)
-        .replace(queryParameters: {'jobId': jobId});
+    final uri = Uri.parse('${ApiUrls.MaimaiHubDxnetJobsUrl}/$jobId');
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+    };
+    if (_authToken != null) {
+      headers['Authorization'] = 'Bearer $_authToken';
+    }
 
     // 轮询日志由调用方控制频率，这里不重复输出
     try {
-      final response = await http.get(uri);
+      final response = await http.get(uri, headers: headers);
 
       if (response.statusCode == 200) {
-        return json.decode(response.body) as Map<String, dynamic>;
+        final job = json.decode(response.body) as Map<String, dynamic>;
+        final jobStatus = job.tryGet<String>('status') ?? '';
+        // 补充兼容字段：旧代码依赖 done / message
+        return {
+          ...job,
+          'done': jobStatus == 'completed' ||
+              jobStatus == 'failed' ||
+              jobStatus == 'canceled',
+          'message': job.tryGet<String>('error') ?? '',
+        };
       }
 
-      _log('  ✗ login-status HTTP ${response.statusCode}: ${_truncateBody(response.body)}');
+      _log('  ✗ dxnet-jobs HTTP ${response.statusCode}: ${_truncateBody(response.body)}');
       return null;
     } catch (e, stack) {
-      _log('  ✗ login-status 网络异常: $e');
+      _log('  ✗ dxnet-jobs 网络异常: $e');
       _log('  Stack: $stack');
       return null;
     }
   }
 
-  /// POST /sync/latest/diving-fish
+  /// POST /me/sync/latest/exports/diving-fish → 轮询至完成
+  ///
+  /// 导出是异步任务：先创建 export job（POST），
+  /// 再轮询 GET /me/sync/prober-export-jobs/{exportJobId} 等待完成。
+  /// 返回格式 `{ job: exportJob }`（与调用方兼容）。
   Future<Map<String, dynamic>?> _exportToDivingFish() async {
     final url = ApiUrls.MaimaiHubSyncDivingFishUrl;
     final headers = <String, String>{
@@ -882,10 +1057,9 @@ class DivingFishProbeManager {
     }
 
     _log('  POST $url');
-    _log('  Headers: Content-Type=application/json, '
-        'Authorization=${_authToken != null ? "Bearer ***" : "无"}');
 
     try {
+      // ── Step A: 创建导出任务 ──
       final response = await http.post(
         Uri.parse(url),
         headers: headers,
@@ -893,15 +1067,67 @@ class DivingFishProbeManager {
 
       _log('  ← HTTP ${response.statusCode} (${response.body.length} 字节)');
 
-      if (response.statusCode == 201) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        _log('  ✓ 返回 success=${data['success']}, exported=${data['exported']}, '
-            'scores=${data['scores']}');
-        return data;
+      if (response.statusCode != 201) {
+        _log('  ✗ 创建导出任务失败: ${response.statusCode}');
+        _log('  Response body: ${_truncateBody(response.body)}');
+        return null;
       }
 
-      _log('  ✗ 状态码异常: ${response.statusCode}');
-      _log('  Response body: ${_truncateBody(response.body)}');
+      final createData = json.decode(response.body) as Map<String, dynamic>;
+      final exportJobId = createData['exportJobId'] as String?;
+      _log('  ✓ 导出任务已创建，exportJobId=$exportJobId, '
+          'status=${createData['status']}');
+
+      if (exportJobId == null) {
+        _log('  ✗ 创建响应缺少 exportJobId');
+        return createData; // 容错：原样返回
+      }
+
+      // ── Step B: 轮询等待导出完成 ──
+      final pollUrl = '${ApiUrls.MaimaiHubSyncExportJobsUrl}/$exportJobId';
+      final startTime = DateTime.now();
+      const pollTimeout = Duration(minutes: 2);
+      const pollInterval = Duration(seconds: 2);
+      String? lastPollStatus;
+
+      while (!_cancelled) {
+        if (DateTime.now().difference(startTime) > pollTimeout) {
+          _log('  ✗ 导出轮询超时（${pollTimeout.inMinutes} 分钟）');
+          return null;
+        }
+
+        await Future.delayed(pollInterval);
+
+        final pollResponse = await http.get(Uri.parse(pollUrl), headers: headers);
+
+        if (pollResponse.statusCode == 200) {
+          final exportJob = json.decode(pollResponse.body) as Map<String, dynamic>;
+          final expStatus = exportJob.tryGet<String>('status') ?? '';
+
+          if (expStatus != lastPollStatus) {
+            lastPollStatus = expStatus;
+            final df = exportJob.tryGet<Map<String, dynamic>>('result')
+                ?.tryGet<Map<String, dynamic>>('divingFish');
+            _log('  导出轮询: status=$expStatus, '
+                'divingFish.status=${df?.tryGet<String>('status')}, '
+                'exported=${df?.tryGet<int>('exported')}');
+          }
+
+          if (expStatus == 'completed' || expStatus == 'partial_failed') {
+            _log('  ✓ 导出完成 (status=$expStatus)');
+            return {'job': exportJob};
+          }
+
+          if (expStatus == 'failed' || expStatus == 'skipped') {
+            _log('  ✗ 导出失败 (status=$expStatus)');
+            return {'job': exportJob};
+          }
+        } else {
+          _log('  ✗ 导出轮询 HTTP ${pollResponse.statusCode}');
+        }
+      }
+
+      // cancelled
       return null;
     } catch (e, stack) {
       _log('  ✗ 网络异常: $e');

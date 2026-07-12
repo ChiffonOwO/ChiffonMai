@@ -111,6 +111,8 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
         return;
       }
 
+      debugPrint('[DEBUG][RoomCreatePage] 创建房间 - 选择的游戏模式: ${_gameType.name} (${_gameType.description})');
+
       final room = await _manager.createRoom(
         gameType: _gameType,
         maxPlayers: _maxPlayers,
@@ -350,20 +352,20 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                                 padding: EdgeInsets.symmetric(
                                     horizontal: paddingM, vertical: paddingS),
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.onSurface,
+                                  color: Theme.of(context).colorScheme.primary,
                                   borderRadius:
                                       BorderRadius.circular(borderRadiusSmall),
                                 ),
                                 child: DropdownButton<GameType>(
                                   value: _gameType,
                                   isExpanded: true,
-                                  dropdownColor: Colors.white,
+                                  dropdownColor: Theme.of(context).colorScheme.surface,
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: Theme.of(context).colorScheme.onPrimary,
                                     fontSize: 18 * scaleFactor,
                                     fontWeight: FontWeight.bold,
                                   ),
-                                  iconEnabledColor: Colors.white,
+                                  iconEnabledColor: Theme.of(context).colorScheme.onPrimary,
                                   underline: const SizedBox(),
                                   items: GameType.values.map((type) {
                                     return DropdownMenuItem(
@@ -377,6 +379,21 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                                       ),
                                     );
                                   }).toList(),
+                                  selectedItemBuilder: (context) {
+                                    return GameType.values.map((type) {
+                                      return Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          type.name,
+                                          style: TextStyle(
+                                            fontSize: 18 * scaleFactor,
+                                            fontWeight: FontWeight.bold,
+                                            color: Theme.of(context).colorScheme.onPrimary,
+                                          ),
+                                        ),
+                                      );
+                                    }).toList();
+                                  },
                                   onChanged: (value) {
                                     if (value != null) {
                                       setState(() => _gameType = value);

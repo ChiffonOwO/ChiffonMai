@@ -213,9 +213,12 @@ class _GameRoomPageState extends State<GameRoomPage> {
 
   Future<void> _initRoom() async {
     await _songAliasManager.init();
-    
+
     // 确保 MultiplayerManager 已初始化（建立事件订阅）
     await _manager.initialize();
+
+    debugPrint('[DEBUG][GameRoomPage] 初始化房间 - gameType: ${widget.room.gameType.name} (${widget.room.gameType.description})');
+    debugPrint('[DEBUG][GameRoomPage] 房间码: ${widget.room.roomCode}, 房间ID: ${widget.room.roomId}');
     
     setState(() {
       _currentRoom = widget.room;
@@ -255,6 +258,14 @@ class _GameRoomPageState extends State<GameRoomPage> {
         totalRounds: room.totalRounds,
         createdAt: room.createdAt,
         lastActivityAt: room.lastActivityAt,
+        selectedVersions: room.selectedVersions,
+        masterMinDx: room.masterMinDx,
+        masterMaxDx: room.masterMaxDx,
+        selectedGenres: room.selectedGenres,
+        blurLevel: room.blurLevel,
+        playDuration: room.playDuration,
+        songCount: room.songCount,
+        nonEnglishCharThreshold: room.nonEnglishCharThreshold,
       ) : null;
       
       setState(() {
@@ -1737,6 +1748,266 @@ class _GameRoomPageState extends State<GameRoomPage> {
     }
   }
 
+  /// 构建别名猜歌提示（alia 模式）
+  Widget _buildAliaHint() {
+    if (_targetSong == null) return const SizedBox.shrink();
+
+    final aliases = _songAliasManager.findAliasesBySongName(_targetSong!.title);
+    final bool isGameOver = _gameState?.isGameOver ?? false;
+
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF6C5CE7), Color(0xFFA29BFE)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.lightbulb_outline, color: Colors.white, size: 28),
+            const SizedBox(height: 8),
+            const Text(
+              '别名提示',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (aliases != null && aliases.isNotEmpty) ...[
+              // 游戏未结束时只显示别名数量，结束后显示全部别名
+              if (!isGameOver) ...[
+                Text(
+                  '该歌曲共有 ${aliases.length} 个别名',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // 随机显示1-2个别名作为提示
+                ..._getRandomAliasHints(aliases),
+              ] else ...[
+                // 游戏结束后显示全部别名
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  alignment: WrapAlignment.center,
+                  children: aliases.map((alias) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      alias,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  )).toList(),
+                ),
+              ],
+            ] else
+              const Text(
+                '暂无别名数据，请根据歌曲信息猜歌',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 从别名列表中随机选取1-2个作为提示（使用确定性种子保证所有玩家一致）
+  List<Widget> _getRandomAliasHints(List<String> aliases) {
+    if (aliases.isEmpty) return [];
+
+    final roomId = _currentRoom?.roomId ?? '';
+    final roundNumber = _gameState?.currentRound ?? 1;
+    final targetSongId = _targetSong?.id ?? '';
+
+    final seed = GameSeedUtil.generateSeed(
+      roomId: roomId,
+      roundNumber: roundNumber,
+      targetSongId: targetSongId,
+    );
+    final random = GameSeedUtil.createRandom(seed);
+
+    // 随机选1-2个别名
+    final hintCount = aliases.length == 1 ? 1 : (1 + random.nextInt(2.clamp(1, aliases.length)));
+    final shuffled = List<String>.from(aliases)..shuffle(random);
+    final hints = shuffled.take(hintCount).toList();
+
+    return hints.map((alias) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.25),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.5), width: 1),
+        ),
+        child: Text(
+          alias,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    )).toList();
+  }
+
+  /// 构建开字母提示（letters 模式）
+  Widget _buildLettersHint() {
+    if (_targetSong == null) return const SizedBox.shrink();
+
+    final title = _targetSong!.title;
+    final bool isGameOver = _gameState?.isGameOver ?? false;
+
+    // 计算需要显示的首字母个数（确定性，基于种子）
+    final roomId = _currentRoom?.roomId ?? '';
+    final roundNumber = _gameState?.currentRound ?? 1;
+    final targetSongId = _targetSong?.id ?? '';
+
+    final seed = GameSeedUtil.generateSeed(
+      roomId: roomId,
+      roundNumber: roundNumber,
+      targetSongId: targetSongId,
+    );
+    final random = GameSeedUtil.createRandom(seed);
+
+    // 根据歌曲名长度决定显示多少首字符（确定性随机，每回合固定）
+    final int revealCount;
+    if (title.length <= 3) {
+      revealCount = 1;
+    } else if (title.length <= 6) {
+      revealCount = 1 + random.nextInt(2); // 1-2个
+    } else {
+      revealCount = 1 + random.nextInt(3); // 1-3个
+    }
+
+    // 截取前N个字符
+    final int actualReveal = revealCount.clamp(1, title.length);
+    final String revealedPart = title.substring(0, actualReveal);
+    final int remainingLength = title.length - actualReveal;
+
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFE17055), Color(0xFFFDCB6E)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.text_fields, color: Colors.white, size: 28),
+            const SizedBox(height: 8),
+            const Text(
+              '开字母',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (!isGameOver) ...[
+              // 游戏进行中：显示首字母 + 占位符
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // 已揭示的首字符
+                  Text(
+                    revealedPart,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 40,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 4,
+                    ),
+                  ),
+                  // 剩余字符用占位符
+                  if (remainingLength > 0)
+                    Text(
+                      List.filled(remainingLength.clamp(0, 20), '_').join(' '),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 32,
+                        letterSpacing: 3,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '共 ${title.length} 个字符，已揭示 $actualReveal 个',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13,
+                ),
+              ),
+            ] else ...[
+              // 游戏结束后显示完整歌曲名
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '完整歌曲名',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   /// 构建模式专属的提示区域（曲绘截取、模糊曲绘、音频播放器）
   Widget _buildModeSpecificHint() {
     if (_targetSong == null || _gameState == null) return const SizedBox.shrink();
@@ -1755,6 +2026,12 @@ class _GameRoomPageState extends State<GameRoomPage> {
 
       case GameType.audio:
         return _buildAudioPlayerHint(roomId, roundNumber, targetSongId);
+
+      case GameType.alia:
+        return _buildAliaHint();
+
+      case GameType.letters:
+        return _buildLettersHint();
 
       default:
         return const SizedBox.shrink();
