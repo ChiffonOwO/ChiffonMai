@@ -15,6 +15,8 @@ import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
+import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
+import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 
 class PersonalizedScorePage extends StatefulWidget {
   const PersonalizedScorePage({super.key});
@@ -60,6 +62,9 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
 
   // 显示模式：true 为列表模式，false 为仅曲绘模式
   bool _showListMode = true;
+
+  // 分割线显示模式：true 使用等级显示（如 14, 14+），false 显示定数（如 14.0, 14.5）
+  bool _useLevelDisplay = true;
 
   // 过滤模式：'all' 全部, 'completed' 已完成, 'uncompleted' 未完成
   String _filterMode = 'all';
@@ -159,6 +164,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
 
       // 设置保存的显示模式
       _showListMode = savedOptions['showListMode'] as bool;
+      _useLevelDisplay = savedOptions['useLevelDisplay'] as bool;
 
       // 加载歌曲完成状态数据
       await _loadSongsWithStatus();
@@ -179,6 +185,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
       titleType: _selectedTitleType,
       difficulty: _selectedDifficulty,
       showListMode: _showListMode,
+      useLevelDisplay: _useLevelDisplay,
       mode: _mode,
       charter: _selectedCharter,
       version: _selectedVersion,
@@ -317,15 +324,17 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
     final screenWidth = MediaQuery.of(context).size.width;
     _scaleFactor = screenWidth / 375.0;
     _paddingXS = 4.0 * _scaleFactor;
-    _paddingS = 8.0 * _scaleFactor;
+    _paddingS = 4.0 * _scaleFactor;
     _paddingM = 12.0 * _scaleFactor;
-    _paddingL = 16.0 * _scaleFactor;
+    _paddingL = 10.0 * _scaleFactor;
     _borderRadiusSmall = 8.0 * _scaleFactor;
     _textSizeXS = 9.0 * _scaleFactor;
     _textSizeS = 11.0 * _scaleFactor;
     _textSizeM = 12.0 * _scaleFactor;
     _textSizeL = 14.0 * _scaleFactor;
     _coverSize = 56.0 * _scaleFactor;
+
+    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -372,7 +381,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL),
+                  margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -970,9 +979,9 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
       String dsKey = '未知';
       
       if (song.ds != null && song.ds.length > diffIndex) {
-        dsKey = _getDsLevelDisplay(song.ds[diffIndex]);
+        dsKey = _useLevelDisplay ? _getLevelDisplay(song.ds[diffIndex]) : _getDsLevelDisplay(song.ds[diffIndex]);
       }
-      
+
       if (!groupedSongs.containsKey(dsKey)) {
         groupedSongs[dsKey] = [];
       }
@@ -982,7 +991,18 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
     // 按定数降序排序
     final sortedDsKeys = groupedSongs.keys.toList()
       ..sort((a, b) {
-        double parseDs(String ds) => double.tryParse(ds) ?? 0.0;
+        double parseDs(String ds) {
+          if (_useLevelDisplay) {
+            // 等级格式：15, 14+, 14 等
+            if (ds == '15') return 15.0;
+            if (ds.endsWith('+')) {
+              return double.parse(ds.substring(0, ds.length - 1)) + 0.5;
+            }
+            return double.tryParse(ds) ?? 0.0;
+          } else {
+            return double.tryParse(ds) ?? 0.0;
+          }
+        }
         return parseDs(b).compareTo(parseDs(a));
       });
 
@@ -1003,7 +1023,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
           padding: EdgeInsets.symmetric(vertical: _paddingXS, horizontal: _paddingM),
           margin: EdgeInsets.only(bottom: _paddingXS),
           child: Text(
-            '${dsKey} | 共 ${dsSongs.length} 首歌曲',
+            '${_useLevelDisplay ? 'Lv.' : ''}${dsKey} | 共 ${dsSongs.length} 首歌曲',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: _textSizeM,
@@ -1361,6 +1381,27 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                 ),
               ),
               SizedBox(width: _paddingS),
+              // 定数/等级显示切换按钮
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  foregroundColor: Theme.of(context).colorScheme.onSurface,
+                  minimumSize: Size(100 * _scaleFactor, 36 * _scaleFactor),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(_borderRadiusSmall),
+                  ),
+                ),
+                onPressed: () {
+                  setState(() {
+                    _useLevelDisplay = !_useLevelDisplay;
+                  });
+                },
+                child: Text(
+                  _useLevelDisplay ? '当前: 等级' : '当前: 定数',
+                  style: TextStyle(fontSize: _textSizeS),
+                ),
+              ),
+              SizedBox(width: _paddingS),
               // 曲绘/列表切换按钮
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -1417,9 +1458,9 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
       String dsKey = '未知';
       
       if (song.ds != null && song.ds.length > diffIndex) {
-        dsKey = _getDsLevelDisplay(song.ds[diffIndex]);
+        dsKey = _useLevelDisplay ? _getLevelDisplay(song.ds[diffIndex]) : _getDsLevelDisplay(song.ds[diffIndex]);
       }
-      
+
       if (!groupedSongs.containsKey(dsKey)) {
         groupedSongs[dsKey] = [];
       }
@@ -1429,7 +1470,17 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
     // 按定数降序排序
     final sortedDsKeys = groupedSongs.keys.toList()
       ..sort((a, b) {
-        double parseDs(String ds) => double.tryParse(ds) ?? 0.0;
+        double parseDs(String ds) {
+          if (_useLevelDisplay) {
+            if (ds == '15') return 15.0;
+            if (ds.endsWith('+')) {
+              return double.parse(ds.substring(0, ds.length - 1)) + 0.5;
+            }
+            return double.tryParse(ds) ?? 0.0;
+          } else {
+            return double.tryParse(ds) ?? 0.0;
+          }
+        }
         return parseDs(b).compareTo(parseDs(a));
       });
 
@@ -1450,7 +1501,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
           padding: EdgeInsets.symmetric(vertical: _paddingXS, horizontal: _paddingM),
           margin: EdgeInsets.only(bottom: _paddingXS),
           child: Text(
-            '${dsKey} | 共 ${dsSongs.length} 首歌曲',
+            '${_useLevelDisplay ? 'Lv.' : ''}${dsKey} | 共 ${dsSongs.length} 首歌曲',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: _textSizeM,
@@ -1622,6 +1673,13 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
       bool _isFirstBuild = true;
       void Function(void Function())? _updateDialog;
 
+      final songCount = _cachedSongsWithStatus?.length ?? 0;
+      final quality = await ExportQualitySelector.show(
+        context,
+        estimatedPngSize: ImageEncodeUtil.estimatePngSize(songCount: songCount, cardsPerRow: 12),
+      );
+      if (quality == null) return;
+
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -1660,7 +1718,11 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                       ],
                     ),
                     SizedBox(height: 16.0),
-                    LinearProgressIndicator(value: _progressValue > 0 ? _progressValue : null),
+                    LinearProgressIndicator(
+                      value: _progressValue > 0 ? _progressValue : null,
+                      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      valueColor: AlwaysStoppedAnimation(Theme.of(context).colorScheme.primary),
+                    ),
                     SizedBox(height: 12.0),
                     Text(
                       _currentLoadingTip,
@@ -1688,6 +1750,8 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
         filterMode: _filterMode,
         getDifficultyName: _getDifficultyName,
         getLevelDisplay: _getLevelDisplay,
+        useLevelDisplay: _useLevelDisplay,
+        jpegQuality: quality.jpegQuality,
         getSongAchievement: _service.getSongAchievement,
         onProgress: (message, progress) {
           _progressMessage = message;

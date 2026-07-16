@@ -33,8 +33,8 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
     
     // 响应式尺寸计算（与黑门页面一致）
     final double scaleFactor = screenWidth / 375.0;
-    final double _paddingS = 8.0 * scaleFactor;
-    final double _paddingL = 16.0 * scaleFactor;
+    final double _paddingS = 4.0 * scaleFactor;
+    final double _paddingL = 10.0 * scaleFactor;
     final double borderRadiusSmall = 8.0 * scaleFactor;
 
     // 自定义常量

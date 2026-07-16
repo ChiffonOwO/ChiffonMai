@@ -10,6 +10,9 @@ class CacheKeyConstant {
   static const String maidataAddedSongsTimestamp = 'maidata_added_songs_timestamp';
   static const String maidataIndexCache = 'maidata_index_cache';
   static const String maidataIndexCacheTimestamp = 'maidata_index_cache_timestamp';
+
+  // Union API 独有歌曲（仅在新API中存在，不参与推荐系统）
+  static const String unionExtraSongIds = 'union_extra_song_ids';
   
   // 知识数据相关
   static const String knowledgeData = 'knowledge_data';

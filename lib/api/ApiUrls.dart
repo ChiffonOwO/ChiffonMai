@@ -3,6 +3,8 @@
 class ApiUrls {
   static const String DiffMusicDataApi = 'https://www.diving-fish.com/api/maimaidxprober/chart_stats';
   static const String MusicDataApi = 'https://www.diving-fish.com/api/maimaidxprober/music_data';
+  /// 更全的歌曲数据API端点（union），作为全量歌曲数据的主要来源
+  static const String UnionMusicDataApi = 'https://union.godserver.cn//api/union/musics';
   static const String TagDataApi = 'https://miruku.dxrating.net/api/v1/tags';
   static const String SongAliasApi = 'https://www.yuzuchan.moe/api/maimaidx/maimaidxalias';
   static const String DXRatingSongAliasApi = 'https://miruku.dxrating.net/api/v1/aliases';
@@ -82,6 +84,10 @@ class ApiUrls {
   static const String MaimaiHubSyncDivingFishUrl = '$MaimaiHubBaseUrl/me/sync/latest/exports/diving-fish';
   static const String MaimaiHubSyncLxnsUrl = '$MaimaiHubBaseUrl/me/sync/latest/exports/lxns';
   static const String MaimaiHubSyncExportJobsUrl = '$MaimaiHubBaseUrl/me/sync/prober-export-jobs';
+
+  // ── Cabinet Score Jobs / 机台QR直同步 ──
+  static const String MaimaiHubCabinetScoreJobsUrl = '$MaimaiHubBaseUrl/me/cabinet-score-jobs';
+  static const String MaimaiHubCabinetScoreJobsActiveUrl = '$MaimaiHubBaseUrl/me/cabinet-score-jobs/active';
 
   // ── DXNet Jobs / 抓取任务 ──
   static const String MaimaiHubDxnetJobsUrl = '$MaimaiHubBaseUrl/me/dxnet-jobs';

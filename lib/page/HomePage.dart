@@ -34,6 +34,9 @@ import '../manager/LuoXue/LuoXueUserPlayDataManager.dart';
 import '../entity/DivingFish/RecordItem.dart';
 import '../service/RankingList/SongRankingService.dart';
 import '../entity/DivingFish/Song.dart';
+import '../entity/FeatureModels.dart';
+import '../widgets/FeatureButton.dart';
+import 'FeatureCategoryPage.dart';
 import 'AchievementFullReverseCalculatorPage.dart';
 import 'AchievementRateCalculatorPage.dart';
 import 'VersionViewPage.dart' hide AppConstants;
@@ -57,6 +60,8 @@ import 'PersonalizedChartPlayConfigure.dart';
 import 'PersonalizedScorePage.dart';
 import 'RankTable/RankTablePage.dart';
 import 'RandomChartPage.dart';
+import 'RatingRecommendPage.dart';
+import 'DsRangeRecommendPage.dart';
 import 'RecommendByTagsPage.dart';
 import 'SingleRatingCalculatorPage.dart';
 import 'SongSearchPage.dart';
@@ -64,10 +69,15 @@ import 'UserScoreSearchPage.dart';
 import 'AboutAppPage.dart';
 import 'CoverRecognitionPage.dart';
 import 'DataBackupPage.dart';
+import 'DailyRecommendPage.dart';
+import 'FriendComparePage.dart';
+import 'LuoXue/UpdateLuoXueScorePage.dart';
 import '../manager/LuoXue/CollectionsManager.dart';
 import '../manager/DivingFishProbeManager.dart';
 import '../entity/LuoXue/Collection.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 // Rating上限数据类
 class RatingLimits {
@@ -103,28 +113,8 @@ class _InitInterval {
 }
 
 // 应用常量类：集中管理所有硬编码的配置值
-class ButtonItem {
-  final IconData icon;
-  final String title;
-  final String subtitle;
 
-  const ButtonItem({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-}
-
-// 按钮分类数据模型
-class ButtonCategory {
-  final String name;
-  final List<ButtonItem> items;
-
-  const ButtonCategory({
-    required this.name,
-    required this.items,
-  });
-}
+// ButtonItem / ButtonCategory 已移至 ../entity/FeatureModels.dart
 
 /// 首页组件：有状态组件，包含所有页面元素和业务数据
 class HomePage extends StatefulWidget {
@@ -309,14 +299,22 @@ class _HomePageState extends State<HomePage> {
     }
   }
   
-  // 按钮分类数据源
-  bool _isDivingFishLoggedIn = false;
+  // 使用 ValueNotifier 以便 FeatureCategoryPage 等子页面也能响应登录状态变化
+  final ValueNotifier<bool> _loginStateNotifier = ValueNotifier<bool>(false);
+  bool get _isDivingFishLoggedIn => _loginStateNotifier.value;
+
+  @override
+  void dispose() {
+    _loginStateNotifier.dispose();
+    super.dispose();
+  }
 
   Future<void> _checkDivingFishLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final jwt = prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '';
     if (mounted) {
-      setState(() => _isDivingFishLoggedIn = jwt.isNotEmpty);
+      _loginStateNotifier.value = jwt.isNotEmpty;
+      setState(() {});
     }
   }
 
@@ -325,8 +323,16 @@ class _HomePageState extends State<HomePage> {
     await prefs.remove(CacheKeyConstant.probeDivingFishToken);
     await prefs.remove(CacheKeyConstant.probeDivingFishImportToken);
     await prefs.remove(CacheKeyConstant.probeDivingFishBindQQ);
+    // 清除缓存的用户标识符，防止排行榜等页面使用旧账号数据
+    await prefs.remove('cachedQQ');
+    await prefs.remove(CacheKeyConstant.shuiyuUserId);
+    await prefs.remove(CacheKeyConstant.luoxueUserId);
+    await prefs.remove(CacheKeyConstant.lastDataSource);
     if (mounted) {
-      setState(() => _isDivingFishLoggedIn = false);
+      _loginStateNotifier.value = false;
+      setState(() {
+        _cachedQQ = '';
+      });
     }
     Fluttertoast.showToast(msg: '已登出水鱼账号');
   }
@@ -359,6 +365,8 @@ class _HomePageState extends State<HomePage> {
     ButtonCategory(name: '实用工具', items: [
       ButtonItem(icon: Icons.arrow_circle_up, title: '段位表', subtitle: '我去，炫彩真段位!'),
       ButtonItem(icon: Icons.label, title: '基于标签推荐', subtitle: '基于你游玩的谱面标签推荐曲目'),
+      ButtonItem(icon: Icons.trending_up, title: '基于目标Rating推荐', subtitle: '基于目标Rating推荐适合上分的谱面'),
+      ButtonItem(icon: Icons.tune, title: '基于定数区间推荐', subtitle: '基于定数区间推荐适合上分的谱面'),
       ButtonItem(icon: Icons.shuffle, title: '随机乐曲', subtitle: '随机选曲1-4首'),
       ButtonItem(icon: Icons.calculate, title: '单曲Rating计算', subtitle: '我鸟加这个有分吃吗？'),
       ButtonItem(icon: Icons.percent, title: '达成率计算', subtitle: '根据判定详情算出达成率'),
@@ -369,11 +377,14 @@ class _HomePageState extends State<HomePage> {
       ButtonItem(icon: Icons.bar_chart, title: '定数分布', subtitle: '查看谱面定数分布柱状图'),
       ButtonItem(icon: Icons.favorite, title: '收藏夹', subtitle: '管理你收藏的谱面'),
       ButtonItem(icon: Icons.play_arrow, title: '自定义谱面播放', subtitle: '播放你自己本地的谱面'),
-      ButtonItem(icon: Icons.qr_code_scanner, title: '同步成绩', subtitle: '将成绩同步到水鱼查分器'),
+      ButtonItem(icon: Icons.today, title: '每日推荐', subtitle: '每日推荐歌曲'),
+      ButtonItem(icon: Icons.people, title: '好友对比', subtitle: '对比你和好友的成绩差异'),
     ]),
     ButtonCategory(name: '系统', items: [
       ButtonItem(icon: Icons.file_upload_sharp, title: '刷新数据', subtitle: '刷新你的舞萌数据'),
       ButtonItem(icon: Icons.cleaning_services, title: '刷新Maidata', subtitle: '手动刷新所有maidata数据'),
+      ButtonItem(icon: Icons.qr_code_scanner, title: '同步成绩到水鱼', subtitle: '将成绩同步到水鱼查分器'),
+      ButtonItem(icon: Icons.cloud_sync, title: '同步成绩到落雪', subtitle: '通过机台QR码同步成绩到落雪平台'),
       if (_isDivingFishLoggedIn)
         ButtonItem(icon: Icons.logout, title: '登出账号', subtitle: '清除水鱼登录状态')
       else
@@ -393,6 +404,7 @@ class _HomePageState extends State<HomePage> {
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
     final brightness = Theme.of(context).brightness;
 
     // 页面根布局：Scaffold + Stack 实现多层级叠加布局
@@ -489,7 +501,7 @@ class _HomePageState extends State<HomePage> {
             left: screenWidth * 0.02,
             right: screenWidth * 0.02,
             top: screenHeight * 0.36,
-            bottom: screenHeight * 0.03,
+            bottom: screenHeight * 0.03 + safeBottom,
             child: Builder(
               builder: (context) {
                 final brightness = Theme.of(context).brightness;
@@ -526,23 +538,24 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     // 分类按钮区域（支持搜索过滤）
-                    ..._buttonCategories.where((category) {
-                      if (_featureSearchQuery.isEmpty) return true;
-                      return category.items.any((item) =>
-                        item.title.toLowerCase().contains(_featureSearchQuery) ||
-                        item.subtitle.toLowerCase().contains(_featureSearchQuery));
-                    }).map((category) {
-                      if (_featureSearchQuery.isEmpty) {
-                        return _buildCategorySection(category, context);
-                      }
-                      final filteredItems = category.items.where((item) =>
-                        item.title.toLowerCase().contains(_featureSearchQuery) ||
-                        item.subtitle.toLowerCase().contains(_featureSearchQuery)).toList();
-                      return _buildCategorySection(
-                        ButtonCategory(name: category.name, items: filteredItems),
-                        context,
-                      );
-                    }),
+                    if (_featureSearchQuery.isEmpty)
+                      // 搜索为空：显示大类导航卡片
+                      ..._buttonCategories.map((category) => _buildCategoryCard(category, context)),
+                    if (_featureSearchQuery.isNotEmpty)
+                      // 搜索有内容：显示匹配的功能按钮（保持原有分类分组行为）
+                      ..._buttonCategories.where((category) {
+                        return category.items.any((item) =>
+                          item.title.toLowerCase().contains(_featureSearchQuery) ||
+                          item.subtitle.toLowerCase().contains(_featureSearchQuery));
+                      }).map((category) {
+                        final filteredItems = category.items.where((item) =>
+                          item.title.toLowerCase().contains(_featureSearchQuery) ||
+                          item.subtitle.toLowerCase().contains(_featureSearchQuery)).toList();
+                        return _buildCategorySection(
+                          ButtonCategory(name: category.name, items: filteredItems),
+                          context,
+                        );
+                      }),
                   ],
                 ),
               ),
@@ -553,7 +566,7 @@ class _HomePageState extends State<HomePage> {
 
           // 层级6：底部版权信息
           Positioned(
-            bottom: screenHeight * 0.01,
+            bottom: screenHeight * 0.01 + safeBottom,
             left: 0,
             right: 0,
             child: Center(
@@ -571,7 +584,7 @@ class _HomePageState extends State<HomePage> {
           // 后台初始化状态提示
           if (_isBackgroundInitializing || _isInitializationCompleted)
             Positioned(
-              bottom: screenHeight * 0.06,
+              bottom: screenHeight * 0.06 + safeBottom,
               left: 0,
               right: 0,
               child: Center(
@@ -1016,7 +1029,7 @@ class _HomePageState extends State<HomePage> {
     
     showDialog(
       context: context,
-      barrierDismissible: !isRefreshing,
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setState) {
@@ -1121,6 +1134,56 @@ class _HomePageState extends State<HomePage> {
                               }
                             },
                             child: Text('点击授权'),
+                          ),
+                          const SizedBox(height: 8),
+                          // 降级方案：复制授权链接手动打开浏览器
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.warningOrange(brightness).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppColors.warningOrange(brightness).withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.info_outline, size: 16,
+                                        color: AppColors.warningOrange(brightness)),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '点击授权没反应？',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.warningOrange(brightness),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  '请复制链接后在浏览器中手动打开完成授权：',
+                                  style: TextStyle(fontSize: 12, color: AppColors.greyHint(brightness)),
+                                ),
+                                const SizedBox(height: 8),
+                                OutlinedButton.icon(
+                                  icon: const Icon(Icons.copy, size: 16),
+                                  label: const Text('复制授权链接', style: TextStyle(fontSize: 13)),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  ),
+                                  onPressed: () {
+                                    final url = LuoXueUserPlayDataManager().getAuthorizationUrl();
+                                    Clipboard.setData(ClipboardData(text: url));
+                                    Fluttertoast.showToast(msg: '授权链接已复制，请在浏览器中粘贴打开');
+                                  },
+                                ),
+                              ],
+                            ),
                           ),
                           SizedBox(height: 8),
                           Text(
@@ -1302,15 +1365,14 @@ class _HomePageState extends State<HomePage> {
   
   // 处理落雪授权（带进度回调）
   Future<void> _handleLuoXueAuthWithProgress(
-    String authCode, 
+    String authCode,
     Function(int, String) onProgress,
-    [bool participateRankings = false, 
+    [bool participateRankings = false,
     bool showNickname = false]
   ) async {
     try {
       onProgress(5, '正在清除缓存...');
-      await Future.delayed(const Duration(milliseconds: 250));
-      
+
       // 清除推荐结果缓存
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -1319,50 +1381,47 @@ class _HomePageState extends State<HomePage> {
       } catch (e) {
         debugPrint('清除推荐结果缓存失败: $e');
       }
-      
+
       onProgress(10, '正在换取访问令牌...');
-      await Future.delayed(const Duration(milliseconds: 250));
-      
-      // 使用授权码换取令牌
+
+      // 使用授权码换取令牌（必须串行，需要authCode）
       final success = await LuoXueUserPlayDataManager().exchangeCodeForToken(authCode);
-      
+
       if (success) {
-        onProgress(15, '授权成功，正在保存数据源...');
-        await Future.delayed(const Duration(milliseconds: 250));
-        
-        // 授权成功，保存数据源为落雪
-        await _saveLastDataSource('luoxue');
-        
-        onProgress(20, '正在刷新歌曲数据...');
-        await Future.delayed(const Duration(milliseconds: 250));
-        
-        // 使用智能刷新：初次拉取获取全量maidata，后续只获取追加歌曲的maidata
-        await MaimaiMusicDataManager().refreshDataWithSmartMaidata();
-        
-        onProgress(35, '正在刷新难度数据...');
-        await Future.delayed(const Duration(milliseconds: 250));
-        
-        // 从API获取并更新难度数据
-        await DiffMusicDataManager().fetchAndUpdateDiffData();
-        
-        onProgress(50, '正在刷新标签数据...');
-        await Future.delayed(const Duration(milliseconds: 250));
-        
-        // 刷新标签数据
-        await RecommendByTagsService.initializeTags();
-        
-        onProgress(60, '正在刷新别名数据...');
-        await Future.delayed(const Duration(milliseconds: 250));
-        
-        // 刷新别名数据
-        await SongAliasManager.instance.refresh();
-        
-        onProgress(65, '正在获取玩家信息...');
-        await Future.delayed(const Duration(milliseconds: 250));
-        
-        // 授权成功，获取玩家信息
-        final playerInfo = await LuoXueUserPlayDataManager().getPlayerInfo();
-        
+        onProgress(15, '授权成功，正在并行刷新数据...');
+
+        // 第二阶段：令牌获取成功后，并行执行所有独立的数据刷新请求
+        int completedCount = 0;
+        const totalParallelTasks = 7;
+        void updateParallelProgress(String message) {
+          completedCount++;
+          final progress = 15 + ((completedCount / totalParallelTasks) * 60).round();
+          onProgress(progress, message);
+        }
+
+        final saveDataSourceFuture = _saveLastDataSource('luoxue');
+        final musicFuture = MaimaiMusicDataManager().refreshDataWithSmartMaidata();
+        final diffFuture = DiffMusicDataManager().fetchAndUpdateDiffData();
+        final tagsFuture = RecommendByTagsService.initializeTags();
+        final aliasFuture = SongAliasManager.instance.refresh();
+        final playerInfoFuture = LuoXueUserPlayDataManager().getPlayerInfo();
+        final playerRecordsFuture = LuoXueUserPlayDataManager().getPlayerRecordsAsRecordItems();
+
+        saveDataSourceFuture.then((_) => updateParallelProgress('数据源已保存'));
+        musicFuture.then((_) => updateParallelProgress('歌曲数据已刷新'));
+        diffFuture.then((_) => updateParallelProgress('难度数据已刷新'));
+        tagsFuture.then((_) => updateParallelProgress('标签数据已刷新'));
+        aliasFuture.then((_) => updateParallelProgress('别名数据已刷新'));
+        playerInfoFuture.then((_) => updateParallelProgress('玩家信息已获取'));
+        playerRecordsFuture.then((_) => updateParallelProgress('玩家成绩已获取'));
+
+        await Future.wait([
+          saveDataSourceFuture, musicFuture, diffFuture, tagsFuture,
+          aliasFuture, playerInfoFuture, playerRecordsFuture,
+        ]);
+
+        // 处理玩家信息结果
+        final playerInfo = await playerInfoFuture;
         if (playerInfo != null) {
           setState(() {
             // 将全角字符转换为半角字符
@@ -1370,34 +1429,30 @@ class _HomePageState extends State<HomePage> {
             _userNickname = halfWidthName.isNotEmpty ? halfWidthName : '未知玩家';
           });
           await _saveUserData();
-          
+
           // 保存落雪用户ID（格式：luoxue:friendCode）
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('luoxue_user_id', 'luoxue:${playerInfo.friendCode}');
         }
-        
-        onProgress(75, '正在获取玩家成绩...');
-        await Future.delayed(const Duration(milliseconds: 250));
-        
-        // 获取玩家成绩并转换为 RecordItem（自动更新缓存）
-        final playerRecords = await LuoXueUserPlayDataManager().getPlayerRecordsAsRecordItems();
+
+        // 处理玩家成绩结果
+        final playerRecords = await playerRecordsFuture;
         debugPrint('玩家成绩数量: ${playerRecords?.length ?? 0}');
-        
+
         onProgress(85, '正在计算 Best50 数据...');
-        await Future.delayed(const Duration(milliseconds: 250));
-        
+
         // 从落雪数据计算并更新首页的 Best50 数据
         if (playerRecords != null && playerRecords.isNotEmpty) {
           await _calculateBest50FromLuoXueRecords(playerRecords);
         }
-        
+
         onProgress(95, '正在保存数据...');
-        await Future.delayed(const Duration(milliseconds: 250));
         
         // 更新排行榜数据
         String? rankingError;
         if (playerInfo != null) {
           final userId = 'luoxue:${playerInfo.friendCode}';
+
           if (participateRankings) {
             final displayNickname = showNickname ? _userNickname : '匿名用户';
             rankingError = await _updateRankings(
@@ -1560,6 +1615,10 @@ class _HomePageState extends State<HomePage> {
       if (addedSongIds.contains(song.id)) {
         return false;
       }
+      // 过滤掉union API独有的歌曲
+      if (song.isExtra) {
+        return false;
+      }
       // 过滤掉ID为6位数的歌曲
       final id = song.id;
       if (id.length == 6 && RegExp(r'^\d+$').hasMatch(id)) {
@@ -1668,8 +1727,7 @@ class _HomePageState extends State<HomePage> {
   ) async {
     try {
       onProgress(5, '正在清除缓存...');
-      await Future.delayed(const Duration(milliseconds: 250));
-      
+
       // 清除推荐结果缓存
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -1678,43 +1736,42 @@ class _HomePageState extends State<HomePage> {
       } catch (e) {
         debugPrint('清除推荐结果缓存失败: $e');
       }
-      
-      onProgress(10, '正在刷新歌曲数据...');
-      await Future.delayed(const Duration(milliseconds: 250));
-      
-      // 使用智能刷新：初次拉取获取全量maidata，后续只获取追加歌曲的maidata
-      await MaimaiMusicDataManager().refreshDataWithSmartMaidata();
-      
-      onProgress(30, '正在刷新难度数据...');
-      await Future.delayed(const Duration(milliseconds: 250));
-      
-      // 从API获取并更新难度数据
-      await DiffMusicDataManager().fetchAndUpdateDiffData();
-      
-      onProgress(45, '正在刷新标签数据...');
-      await Future.delayed(const Duration(milliseconds: 250));
-      
-      // 刷新标签数据
-      await RecommendByTagsService.initializeTags();
-      
-      onProgress(55, '正在刷新别名数据...');
-      await Future.delayed(const Duration(milliseconds: 250));
-      
-      // 刷新别名数据
-      await SongAliasManager.instance.refresh();
-      
-      onProgress(65, '正在获取用户数据...');
-      await Future.delayed(const Duration(milliseconds: 250));
-      
-      // 从API获取并更新用户游玩数据
-      final userPlayDataManager = UserPlayDataManager();
-      final userPlayData = await userPlayDataManager.fetchUserPlayData(qq);
-      
-      onProgress(75, '正在获取Best50数据...');
-      await Future.delayed(const Duration(milliseconds: 250));
-      
-      final best50Manager = UserBest50Manager();
-      final best50Data = await best50Manager.getUserBest50(qq);
+
+      // 保存当前数据源
+      await _saveLastDataSource('shuiyu');
+
+      // 第二阶段：并行执行所有独立的数据刷新请求
+      onProgress(10, '正在并行刷新数据...');
+
+      int completedCount = 0;
+      const totalParallelTasks = 6;
+      void updateParallelProgress(String message) {
+        completedCount++;
+        final progress = 10 + ((completedCount / totalParallelTasks) * 65).round();
+        onProgress(progress, message);
+      }
+
+      final musicFuture = MaimaiMusicDataManager().refreshDataWithSmartMaidata();
+      final diffFuture = DiffMusicDataManager().fetchAndUpdateDiffData();
+      final tagsFuture = RecommendByTagsService.initializeTags();
+      final aliasFuture = SongAliasManager.instance.refresh();
+      final userPlayDataFuture = UserPlayDataManager().fetchUserPlayData(qq);
+      final best50Future = UserBest50Manager().getUserBest50(qq);
+
+      musicFuture.then((_) => updateParallelProgress('歌曲数据已刷新'));
+      diffFuture.then((_) => updateParallelProgress('难度数据已刷新'));
+      tagsFuture.then((_) => updateParallelProgress('标签数据已刷新'));
+      aliasFuture.then((_) => updateParallelProgress('别名数据已刷新'));
+      userPlayDataFuture.then((_) => updateParallelProgress('用户数据已获取'));
+      best50Future.then((_) => updateParallelProgress('Best50数据已获取'));
+
+      await Future.wait([
+        musicFuture, diffFuture, tagsFuture,
+        aliasFuture, userPlayDataFuture, best50Future,
+      ]);
+
+      final userPlayData = await userPlayDataFuture;
+      final best50Data = await best50Future;
       debugPrint(best50Data.toString());
       
       // 更新用户昵称
@@ -1727,8 +1784,7 @@ class _HomePageState extends State<HomePage> {
       }
       
       onProgress(85, '正在计算Rating...');
-      await Future.delayed(const Duration(milliseconds: 250));
-      
+
       // 计算Best50、Best35、Best15总RA
       int totalRA = 0;
       int best35RA = 0;
@@ -1757,8 +1813,7 @@ class _HomePageState extends State<HomePage> {
       }
       
       onProgress(95, '正在保存数据...');
-      await Future.delayed(const Duration(milliseconds: 250));
-      
+
       // 保存数据到本地存储
       await _saveUserData();
       
@@ -1769,11 +1824,11 @@ class _HomePageState extends State<HomePage> {
       // 更新排行榜数据
       String? rankingError;
       final userId = 'shuiyu:$qq';
-      
+
       // 保存水鱼用户ID到本地存储
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('shuiyu_user_id', userId);
-      
+
       if (participateRankings) {
         final displayNickname = showNickname ? _userNickname : '匿名用户';
         rankingError = await _updateRankings(
@@ -1902,7 +1957,7 @@ class _HomePageState extends State<HomePage> {
 
     final String? result = await showDialog<String?>(
       context: context,
-      barrierDismissible: !isSyncing,
+      barrierDismissible: true,
       builder: (BuildContext dialogContext) {
         Timer? _autoCloseTimer;
         int _countdown = 3;
@@ -1928,7 +1983,9 @@ class _HomePageState extends State<HomePage> {
               _autoCloseTimer = Timer(const Duration(seconds: 1), tick);
             }
 
-            return AlertDialog(
+            return PopScope(
+              canPop: !isSyncing && !isBinding,
+              child: AlertDialog(
               title: Row(
                 children: [
                   Icon(
@@ -1950,6 +2007,17 @@ class _HomePageState extends State<HomePage> {
                       Text(
                         '在舞萌|中二公众号请求并打开二维码，扫描后将字符串粘贴到下方：',
                         style: TextStyle(fontSize: 13, color: AppColors.greyHint(brightness)),
+                      ),
+                      const SizedBox(height: 12),
+                      // 多方式导入按钮
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _buildClipboardButton(setState, qrController),
+                          _buildGalleryQrButton(setState, qrController),
+                          _buildCameraScanButton(setState, qrController, dialogContext),
+                        ],
                       ),
                       const SizedBox(height: 12),
                       TextField(
@@ -2239,16 +2307,30 @@ class _HomePageState extends State<HomePage> {
                         currentStage = SyncStage.authenticating;
                       });
 
-                      final result = await DivingFishProbeManager().syncByQrCode(
-                        qrCode,
-                        onProgress: (p) {
-                          setState(() {
-                            currentStage = p.stage;
-                            statusText = p.message;
-                            progress = _stageProgress(p);
-                          });
-                        },
-                      );
+                      // 检测 QR 码类型：SGWCMAID 开头 → 机台直同步，否则走 DXNet Bot 流程
+                      final isCabinetQr = qrCode.startsWith('SGWCMAID');
+
+                      final result = isCabinetQr
+                          ? await DivingFishProbeManager().syncByCabinetQr(
+                              qrCode,
+                              onProgress: (p) {
+                                setState(() {
+                                  currentStage = p.stage;
+                                  statusText = p.message;
+                                  progress = _stageProgress(p);
+                                });
+                              },
+                            )
+                          : await DivingFishProbeManager().syncByQrCode(
+                              qrCode,
+                              onProgress: (p) {
+                                setState(() {
+                                  currentStage = p.stage;
+                                  statusText = p.message;
+                                  progress = _stageProgress(p);
+                                });
+                              },
+                            );
 
                       if (result.isSuccess) {
                         // ===== 同步成功 → 先展示过渡态 =====
@@ -2320,7 +2402,7 @@ class _HomePageState extends State<HomePage> {
                     },
                   ),
               ],
-          );
+          ),); // PopScope closing
           },
         );
       },
@@ -2502,6 +2584,11 @@ class _HomePageState extends State<HomePage> {
                                     : '***';
                                 statusText = '欢迎，$nickname${plate.isNotEmpty ? " ($plate)" : ""}';
                               });
+                              // 登录成功后立即更新缓存的QQ号，确保排行榜等页面使用新账号标识
+                              final bindQQ = result.tryGet<String>('bind_qq') ?? '';
+                              if (bindQQ.isNotEmpty) {
+                                await _saveQQ(bindQQ);
+                              }
                               _checkDivingFishLoginStatus();
                             } else {
                               setState(() {
@@ -2626,7 +2713,10 @@ class _HomePageState extends State<HomePage> {
                         ? Text(errorMsg,
                             style: TextStyle(color: AppColors.errorRed(brightness)))
                         : profile != null
-                            ? _buildAccountInfo(profile, dialogContext)
+                            ? Column(mainAxisSize: MainAxisSize.min, children: [
+                                _buildAccountInfo(profile, dialogContext),
+                                _buildLxnsTokenSection(brightness),
+                              ])
                             : const Text('暂无数据'),
               ),
               actions: [
@@ -2637,6 +2727,159 @@ class _HomePageState extends State<HomePage> {
               ],
             );
           },
+        );
+      },
+    );
+  }
+
+  /// 管理落雪 API 密钥（Hub 侧）
+  Widget _buildLxnsTokenSection(Brightness brightness) {
+    final tokenCtrl = TextEditingController();
+    bool? hasToken;
+    bool saving = false;
+    bool checking = true;
+
+    return StatefulBuilder(
+      builder: (ctx, setState) {
+        // 初次检查
+        if (checking) {
+          DivingFishProbeManager().hasLxnsImportToken().then((has) {
+            if (checking) setState(() { hasToken = has; checking = false; });
+          });
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Divider(height: 24),
+            Row(
+              children: [
+                Icon(
+                  hasToken == true ? Icons.check_circle : Icons.vpn_key,
+                  size: 18,
+                  color: hasToken == true
+                      ? AppColors.successGreen(brightness)
+                      : AppColors.greyHint(brightness),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '落雪 API 密钥',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(ctx).colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (checking)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: SizedBox(width: 16, height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2)),
+              )
+            else ...[
+              if (hasToken == true)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text('已设置',
+                    style: TextStyle(color: AppColors.successGreen(brightness), fontSize: 13)),
+                )
+              else ...[
+                Text('未设置',
+                  style: TextStyle(color: AppColors.warningOrange(brightness), fontSize: 13)),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: () async {
+                    final uri = Uri.parse('https://maimai.lxns.net/user/profile?tab=thirdparty');
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        const TextSpan(text: '访问 ', style: TextStyle(fontSize: 12)),
+                        TextSpan(
+                          text: 'https://maimai.lxns.net/user/profile?tab=thirdparty',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500,
+                            color: AppColors.linkBlue(brightness), decoration: TextDecoration.underline),
+                        ),
+                        const TextSpan(text: '，滑到最底部获取密钥。',
+                          style: TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: tokenCtrl,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        hintText: '在此粘贴落雪个人 API 密钥...',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        isDense: true,
+                      ),
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: saving ? null : () async {
+                      final t = tokenCtrl.text.trim();
+                      if (t.isEmpty) {
+                        Fluttertoast.showToast(msg: '请先输入 API 密钥');
+                        return;
+                      }
+                      setState(() => saving = true);
+                      final ok = await DivingFishProbeManager().setLxnsImportToken(t);
+                      setState(() => saving = false);
+                      if (ok) {
+                        hasToken = true;
+                        tokenCtrl.clear();
+                        Fluttertoast.showToast(msg: '落雪 API 密钥已保存');
+                        setState(() {});
+                      } else {
+                        Fluttertoast.showToast(msg: '保存失败，请先通过「同步成绩到水鱼」建立认证');
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.linkBlue(brightness),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    child: saving
+                        ? const SizedBox(width: 16, height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Text('保存', style: TextStyle(fontSize: 13)),
+                  ),
+                ],
+              ),
+              if (hasToken == true) ...[
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () async {
+                    final ok = await DivingFishProbeManager().setLxnsImportToken(null);
+                    if (ok) {
+                      hasToken = false;
+                      Fluttertoast.showToast(msg: '落雪 API 密钥已清除');
+                      setState(() {});
+                    } else {
+                      Fluttertoast.showToast(msg: '清除失败');
+                    }
+                  },
+                  child: Text('清除密钥',
+                    style: TextStyle(color: AppColors.errorRed(brightness), fontSize: 12)),
+                ),
+              ],
+            ],
+          ],
         );
       },
     );
@@ -2827,517 +3070,456 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // 构建自定义功能按钮
-  Widget _buildCustomButton(ButtonItem item, BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final brightness = Theme.of(context).brightness;
-
-    return SizedBox(
-      height: screenHeight * 0.12,
-      child: TextButton(
-        style: TextButton.styleFrom(
-          backgroundColor: Colors.transparent, // 按钮整体背景设为透明
-          side: BorderSide(
-            color: AppColors.buttonBorder(brightness),
-            width: AppConstants.borderWidth,
-          ),
-          padding: EdgeInsets.zero, // 移除默认内边距
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppConstants.borderRadiusLarge),
-          ),
-          elevation: 0,
-        ),
-        onPressed: () async {
-          debugPrint("点击了：${item.title}");
-          // 版本对照按钮点击事件
-          if (item.title == '版本对照') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => VersionView()),
-            );
-          }
-          if (item.title == '达成率计算') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => AchievementRateCalculator()),
-            );
-          }
-          if (item.title == '达成率反推') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => AchievementFullReverseCalculator()),
-            );
-          }
-          if (item.title == 'Best50查询') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => B50Page()),
-            );
-          }
-          if (item.title == '单曲Rating计算') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => SingleRatingCalculator()),
-            );
-          }
-          if (item.title == '基于标签推荐') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => RecommendByTags()),
-            );
-          }
-          if (item.title == '乐曲查询') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => SongSearchPage()),
-            );
-          }
-          if (item.title == '刷新数据') {
-            _showRefreshDataDialog(context);
-          }
-          if (item.title == '刷新Maidata') {
-            final confirmed = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('确认刷新'),
-                content: const Text('将清除所有maidata缓存并从服务器重新拉取全部maidata数据，耗时可能较长。\n\n确定要刷新吗？'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(false),
-                    child: const Text('取消'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () => Navigator.of(ctx).pop(true),
-                    child: const Text('确认刷新'),
-                  ),
-                ],
-              ),
-            );
-            if (confirmed == true) {
-              // 显示加载对话框
-              if (mounted) {
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (ctx) => const AlertDialog(
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text('正在刷新Maidata...'),
-                      ],
-                    ),
-                  ),
-                );
-              }
-              try {
-                // 清除所有maidata缓存
-                await MaidataManager().clearCache();
-                await MaimaiMusicDataManager().clearAddedSongsCache();
-                final prefs = await SharedPreferences.getInstance();
-                final keys = prefs.getKeys();
-                for (final key in keys) {
-                  if (key.startsWith(CacheKeyConstant.maidataCachePrefix)) {
-                    await prefs.remove(key);
-                  }
-                }
-                // 重新拉取全量maidata
-                await MaimaiMusicDataManager().refreshDataWithSmartMaidata();
-                // 关闭加载对话框
-                if (mounted) Navigator.of(context).pop();
-                if (mounted) {
-                  Fluttertoast.showToast(msg: 'Maidata刷新成功');
-                }
-              } catch (e) {
-                debugPrint('[HomePage] 刷新Maidata失败: $e');
-                if (mounted) Navigator.of(context).pop();
-                if (mounted) {
-                  Fluttertoast.showToast(msg: '刷新失败: $e');
-                }
-              }
-            }
-          }
-          if (item.title == '成绩查询') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => UserScoreSearchPage()),
-            );
-          }
-          if (item.title == '拟合Best50查询'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => DiffBest50Page()),
-            );
-          }
-          if (item.title == '随机乐曲'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => RandomChartPage()),
-            );
-          }
-          if (item.title == '无提示猜歌'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => GuessChartByInfoPage()),
-            );
-          }
-          if (item.title == '根据部分曲绘猜歌'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => GuessChartByCoverPage()),
-            );
-          }
-          if (item.title == '收藏品查询'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => CollectionSearchPage()),
-            );
-          }
-          if (item.title == '根据模糊曲绘猜歌'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => GuessChartByBlurredCoverPage()),
-            );
-          }
-          if (item.title == '根据歌曲片段猜歌'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => GuessChartBySongExcerptPage()),
-            );
-          }
-          if (item.title == '根据别名猜歌'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => GuessChartByAliaPage()),
-            );
-          }
-          if (item.title == '舞萌开字母'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => GuessSongByOpenLettersPage()),
-            );
-          }
-          if (item.title == '多人猜歌游戏'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => MultiplayerLobbyPage()),
-            );
-          }
-          if (item.title == '服务器状态'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => MaimaiServerStatusPage()),
-            );
-          }
-          if (item.title == '个性化Best50查询'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => PersonalizedBest50Page()),
-            );
-          }
-          if (item.title == '舞萌百科'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => KnowledgeSearchPage()),
-            );
-          }
-          if (item.title == 'KALEIDXSCOPE'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => KaleidXScopeSelectPage()),
-            );
-          }
-          if (item.title == '曲绘识别'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const CoverRecognitionPage()),
-            );
-          }
-          if (item.title == '牌子进度'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => PaiziProgressPage()),
-            );
-          }
-          if (item.title == '个性化成绩查询'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => PersonalizedScorePage()),
-            );
-          }
-          if (item.title == '自定义谱面播放'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => PersonalizedChartPlayConfigure()),
-            );
-          }
-          if (item.title == '关于本APP') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AboutAppPage()),
-            );
-          }
-          if (item.title == '问卷调查') {
-            final uri = Uri.parse('https://wj.qq.com/s2/26540572/7828/');
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
-            }
-          }
-          if (item.title == '同步成绩') {
-            // 检测是否已登录水鱼
-            final prefs = await SharedPreferences.getInstance();
-            final hasJwt = (prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '').isNotEmpty;
-            if (!hasJwt) {
-              if (context.mounted) {
-                showDialog(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('提示'),
-                    content: const Text('请先在「登录水鱼」中登录你的水鱼账号，再使用同步功能。'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(ctx).pop(),
-                        child: const Text('取消'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.of(ctx).pop();
-                          _showDivingFishLoginDialog(context);
-                        },
-                        child: const Text('去登录'),
-                      ),
-                    ],
-                  ),
-                );
-              }
-              return;
-            }
-
-            // 检测缓存 QQ 与当前水鱼 bind_qq 是否一致
-            final cachedQQ = _cachedQQ.isNotEmpty ? _cachedQQ : null;
-            if (cachedQQ != null) {
-              final bindQQ = await DivingFishProbeManager().fetchBindQQ();
-              if (bindQQ != null && bindQQ.isNotEmpty && bindQQ != cachedQQ) {
-                if (context.mounted) {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('账号不匹配'),
-                      content: Text(
-                        '当前登录的水鱼账号绑定的 QQ（$bindQQ）与本机缓存的 QQ（$cachedQQ）不一致。\n\n'
-                        '请先登出当前水鱼账号，登录正确的账号后再同步。',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(ctx).pop(),
-                          child: const Text('确定'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-                return;
-              }
-            }
-
-            await _showSyncScoreDialog(context);
-          }
-          if (item.title == '账号管理') {
-            _showAccountManageDialog(context);
-          }
-          if (item.title == '登录水鱼') {
-            _showDivingFishLoginDialog(context);
-          }
-          if (item.title == '登出账号') {
-            final ok = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('确认登出'),
-                content: const Text('登出后将清除缓存的登录信息和 ImportToken，确定要登出吗？'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(false),
-                    child: const Text('取消'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () => Navigator.of(ctx).pop(true),
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed(brightness)),
-                    child: const Text('登出', style: TextStyle(color: Colors.white)),
-                  ),
-                ],
-              ),
-            );
-            if (ok == true) {
-              _logoutDivingFish();
-            }
-          }
-          if (item.title == '段位表'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => RankListPage()),
-            );
-          }
-          if (item.title == '排行榜(仅供参考)'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => RatingRankListPage()),
-            );
-          }
-          if (item.title == '特殊排行榜'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => SpecialRankingListPage()),
-            );
-          }
-          if (item.title == '检查更新'){
-            // 显示加载对话框
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (BuildContext context) {
-                return AlertDialog(
-                  title: Text('检查更新'),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text('正在检查更新...'),
-                    ],
-                  ),
-                );
-              },
-            );
-            
-            // 检查更新
-            final updateManager = LZYCheckUpdateManager();
-            updateManager.showUpdateDialog(context, force: true).then((_) {
-              Navigator.of(context).pop(); // 关闭加载对话框
-            }).catchError((error) {
-              Navigator.of(context).pop(); // 关闭加载对话框
-              // 显示错误提示
-              if (context.mounted) {
-                showDialog(
-                  context: context,
-                  builder: (BuildContext context) {
-                    return AlertDialog(
-                      title: Text('检查更新失败'),
-                      content: Text('请检查网络连接后重试'),
-                      actions: [
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                          },
-                          child: Text('确定'),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              }
-            });
-          }
-          if (item.title == '定数分布'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const DifficultyDistributionPage()),
-            );
-          }
-          if (item.title == '深色模式'){
-            _showThemeDialog();
-          }
-          if (item.title == '收藏夹'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const FavoriteFolderPage()),
-            );
-          }
-          if (item.title == '数据备份'){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const DataBackupPage()),
-            );
-          }
-        },
-        child: Column(
-          children: [
-            // 上半部分：原背景色，居中图标
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.buttonBackground(brightness),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(AppConstants.borderRadiusLarge),
-                    topRight: Radius.circular(AppConstants.borderRadiusLarge),
-                  ),
-                ),
-                child: Center(
-                  child: Container(
-                    width: screenWidth * 0.09, // 圆形背景的宽度
-                    height: screenWidth * 0.09, // 圆形背景的高度
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface, // 主题感知背景
-                      shape: BoxShape.circle, // 圆形形状
-                    ),
-                    child: Center(
-                      child: Icon(
-                        item.icon,
-                        color: Theme.of(context).colorScheme.onSurface,
-                        size: screenWidth * 0.05, // 图标尺寸
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+  // 功能按钮点击分发（提取为独立方法，作为回调传给 FeatureCategoryPage）
+  Future<void> _handleFeatureTap(ButtonItem item) async {
+    debugPrint("点击了：${item.title}");
+    // 版本对照按钮点击事件
+    if (item.title == '版本对照') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => VersionView()),
+      );
+    }
+    if (item.title == '达成率计算') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => AchievementRateCalculator()),
+      );
+    }
+    if (item.title == '达成率反推') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => AchievementFullReverseCalculator()),
+      );
+    }
+    if (item.title == 'Best50查询') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => B50Page()),
+      );
+    }
+    if (item.title == '单曲Rating计算') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => SingleRatingCalculator()),
+      );
+    }
+    if (item.title == '基于标签推荐') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => RecommendByTags()),
+      );
+    }
+    if (item.title == '基于目标Rating推荐') {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => RatingRecommendPage()),
+    );
+  }
+  if (item.title == '基于定数区间推荐') {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => DsRangeRecommendPage()),
+    );
+  }
+    if (item.title == '乐曲查询') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => SongSearchPage()),
+      );
+    }
+    if (item.title == '刷新数据') {
+      _showRefreshDataDialog(context);
+    }
+    if (item.title == '刷新Maidata') {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('确认刷新'),
+          content: const Text('将清除所有maidata缓存并从服务器重新拉取全部maidata数据，耗时可能较长。\n\n确定要刷新吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('取消'),
             ),
-            // 下半部分：白色背景，居中标题和副标题
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(AppConstants.borderRadiusLarge),
-                    bottomRight: Radius.circular(AppConstants.borderRadiusLarge),
-                  ),
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        item.title,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontSize: screenWidth * 0.035,
-                          fontWeight: FontWeight.bold,
-                          fontStyle: FontStyle.normal,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      SizedBox(height: screenHeight * 0.005),
-                      Text(
-                        item.subtitle,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                          fontSize: screenWidth * 0.025,
-                          fontWeight: FontWeight.w300,
-                        ),
-                        textAlign: TextAlign.center,
-                        softWrap: true,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('确认刷新'),
             ),
           ],
         ),
-      ),
-    );
+      );
+      if (confirmed == true) {
+        // 显示加载对话框
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => const AlertDialog(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('正在刷新Maidata...'),
+                ],
+              ),
+            ),
+          );
+        }
+        try {
+          // 清除所有maidata缓存
+          await MaidataManager().clearCache();
+          await MaimaiMusicDataManager().clearAddedSongsCache();
+          final prefs = await SharedPreferences.getInstance();
+          final keys = prefs.getKeys();
+          for (final key in keys) {
+            if (key.startsWith(CacheKeyConstant.maidataCachePrefix)) {
+              await prefs.remove(key);
+            }
+          }
+          // 重新拉取全量maidata
+          await MaimaiMusicDataManager().refreshDataWithSmartMaidata();
+          // 关闭加载对话框
+          if (mounted) Navigator.of(context).pop();
+          if (mounted) {
+            Fluttertoast.showToast(msg: 'Maidata刷新成功');
+          }
+        } catch (e) {
+          debugPrint('[HomePage] 刷新Maidata失败: $e');
+          if (mounted) Navigator.of(context).pop();
+          if (mounted) {
+            Fluttertoast.showToast(msg: '刷新失败: $e');
+          }
+        }
+      }
+    }
+    if (item.title == '成绩查询') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => UserScoreSearchPage()),
+      );
+    }
+    if (item.title == '拟合Best50查询'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => DiffBest50Page()),
+      );
+    }
+    if (item.title == '随机乐曲'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => RandomChartPage()),
+      );
+    }
+    if (item.title == '无提示猜歌'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => GuessChartByInfoPage()),
+      );
+    }
+    if (item.title == '根据部分曲绘猜歌'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => GuessChartByCoverPage()),
+      );
+    }
+    if (item.title == '收藏品查询'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => CollectionSearchPage()),
+      );
+    }
+    if (item.title == '根据模糊曲绘猜歌'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => GuessChartByBlurredCoverPage()),
+      );
+    }
+    if (item.title == '根据歌曲片段猜歌'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => GuessChartBySongExcerptPage()),
+      );
+    }
+    if (item.title == '根据别名猜歌'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => GuessChartByAliaPage()),
+      );
+    }
+    if (item.title == '舞萌开字母'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => GuessSongByOpenLettersPage()),
+      );
+    }
+    if (item.title == '多人猜歌游戏'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => MultiplayerLobbyPage()),
+      );
+    }
+    if (item.title == '服务器状态'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => MaimaiServerStatusPage()),
+      );
+    }
+    if (item.title == '个性化Best50查询'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => PersonalizedBest50Page()),
+      );
+    }
+    if (item.title == '舞萌百科'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => KnowledgeSearchPage()),
+      );
+    }
+    if (item.title == 'KALEIDXSCOPE'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => KaleidXScopeSelectPage()),
+      );
+    }
+    if (item.title == '曲绘识别'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const CoverRecognitionPage()),
+      );
+    }
+    if (item.title == '牌子进度'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => PaiziProgressPage()),
+      );
+    }
+    if (item.title == '个性化成绩查询'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => PersonalizedScorePage()),
+      );
+    }
+    if (item.title == '自定义谱面播放'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => PersonalizedChartPlayConfigure()),
+      );
+    }
+    if (item.title == '关于本APP') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const AboutAppPage()),
+      );
+    }
+    if (item.title == '问卷调查') {
+      final uri = Uri.parse('https://wj.qq.com/s2/26540572/7828/');
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    }
+    if (item.title == '同步成绩到水鱼') {
+      // 检测是否已登录水鱼
+      final prefs = await SharedPreferences.getInstance();
+      final hasJwt = (prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '').isNotEmpty;
+      if (!hasJwt) {
+        if (context.mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('提示'),
+              content: const Text('请先在「登录水鱼」中登录你的水鱼账号，再使用同步功能。'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('取消'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    _showDivingFishLoginDialog(context);
+                  },
+                  child: const Text('去登录'),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+
+      // 检测缓存 QQ 与当前水鱼 bind_qq 是否一致
+      final cachedQQ = _cachedQQ.isNotEmpty ? _cachedQQ : null;
+      if (cachedQQ != null) {
+        final bindQQ = await DivingFishProbeManager().fetchBindQQ();
+        if (bindQQ != null && bindQQ.isNotEmpty && bindQQ != cachedQQ) {
+          if (context.mounted) {
+            showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('账号不匹配'),
+                content: Text(
+                  '当前登录的水鱼账号绑定的 QQ（$bindQQ）与本机缓存的 QQ（$cachedQQ）不一致。\n\n'
+                  '请先登出当前水鱼账号，登录正确的账号后再同步。',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('确定'),
+                  ),
+                ],
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      await _showSyncScoreDialog(context);
+    }
+    if (item.title == '账号管理') {
+      _showAccountManageDialog(context);
+    }
+    if (item.title == '登录水鱼') {
+      _showDivingFishLoginDialog(context);
+    }
+    if (item.title == '登出账号') {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('确认登出'),
+          content: const Text('登出后将清除缓存的登录信息和 ImportToken，确定要登出吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed(Theme.of(context).brightness)),
+              child: const Text('登出', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+      if (ok == true) {
+        await _logoutDivingFish();
+      }
+    }
+    if (item.title == '段位表'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => RankListPage()),
+      );
+    }
+    if (item.title == '排行榜(仅供参考)'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => RatingRankListPage()),
+      );
+    }
+    if (item.title == '特殊排行榜'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => SpecialRankingListPage()),
+      );
+    }
+    if (item.title == '检查更新'){
+      // 显示加载对话框
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('检查更新'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('正在检查更新...'),
+              ],
+            ),
+          );
+        },
+      );
+
+      // 检查更新
+      final updateManager = LZYCheckUpdateManager();
+      updateManager.showUpdateDialog(context, force: true).then((_) {
+        Navigator.of(context).pop(); // 关闭加载对话框
+      }).catchError((error) {
+        Navigator.of(context).pop(); // 关闭加载对话框
+        // 显示错误提示
+        if (context.mounted) {
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text('检查更新失败'),
+                content: Text('请检查网络连接后重试'),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Clipboard.setData(const ClipboardData(text: LZYCheckUpdateManager.defaultDownloadUrl));
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('下载链接已复制到剪贴板'), duration: Duration(seconds: 2)),
+                      );
+                    },
+                    child: Text('复制下载链接'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: Text('确定'),
+                  ),
+                ],
+              );
+            },
+          );
+        }
+      });
+    }
+    if (item.title == '定数分布'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const DifficultyDistributionPage()),
+      );
+    }
+    if (item.title == '深色模式'){
+      _showThemeDialog();
+    }
+    if (item.title == '收藏夹'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const FavoriteFolderPage()),
+      );
+    }
+    if (item.title == '同步成绩到落雪'){
+      UpdateLuoXueScorePage.show(context);
+    }
+    if (item.title == '每日推荐'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const DailyRecommendPage()),
+      );
+    }
+    if (item.title == '好友对比'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const FriendComparePage()),
+      );
+    }
+    if (item.title == '数据备份'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const DataBackupPage()),
+      );
+    }
   }
 
   // 构建分类区域（分类标题 + 分隔条 + 按钮网格）
@@ -3386,11 +3568,107 @@ class _HomePageState extends State<HomePage> {
           ),
           itemCount: category.items.length,
           itemBuilder: (context, index) {
-            return _buildCustomButton(category.items[index], context);
+            return FeatureButton(
+              item: category.items[index],
+              onTap: () => _handleFeatureTap(category.items[index]),
+            );
           },
         ),
         SizedBox(height: screenHeight * 0.006),
       ],
+    );
+  }
+
+  // 构建大类导航卡片按钮
+  Widget _buildCategoryCard(ButtonCategory category, BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final brightness = Theme.of(context).brightness;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: screenHeight * 0.012),
+      child: SizedBox(
+        height: screenHeight * 0.09,
+        child: TextButton(
+          style: TextButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
+            side: BorderSide(
+              color: AppColors.buttonBorder(brightness),
+              width: AppConstants.borderWidth,
+            ),
+            padding: EdgeInsets.symmetric(
+              horizontal: screenWidth * 0.04,
+              vertical: screenHeight * 0.01,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppConstants.borderRadiusLarge),
+            ),
+            elevation: 0,
+          ),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (ctx) => FeatureCategoryPage(
+                  category: category,
+                  onFeatureTap: _handleFeatureTap,
+                  loginStateNotifier: _loginStateNotifier,
+                ),
+              ),
+            ).then((_) => _checkDivingFishLoginStatus());
+          },
+          child: Row(
+            children: [
+              // 左侧：分类图标（圆形背景）
+              Container(
+                width: screenWidth * 0.11,
+                height: screenWidth * 0.11,
+                decoration: BoxDecoration(
+                  color: AppColors.buttonBackground(brightness),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  category.items.isNotEmpty ? category.items.first.icon : Icons.folder,
+                  color: Theme.of(context).colorScheme.onSurface,
+                  size: screenWidth * 0.06,
+                ),
+              ),
+              SizedBox(width: screenWidth * 0.04),
+              // 中间：分类名称 + 功能数量
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      category.name,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: screenWidth * 0.042,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      '${category.items.length} 个功能',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        fontSize: screenWidth * 0.03,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // 右侧：箭头
+              Icon(
+                Icons.chevron_right,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                size: screenWidth * 0.06,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -3463,5 +3741,181 @@ class _HomePageState extends State<HomePage> {
     }
     
     return false;
+  }
+
+  // ===== 水鱼导入辅助方法 =====
+
+  /// 读取剪贴板按钮
+  Widget _buildClipboardButton(StateSetter setState, TextEditingController qrCtrl) {
+    return OutlinedButton.icon(
+      icon: const Icon(Icons.paste, size: 16),
+      label: const Text('读取剪贴板', style: TextStyle(fontSize: 13)),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      ),
+      onPressed: () async {
+        final data = await Clipboard.getData(Clipboard.kTextPlain);
+        final text = data?.text ?? '';
+        if (text.trim().startsWith('SGWCMAID')) {
+          setState(() {
+            qrCtrl.text = text.trim();
+          });
+          Fluttertoast.showToast(msg: '已识别到有效二维码字符串，已自动填入');
+        } else if (text.isNotEmpty) {
+          // 未检测到有效前缀，提示用户
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('提示'),
+              content: const Text('剪贴板内容未以 SGWCMAID 开头，仍要填入吗？'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('取消'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('填入'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed == true) {
+            setState(() {
+              qrCtrl.text = text.trim();
+            });
+          }
+        } else {
+          Fluttertoast.showToast(msg: '剪贴板为空');
+        }
+      },
+    );
+  }
+
+  /// 从相册识别二维码按钮
+  Widget _buildGalleryQrButton(StateSetter setState, TextEditingController qrCtrl) {
+    return OutlinedButton.icon(
+      icon: const Icon(Icons.photo_library, size: 16),
+      label: const Text('从相册识别', style: TextStyle(fontSize: 13)),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      ),
+      onPressed: () async {
+        try {
+          final picker = ImagePicker();
+          final pickedFile = await picker.pickImage(
+            source: ImageSource.gallery,
+            imageQuality: 100,
+          );
+          if (pickedFile == null) return;
+
+          // 使用 mobile_scanner 解析图片中的二维码
+          final controller = MobileScannerController();
+          try {
+            final barcodes = await controller.analyzeImage(pickedFile.path);
+
+            if (barcodes != null && barcodes.barcodes.isNotEmpty) {
+              final qrText = barcodes.barcodes.first.rawValue ?? '';
+              if (qrText.isNotEmpty) {
+                setState(() {
+                  qrCtrl.text = qrText;
+                });
+                Fluttertoast.showToast(msg: '已识别到二维码，已自动填入');
+              } else {
+                Fluttertoast.showToast(msg: '未能从图片中识别到二维码内容');
+              }
+            } else {
+              Fluttertoast.showToast(msg: '未在图片中检测到二维码');
+            }
+          } finally {
+            controller.dispose();
+          }
+        } catch (e) {
+          debugPrint('从相册识别二维码失败: $e');
+          Fluttertoast.showToast(msg: '识别失败: $e');
+        }
+      },
+    );
+  }
+
+  /// 摄像头扫码按钮
+  Widget _buildCameraScanButton(StateSetter setState, TextEditingController qrCtrl, BuildContext dialogContext) {
+    return OutlinedButton.icon(
+      icon: const Icon(Icons.qr_code_scanner, size: 16),
+      label: const Text('扫描二维码', style: TextStyle(fontSize: 13)),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      ),
+      onPressed: () async {
+        try {
+          final result = await Navigator.of(dialogContext).push<String>(
+            MaterialPageRoute(
+              builder: (_) => _QrScannerPage(),
+            ),
+          );
+          if (result != null && result.isNotEmpty) {
+            setState(() {
+              qrCtrl.text = result;
+            });
+            Fluttertoast.showToast(msg: '已扫描到二维码，已自动填入');
+          }
+        } catch (e) {
+          debugPrint('摄像头扫码失败: $e');
+          Fluttertoast.showToast(msg: '扫码失败: $e');
+        }
+      },
+    );
+  }
+}
+
+/// 摄像头扫二维码页面
+class _QrScannerPage extends StatefulWidget {
+  const _QrScannerPage();
+
+  @override
+  State<_QrScannerPage> createState() => _QrScannerPageState();
+}
+
+class _QrScannerPageState extends State<_QrScannerPage> {
+  bool _hasPopped = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('扫描二维码'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: MobileScanner(
+        onDetect: (BarcodeCapture capture) {
+          if (_hasPopped) return;
+          final barcode = capture.barcodes.firstOrNull;
+          if (barcode != null && barcode.rawValue != null && barcode.rawValue!.isNotEmpty) {
+            _hasPopped = true;
+            Navigator.pop(context, barcode.rawValue);
+          }
+        },
+        errorBuilder: (context, error) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                const SizedBox(height: 16),
+                Text('摄像头错误: $error'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('返回'),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 }

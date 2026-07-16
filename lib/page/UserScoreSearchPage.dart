@@ -926,6 +926,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     final brightness = Theme.of(context).brightness;
     // ignore: unused_local_variable
     final stats =  _calculateStats();
@@ -979,7 +980,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16), // 进一步减小上边距，从4减小到0
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom), // 进一步减小上边距，从4减小到0
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),

@@ -72,9 +72,9 @@ class _MultiplayerLobbyPageState extends State<MultiplayerLobbyPage> {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
     final scaleFactor = screenWidth / 375.0;
-    final paddingS = 8.0 * scaleFactor;
+    final paddingS = 4.0 * scaleFactor;
     final paddingM = 12.0 * scaleFactor;
-    final paddingL = 16.0 * scaleFactor;
+    final paddingL = 10.0 * scaleFactor;
     final borderRadiusSmall = 8.0 * scaleFactor;
 
     return Scaffold(
@@ -133,7 +133,7 @@ class _MultiplayerLobbyPageState extends State<MultiplayerLobbyPage> {
                           child: ElevatedButton(
                             onPressed: _handleCreateRoom,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.onSurface,
+                              backgroundColor: Theme.of(context).colorScheme.primary,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(borderRadiusSmall),
                               ),
@@ -141,12 +141,12 @@ class _MultiplayerLobbyPageState extends State<MultiplayerLobbyPage> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.add_box, size: 48 * scaleFactor, color: Colors.white),
+                                Icon(Icons.add_box, size: 48 * scaleFactor, color: Theme.of(context).colorScheme.onPrimary),
                                 SizedBox(height: paddingM),
                                 Text(
                                   '创建房间',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: Theme.of(context).colorScheme.onPrimary,
                                     fontSize: 18 * scaleFactor,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -164,8 +164,8 @@ class _MultiplayerLobbyPageState extends State<MultiplayerLobbyPage> {
                           child: ElevatedButton(
                             onPressed: _handleJoinRoom,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              side: BorderSide(color: Theme.of(context).colorScheme.onSurface, width: 2),
+                              backgroundColor: Theme.of(context).colorScheme.surface,
+                              side: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(borderRadiusSmall),
                               ),
@@ -173,12 +173,12 @@ class _MultiplayerLobbyPageState extends State<MultiplayerLobbyPage> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.group_add, size: 48 * scaleFactor, color: Theme.of(context).colorScheme.onSurface),
+                                Icon(Icons.group_add, size: 48 * scaleFactor, color: Theme.of(context).colorScheme.primary),
                                 SizedBox(height: paddingM),
                                 Text(
                                   '加入房间',
                                   style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurface,
+                                    color: Theme.of(context).colorScheme.primary,
                                     fontSize: 18 * scaleFactor,
                                     fontWeight: FontWeight.bold,
                                   ),

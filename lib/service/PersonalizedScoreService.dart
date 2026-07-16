@@ -396,6 +396,7 @@ class PersonalizedScoreService {
   static const String _keyCharter = 'level_score_charter';
   static const String _keyVersion = 'level_score_version';
   static const String _keyArtist = 'level_score_artist';
+  static const String _keyUseLevelDisplay = 'level_score_use_level_display';
 
   // 保存用户选择的选项
   Future<void> saveSelectedOptions({
@@ -403,6 +404,7 @@ class PersonalizedScoreService {
     required String? titleType,
     required int? difficulty,
     required bool showListMode,
+    required bool useLevelDisplay,
     required String? mode,
     required String? charter,
     String? version,
@@ -413,6 +415,7 @@ class PersonalizedScoreService {
     await prefs.setString(_keyTitleType, titleType ?? '');
     await prefs.setInt(_keyDifficulty, difficulty ?? -1);
     await prefs.setBool(_keyShowListMode, showListMode);
+    await prefs.setBool(_keyUseLevelDisplay, useLevelDisplay);
     await prefs.setString(_keyMode, mode ?? 'level');
     await prefs.setString(_keyCharter, charter ?? '');
     await prefs.setString(_keyVersion, version ?? '');
@@ -427,6 +430,7 @@ class PersonalizedScoreService {
       'titleType': prefs.getString(_keyTitleType) ?? '',
       'difficulty': prefs.getInt(_keyDifficulty) ?? -1,
       'showListMode': prefs.getBool(_keyShowListMode) ?? true,
+      'useLevelDisplay': prefs.getBool(_keyUseLevelDisplay) ?? true,
       'mode': prefs.getString(_keyMode) ?? 'level',
       'charter': prefs.getString(_keyCharter) ?? '',
       'version': prefs.getString(_keyVersion) ?? '',
@@ -441,8 +445,9 @@ class PersonalizedScoreService {
 
   // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析）
   bool _isMaidataSong(Song song) {
-    if (song.cids.isEmpty) return false;
-    return song.cids.every((cid) => cid == 0);
+    if (song.cids.isNotEmpty && song.cids.every((cid) => cid == 0)) return true;
+    if (song.isExtra) return true;
+    return false;
   }
 
   // 获取所有曲师及其谱面数量

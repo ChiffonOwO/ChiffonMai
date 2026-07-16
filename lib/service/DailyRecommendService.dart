@@ -152,8 +152,9 @@ class DailyRecommendService {
   bool _isMaidataSong(Song song) {
     try {
       final cids = song.cids;
-      if (cids == null || cids.isEmpty) return false;
-      return cids.every((cid) => cid == 0);
+      if (cids.isNotEmpty && cids.every((cid) => cid == 0)) return true;
+      if (song.isExtra) return true;
+      return false;
     } catch (_) {
       return false;
     }

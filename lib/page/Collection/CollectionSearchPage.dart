@@ -184,6 +184,7 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
 
     // 按钮相关配置
     final buttonHeight = 36.0; // 降低按钮高度
@@ -239,7 +240,7 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),

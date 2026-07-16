@@ -15,6 +15,10 @@ import '../../constant/VersionListConstant.dart';
 import '../../service/Best50/PersonalizedBest50ConvertToImgService.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
+import 'package:my_first_flutter_app/entity/DXRating/MaiTagsEntity.dart';
+import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
+import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 
 class PersonalizedBest50Page extends StatefulWidget {
   const PersonalizedBest50Page({super.key});
@@ -57,6 +61,8 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     {'value': 'dx_50', 'label': 'DX50'},
     {'value': 'st_50', 'label': 'ST50'},
     {'value': 'star_50', 'label': '星数50'},
+    {'value': 'tag_50', 'label': '标签50'},
+    {'value': 'all_50', 'label': 'ALL50'},
   ];
 
   // 星数选项
@@ -72,6 +78,9 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
   ];
 
   String? _selectedStar; // 选中的星数
+  int? _selectedTagId; // 选中的标签ID
+  String? _selectedTagName; // 选中的标签名称
+  bool _isInclusiveMode = false; // 包容关系模式开关（仅对连击/同步50有效）
 
   @override
   void initState() {
@@ -93,6 +102,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
               'ds': song.ds,
               'level': song.level,
               'cids': song.cids,
+              'is_extra': song.isExtra,
               'charts': song.charts.map((chart) => {
                 'notes': chart.notes,
                 'charter': chart.charter
@@ -135,6 +145,63 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     }
   }
 
+  // 判断当前选中类型是否为连击类型（FC/FC+/AP/AP+）
+  bool _isComboType() {
+    return _getComboValue() != null;
+  }
+
+  // 获取当前选中类型对应的fc字段值
+  String? _getComboValue() {
+    switch (_selectedType) {
+      case 'fc_50': return 'fc';
+      case 'fc_plus_50': return 'fcp';
+      case 'ap_50': return 'ap';
+      case 'ap_plus_50': return 'app';
+      default: return null;
+    }
+  }
+
+  // 判断当前选中类型是否为同步类型（FS/FS+/FDX/FDX+）
+  bool _isSyncType() {
+    return _getSyncValue() != null;
+  }
+
+  // 获取当前选中类型对应的fs字段值
+  String? _getSyncValue() {
+    switch (_selectedType) {
+      case 'fs_50': return 'fs';
+      case 'fs_plus_50': return 'fsp';
+      case 'fsd_50': return 'fsd';
+      case 'fsdp_50': return 'fsdp';
+      default: return null;
+    }
+  }
+
+  // 判断当前选中类型是否支持包容关系模式（连击或同步类型）
+  bool _supportsInclusiveMode() {
+    return _isComboType() || _isSyncType();
+  }
+
+  // 包容关系模式下显示的标签
+  String _getInclusiveModeLabel() {
+    if (_isComboType()) {
+      const labels = {'fc': 'FC', 'fcp': 'FC+', 'ap': 'AP', 'app': 'AP+'};
+      const hierarchy = ['fc', 'fcp', 'ap', 'app'];
+      final base = _getComboValue()!;
+      final startIndex = hierarchy.indexOf(base);
+      final included = hierarchy.sublist(startIndex).map((v) => labels[v]!).join('/');
+      return '包含: $included';
+    } else if (_isSyncType()) {
+      const labels = {'fs': 'FS', 'fsp': 'FS+', 'fsd': 'FDX', 'fsdp': 'FDX+'};
+      const hierarchy = ['fs', 'fsp', 'fsd', 'fsdp'];
+      final base = _getSyncValue()!;
+      final startIndex = hierarchy.indexOf(base);
+      final included = hierarchy.sublist(startIndex).map((v) => labels[v]!).join('/');
+      return '包含: $included';
+    }
+    return '';
+  }
+
   Future<void> _fetchPersonalizedData() async {
     setState(() {
       _isLoading = true;
@@ -147,16 +214,32 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
       // 根据选择的类型获取数据
       switch (_selectedType) {
         case 'ap_plus_50':
-          data = await service.getAPPlus50Data();
+          if (_isInclusiveMode) {
+            data = await service.getInclusiveCombo50Data('app');
+          } else {
+            data = await service.getAPPlus50Data();
+          }
           break;
         case 'ap_50':
-          data = await service.getAP50Data();
+          if (_isInclusiveMode) {
+            data = await service.getInclusiveCombo50Data('ap');
+          } else {
+            data = await service.getAP50Data();
+          }
           break;
         case 'fc_50':
-          data = await service.getFC50Data();
+          if (_isInclusiveMode) {
+            data = await service.getInclusiveCombo50Data('fc');
+          } else {
+            data = await service.getFC50Data();
+          }
           break;
         case 'fc_plus_50':
-          data = await service.getFCPlus50Data();
+          if (_isInclusiveMode) {
+            data = await service.getInclusiveCombo50Data('fcp');
+          } else {
+            data = await service.getFCPlus50Data();
+          }
           break;
         case 'cun_50':
           data = await service.getCun50Data();
@@ -181,16 +264,32 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
           data = await service.getST50Data();
           break;
         case 'fs_50':
-          data = await service.getFS50Data();
+          if (_isInclusiveMode) {
+            data = await service.getInclusiveSync50Data('fs');
+          } else {
+            data = await service.getFS50Data();
+          }
           break;
         case 'fs_plus_50':
-          data = await service.getFSPlus50Data();
+          if (_isInclusiveMode) {
+            data = await service.getInclusiveSync50Data('fsp');
+          } else {
+            data = await service.getFSPlus50Data();
+          }
           break;
         case 'fsd_50':
-          data = await service.getFDX50Data();
+          if (_isInclusiveMode) {
+            data = await service.getInclusiveSync50Data('fsd');
+          } else {
+            data = await service.getFDX50Data();
+          }
           break;
         case 'fsdp_50':
-          data = await service.getFDXPlus50Data();
+          if (_isInclusiveMode) {
+            data = await service.getInclusiveSync50Data('fsdp');
+          } else {
+            data = await service.getFDXPlus50Data();
+          }
           break;
         case 'cuniao_plus_50':
           data = await service.getCuniaoPlus50Data();
@@ -213,6 +312,14 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
           if (_selectedStar != null) {
             data = await service.getStar50Data(_selectedStar!);
           }
+          break;
+        case 'tag_50':
+          if (_selectedTagId != null) {
+            data = await service.getTag50Data(_selectedTagId!);
+          }
+          break;
+        case 'all_50':
+          data = await service.getAll50Data();
           break;
       }
 
@@ -330,6 +437,17 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
         return;
       }
 
+      // 先弹出质量选择器
+      final quality = await ExportQualitySelector.show(
+        context,
+        estimatedPngSize: ImageEncodeUtil.estimatePngSize(
+          songCount: _personalizedSongs.isNotEmpty ? _personalizedSongs.length : 50,
+        ),
+      );
+      if (quality == null) {
+        return; // 用户取消
+      }
+
       // 显示加载指示器
       showDialog(
         context: context,
@@ -354,13 +472,16 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                   ? '流派50 - ${_selectedGenre!}'
                   : _selectedType == 'star_50' && _selectedStar != null
                       ? '星数50 - ${_selectedStar!}'
-                      : '个性化Best50 - ${_options.firstWhere((option) => option['value'] == _selectedType)['label']!}';
+                      : _selectedType == 'tag_50' && _selectedTagName != null
+                          ? '标签50 - ${_selectedTagName!}'
+                          : '个性化Best50 - ${_options.firstWhere((option) => option['value'] == _selectedType)['label']!}';
 
       final file = await PersonalizedB50ConvertToImg.convertToImage(
         context,
         title,
         _personalizedSongs,
         _maimaiMusicData,
+        jpegQuality: quality.jpegQuality,
       );
 
       // 关闭加载指示器
@@ -440,6 +561,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     final brightness = Theme.of(context).brightness;
 
     final double borderRadiusSmall = 8.0;
+    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -487,7 +609,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
@@ -517,7 +639,9 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                                         ? '选择类型: 流派50 - ${_selectedGenre!}'
                                         : _selectedType == 'star_50' && _selectedStar != null
                                             ? '选择类型: 星数50 - ${_selectedStar!}'
-                                            : '选择类型: ${_options.firstWhere((option) => option['value'] == _selectedType)['label']!}',
+                                            : _selectedType == 'tag_50' && _selectedTagName != null
+                                                ? '选择类型: 标签50 - ${_selectedTagName!}'
+                                                : '选择类型: ${_options.firstWhere((option) => option['value'] == _selectedType)['label']!}',
                             style: TextStyle(
                               fontSize: MediaQuery.of(context).size.width * 0.04,
                               color: Colors.white,
@@ -526,6 +650,12 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                           ),
                         ),
                         SizedBox(height: 12.0),
+
+                        // 包容关系模式开关（仅对连击/同步50类型显示）
+                        if (_supportsInclusiveMode())
+                          _buildInclusiveModeToggle(),
+                        if (_supportsInclusiveMode())
+                          SizedBox(height: 12.0),
 
                         // 数据统计区域
                         _buildStatsSection(),
@@ -579,6 +709,10 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                       // 显示星数选择对话框
                       Navigator.of(context).pop();
                       _showStarSelectionDialog();
+                    } else if (option['value'] == 'tag_50') {
+                      // 显示标签选择对话框
+                      Navigator.of(context).pop();
+                      _showTagSelectionDialog();
                     } else {
                       setState(() {
                         _selectedType = option['value']!;
@@ -586,8 +720,11 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                         _selectedVersion = null;
                         _selectedGenre = null;
                         _selectedStar = null;
+                        _selectedTagId = null;
+                        _selectedTagName = null;
                       });
                       Navigator.of(context).pop();
+                      _isInclusiveMode = false; // 切换类型时重置包容关系模式
                       _fetchPersonalizedData();
                     }
                   },
@@ -787,6 +924,104 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     );
   }
 
+  // 显示标签选择对话框
+  void _showTagSelectionDialog() async {
+    // 加载标签数据
+    final tagsEntity = await MaiTagsManager().getTags();
+    if (tagsEntity == null || tagsEntity.tags.isEmpty) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('提示'),
+            content: Text('没有找到标签数据'),
+            actions: [
+              TextButton(
+                child: Text('确定'),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
+
+    // 构建分组ID → 分组名称映射
+    final Map<int, String> groupIdToName = {};
+    for (var group in tagsEntity.tagGroups) {
+      groupIdToName[group.id] = group.localizedName.zhHans;
+    }
+
+    // 按分组整理标签
+    final Map<String, List<TagItem>> groupedTags = {};
+    for (var tag in tagsEntity.tags) {
+      final groupName = groupIdToName[tag.groupId] ?? '其他';
+      groupedTags.putIfAbsent(groupName, () => []);
+      groupedTags[groupName]!.add(tag);
+    }
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('选择标签'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: groupedTags.entries.map((entry) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Text(
+                          entry.key,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                      ...entry.value.map((tag) {
+                        return ListTile(
+                          title: Text(tag.localizedName.zhHans),
+                          subtitle: Text(tag.localizedDescription.zhHans, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          dense: true,
+                          selected: _selectedTagId == tag.id,
+                          onTap: () {
+                            setState(() {
+                              _selectedType = 'tag_50';
+                              _selectedTagId = tag.id;
+                              _selectedTagName = tag.localizedName.zhHans;
+                            });
+                            Navigator.of(context).pop();
+                            _fetchPersonalizedData();
+                          },
+                        );
+                      }),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text('取消'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // 显示charter选择对话框
   void _showCharterSelectionDialog() {
     if (_charterCounts == null || _charterCounts!.isEmpty) {
@@ -881,7 +1116,9 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                           ? '流派50 - ${_selectedGenre!} 统计'
                           : _selectedType == 'star_50' && _selectedStar != null
                               ? '星数50 - ${_selectedStar!} 统计'
-                              : '${_options.firstWhere((option) => option['value'] == _selectedType)['label']!} 统计',
+                              : _selectedType == 'tag_50' && _selectedTagName != null
+                                  ? '标签50 - ${_selectedTagName!} 统计'
+                                  : '${_options.firstWhere((option) => option['value'] == _selectedType)['label']!} 统计',
               style: TextStyle(
                 fontSize: MediaQuery.of(context).size.width * 0.045,
                 fontWeight: FontWeight.bold,
@@ -980,6 +1217,66 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 构建包容关系模式开关
+  Widget _buildInclusiveModeToggle() {
+    final brightness = Theme.of(context).brightness;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: _isInclusiveMode
+              ? AppColors.linkBlue(brightness)
+              : Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
+          width: 1.5,
+        ),
+        borderRadius: BorderRadius.circular(8.0),
+        color: _isInclusiveMode
+            ? AppColors.linkBlue(brightness).withOpacity(0.05)
+            : Colors.transparent,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '包含关系模式',
+                  style: TextStyle(
+                    fontSize: MediaQuery.of(context).size.width * 0.035,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                SizedBox(height: 2.0),
+                Text(
+                  _getInclusiveModeLabel(),
+                  style: TextStyle(
+                    fontSize: MediaQuery.of(context).size.width * 0.028,
+                    color: AppColors.linkBlue(brightness),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: _isInclusiveMode,
+            onChanged: (value) {
+              setState(() {
+                _isInclusiveMode = value;
+              });
+              _fetchPersonalizedData();
+            },
+            activeColor: AppColors.linkBlue(brightness),
           ),
         ],
       ),

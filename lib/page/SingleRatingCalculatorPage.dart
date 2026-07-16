@@ -202,6 +202,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
     final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
     
     // 计算尺寸参数
@@ -276,7 +277,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
                       children: [
                         // 第一个白色区域：输入和结果
                         Container(
-                          margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                          margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                           decoration: BoxDecoration(
                             color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                             borderRadius: BorderRadius.circular(borderRadiusSmall),
@@ -465,7 +466,7 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
 
                         // 第二个白色区域：评级对照表
                         Container(
-                          margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                          margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                           decoration: BoxDecoration(
                             color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                             borderRadius: BorderRadius.circular(borderRadiusSmall),

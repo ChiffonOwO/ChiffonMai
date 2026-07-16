@@ -169,8 +169,9 @@ class GuessSongByOpenLettersService {
   
   // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析）
   static bool _isMaidataSong(Song song) {
-    if (song.cids.isEmpty) return false;
-    return song.cids.every((cid) => cid == 0);
+    if (song.cids.isNotEmpty && song.cids.every((cid) => cid == 0)) return true;
+    if (song.isExtra) return true;
+    return false;
   }
   
   // 计算非英文字符占比（包括日语和其他非英文字符，除空格外）

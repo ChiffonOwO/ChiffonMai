@@ -636,8 +636,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
     return results.take(20).toList();
   }
 
-  // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析）
+  // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析），或union独有的歌曲
   bool _isMaidataSong(Song song) {
+    if (song.isExtra) return true;
     if (song.cids.isEmpty) return false;
     return song.cids.every((cid) => cid == 0);
   }
@@ -669,16 +670,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
       bool isCorrect = false;
       if (_targetSong != null) {
         guessSong = await GuessChartByInfoService.calculateGuessResult(
-            guessSong, _targetSong!);
-        // 检查是否答对（所有属性都正确）
-        isCorrect = guessSong.titleBgColor == Colors.green &&
-            guessSong.typeBgColor == Colors.green &&
-            guessSong.bpmBgColor == Colors.green &&
-            guessSong.artistBgColor == Colors.green &&
-            guessSong.masterLevelBgColor == Colors.green &&
-            guessSong.masterCharterBgColor == Colors.green &&
-            guessSong.genreBgColor == Colors.green &&
-            guessSong.versionBgColor == Colors.green;
+            guessSong, _targetSong!, Theme.of(context).brightness);
+        // 检查是否答对（曲名一致即为正确）
+        isCorrect = guessedSong.basicInfo.title == _targetSong!.basicInfo.title;
       }
 
       // 更新本地UI状态
@@ -870,7 +864,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
               margin: const EdgeInsets.only(top: 20),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.green[50],
+                color: AppColors.guessAnswerCardBg(brightness),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: _buildAnswerDisplay(),
@@ -923,7 +917,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
               margin: const EdgeInsets.only(top: 20),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.green[50],
+                color: AppColors.guessAnswerCardBg(brightness),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: _buildAnswerDisplay(),
@@ -1544,7 +1538,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
       
       if (_targetSong != null) {
         guessSong = await GuessChartByInfoService.calculateGuessResult(
-            guessSong, _targetSong!);
+            guessSong, _targetSong!, Theme.of(context).brightness);
       }
       
       return guessSong;
@@ -1675,7 +1669,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
                   ),
                   // 第三行：masterDs | remasterDs | version
                   Text(
-                    '${_targetSong!.ds.length > 3 ? _targetSong!.ds[3].toString() : '-'} | ${_targetSong!.ds.length > 4 ? _targetSong!.ds[4].toString() : '-'} | ${StringUtil.formatVersion2(_targetSong!.basicInfo.from)}',
+                    '${_targetSong!.ds.length > 3 ? _targetSong!.ds[3].toString() : '-'} | ${_targetSong!.ds.length > 4 ? _targetSong!.ds[4].toString() : '-'} | ${StringUtil.formatVersion2WithFlag(_targetSong!.basicInfo.from, _targetSong!.isExtra)}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -2400,9 +2394,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
     final scaleFactor = screenWidth / 375.0;
-    final paddingS = 8.0 * scaleFactor;
+    final paddingS = 4.0 * scaleFactor;
     final paddingM = 12.0 * scaleFactor;
-    final paddingL = 16.0 * scaleFactor;
+    final paddingL = 10.0 * scaleFactor;
     final borderRadiusSmall = 8.0 * scaleFactor;
 
     return Scaffold(

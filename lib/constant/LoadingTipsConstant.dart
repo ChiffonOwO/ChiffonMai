@@ -26,6 +26,10 @@ class LoadingTipsConstant {
     '如果你想为Tips添砖加瓦，可以滑到底部填写问卷!',
     'CRH380AL说：小朋友，今天去哪🎹🎹?',
     'wander说：你的星星被迪拉熊吃掉啦哈哈',
+    'CRH2A说：ふ、普通とか当たり前ってなんだろう',
+    'CRH2A说：X X XXX',
+    '水母念波说：(/≧▽≦/)',
+    'Andy说：ChiFFoN在上机的时候接到了网站备案的审核电话',
   ];
 
   static int _currentIndex = 0;

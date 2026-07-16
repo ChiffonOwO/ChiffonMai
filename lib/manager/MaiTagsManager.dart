@@ -12,6 +12,10 @@ class MaiTagsManager {
   factory MaiTagsManager() => _instance;
   MaiTagsManager._internal();
 
+  // 内存缓存，避免每次调用都从 SharedPreferences 解析 JSON
+  MaiTagsEntity? _cachedTags;
+  Map<String, List<int>>? _cachedSongIdToTagIdsMap;
+
   // API 配置
   static const String TAGS_API_URL = ApiUrls.TagDataApi;
   // static const Map<String, String> TAGS_API_HEADERS = {
@@ -52,6 +56,9 @@ class MaiTagsManager {
           // 更新本地缓存
           await prefs.setString(CacheKeyConstant.maiTagsCache, mainTagString);
           await prefs.setInt(CacheKeyConstant.maiTagsCacheTimestamp, DateTime.now().millisecondsSinceEpoch);
+          // 清除内存缓存，下次访问时重新解析
+          _cachedTags = null;
+          _cachedSongIdToTagIdsMap = null;
           
           debugPrint('从网络加载标签数据并更新缓存');
         } else {
@@ -70,12 +77,18 @@ class MaiTagsManager {
    */
   Future<MaiTagsEntity?> getTags() async {
     try {
+      // 优先返回内存缓存，避免重复解析 JSON
+      if (_cachedTags != null) {
+        return _cachedTags;
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final cachedData = prefs.getString(CacheKeyConstant.maiTagsCache);
-      
+
       if (cachedData != null) {
         Map<String, dynamic> mainTagJson = json.decode(cachedData);
-        return MaiTagsEntity.fromJson(mainTagJson);
+        _cachedTags = MaiTagsEntity.fromJson(mainTagJson);
+        return _cachedTags;
       }
       
       // 如果没有缓存，尝试初始化
@@ -99,9 +112,13 @@ class MaiTagsManager {
    * 构建 谱面标识 = 谱面ID + 谱面类型 + 谱面难度 到 标签ID列表 的映射
    */
   Future<Map<String, List<int>>> getSongIdToTagIdsMap() async {
+    if (_cachedSongIdToTagIdsMap != null) {
+      return _cachedSongIdToTagIdsMap!;
+    }
     final maiTagsEntity = await getTags();
     if (maiTagsEntity != null) {
-      return buildSongIdToTagIdsMap(maiTagsEntity);
+      _cachedSongIdToTagIdsMap = buildSongIdToTagIdsMap(maiTagsEntity);
+      return _cachedSongIdToTagIdsMap!;
     } else {
       return {};
     }
@@ -192,7 +209,10 @@ class MaiTagsManager {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(CacheKeyConstant.maiTagsCache, mainTagString);
         await prefs.setInt(CacheKeyConstant.maiTagsCacheTimestamp, DateTime.now().millisecondsSinceEpoch);
-        
+        // 清除内存缓存，下次访问时重新解析
+        _cachedTags = null;
+        _cachedSongIdToTagIdsMap = null;
+
         debugPrint('手动刷新标签数据缓存成功');
       } else {
         debugPrint('手动刷新标签数据缓存失败，状态码: ${response.statusCode}');

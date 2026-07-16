@@ -476,7 +476,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
             margin: const EdgeInsets.symmetric(vertical: 8),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isGuessed ? Colors.green[50] : Theme.of(context).colorScheme.surface,
+              color: isGuessed ? AppColors.guessAnswerCardBg(Theme.of(context).brightness) : Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(8),
               boxShadow: [AppColors.defaultShadow(Theme.of(context).brightness)],
             ),
@@ -508,7 +508,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: isGuessed ? FontWeight.bold : FontWeight.normal,
-                          color: isGuessed ? Colors.green : Theme.of(context).colorScheme.onSurface,
+                          color: isGuessed ? AppColors.successGreen(Theme.of(context).brightness) : Theme.of(context).colorScheme.onSurface,
                         ),
                         textAlign: _isGameOver || isGuessed ? TextAlign.left : TextAlign.center,
                       ),
@@ -529,6 +529,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
   // 构建猜测历史项
   Widget _buildGuessHistoryItem(Song song, int originalIndex) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     
     return GestureDetector(
       onTap: () => _navigateToSongInfo(song.id),
@@ -606,7 +607,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                       ),
                       // 第三行：masterDs | remasterDs | version
                       Text(
-                        '${song.ds.length > 3 ? song.ds[3].toString() : '-'} | ${song.ds.length > 4 ? song.ds[4].toString() : '-'} | ${StringUtil.formatVersion2(song.basicInfo.from)}',
+                        '${song.ds.length > 3 ? song.ds[3].toString() : '-'} | ${song.ds.length > 4 ? song.ds[4].toString() : '-'} | ${StringUtil.formatVersion2WithFlag(song.basicInfo.from, song.isExtra)}',
                         style: TextStyle(
                           fontSize: screenWidth * 0.03,
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -974,6 +975,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
     final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
 
     // 自定义常量
     final double borderRadiusSmall = 8.0;
@@ -1025,7 +1027,7 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
@@ -1134,8 +1136,8 @@ class _GuessSongByOpenLettersPageState extends State<GuessSongByOpenLettersPage>
                                                           screenWidth * 0.04,
                                                       fontWeight: FontWeight.bold,
                                                       color: _isWon
-                                                          ? Colors.green
-                                                          : Colors.red,
+                                                          ? AppColors.successGreen(brightness)
+                                                          : AppColors.errorRed(brightness),
                                                     ),
                                                   ),
                                               ],

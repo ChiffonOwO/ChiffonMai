@@ -581,7 +581,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                   SizedBox(height: 1),
                                   // 第二行：类型|版本
                                   Text(
-                                    '${_getTypeDisplay(requiredSong.type)} | ${song != null ? StringUtil.formatVersion2(song.basicInfo.from) : '-'}',
+                                    '${_getTypeDisplay(requiredSong.type)} | ${song != null ? StringUtil.formatVersion2WithFlag(song.basicInfo.from, song.isExtra) : '-'}',
                                     style: TextStyle(
                                       fontSize: 9,
                                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -900,6 +900,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -950,7 +951,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),

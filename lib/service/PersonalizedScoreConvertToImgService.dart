@@ -12,6 +12,8 @@ import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
+import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
+import 'package:my_first_flutter_app/utils/ExportUserInfoWidget.dart';
 
 class PersonalizedScoreConvertToImg {
   static GlobalKey _globalKey = GlobalKey();
@@ -30,7 +32,9 @@ class PersonalizedScoreConvertToImg {
     required String Function(int) getDifficultyName,
     required String Function(double) getLevelDisplay,
     required double Function(int, int) getSongAchievement,
+    required bool useLevelDisplay,
     void Function(String message, double progress)? onProgress,
+    int? jpegQuality,
   }) async {
     OverlayEntry? overlayEntry;
     try {
@@ -50,6 +54,7 @@ class PersonalizedScoreConvertToImg {
       Widget imageWidget = RepaintBoundary(
         key: globalKey,
         child: _buildExportImageWidget(
+          context,
           selectedLevel: selectedLevel,
           selectedCharter: selectedCharter,
           selectedVersion: selectedVersion,
@@ -62,6 +67,7 @@ class PersonalizedScoreConvertToImg {
           getDifficultyName: getDifficultyName,
           getLevelDisplay: getLevelDisplay,
           getSongAchievement: getSongAchievement,
+          useLevelDisplay: useLevelDisplay,
         ),
       );
 
@@ -140,7 +146,18 @@ class PersonalizedScoreConvertToImg {
       }
       debugPrint('ByteData conversion successful');
 
-      Uint8List pngBytes = byteData.buffer.asUint8List();
+      Uint8List pngBytes = byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes);
+
+      // 根据质量参数决定最终格式
+      Uint8List finalBytes;
+      String extension;
+      if (jpegQuality != null) {
+        finalBytes = ImageEncodeUtil.pngToJpeg(pngBytes, quality: jpegQuality);
+        extension = 'jpg';
+      } else {
+        finalBytes = pngBytes;
+        extension = 'png';
+      }
 
       image.dispose();
 
@@ -206,7 +223,7 @@ class PersonalizedScoreConvertToImg {
 
       if (Platform.isAndroid && status.isGranted) {
         debugPrint('Step 5: Trying to save via MediaStore API...');
-        String? galleryPath = await _saveImageToGallery(pngBytes, 'personalized_score_export_${DateTime.now().millisecondsSinceEpoch}.png');
+        String? galleryPath = await _saveImageToGallery(finalBytes, 'personalized_score_export_${DateTime.now().millisecondsSinceEpoch}.$extension');
         if (galleryPath != null) {
           debugPrint('Image saved to gallery via MediaStore: $galleryPath');
           await _notifySystemGallery(galleryPath);
@@ -220,8 +237,8 @@ class PersonalizedScoreConvertToImg {
         directory.createSync(recursive: true);
       }
 
-      final file = File('${directory.path}/personalized_score_export_${DateTime.now().millisecondsSinceEpoch}.png');
-      await file.writeAsBytes(pngBytes);
+      final file = File('${directory.path}/personalized_score_export_${DateTime.now().millisecondsSinceEpoch}.$extension');
+      await file.writeAsBytes(finalBytes);
       debugPrint('Image saved to: ${file.path}');
 
       if (Platform.isAndroid) {
@@ -238,7 +255,8 @@ class PersonalizedScoreConvertToImg {
     }
   }
 
-  static Widget _buildExportImageWidget({
+  static Widget _buildExportImageWidget(
+    BuildContext context, {
     required String? selectedLevel,
     required String? selectedCharter,
     required String? selectedVersion,
@@ -251,6 +269,7 @@ class PersonalizedScoreConvertToImg {
     required String Function(int) getDifficultyName,
     required String Function(double) getLevelDisplay,
     required double Function(int, int) getSongAchievement,
+    required bool useLevelDisplay,
   }) {
     const double containerWidth = 1200.0;
 
@@ -315,7 +334,7 @@ class PersonalizedScoreConvertToImg {
       if (song is Song) {
         if (song.ds != null && song.ds.length > diffIndex) {
           final ds = song.ds[diffIndex];
-          levelKey = ds.toStringAsFixed(1);
+          levelKey = useLevelDisplay ? getLevelDisplay(ds) : ds.toStringAsFixed(1);
         }
       }
       if (!groupedSongs.containsKey(levelKey)) {
@@ -326,7 +345,17 @@ class PersonalizedScoreConvertToImg {
 
     final sortedLevelKeys = groupedSongs.keys.toList()
       ..sort((a, b) {
-        double parseDs(String ds) => double.tryParse(ds) ?? 0.0;
+        double parseDs(String ds) {
+          if (useLevelDisplay) {
+            if (ds == '15') return 15.0;
+            if (ds.endsWith('+')) {
+              return double.parse(ds.substring(0, ds.length - 1)) + 0.5;
+            }
+            return double.tryParse(ds) ?? 0.0;
+          } else {
+            return double.tryParse(ds) ?? 0.0;
+          }
+        }
         return parseDs(b).compareTo(parseDs(a));
       });
 
@@ -382,6 +411,10 @@ class PersonalizedScoreConvertToImg {
                 ),
               ),
             ),
+            SizedBox(height: 16.0),
+
+            // 用户信息区域
+            ExportUserInfoWidget.buildUserInfoSection(context),
             SizedBox(height: 16.0),
 
             // 统计区域
@@ -486,7 +519,7 @@ class PersonalizedScoreConvertToImg {
                     padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 14.0),
                     margin: EdgeInsets.only(bottom: 8.0),
                     child: Text(
-                      '${levelKey} | 共 ${levelSongs.length} 首歌曲',
+                      '${useLevelDisplay ? 'Lv.' : ''}${levelKey} | 共 ${levelSongs.length} 首歌曲',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: sectionNameFontSize,

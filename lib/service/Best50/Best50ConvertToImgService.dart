@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:convert';
+import 'package:my_first_flutter_app/utils/ExportUserInfoWidget.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -8,13 +8,12 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:media_scanner/media_scanner.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/TextStyleUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
-import 'package:my_first_flutter_app/constant/CacheKeyConstant.dart';
+import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 
 class B50ConvertToImg {
   // 全局Key，用于获取widget的渲染对象
@@ -22,7 +21,7 @@ class B50ConvertToImg {
   static GlobalKey _globalKey = GlobalKey();
 
   // 导出为图片的方法
-  static Future<File?> convertToImage(BuildContext context, Map<String, dynamic>? b50Data, List<Map<String, dynamic>> sdSongs, List<Map<String, dynamic>> dxSongs, List<dynamic>? maimaiMusicData, {bool isTheoreticalMode = false}) async {
+  static Future<File?> convertToImage(BuildContext context, Map<String, dynamic>? b50Data, List<Map<String, dynamic>> sdSongs, List<Map<String, dynamic>> dxSongs, List<dynamic>? maimaiMusicData, {bool isTheoreticalMode = false, int? jpegQuality}) async {
     OverlayEntry? overlayEntry;
     try {
       debugPrint('=== STARTING IMAGE CONVERSION ===');
@@ -106,7 +105,18 @@ class B50ConvertToImg {
       debugPrint('ByteData conversion successful');
 
       // 将图片数据写入文件
-      Uint8List pngBytes = byteData.buffer.asUint8List();
+      Uint8List pngBytes = byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes);
+
+      // 根据质量参数决定最终格式
+      Uint8List finalBytes;
+      String extension;
+      if (jpegQuality != null) {
+        finalBytes = ImageEncodeUtil.pngToJpeg(pngBytes, quality: jpegQuality);
+        extension = 'jpg';
+      } else {
+        finalBytes = pngBytes;
+        extension = 'png';
+      }
       
       // 释放图片资源
       image.dispose();
@@ -180,7 +190,7 @@ class B50ConvertToImg {
       // 尝试使用 MediaStore API 保存到相册（Android 13+）
       if (Platform.isAndroid && status.isGranted) {
         debugPrint('Step 5: Trying to save via MediaStore API...');
-        String? galleryPath = await _saveImageToGallery(pngBytes, 'b50_export_${DateTime.now().millisecondsSinceEpoch}.png');
+        String? galleryPath = await _saveImageToGallery(finalBytes, 'b50_export_${DateTime.now().millisecondsSinceEpoch}.$extension');
         if (galleryPath != null) {
           debugPrint('Image saved to gallery via MediaStore: $galleryPath');
           // 调用媒体扫描器
@@ -195,8 +205,8 @@ class B50ConvertToImg {
         directory.createSync(recursive: true);
       }
 
-      final file = File('${directory.path}/b50_export_${DateTime.now().millisecondsSinceEpoch}.png');
-      await file.writeAsBytes(pngBytes);
+      final file = File('${directory.path}/b50_export_${DateTime.now().millisecondsSinceEpoch}.$extension');
+      await file.writeAsBytes(finalBytes);
       debugPrint('Image saved to: ${file.path}');
 
       // 调用媒体扫描器，通知系统有新文件（多重保障）
@@ -273,15 +283,6 @@ class B50ConvertToImg {
     // 创建一个容器，设置固定宽度以确保布局一致
     double containerWidth = 1200; // 适合5列布局的宽度
 
-    // 获取用户信息（非理论模式下）
-    String nickname = '';
-    String dataSource = '水鱼';
-    if (!isTheoreticalMode) {
-      final userInfo = await _getUserInfo();
-      nickname = userInfo['nickname'] ?? '';
-      dataSource = userInfo['dataSource'] ?? '水鱼';
-    }
-
     return Container(
       width: containerWidth,
       decoration: BoxDecoration(
@@ -301,7 +302,7 @@ class B50ConvertToImg {
               children: [
                 // 用户信息区域（非理论模式下显示）
                 if (!isTheoreticalMode) ...[
-                  _buildUserInfoSection(context, nickname, dataSource),
+                  ExportUserInfoWidget.buildUserInfoSection(context),
                   SizedBox(height: 16.0),
                 ],
                 
@@ -1126,88 +1127,6 @@ class B50ConvertToImg {
       PermissionStatus status = await Permission.storage.request();
       debugPrint('Storage permission result: $status');
       return status;
-    }
-  }
-
-  // 获取用户信息（昵称和数据源）
-  static Future<Map<String, String>> _getUserInfo() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      // 获取用户游玩数据
-      String? userPlayDataStr = prefs.getString(CacheKeyConstant.userPlayData);
-      String nickname = '';
-      String dataSource = 'shuiyu'; // 默认水鱼
-      
-      if (userPlayDataStr != null) {
-        try {
-          Map<String, dynamic> userPlayData = jsonDecode(userPlayDataStr);
-          nickname = userPlayData['nickname']?.toString() ?? '';
-          
-          // 根据数据特征判断数据源
-          // 水鱼数据源的特征：有非空的nickname字段
-          // 落雪数据源的特征：nickname为空或为'', records字段存在且非空
-          if (nickname.isNotEmpty && nickname != '') {
-            // 有水鱼格式的昵称，是水鱼数据源
-            dataSource = 'shuiyu';
-          } else if (userPlayData.containsKey('records') && userPlayData['records'] is List && (userPlayData['records'] as List).isNotEmpty) {
-            // 有records但没有有效昵称，是落雪数据源
-            dataSource = 'luoxue';
-          }
-        } catch (e) {
-          debugPrint('Error parsing user play data: $e');
-        }
-      }
-      
-      return {
-        'nickname': nickname,
-        'dataSource': dataSource,
-      };
-    } catch (e) {
-      debugPrint('Error getting user info: $e');
-      return {
-        'nickname': '',
-        'dataSource': 'shuiyu',
-      };
-    }
-  }
-
-  // 构建用户信息区域
-  static Widget _buildUserInfoSection(BuildContext context, String nickname, String dataSource) {
-    // 将数据源转换为中文显示
-    String displayDataSource = _convertDataSourceToChinese(dataSource);
-    
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.black, width: 2.0),
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            '${nickname.isNotEmpty ? '玩家: $nickname' : '玩家: 未知'} | 数据源: $displayDataSource',
-            style: TextStyle(
-              fontSize: 32.0,
-              color: Colors.black,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 将数据源转换为中文显示
-  static String _convertDataSourceToChinese(String dataSource) {
-    switch (dataSource.toLowerCase()) {
-      case 'luoxue':
-        return '落雪';
-      case 'shuiyu':
-        return '水鱼';
-      default:
-        return dataSource;
     }
   }
 }

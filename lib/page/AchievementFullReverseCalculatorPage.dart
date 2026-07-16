@@ -143,6 +143,7 @@ class _AchievementFullReverseCalculatorState
     final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
     
     // 计算总计
@@ -201,7 +202,7 @@ class _AchievementFullReverseCalculatorState
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
@@ -280,6 +281,7 @@ class _AchievementFullReverseCalculatorState
   // 构建计算按钮
   Widget _buildCalculateButton() {
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
     
     return ElevatedButton(
@@ -545,6 +547,7 @@ class _AchievementFullReverseCalculatorState
   // 构建区域标题
   Widget _buildSectionTitle(String title) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     
     return Text(
       title,
@@ -718,6 +721,7 @@ class _AchievementFullReverseCalculatorState
   // 构建达成率输入框
   Widget _buildAchievementRateInput() {
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -727,6 +731,7 @@ class _AchievementFullReverseCalculatorState
           width: screenWidth * 0.3, // 宽度为屏幕宽度的30%
           child: TextField(
             decoration: InputDecoration(
+              filled: false,
               border: const OutlineInputBorder(),
               hintText: '四位小数',
               contentPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.02), // 水平 padding 为屏幕宽度的2%
@@ -752,6 +757,7 @@ class _AchievementFullReverseCalculatorState
   // 构建表格单元格
   Widget _buildTableCell(String text, {Color? color, double fontSize = 12.0}) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
@@ -775,6 +781,7 @@ class _AchievementFullReverseCalculatorState
       int value, Function(int) onChanged, TextEditingController controller,
       {Color? color}) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
@@ -785,10 +792,11 @@ class _AchievementFullReverseCalculatorState
       child: TextField(
         controller: controller,
         decoration: InputDecoration(
+          filled: false,
           border: InputBorder.none,
           hintText: value == 0 ? '' : value.toString(),
           contentPadding: EdgeInsets.symmetric(
-              horizontal: screenWidth * 0.01, 
+              horizontal: screenWidth * 0.01,
               vertical: screenHeight * 0.01), // 设置输入框内边距
           isDense: true, // 紧凑模式，减少默认高度
         ),

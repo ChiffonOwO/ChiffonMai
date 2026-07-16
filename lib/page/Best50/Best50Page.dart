@@ -20,6 +20,8 @@ import '../SongInfoPage.dart';
 import '../../utils/CoverUtil.dart';
 import '../../utils/TextStyleUtil.dart';
 import '../../entity/DivingFish/RecordItem.dart';
+import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
+import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 
 class B50Page extends StatefulWidget {
   final Map<String, dynamic>? b50Data;
@@ -81,6 +83,7 @@ class _B50PageState extends State<B50Page> {
               'ds': song.ds,
               'level': song.level,
               'cids': song.cids,
+              'is_extra': song.isExtra,
               'charts': song.charts.map((chart) => {
                 'notes': chart.notes,
                 'charter': chart.charter
@@ -268,7 +271,8 @@ class _B50PageState extends State<B50Page> {
       // 1. 过滤掉id为6位数的歌曲（songId >= 100000，宴会场谱面）
       // 2. 过滤掉从maidata追加的歌曲（cids全为0）
       bool isMaidataSong = cids.isNotEmpty && cids.every((cid) => cid == 0);
-      if (songId >= 100000 || isMaidataSong) {
+      bool isExtra = song['is_extra'] == true;
+      if (songId >= 100000 || isMaidataSong || isExtra) {
         continue;
       }
 
@@ -595,6 +599,7 @@ class _B50PageState extends State<B50Page> {
     final Color textPrimaryColor = Theme.of(context).colorScheme.onSurface;
     final double borderRadiusSmall = 8.0;
     final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
+    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -633,7 +638,7 @@ class _B50PageState extends State<B50Page> {
               ),
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
@@ -2034,6 +2039,11 @@ class _B50PageState extends State<B50Page> {
         return;
       }
 
+      // Show quality selector first
+      final estimatedPngSize = ImageEncodeUtil.estimatePngSize(songCount: 50, hasHeader: true, hasUserInfo: !_isTheoreticalMode);
+      final quality = await ExportQualitySelector.show(context, estimatedPngSize: estimatedPngSize);
+      if (quality == null) return; // user cancelled
+
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -2056,6 +2066,7 @@ class _B50PageState extends State<B50Page> {
         _isTheoreticalMode ? _theoreticalDxSongs : _dxSongs,
         _maimaiMusicData,
         isTheoreticalMode: _isTheoreticalMode,
+        jpegQuality: quality.jpegQuality,
       );
 
       // 先关闭"导出中"对话框

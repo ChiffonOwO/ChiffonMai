@@ -26,6 +26,8 @@ import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/MaidataDecodeUtil.dart';
 import 'package:my_first_flutter_app/utils/TextStyleUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
+import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 import 'Collection/CollectionInfoPage.dart';
 import 'SongPlayPage.dart';
 import 'RankingList/SongRankingPage.dart';
@@ -1342,7 +1344,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
     // 如果存在玩家最佳成绩，将其添加到表格中
     if (userRecord != null && userRecord['dxScore'] != null) {
-      int userScore = userRecord['dxScore'];
+      int userScore = (userRecord['dxScore'] as num).toInt();
 
       // 找到合适的插入位置
       int insertIndex = 0;
@@ -1642,8 +1644,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
     if (userRecord != null &&
         userRecord['achievements'] != null &&
         userRecord['ra'] != null) {
-      double userCompletion = userRecord['achievements'];
-      int userScore = userRecord['ra'];
+      double userCompletion = (userRecord['achievements'] as num).toDouble();
+      int userScore = (userRecord['ra'] as num).toInt();
 
       // 找到合适的插入位置：对比玩家的达成率与每一行的达成率
       int insertIndex = 0;
@@ -1864,6 +1866,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
     final Color textPrimaryColor = Theme.of(context).colorScheme.onSurface;
     final double borderRadiusSmall = 8.0;
     final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
+    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
 
     // 曲绘将使用CoverPathUtil工具类加载
 
@@ -1917,7 +1920,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
@@ -2379,8 +2382,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                       basicInfo['artist'].split('/').last),
                                   _buildStatItem(
                                       '版本',
-                                      StringUtil.formatVersion2(
-                                          basicInfo['from'])),
+                                      StringUtil.formatVersion2WithFlag(
+                                          basicInfo['from'], _songData?['is_extra'] == true)),
                                   _buildStatItem(
                                       '谱面谱师', currentChart['charter']),
                                 ],
@@ -2395,14 +2398,18 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                 children: [
                                   _buildStatItem(
                                       '官方定数',
-                                      _songData!['ds'][_currentDiffIndex]
+                                      (_songData!['ds'][_currentDiffIndex]
+                                              as num)
+                                          .toDouble()
                                           .toStringAsFixed(1)),
                                   _buildStatItem(
                                       '拟合定数',
                                       currentDiffData != null
                                           ? (currentDiffData is DiffData
                                                   ? currentDiffData.fitDiff
-                                                  : currentDiffData['fit_diff'])
+                                                  : (currentDiffData['fit_diff']
+                                                          as num)
+                                                      .toDouble())
                                               .toStringAsFixed(2)
                                           : '-'),
                                   Builder(builder: (ctx) {
@@ -2423,7 +2430,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                   _buildStatItem(
                                       '平均达成',
                                       currentDiffData != null
-                                          ? '${(currentDiffData is DiffData ? currentDiffData.avg : currentDiffData['avg']).toStringAsFixed(2)}%'
+                                          ? '${(currentDiffData is DiffData ? currentDiffData.avg : (currentDiffData['avg'] as num).toDouble()).toStringAsFixed(2)}%'
                                           : '-'),
                                 ],
                               ),
@@ -2573,7 +2580,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                   Expanded(
                                                     child: Text(
                                                       userRecord != null
-                                                          ? '${userRecord['achievements'].toStringAsFixed(4)}%'
+                                                          ? '${(userRecord['achievements'] as num).toDouble().toStringAsFixed(4)}%'
                                                           : '无记录',
                                                       style: TextStyle(
                                                         fontSize:
@@ -2694,7 +2701,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                             ),
                                                           ),
                                                           TextStyleUtil.span(
-                                                            '${(userRecord['dxScore'] / _calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex) * 100).toStringAsFixed(2)}%  ',
+                                                            '${((userRecord['dxScore'] as num).toDouble() / _calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex) * 100).toStringAsFixed(2)}%  ',
                                                             TextStyle(
                                                               fontSize: MediaQuery.of(
                                                                           context)
@@ -6078,6 +6085,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
     required Map<String, dynamic> basicInfo,
     required List<dynamic> levels,
   }) async {
+    final quality = await ExportQualitySelector.show(context, estimatedPngSize: ImageEncodeUtil.estimatePngSize(songCount: 1, hasHeader: false, cardsPerRow: 1));
+    if (quality == null) return;
+
     // 显示加载对话框
     showDialog(
       context: context,
@@ -6137,6 +6147,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
         fc: fc,
         fs: fs,
         rawRate: rawRate,
+        jpegQuality: quality.jpegQuality,
       );
 
       // 关闭加载对话框
@@ -6224,6 +6235,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
   Future<void> _exportSongInfoToImage() async {
     if (_songData == null) return;
 
+    final quality = await ExportQualitySelector.show(context, estimatedPngSize: ImageEncodeUtil.estimatePngSize(songCount: 1, hasHeader: false, cardsPerRow: 1));
+    if (quality == null) return;
+
     // 显示加载对话框
     showDialog(
       context: context,
@@ -6259,6 +6273,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
         maidataNoteCounts: _maidataNoteCounts,
         maidataBreakCounts: _maidataBreakCounts,
         maidataDecodedSuccessfully: _maidataDecodedSuccessfully,
+        jpegQuality: quality.jpegQuality,
       );
 
       // 关闭加载对话框

@@ -190,6 +190,7 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -205,7 +206,7 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
             children: [
               // 标题栏
               Container(
-                padding: const EdgeInsets.fromLTRB(16, 48, 16, 8),
+                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
                 child: Row(
                   children: [
                     // 返回按钮
@@ -235,7 +236,7 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
@@ -519,6 +520,7 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -534,7 +536,7 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
             children: [
               // 标题栏
               Container(
-                padding: const EdgeInsets.fromLTRB(16, 48, 16, 8),
+                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
                 child: _isBatchMode ? _buildBatchAppBar() : Row(
                   children: [
                     // 返回按钮
@@ -598,7 +600,7 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
@@ -1026,7 +1028,7 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
     // 获取歌曲详细信息
     final song = _songMap[chart.songId];
     final genre = song?.basicInfo.genre ?? '';
-    final version = StringUtil.formatVersion2(song?.basicInfo.from ?? '');
+    final version = StringUtil.formatVersion2WithFlag(song?.basicInfo.from ?? '', song?.isExtra ?? false);
     final songType = chart.songType.isNotEmpty ? chart.songType : (song?.type ?? '');
 
     final isSelected = _selectedKeys.contains(chart.uniqueKey);
@@ -1298,7 +1300,7 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
       buffer.writeln('---');
       for (final chart in sortedCharts) {
         final song = _songMap[chart.songId];
-        final version = StringUtil.formatVersion2(song?.basicInfo.from ?? '');
+        final version = StringUtil.formatVersion2WithFlag(song?.basicInfo.from ?? '', song?.isExtra ?? false);
         buffer.writeln(
             '${chart.songTitle} | ${chart.ds.toStringAsFixed(1)} | $version | ${chart.level}');
       }

@@ -58,9 +58,9 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
         Set<String> versions = {};
         Set<String> genres = {};
 
-        // 过滤掉从maidata追加的歌曲
+        // 过滤掉从maidata追加的歌曲和union独有的歌曲
         final validSongs = allSongs.where((song) =>
-          song.cids.isNotEmpty && !song.cids.every((cid) => cid == 0)
+          song.cids.isNotEmpty && !song.cids.every((cid) => cid == 0) && !song.isExtra
         ).toList();
 
         for (var song in validSongs) {
@@ -545,7 +545,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                                 onPressed: _isCreating ? null : _handleCreateRoom,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor:
-                                      Theme.of(context).colorScheme.onSurface,
+                                      Theme.of(context).colorScheme.primary,
                                   padding: EdgeInsets.symmetric(
                                       vertical: 16 * scaleFactor),
                                   minimumSize: Size(
@@ -555,12 +555,12 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                                     ? SizedBox(
                                         width: 24 * scaleFactor,
                                         height: 24 * scaleFactor,
-                                        child: const CircularProgressIndicator(
-                                            color: Colors.white),
+                                        child: CircularProgressIndicator(
+                                            color: Theme.of(context).colorScheme.onPrimary),
                                       )
                                     : Text('创建房间',
                                         style: TextStyle(
-                                            color: Colors.white,
+                                            color: Theme.of(context).colorScheme.onPrimary,
                                             fontSize: 16 * scaleFactor)),
                               ),
                               SizedBox(height: paddingL),

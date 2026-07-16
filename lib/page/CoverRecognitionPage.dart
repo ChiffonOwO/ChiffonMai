@@ -174,6 +174,7 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final sw = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
     final c = Theme.of(context).colorScheme.onSurface;
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -186,7 +187,7 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
             _buildTitleBar(sw, c),
             Expanded(
               child: Container(
-                margin: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+                margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                   borderRadius: BorderRadius.circular(12),
@@ -202,7 +203,7 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
   }
 
   Widget _buildTitleBar(double sw, Color c) => Container(
-    padding: const EdgeInsets.fromLTRB(16, 48, 16, 8),
+    padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
     child: Row(children: [
       IconButton(icon: Icon(Icons.arrow_back, color: c), onPressed: () => Navigator.pop(context)),
       Expanded(child: Center(child: Text('曲绘识别', style: TextStyle(color: c, fontSize: sw * 0.06, fontWeight: FontWeight.bold)))),

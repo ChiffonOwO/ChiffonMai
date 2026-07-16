@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 
 class PersonalizedBest50Service {
   // 单例模式
@@ -951,6 +952,108 @@ class PersonalizedBest50Service {
     }
   }
 
+  // 获取包容关系的连击Best50数据
+  // fcValue: 'fc', 'fcp', 'ap', 'app' — 包含关系中，包含该值及其右侧所有值
+  Future<Map<String, dynamic>?> getInclusiveCombo50Data(String fcValue) async {
+    try {
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      // 连击层级（从左到右：左边包含右边）
+      const comboHierarchy = ['fc', 'fcp', 'ap', 'app'];
+      final startIndex = comboHierarchy.indexOf(fcValue);
+      if (startIndex == -1) return null;
+
+      // 获取包含关系中的所有fc值（当前值及其右侧所有值）
+      final inclusiveFcValues = comboHierarchy.sublist(startIndex);
+
+      // 过滤出fc字段在包含范围内的记录
+      final filteredRecords = records.where((record) {
+        if (record is Map<String, dynamic>) {
+          return inclusiveFcValues.contains(record['fc']);
+        }
+        return false;
+      }).toList();
+
+      // 按ra值降序排序
+      filteredRecords.sort((a, b) {
+        if (a is Map<String, dynamic> && b is Map<String, dynamic>) {
+          int raB = (b['ra'] ?? 0) as int;
+          int raA = (a['ra'] ?? 0) as int;
+          return raB.compareTo(raA);
+        }
+        return 0;
+      });
+
+      // 取前50条
+      final top50Records = filteredRecords.take(50).toList();
+
+      return {
+        'records': top50Records,
+        'total': top50Records.length,
+        'type': 'inclusive_combo_50',
+        'base_fc': fcValue,
+      };
+    } catch (e) {
+      debugPrint('获取包容关系连击50数据时出错: $e');
+      return null;
+    }
+  }
+
+  // 获取包容关系的同步Best50数据
+  // fsValue: 'fs', 'fsp', 'fsd', 'fsdp' — 包含关系中，包含该值及其右侧所有值
+  Future<Map<String, dynamic>?> getInclusiveSync50Data(String fsValue) async {
+    try {
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      // 同步层级（从左到右：左边包含右边）
+      const syncHierarchy = ['fs', 'fsp', 'fsd', 'fsdp'];
+      final startIndex = syncHierarchy.indexOf(fsValue);
+      if (startIndex == -1) return null;
+
+      // 获取包含关系中的所有fs值（当前值及其右侧所有值）
+      final inclusiveFsValues = syncHierarchy.sublist(startIndex);
+
+      // 过滤出fs字段在包含范围内的记录
+      final filteredRecords = records.where((record) {
+        if (record is Map<String, dynamic>) {
+          return inclusiveFsValues.contains(record['fs']);
+        }
+        return false;
+      }).toList();
+
+      // 按ra值降序排序
+      filteredRecords.sort((a, b) {
+        if (a is Map<String, dynamic> && b is Map<String, dynamic>) {
+          int raB = (b['ra'] ?? 0) as int;
+          int raA = (a['ra'] ?? 0) as int;
+          return raB.compareTo(raA);
+        }
+        return 0;
+      });
+
+      // 取前50条
+      final top50Records = filteredRecords.take(50).toList();
+
+      return {
+        'records': top50Records,
+        'total': top50Records.length,
+        'type': 'inclusive_sync_50',
+        'base_fs': fsValue,
+      };
+    } catch (e) {
+      debugPrint('获取包容关系同步50数据时出错: $e');
+      return null;
+    }
+  }
+
   // 获取流派列表
   Future<Map<String, int>> getGenreCounts() async {
     try {
@@ -1183,9 +1286,129 @@ class PersonalizedBest50Service {
     }
   }
 
+  // 获取标签50数据
+  Future<Map<String, dynamic>?> getTag50Data(int tagId) async {
+    try {
+      // 获取用户游玩数据
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+
+      // 确保records是List类型
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      // 获取所有歌曲数据
+      final allSongs = await MaimaiMusicDataManager().getCachedSongs();
+      if (allSongs == null) return null;
+
+      // 构建歌曲ID到歌曲信息的映射
+      final songMap = { for (var song in allSongs) song.id: song };
+
+      // 获取标签-歌曲映射
+      final songIdToTagIdsMap = await MaiTagsManager().getSongIdToTagIdsMap();
+
+      // 难度索引 → 难度字符串映射（需与标签API中的格式一致：全小写）
+      const diffNames = ['basic', 'advanced', 'expert', 'master', 'remaster'];
+
+      // 过滤出具有指定标签的记录
+      final tagRecords = records.where((record) {
+        if (record is Map<String, dynamic>) {
+          final songId = record['song_id']?.toString() ?? '';
+          final levelIndex = record['level_index'] ?? 0;
+          final song = songMap[songId];
+
+          if (song != null) {
+            // tags API 中 song_id 是歌曲名称（如"弱虫モンブラン"），不是数字ID
+            // sheetType 需与标签API中的格式一致：dx / std / utage（全小写）
+            final String sheetType;
+            if (song.basicInfo.genre == '宴会场') {
+              sheetType = 'utage';
+            } else {
+              sheetType = song.type == 'DX' ? 'dx' : 'std';
+            }
+            final sheetDifficulty = diffNames[(levelIndex as int).clamp(0, 4)];
+            final songKey = '${song.title}#$sheetType#$sheetDifficulty';
+            final tagIds = songIdToTagIdsMap[songKey] ?? [];
+            return tagIds.contains(tagId);
+          }
+        }
+        return false;
+      }).toList();
+
+      // 按ra值降序排序
+      tagRecords.sort((a, b) {
+        if (a is Map<String, dynamic> && b is Map<String, dynamic>) {
+          int raB = (b['ra'] ?? 0) as int;
+          int raA = (a['ra'] ?? 0) as int;
+          return raB.compareTo(raA);
+        }
+        return 0;
+      });
+
+      // 取前50条
+      final top50Records = tagRecords.take(50).toList();
+
+      return {
+        'records': top50Records,
+        'total': top50Records.length,
+        'type': 'tag_50',
+        'tag_id': tagId,
+      };
+    } catch (e) {
+      debugPrint('获取标签50数据时出错: $e');
+      return null;
+    }
+  }
+
+  // 获取ALL50数据（所有游玩记录中RA前50，不区分Best35/15）
+  Future<Map<String, dynamic>?> getAll50Data() async {
+    try {
+      // 获取用户游玩数据
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+
+      // 确保records是List类型
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      // 直接复制所有记录
+      final allRecords = records.where((record) {
+        return record is Map<String, dynamic>;
+      }).toList();
+
+      // 按ra值降序排序
+      allRecords.sort((a, b) {
+        if (a is Map<String, dynamic> && b is Map<String, dynamic>) {
+          int raB = (b['ra'] ?? 0) as int;
+          int raA = (a['ra'] ?? 0) as int;
+          return raB.compareTo(raA);
+        }
+        return 0;
+      });
+
+      // 取前50条
+      final top50Records = allRecords.take(50).toList();
+
+      // 构建返回数据
+      return {
+        'records': top50Records,
+        'total': top50Records.length,
+        'type': 'all_50'
+      };
+    } catch (e) {
+      debugPrint('获取ALL50数据时出错: $e');
+      return null;
+    }
+  }
+
   // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析）
   bool _isMaidataSong(dynamic song) {
-    if (song == null || song.cids == null || song.cids.isEmpty) return false;
-    return song.cids.every((cid) => cid == 0);
+    if (song == null || song.cids == null || song.cids.isEmpty) {
+      if (song != null && song.isExtra == true) return true;
+      return false;
+    }
+    if (song.cids.every((cid) => cid == 0)) return true;
+    if (song.isExtra == true) return true;
+    return false;
   }
 }

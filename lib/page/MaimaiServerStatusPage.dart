@@ -68,6 +68,7 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
     final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     
     // 字体大小
     final titleFontSize = screenWidth * 0.06;
@@ -121,7 +122,7 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
@@ -159,6 +160,7 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
   // 构建图例卡片
   Widget _buildLegendCard() {
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     final smallFontSize = screenWidth * 0.03;
     
     return Card(
@@ -296,6 +298,7 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
   // 构建服务器卡片
   Widget _buildServerCard(String serverId, HeartbeatItem? heartbeat) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     final contentFontSize = screenWidth * 0.04;
     final smallFontSize = screenWidth * 0.03;
 

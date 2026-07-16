@@ -83,6 +83,8 @@ class Song {
   final List<int> cids;
   final List<Chart> charts; // 嵌套 Chart 数组
   final BasicInfo basicInfo; // 嵌套 BasicInfo 对象
+  /// 是否为更全API端点多出来的歌曲（非官方歌曲，不参与推荐系统）
+  final bool isExtra;
 
   Song({
     required this.id,
@@ -93,11 +95,12 @@ class Song {
     required this.cids,
     required this.charts,
     required this.basicInfo,
+    this.isExtra = false,
   });
 
   factory Song.fromJson(Map<String, dynamic> json) {
     return Song(
-      id: json['id'] ?? '',
+      id: json['id']?.toString() ?? '',
       title: json['title'] ?? '',
       type: json['type'] ?? '',
       // 解析 double 数组
@@ -112,6 +115,8 @@ class Song {
               .toList() ?? [],
       // 解析嵌套的 BasicInfo 对象
       basicInfo: BasicInfo.fromJson(json['basic_info'] ?? {}),
+      // 解析 isExtra 字段（兼容旧缓存，默认 false）
+      isExtra: json['is_extra'] ?? false,
     );
   }
 
@@ -126,6 +131,7 @@ class Song {
       // 数组转 JSON：遍历调用 Chart.toJson
       'charts': charts.map((chart) => chart.toJson()).toList(),
       'basic_info': basicInfo.toJson(),
+      'is_extra': isExtra,
     };
   }
 }

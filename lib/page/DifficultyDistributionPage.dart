@@ -1,11 +1,14 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import '../entity/DivingFish/Song.dart';
 import '../entity/DivingFish/UserPlayDataEntity.dart';
 import '../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../manager/DivingFish/UserPlayDataManager.dart';
 import '../service/DifficultyDistributionService.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/AppTheme.dart';
+import '../utils/CoverUtil.dart';
+import '../utils/StringUtil.dart';
 import 'SongInfoPage.dart';
 
 /// 谱面定数分布柱状图页面
@@ -23,7 +26,7 @@ class _DifficultyDistributionPageState
   List<DistributionBucket> _buckets = [];
   bool _isLoading = true;
 
-  static const _levelNames = ['BASIC', 'ADV', 'EXPERT', 'MASTER', 'Re:MAS'];
+  static const _levelNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'Re:MASTER'];
   static const _levelColors = [
     Colors.green,
     Colors.orange,
@@ -77,6 +80,7 @@ class _DifficultyDistributionPageState
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final textColor = Theme.of(context).colorScheme.onSurface;
+    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -88,7 +92,7 @@ class _DifficultyDistributionPageState
             children: [
               // 标题栏
               Container(
-                padding: const EdgeInsets.fromLTRB(16, 48, 16, 8),
+                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
                 child: Row(
                   children: [
                     IconButton(
@@ -126,7 +130,7 @@ class _DifficultyDistributionPageState
               // 图表区域
               Expanded(
                 child: Container(
-                  margin: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(8),
@@ -149,7 +153,7 @@ class _DifficultyDistributionPageState
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _legendItem(Colors.green, '已游玩'),
+                      _legendItem(_getBarColor(), '已游玩'),
                       const SizedBox(width: 20),
                       _legendItem(AppColors.greyHint(brightness), '未游玩'),
                     ],
@@ -218,24 +222,24 @@ class _DifficultyDistributionPageState
               return BarChartGroupData(
                 x: idx,
                 barRods: [
-                  // 未游玩（灰色底）
+                  // 总计（灰色底）
                   BarChartRodData(
-                    toY: bucket.unplayedCount.toDouble(),
+                    toY: bucket.totalCount.toDouble(),
                     color: AppColors.greyHint(brightness),
                     width: barWidth,
-                    borderRadius: bucket.playedCount > 0
-                        ? BorderRadius.zero
-                        : const BorderRadius.vertical(
-                            top: Radius.circular(5)),
+                    borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(5)),
                   ),
-                  // 已游玩（彩色顶）
+                  // 已游玩（彩色叠在上面）
                   if (bucket.playedCount > 0)
                     BarChartRodData(
-                      toY: bucket.totalCount.toDouble(),
+                      toY: bucket.playedCount.toDouble(),
                       color: _getBarColor(),
                       width: barWidth,
-                      borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(5)),
+                      borderRadius: bucket.unplayedCount > 0
+                          ? BorderRadius.zero
+                          : const BorderRadius.vertical(
+                              top: Radius.circular(5)),
                     ),
                 ],
               );
@@ -301,7 +305,7 @@ class _DifficultyDistributionPageState
                   if (groupIndex >= _buckets.length) return null;
                   final bucket = _buckets[groupIndex];
                   return BarTooltipItem(
-                    '定数 ${bucket.label}\n共 ${bucket.totalCount} 首\n已玩 ${bucket.playedCount} 首',
+                    'Lv.${bucket.label}\n共 ${bucket.totalCount} 首\n已玩 ${bucket.playedCount} 首',
                     const TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -337,6 +341,37 @@ class _DifficultyDistributionPageState
     final suffix = _selectedLevelIndex >= 0
         ? ' (${_levelNames[_selectedLevelIndex.clamp(0, 4)]})'
         : '';
+
+    // ALL 模式下按 song.id 去重，选落在该定数桶范围内的难度
+    final List<_BucketEntry> entries;
+    if (_selectedLevelIndex < 0) {
+      final seen = <String, int>{}; // songId -> dsIdx (matching bucket range)
+      final songMap = <String, Song>{};
+      for (final s in bucket.songs) {
+        songMap[s.id] = s;
+        // 找到落在 bucket.dsMin..bucket.dsMax 范围内的难度
+        for (int idx = 0; idx < s.ds.length; idx++) {
+          if (s.ds[idx] >= bucket.dsMin && s.ds[idx] <= bucket.dsMax) {
+            seen[s.id] = idx;
+            break;
+          }
+        }
+        // 没找到匹配的则保留已有（或默认最高）
+        if (!seen.containsKey(s.id)) {
+          seen[s.id] = s.ds.length - 1;
+        }
+      }
+      entries = seen.entries
+          .map((e) => _BucketEntry(song: songMap[e.key]!, dsIdx: e.value))
+          .toList()
+        ..sort((a, b) => a.song.basicInfo.title.compareTo(b.song.basicInfo.title));
+    } else {
+      entries = bucket.songs.map((s) => _BucketEntry(
+        song: s,
+        dsIdx: _selectedLevelIndex < s.ds.length ? _selectedLevelIndex : (s.ds.length - 1),
+      )).toList();
+    }
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -365,7 +400,7 @@ class _DifficultyDistributionPageState
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
-                    '定数 ${bucket.label} $suffix (共 ${bucket.totalCount} 首)',
+                    'Lv.${bucket.label} $suffix (共 ${entries.length} 首)',
                     style: const TextStyle(
                         fontSize: 16, fontWeight: FontWeight.bold),
                   ),
@@ -374,27 +409,19 @@ class _DifficultyDistributionPageState
                 Expanded(
                   child: ListView.builder(
                     controller: scrollController,
-                    itemCount: bucket.songs.length,
+                    itemCount: entries.length,
                     itemBuilder: (_, i) {
-                      final song = bucket.songs[i];
+                      final entry = entries[i];
+                      final song = entry.song;
+                      final dsIdx = entry.dsIdx;
                       final isPlayed = bucket.playedSongs.any(
                           (s) => s.id == song.id);
-                      final dsIdx = _selectedLevelIndex >= 0 &&
-                              _selectedLevelIndex < song.ds.length
-                          ? _selectedLevelIndex
-                          : (song.ds.isNotEmpty ? 0 : -1);
                       return ListTile(
-                        leading: Icon(
-                          isPlayed
-                              ? Icons.check_circle
-                              : Icons.circle_outlined,
-                          color: isPlayed ? Colors.green : Colors.grey,
-                          size: 18,
-                        ),
+                        leading: CoverUtil.buildCoverWidgetWithContextRRect(ctx, song.id, 40),
                         title: Text(song.basicInfo.title,
                             style: const TextStyle(fontSize: 14),
                             maxLines: 1, overflow: TextOverflow.ellipsis),
-                        subtitle: Text('${song.basicInfo.artist} | ${song.type}',
+                        subtitle: Text('${song.basicInfo.artist} | ${StringUtil.getTypeDisplay(song.type)}',
                             style: const TextStyle(fontSize: 11)),
                         trailing: Text(
                           dsIdx >= 0
@@ -409,7 +436,7 @@ class _DifficultyDistributionPageState
                             builder: (_) => SongInfoPage(
                               songId: song.id,
                               initialLevelIndex:
-                                  _selectedLevelIndex >= 0 ? _selectedLevelIndex : 3,
+                                  _selectedLevelIndex >= 0 ? _selectedLevelIndex : dsIdx,
                               isDefaultLevelIndex: _selectedLevelIndex < 0,
                             ),
                           ));
@@ -425,4 +452,11 @@ class _DifficultyDistributionPageState
       },
     );
   }
+}
+
+/// 曲目条目（song + 难度索引）
+class _BucketEntry {
+  final Song song;
+  final int dsIdx;
+  _BucketEntry({required this.song, required this.dsIdx});
 }

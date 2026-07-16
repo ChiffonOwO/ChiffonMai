@@ -15,6 +15,8 @@ import '../SongInfoPage.dart';
 import '../../utils/CoverUtil.dart';
 import '../../utils/TextStyleUtil.dart';
 import '../../utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
+import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 
 class DiffBest50Page extends StatefulWidget {
   const DiffBest50Page({super.key});
@@ -61,6 +63,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
               'ds': song.ds,
               'level': song.level,
               'cids': song.cids,
+              'is_extra': song.isExtra,
               'charts': song.charts.map((chart) => {
                 'notes': chart.notes,
                 'charter': chart.charter
@@ -263,8 +266,9 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
     }
 
     // 主内容区域
+    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
     return Container(
-      margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+      margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
         borderRadius: BorderRadius.circular(borderRadiusSmall),
@@ -1078,6 +1082,13 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
         return;
       }
 
+      // 显示质量选择器
+      final quality = await ExportQualitySelector.show(
+        context,
+        estimatedPngSize: ImageEncodeUtil.estimatePngSize(songCount: 50),
+      );
+      if (quality == null) return;
+
       // 显示加载指示器
       showDialog(
         context: context,
@@ -1101,6 +1112,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
         _diffSongs,
         _maimaiMusicData,
         currentMode: _currentMode,
+        jpegQuality: quality.jpegQuality,
       );
 
       // 关闭加载指示器

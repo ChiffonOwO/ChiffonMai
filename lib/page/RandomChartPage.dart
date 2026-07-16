@@ -275,6 +275,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
 
     // 统一管理的尺寸变量
     final whiteAreaPadding = screenWidth * 0.04; // 白色区域内边距
@@ -338,7 +339,7 @@ class _RandomChartPageState extends State<RandomChartPage> {
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),

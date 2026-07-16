@@ -95,7 +95,7 @@ class FavoriteExportService {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '${chart.ds.toStringAsFixed(1)} | ${StringUtil.formatVersion2(song?.basicInfo.from ?? '')} | ${song?.basicInfo.genre ?? ''}',
+                            '${chart.ds.toStringAsFixed(1)} | ${StringUtil.formatVersion2WithFlag(song?.basicInfo.from ?? '', song?.isExtra ?? false)} | ${song?.basicInfo.genre ?? ''}',
                             style: const TextStyle(
                               fontSize: 11,
                               color: Colors.grey,

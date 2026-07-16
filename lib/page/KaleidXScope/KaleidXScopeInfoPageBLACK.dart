@@ -65,9 +65,9 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
     _defaultShadowOffset = 2.0 * scaleFactor;
 
     _paddingXS = 4.0 * scaleFactor;
-    _paddingS = 8.0 * scaleFactor;
+    _paddingS = 4.0 * scaleFactor;
     _paddingM = 12.0 * scaleFactor;
-    _paddingL = 16.0 * scaleFactor;
+    _paddingL = 10.0 * scaleFactor;
     _paddingXL = 48.0 * scaleFactor;
 
     _textSizeXS = 9.0 * scaleFactor;
@@ -367,7 +367,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
                         style: TextStyle(
                           fontSize: progressBarFontSize,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: brightness == Brightness.dark ? Colors.white : Colors.black87,
                         ),
                       ),
                     ),
@@ -524,7 +524,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
                     ),
                     SizedBox(height: _paddingXS * 0.25),
                     Text(
-                      '${_getTypeDisplay(song.type)} | ${StringUtil.formatVersion2(song.basicInfo.from)}',
+                      '${_getTypeDisplay(song.type)} | ${StringUtil.formatVersion2WithFlag(song.basicInfo.from, song.isExtra)}',
                       style: TextStyle(
                         fontSize: _textSizeXS,
                         color: AppColors.greyHint(brightness),
@@ -731,7 +731,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
                           ),
                           SizedBox(height: _paddingXS * 0.25),
                           Text(
-                            '${_getTypeDisplay(song.type)} | ${StringUtil.formatVersion2(song.basicInfo.from)}',
+                            '${_getTypeDisplay(song.type)} | ${StringUtil.formatVersion2WithFlag(song.basicInfo.from, song.isExtra)}',
                             style: TextStyle(
                               fontSize: _textSizeXS,
                               color: AppColors.greyHint(brightness),
@@ -881,7 +881,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
                           ),
                           SizedBox(height: _paddingXS * 0.25),
                           Text(
-                            '${_getTypeDisplay(song.type)} | ${StringUtil.formatVersion2(song.basicInfo.from)}',
+                            '${_getTypeDisplay(song.type)} | ${StringUtil.formatVersion2WithFlag(song.basicInfo.from, song.isExtra)}',
                             style: TextStyle(
                               fontSize: _textSizeXS,
                               color: AppColors.greyHint(brightness),

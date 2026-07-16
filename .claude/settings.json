@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"from PIL import Image; img=Image.open\\('d:/flutterProjects/my_first_flutter_app/assets/ratingbg/UI_CMN_DXRating_01.png'\\); w,h=img.size; print\\(f'{w}x{h}'\\); pixels=img.load\\(\\); dark=[\\(x,y\\) for y in range\\(h\\) for x in range\\(w\\) if pixels[x,y][0]<30 and pixels[x,y][1]<30 and pixels[x,y][2]<30 and pixels[x,y][3]>200]; xs=[p[0] for p in dark]; ys=[p[1] for p in dark]; print\\(f'dark box: \\({min\\(xs\\)},{min\\(ys\\)}\\)-\\({max\\(xs\\)},{max\\(ys\\)}\\) size {max\\(xs\\)-min\\(xs\\)}x{max\\(ys\\)-min\\(ys\\)}'\\)\")"
+    ]
+  }
+}

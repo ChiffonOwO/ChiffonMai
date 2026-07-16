@@ -10,6 +10,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:media_scanner/media_scanner.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
+import 'package:my_first_flutter_app/utils/ExportUserInfoWidget.dart';
+import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 
@@ -29,6 +31,7 @@ class PaiziProgressConvertToImg {
     required String Function(double) getLevelDisplay,
     required double Function(int, int) getSongAchievement,
     void Function(String message, double progress)? onProgress,
+    int? jpegQuality,
   }) async {
     OverlayEntry? overlayEntry;
     try {
@@ -48,6 +51,7 @@ class PaiziProgressConvertToImg {
       Widget imageWidget = RepaintBoundary(
         key: globalKey,
         child: _buildExportImageWidget(
+          context,
           currentPlate: currentPlate,
           cachedSongsWithStatus: cachedSongsWithStatus,
           selectedFirstChar: selectedFirstChar,
@@ -136,7 +140,18 @@ class PaiziProgressConvertToImg {
       }
       debugPrint('ByteData conversion successful');
 
-      Uint8List pngBytes = byteData.buffer.asUint8List();
+      Uint8List pngBytes = byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes);
+
+      // 根据质量参数决定最终格式
+      Uint8List finalBytes;
+      String extension;
+      if (jpegQuality != null) {
+        finalBytes = ImageEncodeUtil.pngToJpeg(pngBytes, quality: jpegQuality);
+        extension = 'jpg';
+      } else {
+        finalBytes = pngBytes;
+        extension = 'png';
+      }
 
       image.dispose();
 
@@ -202,7 +217,7 @@ class PaiziProgressConvertToImg {
 
       if (Platform.isAndroid && status.isGranted) {
         debugPrint('Step 5: Trying to save via MediaStore API...');
-        String? galleryPath = await _saveImageToGallery(pngBytes, 'paizi_progress_export_${DateTime.now().millisecondsSinceEpoch}.png');
+        String? galleryPath = await _saveImageToGallery(finalBytes, 'paizi_progress_export_${DateTime.now().millisecondsSinceEpoch}.$extension');
         if (galleryPath != null) {
           debugPrint('Image saved to gallery via MediaStore: $galleryPath');
           await _notifySystemGallery(galleryPath);
@@ -216,8 +231,8 @@ class PaiziProgressConvertToImg {
         directory.createSync(recursive: true);
       }
 
-      final file = File('${directory.path}/paizi_progress_export_${DateTime.now().millisecondsSinceEpoch}.png');
-      await file.writeAsBytes(pngBytes);
+      final file = File('${directory.path}/paizi_progress_export_${DateTime.now().millisecondsSinceEpoch}.$extension');
+      await file.writeAsBytes(finalBytes);
       debugPrint('Image saved to: ${file.path}');
 
       if (Platform.isAndroid) {
@@ -234,7 +249,8 @@ class PaiziProgressConvertToImg {
     }
   }
 
-  static Widget _buildExportImageWidget({
+  static Widget _buildExportImageWidget(
+    BuildContext context, {
     required Collection? currentPlate,
     required List<Map<String, dynamic>>? cachedSongsWithStatus,
     required String? selectedFirstChar,
@@ -374,6 +390,10 @@ class PaiziProgressConvertToImg {
                 ),
               ),
             ),
+            SizedBox(height: 16.0),
+
+            // 用户信息区域
+            ExportUserInfoWidget.buildUserInfoSection(context),
             SizedBox(height: 16.0),
 
             // 统计区域

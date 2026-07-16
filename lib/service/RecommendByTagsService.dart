@@ -14,6 +14,7 @@ import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constant/CacheKeyConstant.dart';
+import 'RatingRecommendService.dart';
 
 class RecommendByTagsService {
   static const int MAX_LIMIT = 70; // 最大推荐数
@@ -575,7 +576,8 @@ Future<List<RecommendationResult>> calculateRecommendations(
     int maxRating,
     int best35minRating,
     int best35maxRating,
-    bool isNewOnly) async {
+    bool isNewOnly,
+    Map<String, int> bestRecordRaMap) async {
   List<RecommendationResult> recommendations = [];
   // 初始化所有歌曲列表
   List<Song>? songs;
@@ -603,9 +605,17 @@ Future<List<RecommendationResult>> calculateRecommendations(
    * 剔除条件：
    * 1. 达成率已达到100.5%以上的谱面
    */
+  int songIterCount = 0; // 用于定期 yield 给事件循环，防止 UI 卡死
   for (var song in songs!) {
+    // 每处理10首歌曲，yield 给事件循环以保持 UI 响应
+    if (++songIterCount % 10 == 0) {
+      await Future.delayed(Duration.zero);
+    }
     // 0. 过滤掉从maidata追加的歌曲（cids全为0表示从maidata解析）
     if (song.cids.isNotEmpty && song.cids.every((cid) => cid == 0)) {
+      continue;
+    }
+    if (song.isExtra) {
       continue;
     }
     // 1. 歌曲必须是目标版本的谱面（根据isNewOnly判断）
@@ -668,19 +678,17 @@ Future<List<RecommendationResult>> calculateRecommendations(
         // 将综合相似度 >= 0.5 的谱面加入推荐结果列表
         if (similarity >= 0.5) {
           // 计算此推荐结果能否带来Rating的提升
-          int minAchievementsRating = 
+          int minAchievementsRating =
               calculateSingleRating(ds, minAchievements);
-          // 对于Best35的提升情况
-          if (isNewOnly == false && minAchievementsRating > best35minRating) {
-            // 计算此推荐结果能提升的Rating
+          // 检查该歌曲是否已在Best列表中，如果在则用其当前RA作为基准计算提升值
+          String bestLookupKey = '${int.parse(song.id)}_$i';
+          int existingBestRa = bestRecordRaMap[bestLookupKey] ?? 0;
+          // Best55用Best35的min作为兜底，Best15用Best15的min作为兜底
+          int fallbackBaseRating = isNewOnly ? minRating : best35minRating;
+          int baseRating = existingBestRa > 0 ? existingBestRa : fallbackBaseRating;
+          if (minAchievementsRating > baseRating) {
             ableRiseTotalRating = true;
-            riseToatalRating = minAchievementsRating - best35minRating;
-          }
-          // 对于Best15的提升情况
-          if (isNewOnly == true) {
-            // 计算此推荐结果能提升的Rating
-            ableRiseTotalRating = true;
-            riseToatalRating = minAchievementsRating - minRating;
+            riseToatalRating = minAchievementsRating - baseRating;
           }
 
           // 根据转换的对象中的已知条件找出玩家这个谱面的达成率
@@ -693,7 +701,9 @@ Future<List<RecommendationResult>> calculateRecommendations(
           }
           recommendations.add(RecommendationResult(
             songTitle: song.basicInfo.title,
-            level: song.level[i],
+            level: i < RatingRecommendService.LEVEL_LABELS.length
+                ? RatingRecommendService.LEVEL_LABELS[i]
+                : '',
             ds: ds,
             similarity: similarity,
             nowAchievement: double.parse(playerRecord.achievements.toString()),
@@ -704,6 +714,8 @@ Future<List<RecommendationResult>> calculateRecommendations(
                 : '无Rating提升,推荐练习',
             songId: song.id,
             levelIndex: i,
+            type: song.type,
+            difficultyCount: song.ds.length,
           ));
         }
       }
@@ -743,84 +755,27 @@ Future<List<RecommendationResult>> calculateRecommendations(
 
 /**
  * 计算能落入rating区间的最低达成率
+ * 先算100%，如果无法落入区间则算100.5%，都不行则返回101.0（后续会被过滤）
  * @param ds 谱面定数
  * @param targetRa 目标Rating
  * @param currentAchievement 当前达成率
- * @return 能落入rating区间的最低达成率，且始终大于当前达成率
+ * @return 能落入rating区间的最低达成率，始终大于当前达成率
  */
 double calculateMinAchievements(double ds, int targetRa, double currentAchievement) {
-  // 生成所有可能的分数点
-  List<double> achievementPoints = generateAchievementPoints(ds, currentAchievement);
-  
-  // 从分数点中找到能达到目标Rating的最低达成率
-  double minAchievement = 100.5; // 默认值
-  
-  for (double achievement in achievementPoints) {
-    int ra = calculateSingleRating(ds, achievement);
-    if (ra >= targetRa) {
-      minAchievement = achievement;
-      break; // 找到第一个能达到目标Rating的分数点
-    }
-  }
-  
-  return minAchievement;
-}
+  double minAchievement = currentAchievement + 0.001; // 确保大于当前达成率
 
-/**
- * 生成推荐结果所需的分数点
- * @param ds 谱面定数
- * @param currentAchievement 当前达成率
- * @return 分数点列表，包含100-100.5%之间的最多2个值，以及100.5%
- */
-List<double> generateAchievementPoints(double ds, double currentAchievement) {
-  List<double> points = [];
-  
-  // 计算100%对应的Rating
-  int raAt100 = calculateSingleRating(ds, 100.0);
-  
-  // 计算100-100.5%之间的点
-  int additionalPoints = 0;
-  double currentPoint = currentAchievement + 0.001; // 确保大于当前达成率
-  
-  // 确保起点不低于100.0
-  if (currentPoint < 100.0) {
-    currentPoint = 100.0;
+  // 尝试100%达成率
+  if (minAchievement <= 100.0 && calculateSingleRating(ds, 100.0) >= targetRa) {
+    return 100.0;
   }
-  
-  // 尝试找到第一个点（Rating比100%高1）
-  while (currentPoint < 100.5 && additionalPoints < 2) {
-    currentPoint += 0.001;
-    int currentRa = calculateSingleRating(ds, currentPoint);
-    if (currentRa == raAt100 + 1) {
-      points.add(currentPoint);
-      additionalPoints++;
-    } else if (currentRa > raAt100 + 1) {
-      break;
-    }
+
+  // 尝试100.5%达成率
+  if (calculateSingleRating(ds, 100.5) >= targetRa) {
+    return minAchievement > 100.5 ? minAchievement : 100.5;
   }
-  
-  // 尝试找到第二个点（Rating比100%高2）
-  if (additionalPoints < 2) {
-    while (currentPoint < 100.5) {
-      currentPoint += 0.001;
-      int currentRa = calculateSingleRating(ds, currentPoint);
-      if (currentRa == raAt100 + 2) {
-        points.add(currentPoint);
-        additionalPoints++;
-        break;
-      } else if (currentRa > raAt100 + 2) {
-        break;
-      }
-    }
-  }
-  
-  // 100.5% 达成率
-  double hundredPointFive = 100.5;
-  if (hundredPointFive > currentAchievement) {
-    points.add(hundredPointFive);
-  }
-  
-  return points;
+
+  // 无法落入目标区间，返回一个会被 filter 剔除的值
+  return 101.0;
 }
 
 
@@ -871,6 +826,16 @@ Future<Map<String, List<RecommendationResult>>> recommendSongs() async {
         await getBestNRecords(userPlayDataRecords, 35, false);
     debugPrint('获取到 ${best35.length} 条Best35记录');
 
+    // 构建 Best35 和 Best15 的 RA 查找表，用于判断推荐结果中已有歌曲的提升值
+    Map<String, int> best35RaMap = {};
+    for (var r in best35) {
+      best35RaMap['${r.songId}_${r.levelIndex}'] = r.ra;
+    }
+    Map<String, int> best15RaMap = {};
+    for (var r in best15) {
+      best15RaMap['${r.songId}_${r.levelIndex}'] = r.ra;
+    }
+
     // 获取Rating范围
     int best55minRating = 0;
     int best55maxRating = 0;
@@ -911,7 +876,8 @@ Future<Map<String, List<RecommendationResult>>> recommendSongs() async {
             best55maxRating,
             best35minRating,
             best35maxRating,
-            false);
+            false,
+            best35RaMap);
 
     final Future<List<RecommendationResult>> best15Future = 
         calculateRecommendations(
@@ -923,7 +889,8 @@ Future<Map<String, List<RecommendationResult>>> recommendSongs() async {
             best15maxRating,
             best35minRating,
             best35maxRating,
-            true);
+            true,
+            best15RaMap);
 
     // 等待两个计算完成
     final best55Recommendations = await best55Future;

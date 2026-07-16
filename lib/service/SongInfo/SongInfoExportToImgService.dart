@@ -11,6 +11,7 @@ import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 
 /// 歌曲信息导出为图片服务
 /// 将歌曲的完整信息（曲绘、歌名、所有难度的物量和绝赞统计）渲染为图片
@@ -28,6 +29,7 @@ class SongInfoExportToImgService {
     required Map<int, List<int>> maidataNoteCounts,
     required Map<int, List<int>> maidataBreakCounts,
     required bool maidataDecodedSuccessfully,
+    int? jpegQuality,
   }) async {
     OverlayEntry? overlayEntry;
     try {
@@ -116,13 +118,24 @@ class SongInfoExportToImgService {
         return null;
       }
 
-      Uint8List pngBytes = byteData.buffer.asUint8List();
+      Uint8List pngBytes = byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes);
       image.dispose();
       overlayEntry.remove();
 
+      // 根据质量参数决定最终格式
+      Uint8List finalBytes;
+      String extension;
+      if (jpegQuality != null) {
+        finalBytes = ImageEncodeUtil.pngToJpeg(pngBytes, quality: jpegQuality);
+        extension = 'jpg';
+      } else {
+        finalBytes = pngBytes;
+        extension = 'png';
+      }
+
       // 保存图片
       final songTitle = basicInfo['title'] ?? '';
-      return await _saveImage(pngBytes, songTitle, status.isGranted);
+      return await _saveImage(finalBytes, songTitle, status.isGranted, extension: extension);
     } catch (e) {
       debugPrint('SongInfoExport: Error: $e');
       overlayEntry?.remove();
@@ -824,10 +837,11 @@ class SongInfoExportToImgService {
   }
 
   static Future<File?> _saveImage(
-    Uint8List pngBytes,
+    Uint8List imageBytes,
     String songTitle,
-    bool hasPermission,
-  ) async {
+    bool hasPermission, {
+    String extension = 'png',
+  }) async {
     Directory? directory;
 
     if (hasPermission) {
@@ -865,8 +879,8 @@ class SongInfoExportToImgService {
     // Android: 尝试 MediaStore API
     if (Platform.isAndroid && hasPermission) {
       String? galleryPath = await _saveImageToGallery(
-        pngBytes,
-        'chiffonmai_songinfo_${_sanitizeFileName(songTitle)}_${DateTime.now().millisecondsSinceEpoch}.png',
+        imageBytes,
+        'chiffonmai_songinfo_${_sanitizeFileName(songTitle)}_${DateTime.now().millisecondsSinceEpoch}.$extension',
       );
       if (galleryPath != null) {
         await _notifySystemGallery(galleryPath);
@@ -879,9 +893,9 @@ class SongInfoExportToImgService {
     }
 
     final file = File(
-      '${directory.path}/chiffonmai_songinfo_${_sanitizeFileName(songTitle)}_${DateTime.now().millisecondsSinceEpoch}.png',
+      '${directory.path}/chiffonmai_songinfo_${_sanitizeFileName(songTitle)}_${DateTime.now().millisecondsSinceEpoch}.$extension',
     );
-    await file.writeAsBytes(pngBytes);
+    await file.writeAsBytes(imageBytes);
 
     if (Platform.isAndroid) {
       await _notifySystemGallery(file.path);

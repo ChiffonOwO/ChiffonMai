@@ -17,6 +17,8 @@ import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/page/Collection/CollectionInfoPage.dart';
+import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
+import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 
 // 根据 formatVersion2 的顺序定义首字顺序
 const List<String> _firstCharOrder = [
@@ -285,15 +287,17 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     _scaleFactor = screenWidth / 375.0;
     _paddingXS = 4.0 * _scaleFactor;
-    _paddingS = 8.0 * _scaleFactor;
+    _paddingS = 4.0 * _scaleFactor;
     _paddingM = 12.0 * _scaleFactor;
-    _paddingL = 16.0 * _scaleFactor;
+    _paddingL = 10.0 * _scaleFactor;
     _borderRadiusSmall = 8.0 * _scaleFactor;
     _textSizeXS = 9.0 * _scaleFactor;
     _textSizeS = 11.0 * _scaleFactor;
     _textSizeM = 12.0 * _scaleFactor;
     _textSizeL = 14.0 * _scaleFactor;
     _coverSize = 56.0 * _scaleFactor;
+
+    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -340,7 +344,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL),
+                  margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -1407,6 +1411,13 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
         return;
       }
 
+      final songCount = _cachedSongsWithStatus?.length ?? 0;
+      final quality = await ExportQualitySelector.show(
+        context,
+        estimatedPngSize: ImageEncodeUtil.estimatePngSize(songCount: songCount, cardsPerRow: 12),
+      );
+      if (quality == null) return;
+
       String _progressMessage = '正在准备导出...';
       double _progressValue = 0.0;
       String _currentLoadingTip = LoadingTipsConstant.getRandomLoadingTip();
@@ -1451,7 +1462,11 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                       ],
                     ),
                     SizedBox(height: 16.0),
-                    LinearProgressIndicator(value: _progressValue > 0 ? _progressValue : null),
+                    LinearProgressIndicator(
+                      value: _progressValue > 0 ? _progressValue : null,
+                      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      valueColor: AlwaysStoppedAnimation(Theme.of(context).colorScheme.primary),
+                    ),
                     SizedBox(height: 12.0),
                     Text(
                       _currentLoadingTip,
@@ -1478,6 +1493,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
         getDifficultyName: _getDifficultyName,
         getLevelDisplay: _getLevelDisplay,
         getSongAchievement: _service.getSongAchievement,
+        jpegQuality: quality.jpegQuality,
         onProgress: (message, progress) {
           _progressMessage = message;
           _progressValue = progress;

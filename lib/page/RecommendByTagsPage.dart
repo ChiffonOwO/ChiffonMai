@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -7,6 +8,8 @@ import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
 import 'package:my_first_flutter_app/entity/RecommendationResult.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import 'package:my_first_flutter_app/utils/CoverUtil.dart';
+import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constant/CacheKeyConstant.dart';
 import '../constant/LoadingTipsConstant.dart';
@@ -30,6 +33,70 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   int _currentPage = 1; // 当前页码
   int _pageSize = 10; // 每页显示的推荐项数量
   ScrollController _scrollController = ScrollController(); // 滚动控制器
+  bool _isDisposed = false; // 页面是否已销毁，用于取消正在进行的异步操作
+  StreamSubscription<String>? _tipSubscription; // 加载提示的流订阅
+
+  Color _getBackgroundColor(int diffIndex, int difficultyCount) {
+    if (difficultyCount <= 2) {
+      return const Color(0xFFE9D8FF);
+    }
+    switch (diffIndex) {
+      case 0:
+        return const Color(0xFFE8F5E8);
+      case 1:
+        return const Color(0xFFFFF8E1);
+      case 2:
+        return const Color(0xFFFCE4EC);
+      case 3:
+        return const Color(0xFFE9D8FF);
+      case 4:
+        return const Color(0xFFF3E5F5);
+      default:
+        return const Color(0xFFE9D8FF);
+    }
+  }
+
+  Color _getTypeColor(String type, Brightness brightness) {
+    return type == 'DX'
+        ? AppColors.warningOrange(brightness)
+        : AppColors.linkBlue(brightness);
+  }
+
+  Color _getDifficultyBgColor(int levelIndex, Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+    switch (levelIndex) {
+      case 0:
+        return isDark ? const Color(0xFF1B3D1B) : Colors.green.shade100;
+      case 1:
+        return isDark ? const Color(0xFF3D2E00) : Colors.orange.shade100;
+      case 2:
+        return isDark ? const Color(0xFF4A2020) : Colors.red.shade100;
+      case 3:
+        return isDark ? const Color(0xFF2A1A3D) : Colors.purple.shade100;
+      case 4:
+        return isDark ? const Color(0xFF352545) : Colors.purple.shade50;
+      default:
+        return isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100;
+    }
+  }
+
+  Color _getDifficultyTextColor(int levelIndex, Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+    switch (levelIndex) {
+      case 0:
+        return isDark ? const Color(0xFF66BB6A) : Colors.green.shade700;
+      case 1:
+        return isDark ? const Color(0xFFFFB74D) : Colors.orange.shade700;
+      case 2:
+        return isDark ? const Color(0xFFEF5350) : Colors.red;
+      case 3:
+        return isDark ? const Color(0xFFCE93D8) : Colors.purple.shade700;
+      case 4:
+        return isDark ? const Color(0xFFE1BEE7) : Colors.purple.shade400;
+      default:
+        return isDark ? Colors.grey.shade400 : Colors.grey.shade700;
+    }
+  }
 
   @override
   void initState() {
@@ -38,8 +105,18 @@ class _RecommendByTagsState extends State<RecommendByTags> {
     // 延迟一小段时间再开始获取推荐结果，确保页面能够完全加载并显示加载动画
     // 这样可以避免在首页点击标签时出现卡顿
     Future.delayed(Duration(milliseconds: 1000), () {
-      _fetchRecommendations();
+      if (!_isDisposed && mounted) {
+        _fetchRecommendations();
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    _tipSubscription?.cancel();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _initializeLoadingTip() {
@@ -48,8 +125,8 @@ class _RecommendByTagsState extends State<RecommendByTags> {
       _currentLoadingTip = LoadingTipsConstant.getRandomLoadingTip();
     });
     LoadingTipsConstant.startAutoSwitch();
-    LoadingTipsConstant.tipStream.listen((newTip) {
-      if (mounted) {
+    _tipSubscription = LoadingTipsConstant.tipStream.listen((newTip) {
+      if (mounted && !_isDisposed) {
         setState(() {
           _currentLoadingTip = newTip;
         });
@@ -60,6 +137,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   // 获取推荐结果
   Future<void> _fetchRecommendations() async {
     try {
+      if (!mounted || _isDisposed) return;
       setState(() {
         _isLoading = true;
         _errorMessage = null;
@@ -74,6 +152,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
           final best55 = (resultMap['Best55'] as List).map((item) => RecommendationResult.fromJson(item)).toList();
           final best15 = (resultMap['Best15'] as List).map((item) => RecommendationResult.fromJson(item)).toList();
           
+          if (!mounted || _isDisposed) return;
           setState(() {
             _recommendations = {
               'Best55': best55,
@@ -103,6 +182,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
         await Future.delayed(Duration(milliseconds: 2000 - elapsedTime));
       }
       
+      if (!mounted || _isDisposed) return;
       setState(() {
         _recommendations = result;
         _isLoading = false;
@@ -111,7 +191,8 @@ class _RecommendByTagsState extends State<RecommendByTags> {
     } catch (e) {
       // 即使出错，也要确保加载动画至少显示2秒
       await Future.delayed(Duration(milliseconds: 2000));
-      
+
+      if (!mounted || _isDisposed) return;
       setState(() {
         _errorMessage = '获取推荐结果失败：$e';
         _isLoading = false;
@@ -124,6 +205,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
     final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
     
     final double borderRadiusSmall = 8.0;
@@ -174,7 +256,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
@@ -329,12 +411,10 @@ class _RecommendByTagsState extends State<RecommendByTags> {
 
   // 构建推荐内容
   Widget _buildRecommendationContent(Brightness brightness) {
-    // 根据当前选中的标签获取推荐结果
+    final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     List<RecommendationResult> results = _recommendations[_currentTab] ?? [];
-
-    // 计算分页
     int totalItems = results.length;
-    //int totalPages = (totalItems / _pageSize).ceil();
     int startIndex = (_currentPage - 1) * _pageSize;
     int endIndex = min(startIndex + _pageSize, totalItems);
     List<RecommendationResult> paginatedResults = [];
@@ -343,12 +423,175 @@ class _RecommendByTagsState extends State<RecommendByTags> {
       paginatedResults = results.sublist(startIndex, endIndex);
     }
 
-    return _buildRecommendationSection(brightness, '${_currentTab}推荐', paginatedResults);
+    return Column(
+      children: paginatedResults
+          .map((result) => _buildResultCard(brightness, result, screenWidth))
+          .toList(),
+    );
   }
-  
+
+  // 构建单个推荐卡片
+  Widget _buildResultCard(
+      Brightness brightness, RecommendationResult result, double screenWidth) {
+    final bgColor = brightness == Brightness.dark
+        ? Colors.black
+        : _getBackgroundColor(result.levelIndex, result.difficultyCount);
+    final borderColor = brightness == Brightness.dark
+        ? _getBackgroundColor(result.levelIndex, result.difficultyCount)
+        : bgColor;
+    final typeColor = _getTypeColor(result.type, brightness);
+    final typeLabel = StringUtil.formatSongType(result.type);
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SongInfoPage(
+              songId: result.songId,
+              initialLevelIndex: result.levelIndex,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        margin: EdgeInsets.only(bottom: screenWidth * 0.03),
+        decoration: BoxDecoration(
+          color: brightness == Brightness.dark
+              ? bgColor
+              : bgColor.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: borderColor,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(9),
+                bottomLeft: Radius.circular(9),
+              ),
+              child: SizedBox(
+                width: 80,
+                height: 80,
+                child: CoverUtil.buildCoverWidget(result.songId, 80),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          typeLabel,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: typeColor,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: _getDifficultyBgColor(
+                                result.levelIndex, brightness),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            result.level,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: _getDifficultyTextColor(
+                                  result.levelIndex, brightness),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      result.songTitle,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Text(
+                          '定数 ${result.ds.toStringAsFixed(1)}',
+                          style: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          '相似度 ${(result.similarity * 100).toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (result.ableRiseTotalRating)
+                          Text(
+                            result.riseTotalRating,
+                            style: TextStyle(
+                              color: AppColors.successGreen(brightness),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '当前:${result.nowAchievement.toStringAsFixed(4)}% → 目标:${result.minAchievement.toStringAsFixed(4)}%',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 12,
+                      ),
+                    ),
+                    if (!result.ableRiseTotalRating)
+                      Text(
+                        result.riseTotalRating,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // 构建分页组件
   Widget _buildPagination() {
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     
     List<RecommendationResult> results = _recommendations[_currentTab] ?? [];
     int totalItems = results.length;
@@ -400,140 +643,6 @@ class _RecommendByTagsState extends State<RecommendByTags> {
           child: const Text('下一页'),
         ),
       ],
-    );
-  }
-
-  // 构建推荐区域
-  Widget _buildRecommendationSection(Brightness brightness, String title, List<RecommendationResult> results) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // 区域标题
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: screenWidth * 0.045, // 字体大小为屏幕宽度的4.5%
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-        SizedBox(height: screenHeight * 0.015), // 间距为屏幕高度的1.5%
-
-        // 推荐结果列表
-        if (results.isEmpty)
-          Padding(
-            padding: EdgeInsets.symmetric(vertical: screenHeight * 0.025), // 垂直 padding 为屏幕高度的2.5%
-            child: Text(
-              '暂无推荐结果',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.greyHint(brightness)),
-            ),
-          )
-        else
-          Column(
-            children: results.map((result) => _buildRecommendationItem(brightness, result)).toList(),
-          ),
-      ],
-    );
-  }
-
-  // 构建单个推荐项
-  Widget _buildRecommendationItem(Brightness brightness, RecommendationResult result) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    return GestureDetector(
-      onTap: () {
-        // 导航到SongInfoPage
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SongInfoPage(
-              songId: result.songId,
-              initialLevelIndex: result.levelIndex,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        margin: EdgeInsets.only(bottom: screenHeight * 0.015), // 底部 margin 为屏幕高度的1.5%
-        padding: EdgeInsets.all(screenWidth * 0.03), // padding 为屏幕宽度的3%
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.tableBorder(brightness)),
-          borderRadius: BorderRadius.circular(8),
-          color: Theme.of(context).colorScheme.surface,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 歌曲标题和难度
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    result.songTitle,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: screenWidth * 0.04, // 字体大小为屏幕宽度的4%
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-                Text(
-                  result.level,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: screenWidth * 0.035, // 字体大小为屏幕宽度的3.5%
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: screenHeight * 0.01), // 间距为屏幕高度的1%
-
-            // 定数、相似度
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('定数: ${result.ds}', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                Text('相似度: ${(result.similarity * 100).toStringAsFixed(1)}%', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-              ],
-            ),
-            SizedBox(height: screenHeight * 0.01), // 间距为屏幕高度的1%
-            // 最低达成率
-            Text('当前:${result.nowAchievement.toStringAsFixed(4)}%→目标:${result.minAchievement.toStringAsFixed(4)}%',
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-
-            // 提升Rating信息
-            if (result.ableRiseTotalRating == true)
-            Padding(
-              padding: EdgeInsets.only(top: screenHeight * 0.01), // 顶部 padding 为屏幕高度的1%
-              child: Text(
-                'Rating提升: ' + result.riseTotalRating,
-                style: TextStyle(
-                  color: AppColors.successGreen(brightness),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            if (result.ableRiseTotalRating == false)
-            Padding(
-              padding: EdgeInsets.only(top: screenHeight * 0.01), // 顶部 padding 为屏幕高度的1%
-              child: Text(
-                result.riseTotalRating,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.normal,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

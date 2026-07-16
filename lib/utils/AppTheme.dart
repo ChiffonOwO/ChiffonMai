@@ -201,7 +201,7 @@ class AppColors {
   static Color greyHint(Brightness brightness, {int shade = 500}) =>
       brightness == Brightness.dark
           ? Colors.grey.shade500
-          : Colors.grey.shade400;
+          : Colors.grey.shade600;
 
   /// 表格/列表边框色
   static Color tableBorder(Brightness brightness) =>
@@ -220,6 +220,32 @@ class AppColors {
       brightness == Brightness.dark
           ? const Color(0xFF66BB6A)
           : Colors.green;
+
+  // ========== 猜歌游戏颜色（主题感知） ==========
+
+  /// 猜歌 - 正确（绿色）背景色
+  static Color guessCorrectBg(Brightness brightness) =>
+      brightness == Brightness.dark
+          ? const Color(0xFF2E7D32)
+          : Colors.green;
+
+  /// 猜歌 - 接近（黄色）背景色
+  static Color guessCloseBg(Brightness brightness) =>
+      brightness == Brightness.dark
+          ? const Color(0xFFE6A000)
+          : Colors.yellow;
+
+  /// 猜歌 - 错误（灰色）背景色
+  static Color guessWrongBg(Brightness brightness) =>
+      brightness == Brightness.dark
+          ? const Color(0xFF616161)
+          : Colors.grey;
+
+  /// 猜歌 - 答案卡片背景色（游戏结束后显示正确答案的区域）
+  static Color guessAnswerCardBg(Brightness brightness) =>
+      brightness == Brightness.dark
+          ? const Color(0xFF1B3820)
+          : const Color(0xFFE8F5E9);
 
   /// 语义蓝色（链接、信息）
   static Color linkBlue(Brightness brightness) =>

@@ -23,6 +23,7 @@ class _DataBackupPageState extends State<DataBackupPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final textPrimaryColor = Theme.of(context).colorScheme.onSurface;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -62,7 +63,7 @@ class _DataBackupPageState extends State<DataBackupPage> {
               // 主内容
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(12),

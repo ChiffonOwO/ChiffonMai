@@ -585,6 +585,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
     final themeColor = Theme.of(context).colorScheme.primary;
     final brightness = Theme.of(context).brightness;
     final textPrimaryColor = Theme.of(context).colorScheme.onSurface;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -676,7 +677,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                 ),
               ),
               Container(
-                margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                margin: const EdgeInsets.fromLTRB(4, 0, 4, 8),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
@@ -807,7 +808,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
               ),
               Expanded(
                 child: Container(
-                  margin: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(12),

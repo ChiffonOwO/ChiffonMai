@@ -296,8 +296,9 @@ class _GuessChartByAliaPageState extends State<GuessChartByAliaPage> {
     return results.take(20).toList();
   }
 
-  // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析）
+  // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析），或union独有的歌曲
   bool _isMaidataSong(Song song) {
+    if (song.isExtra) return true;
     if (song.cids.isEmpty) return false;
     return song.cids.every((cid) => cid == 0);
   }
@@ -327,7 +328,7 @@ class _GuessChartByAliaPageState extends State<GuessChartByAliaPage> {
     var guessSong = await GuessChartByAliaService.buildGuessSongEntity(guessedSong);
     // 计算猜测结果
     guessSong = await GuessChartByAliaService.calculateGuessResult(
-        guessSong, _targetSong!);
+        guessSong, _targetSong!, Theme.of(context).brightness);
 
     // 更新猜测历史
     setState(() {
@@ -1086,6 +1087,7 @@ class _GuessChartByAliaPageState extends State<GuessChartByAliaPage> {
     final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
 
     // 自定义常量
@@ -1138,7 +1140,7 @@ class _GuessChartByAliaPageState extends State<GuessChartByAliaPage> {
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
@@ -1246,8 +1248,8 @@ class _GuessChartByAliaPageState extends State<GuessChartByAliaPage> {
                                                           screenWidth * 0.04,
                                                       fontWeight: FontWeight.bold,
                                                       color: _isWon
-                                                          ? Colors.green
-                                                          : Colors.red,
+                                                          ? AppColors.successGreen(brightness)
+                                                          : AppColors.errorRed(brightness),
                                                     ),
                                                   ),
                                                 if (_isGameOver && !_isWon)
@@ -1425,7 +1427,7 @@ class _GuessChartByAliaPageState extends State<GuessChartByAliaPage> {
                                                     const EdgeInsets.only(top: 20),
                                                 padding: const EdgeInsets.all(16),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.green[50],
+                                                  color: AppColors.guessAnswerCardBg(brightness),
                                                   borderRadius:
                                                       BorderRadius.circular(8),
                                                 ),
@@ -1440,8 +1442,8 @@ class _GuessChartByAliaPageState extends State<GuessChartByAliaPage> {
                                                             screenWidth * 0.04,
                                                         fontWeight: FontWeight.bold,
                                                         color: _isWon
-                                                            ? Colors.green
-                                                            : Colors.blue,
+                                                            ? AppColors.successGreen(brightness)
+                                                            : AppColors.linkBlue(brightness),
                                                       ),
                                                     ),
                                                     const SizedBox(height: 8),
@@ -1507,7 +1509,7 @@ class _GuessChartByAliaPageState extends State<GuessChartByAliaPage> {
                                                                 ),
                                                                 // 第三行：masterDs | remasterDs | version
                                                               Text(
-                                                                '${_targetSong!.ds.length > 3 ? _targetSong!.ds[3].toString() : '-'} | ${_targetSong!.ds.length > 4 ? _targetSong!.ds[4].toString() : '-'} | ${StringUtil.formatVersion2(_targetSong!.basicInfo.from)}',
+                                                                '${_targetSong!.ds.length > 3 ? _targetSong!.ds[3].toString() : '-'} | ${_targetSong!.ds.length > 4 ? _targetSong!.ds[4].toString() : '-'} | ${StringUtil.formatVersion2WithFlag(_targetSong!.basicInfo.from, _targetSong!.isExtra)}',
                                                                 style: TextStyle(
                                                                   fontSize: screenWidth * 0.03,
                                                                   color: Theme.of(context).colorScheme.onSurfaceVariant,

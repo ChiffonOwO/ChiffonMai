@@ -288,6 +288,7 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     final double borderRadiusSmall = 8.0;
 
     return Scaffold(
@@ -339,7 +340,7 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(borderRadiusSmall),

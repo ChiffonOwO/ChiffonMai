@@ -46,9 +46,9 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
     final scaleFactor = screenWidth / 375.0;
-    final paddingS = 8.0 * scaleFactor;
+    final paddingS = 4.0 * scaleFactor;
     final paddingM = 12.0 * scaleFactor;
-    final paddingL = 16.0 * scaleFactor;
+    final paddingL = 10.0 * scaleFactor;
     final borderRadiusSmall = 8.0 * scaleFactor;
 
     return Scaffold(
@@ -150,13 +150,13 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
                           ElevatedButton(
                             onPressed: _handleJoin,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.onSurface,
+                              backgroundColor: Theme.of(context).colorScheme.primary,
                               padding: EdgeInsets.symmetric(vertical: 16 * scaleFactor),
                               minimumSize: Size(double.infinity, 50 * scaleFactor),
                             ),
                             child: _isJoining
-                                ? SizedBox(width: 24 * scaleFactor, height: 24 * scaleFactor, child: CircularProgressIndicator(color: Colors.white))
-                                : Text('加入房间', style: TextStyle(color: Colors.white, fontSize: 16 * scaleFactor)),
+                                ? SizedBox(width: 24 * scaleFactor, height: 24 * scaleFactor, child: CircularProgressIndicator(color: Theme.of(context).colorScheme.onPrimary))
+                                : Text('加入房间', style: TextStyle(color: Theme.of(context).colorScheme.onPrimary, fontSize: 16 * scaleFactor)),
                           ),
                           SizedBox(height: paddingL),
                           const Divider(),

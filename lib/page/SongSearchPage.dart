@@ -176,6 +176,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
         filteredResults = filteredResults.where((song) {
           return _selectedVersions.contains(song.basicInfo.from);
         }).toList();
+        // 额外歌曲（union独有）不参与版本筛选结果
+        filteredResults = filteredResults.where((song) => !song.isExtra).toList();
       }
 
       // 应用流派筛选
@@ -372,50 +374,53 @@ class _SongSearchPageState extends State<SongSearchPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Flexible(
-              child: Row(
-                children: [
-                  Text(
-                    '定数筛选',
-                    style: TextStyle(
-                      fontSize: screenWidth * 0.035,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  if (selectedLevelText.isNotEmpty)
-                    Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(left: screenWidth * 0.02),
-                        child: Text(
-                          selectedLevelText,
-                          style: TextStyle(
-                            fontSize: screenWidth * 0.03,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
+        InkWell(
+          onTap: () {
+            setState(() {
+              _showLevelFilter = !_showLevelFilter;
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Row(
+                    children: [
+                      Text(
+                        '定数筛选',
+                        style: TextStyle(
+                          fontSize: screenWidth * 0.035,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
-                    ),
-                ],
-              ),
+                      if (selectedLevelText.isNotEmpty)
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(left: screenWidth * 0.02),
+                            child: Text(
+                              selectedLevelText,
+                              style: TextStyle(
+                                fontSize: screenWidth * 0.03,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  _showLevelFilter ? Icons.expand_less : Icons.expand_more,
+                  size: screenWidth * 0.04,
+                ),
+              ],
             ),
-            IconButton(
-              icon: Icon(
-                _showLevelFilter ? Icons.expand_less : Icons.expand_more,
-                size: screenWidth * 0.04,
-              ),
-              onPressed: () {
-                setState(() {
-                  _showLevelFilter = !_showLevelFilter;
-                });
-              },
-            ),
-          ],
+          ),
         ),
         if (_showLevelFilter)
           Container(
@@ -476,50 +481,53 @@ class _SongSearchPageState extends State<SongSearchPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Flexible(
-              child: Row(
-                children: [
-                  Text(
-                    '版本筛选',
-                    style: TextStyle(
-                      fontSize: screenWidth * 0.035,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  if (selectedVersionsText.isNotEmpty)
-                    Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(left: screenWidth * 0.02),
-                        child: Text(
-                          selectedVersionsText,
-                          style: TextStyle(
-                            fontSize: screenWidth * 0.03,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
+        InkWell(
+          onTap: () {
+            setState(() {
+              _showVersionFilter = !_showVersionFilter;
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Row(
+                    children: [
+                      Text(
+                        '版本筛选',
+                        style: TextStyle(
+                          fontSize: screenWidth * 0.035,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
-                    ),
-                ],
-              ),
+                      if (selectedVersionsText.isNotEmpty)
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(left: screenWidth * 0.02),
+                            child: Text(
+                              selectedVersionsText,
+                              style: TextStyle(
+                                fontSize: screenWidth * 0.03,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  _showVersionFilter ? Icons.expand_less : Icons.expand_more,
+                  size: screenWidth * 0.04,
+                ),
+              ],
             ),
-            IconButton(
-              icon: Icon(
-                _showVersionFilter ? Icons.expand_less : Icons.expand_more,
-                size: screenWidth * 0.04,
-              ),
-              onPressed: () {
-                setState(() {
-                  _showVersionFilter = !_showVersionFilter;
-                });
-              },
-            ),
-          ],
+          ),
         ),
         if (_showVersionFilter)
           Container(
@@ -561,50 +569,53 @@ class _SongSearchPageState extends State<SongSearchPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Flexible(
-              child: Row(
-                children: [
-                  Text(
-                    '流派筛选',
-                    style: TextStyle(
-                      fontSize: screenWidth * 0.035,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  if (selectedGenresText.isNotEmpty)
-                    Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(left: screenWidth * 0.02),
-                        child: Text(
-                          selectedGenresText,
-                          style: TextStyle(
-                            fontSize: screenWidth * 0.03,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
+        InkWell(
+          onTap: () {
+            setState(() {
+              _showGenreFilter = !_showGenreFilter;
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Row(
+                    children: [
+                      Text(
+                        '流派筛选',
+                        style: TextStyle(
+                          fontSize: screenWidth * 0.035,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
-                    ),
-                ],
-              ),
+                      if (selectedGenresText.isNotEmpty)
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(left: screenWidth * 0.02),
+                            child: Text(
+                              selectedGenresText,
+                              style: TextStyle(
+                                fontSize: screenWidth * 0.03,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  _showGenreFilter ? Icons.expand_less : Icons.expand_more,
+                  size: screenWidth * 0.04,
+                ),
+              ],
             ),
-            IconButton(
-              icon: Icon(
-                _showGenreFilter ? Icons.expand_less : Icons.expand_more,
-                size: screenWidth * 0.04,
-              ),
-              onPressed: () {
-                setState(() {
-                  _showGenreFilter = !_showGenreFilter;
-                });
-              },
-            ),
-          ],
+          ),
         ),
         if (_showGenreFilter)
           Container(
@@ -648,50 +659,53 @@ class _SongSearchPageState extends State<SongSearchPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Flexible(
-              child: Row(
-                children: [
-                  Text(
-                    '标签筛选',
-                    style: TextStyle(
-                      fontSize: screenWidth * 0.035,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  if (selectedTagsText.isNotEmpty)
-                    Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(left: screenWidth * 0.02),
-                        child: Text(
-                          selectedTagsText,
-                          style: TextStyle(
-                            fontSize: screenWidth * 0.03,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
+        InkWell(
+          onTap: () {
+            setState(() {
+              _showTagFilter = !_showTagFilter;
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Row(
+                    children: [
+                      Text(
+                        '标签筛选',
+                        style: TextStyle(
+                          fontSize: screenWidth * 0.035,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
-                    ),
-                ],
-              ),
+                      if (selectedTagsText.isNotEmpty)
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(left: screenWidth * 0.02),
+                            child: Text(
+                              selectedTagsText,
+                              style: TextStyle(
+                                fontSize: screenWidth * 0.03,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  _showTagFilter ? Icons.expand_less : Icons.expand_more,
+                  size: screenWidth * 0.04,
+                ),
+              ],
             ),
-            IconButton(
-              icon: Icon(
-                _showTagFilter ? Icons.expand_less : Icons.expand_more,
-                size: screenWidth * 0.04,
-              ),
-              onPressed: () {
-                setState(() {
-                  _showTagFilter = !_showTagFilter;
-                });
-              },
-            ),
-          ],
+          ),
         ),
         if (_showTagFilter)
           Container(
@@ -793,6 +807,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
     final Color cardBgColor = Theme.of(context).colorScheme.surface.withOpacity(0.9);
     final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
     final double borderRadiusSmall = 8.0;
+    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -833,7 +848,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
 
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: cardBgColor,
                     borderRadius: BorderRadius.circular(borderRadiusSmall),
@@ -973,16 +988,28 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                               borderRadius: BorderRadius.circular(4),
                                             ),
                                             padding: EdgeInsets.symmetric(
-                                              horizontal: screenWidth * 0.02,
-                                              vertical: screenHeight * 0.005,
+                                              horizontal: screenWidth * 0.04,
+                                              vertical: screenHeight * 0.008,
                                             ),
-                                            minimumSize: Size(screenWidth * 0.15, 30),
+                                            minimumSize: Size(screenWidth * 0.2, 36),
+                                            backgroundColor: AppColors.linkBlue(brightness),
+                                            foregroundColor: Colors.white,
                                           ),
-                                          child: Text(
-                                            _showAllFilters ? '收起' : '展开',
-                                            style: TextStyle(
-                                              fontSize: tinyFontSize,
-                                            ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                _showAllFilters ? Icons.expand_less : Icons.expand_more,
+                                                size: 16,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                _showAllFilters ? '收起筛选' : '展开筛选',
+                                                style: TextStyle(
+                                                  fontSize: tinyFontSize,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
@@ -1256,7 +1283,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                       // 版本和流派
                       Expanded(
                         child: Text(
-                          '${StringUtil.formatVersion(song.basicInfo.from)} | ${song.basicInfo.genre}',
+                          '${StringUtil.formatVersionWithFlag(song.basicInfo.from, song.isExtra)} | ${song.basicInfo.genre}',
                           style: TextStyle(
                             fontSize: 14,
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1436,7 +1463,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
     // 检查版本匹配
     if (song.basicInfo.from.toLowerCase().contains(query)) {
       matchInfos
-          .add({'type': '版本', 'value': StringUtil.formatVersion(song.basicInfo.from)});
+          .add({'type': '版本', 'value': StringUtil.formatVersionWithFlag(song.basicInfo.from, song.isExtra)});
     }
     // 检查别名匹配
     final aliases = SongAliasManager.instance.aliases[song.title] ?? [];

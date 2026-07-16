@@ -30,9 +30,9 @@ class _RankListPageState extends State<RankListPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     _scaleFactor = screenWidth / 375.0;
     _paddingXS = 4.0 * _scaleFactor;
-    _paddingS = 8.0 * _scaleFactor;
+    _paddingS = 4.0 * _scaleFactor;
     _paddingM = 12.0 * _scaleFactor;
-    _paddingL = 16.0 * _scaleFactor;
+    _paddingL = 10.0 * _scaleFactor;
     _borderRadiusSmall = 8.0 * _scaleFactor;
     _textSizeM = 12.0 * _scaleFactor;
 

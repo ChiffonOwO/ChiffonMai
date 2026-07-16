@@ -3,6 +3,7 @@ import 'package:redis/redis.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/api/DeveloperToken.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
+import '../../constant/CacheKeyConstant.dart';
 
 enum RankingType {
   achievementRate,
@@ -272,19 +273,19 @@ class SongRankingService {
 
   Future<String> getCurrentPlayerId() async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     // 优先获取洛雪用户ID
-    String? luoxueUserId = prefs.getString('luoxue_user_id');
+    String? luoxueUserId = prefs.getString(CacheKeyConstant.luoxueUserId);
     if (luoxueUserId != null && luoxueUserId.isNotEmpty) {
       return luoxueUserId;
     }
-    
+
     // 获取水鱼用户ID
-    String? shuiyuUserId = prefs.getString('shuiyu_user_id');
+    String? shuiyuUserId = prefs.getString(CacheKeyConstant.shuiyuUserId);
     if (shuiyuUserId != null && shuiyuUserId.isNotEmpty) {
       return shuiyuUserId;
     }
-    
+
     // 默认返回空字符串
     return '';
   }

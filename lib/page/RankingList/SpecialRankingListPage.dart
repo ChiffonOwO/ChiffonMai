@@ -555,6 +555,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
+    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -566,7 +567,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
             children: [
               // 头部
               Container(
-                padding: const EdgeInsets.fromLTRB(16, 48, 16, 16),
+                padding: EdgeInsets.fromLTRB(16, 48, 16, 16),
                 child: Row(
                   children: [
                     IconButton(
@@ -642,7 +643,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
               // 排行榜列表
               Expanded(
                 child: Container(
-                  margin: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: AppColors.cardBackgroundTranslucent(brightness),
                     borderRadius: BorderRadius.circular(12),

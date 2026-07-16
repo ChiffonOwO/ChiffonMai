@@ -826,7 +826,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
               
               // 歌曲信息区域 - 固定宽高，左侧曲绘，右侧信息
               Container(
-                margin: EdgeInsets.fromLTRB(8, 0, 8, 8),
+                margin: EdgeInsets.fromLTRB(4, 0, 4, 8),
                 height: 120,
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
@@ -939,7 +939,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                 ),
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 8, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 8, 4, 16),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
                     borderRadius: BorderRadius.circular(8),

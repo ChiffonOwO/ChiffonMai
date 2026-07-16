@@ -104,6 +104,7 @@ class _FriendComparePageState extends State<FriendComparePage> {
     final cardShadow = AppColors.defaultShadow(brightness);
     // ignore: unused_local_variable
     final borderColor = AppColors.tableBorder(brightness);
+    final safeBottom = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -141,7 +142,7 @@ class _FriendComparePageState extends State<FriendComparePage> {
 
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: cardBgColor,
                     borderRadius: BorderRadius.circular(12),

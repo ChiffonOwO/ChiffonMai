@@ -144,6 +144,7 @@ class SongInfoService {
               'level': song.level,
               'cids': song.cids,
               'shortId': shortId,
+              'is_extra': song.isExtra,
               'charts': song.charts
                   .map((chart) =>
                       {'notes': chart.notes, 'charter': chart.charter})
@@ -1175,7 +1176,7 @@ class SongInfoService {
         List<dynamic> cids = song.cids;
 
         bool isMaidataSong = cids.isNotEmpty && cids.every((cid) => cid == 0);
-        if (songId >= 100000 || isMaidataSong) continue;
+        if (songId >= 100000 || isMaidataSong || song.isExtra) continue;
 
         for (int levelIndex = 0;
             levelIndex < song.charts.length;

@@ -9,6 +9,7 @@ import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
+import 'package:my_first_flutter_app/utils/AppTheme.dart';
 
 class GuessChartByAliaService {
   // 单例模式
@@ -258,7 +259,7 @@ class GuessChartByAliaService {
   }
 
   // 根据用户猜测和目标歌曲，返回颜色提示并填入用户猜测实体
-  static Future<GuessSong> calculateGuessResult(GuessSong guessedSong, Song targetSong) async {
+  static Future<GuessSong> calculateGuessResult(GuessSong guessedSong, Song targetSong, Brightness brightness) async {
     try {
       // 获取标签数据
       final tagIdToNameMap = await buildTagIdToNameMap();
@@ -280,26 +281,26 @@ class GuessChartByAliaService {
       guessedSong.masterTags = guessedTags;
 
       // 计算各属性的颜色
-      guessedSong.titleBgColor = guessedSong.title == targetSong.basicInfo.title ? Colors.green : Colors.grey;
-      guessedSong.typeBgColor = guessedSong.type == targetSong.type ? Colors.green : Colors.grey;
+      guessedSong.titleBgColor = guessedSong.title == targetSong.basicInfo.title ? AppColors.guessCorrectBg(brightness) : AppColors.guessWrongBg(brightness);
+      guessedSong.typeBgColor = guessedSong.type == targetSong.type ? AppColors.guessCorrectBg(brightness) : AppColors.guessWrongBg(brightness);
       
       // BPM比较
       if (guessedSong.bpm == targetSong.basicInfo.bpm) {
-        guessedSong.bpmBgColor = Colors.green;
+        guessedSong.bpmBgColor = AppColors.guessCorrectBg(brightness);
         guessedSong.bpmArrow = null;
       } else if ((guessedSong.bpm - targetSong.basicInfo.bpm).abs() <= 20) {
-        guessedSong.bpmBgColor = Colors.yellow;
+        guessedSong.bpmBgColor = AppColors.guessCloseBg(brightness);
         guessedSong.bpmArrow = guessedSong.bpm < targetSong.basicInfo.bpm ? '↑' : '↓';
       } else {
-        guessedSong.bpmBgColor = Colors.grey;
+        guessedSong.bpmBgColor = AppColors.guessWrongBg(brightness);
         guessedSong.bpmArrow = guessedSong.bpm < targetSong.basicInfo.bpm ? '↑' : '↓';
       }
 
-      guessedSong.artistBgColor = guessedSong.artist == targetSong.basicInfo.artist ? Colors.green : Colors.grey;
+      guessedSong.artistBgColor = guessedSong.artist == targetSong.basicInfo.artist ? AppColors.guessCorrectBg(brightness) : AppColors.guessWrongBg(brightness);
 
       // Master难度比较
       if (guessedSong.masterDs == (targetSong.ds.length > 3 ? targetSong.ds[3].toString() : '')) {
-        guessedSong.masterLevelBgColor = Colors.green;
+        guessedSong.masterLevelBgColor = AppColors.guessCorrectBg(brightness);
         guessedSong.masterLevelArrow = null;
       } else {
         try {
@@ -307,26 +308,26 @@ class GuessChartByAliaService {
           final targetLevel = double.tryParse(targetSong.ds.length > 3 ? targetSong.ds[3].toString() : '');
           if (guessedLevel != null && targetLevel != null) {
             if ((guessedLevel - targetLevel).abs() <= 0.4) {
-              guessedSong.masterLevelBgColor = Colors.yellow;
+              guessedSong.masterLevelBgColor = AppColors.guessCloseBg(brightness);
             } else {
-              guessedSong.masterLevelBgColor = Colors.grey;
+              guessedSong.masterLevelBgColor = AppColors.guessWrongBg(brightness);
             }
             guessedSong.masterLevelArrow = guessedLevel < targetLevel ? '↑' : '↓';
           } else {
-            guessedSong.masterLevelBgColor = Colors.grey;
+            guessedSong.masterLevelBgColor = AppColors.guessWrongBg(brightness);
             guessedSong.masterLevelArrow = null;
           }
         } catch (e) {
-          guessedSong.masterLevelBgColor = Colors.grey;
+          guessedSong.masterLevelBgColor = AppColors.guessWrongBg(brightness);
           guessedSong.masterLevelArrow = null;
         }
       }
 
-      guessedSong.masterCharterBgColor = guessedSong.masterCharter == (targetSong.charts.length > 3 ? targetSong.charts[3].charter : '') ? Colors.green : Colors.grey;
+      guessedSong.masterCharterBgColor = guessedSong.masterCharter == (targetSong.charts.length > 3 ? targetSong.charts[3].charter : '') ? AppColors.guessCorrectBg(brightness) : AppColors.guessWrongBg(brightness);
 
       // Re:Master难度比较
       if (guessedSong.remasterDs == (targetSong.ds.length > 4 ? targetSong.ds[4].toString() : '')) {
-        guessedSong.remasterLevelBgColor = Colors.green;
+        guessedSong.remasterLevelBgColor = AppColors.guessCorrectBg(brightness);
         guessedSong.remasterLevelArrow = null;
       } else {
         try {
@@ -334,27 +335,27 @@ class GuessChartByAliaService {
           final targetLevel = double.tryParse(targetSong.ds.length > 4 ? targetSong.ds[4].toString() : '');
           if (guessedLevel != null && targetLevel != null) {
             if ((guessedLevel - targetLevel).abs() <= 0.4) {
-              guessedSong.remasterLevelBgColor = Colors.yellow;
+              guessedSong.remasterLevelBgColor = AppColors.guessCloseBg(brightness);
             } else {
-              guessedSong.remasterLevelBgColor = Colors.grey;
+              guessedSong.remasterLevelBgColor = AppColors.guessWrongBg(brightness);
             }
             guessedSong.remasterLevelArrow = guessedLevel < targetLevel ? '↑' : '↓';
           } else {
-            guessedSong.remasterLevelBgColor = Colors.grey;
+            guessedSong.remasterLevelBgColor = AppColors.guessWrongBg(brightness);
             guessedSong.remasterLevelArrow = null;
           }
         } catch (e) {
-          guessedSong.remasterLevelBgColor = Colors.grey;
+          guessedSong.remasterLevelBgColor = AppColors.guessWrongBg(brightness);
           guessedSong.remasterLevelArrow = null;
         }
       }
 
-      guessedSong.remasterCharterBgColor = guessedSong.remasterCharter == (targetSong.charts.length > 4 ? targetSong.charts[4].charter : '') ? Colors.green : Colors.grey;
-      guessedSong.genreBgColor = guessedSong.genre == targetSong.basicInfo.genre ? Colors.green : Colors.grey;
+      guessedSong.remasterCharterBgColor = guessedSong.remasterCharter == (targetSong.charts.length > 4 ? targetSong.charts[4].charter : '') ? AppColors.guessCorrectBg(brightness) : AppColors.guessWrongBg(brightness);
+      guessedSong.genreBgColor = guessedSong.genre == targetSong.basicInfo.genre ? AppColors.guessCorrectBg(brightness) : AppColors.guessWrongBg(brightness);
       
       // 版本比较
       if (guessedSong.version == targetSong.basicInfo.from) {
-        guessedSong.versionBgColor = Colors.green;
+        guessedSong.versionBgColor = AppColors.guessCorrectBg(brightness);
         guessedSong.versionArrow = null;
       } else {
         // 版本相差一个世代（例如 maimai → maimai PLUS）
@@ -362,21 +363,21 @@ class GuessChartByAliaService {
         final targetVersionIndex = _versionList.indexOf(targetSong.basicInfo.from);
         if (guessedVersionIndex != -1 && targetVersionIndex != -1) {
           if ((guessedVersionIndex - targetVersionIndex).abs() == 1) {
-            guessedSong.versionBgColor = Colors.yellow;
+            guessedSong.versionBgColor = AppColors.guessCloseBg(brightness);
           } else {
-            guessedSong.versionBgColor = Colors.grey;
+            guessedSong.versionBgColor = AppColors.guessWrongBg(brightness);
           }
           // 版本箭头：索引越小版本越早，所以如果猜的版本索引小于目标版本索引，说明猜晚了，需要↑表示目标版本更早
           guessedSong.versionArrow = guessedVersionIndex > targetVersionIndex ? '猜晚了' : '猜早了';
         } else {
-          guessedSong.versionBgColor = Colors.grey;
+          guessedSong.versionBgColor = AppColors.guessWrongBg(brightness);
           guessedSong.versionArrow = null;
         }
       }
 
       // 标签比较
       guessedSong.tagBgColors = guessedSong.masterTags?.map((tag) {
-        return targetTags.contains(tag) ? Colors.green : Colors.grey;
+        return targetTags.contains(tag) ? AppColors.guessCorrectBg(brightness) : AppColors.guessWrongBg(brightness);
       }).toList();
 
       return guessedSong;
@@ -388,7 +389,8 @@ class GuessChartByAliaService {
   
   // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析）
   static bool _isMaidataSong(Song song) {
-    if (song.cids.isEmpty) return false;
-    return song.cids.every((cid) => cid == 0);
+    if (song.cids.isNotEmpty && song.cids.every((cid) => cid == 0)) return true;
+    if (song.isExtra) return true;
+    return false;
   }
 }

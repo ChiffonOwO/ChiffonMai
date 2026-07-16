@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../service/RankingList/RatingRankListService.dart';
 import '../../constant/CacheKeyConstant.dart';
 import '../../utils/AppTheme.dart';
+import '../../utils/ColorUtil.dart';
 
 class RatingRankListPage extends StatefulWidget {
   const RatingRankListPage({super.key});
@@ -48,25 +49,41 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
     final prefs = await SharedPreferences.getInstance();
     final lastDataSource = prefs.getString(CacheKeyConstant.lastDataSource);
     final qq = prefs.getString('cachedQQ');
-    final luoxueUserId = prefs.getString('luoxue_user_id');
+    final shuiyuUserId = prefs.getString(CacheKeyConstant.shuiyuUserId);
+    final luoxueUserId = prefs.getString(CacheKeyConstant.luoxueUserId);
+
+    // 优先使用正式存储的用户ID（shuiyu_user_id / luoxue_user_id），
+    // 因为它们在数据刷新时由 HomePage 写入，比 cachedQQ 更权威
+    final hasShuiyuId = shuiyuUserId != null && shuiyuUserId.isNotEmpty;
+    final hasLuoxueId = luoxueUserId != null && luoxueUserId.isNotEmpty;
+    final hasQQ = qq != null && qq.isNotEmpty;
 
     // 根据缓存推断当前数据源：优先使用有有效用户ID的数据源
-    // 如果水鱼有QQ且落雪没有用户ID，使用水鱼
-    // 如果落雪有用户ID且水鱼没有QQ，使用落雪
-    // 否则使用缓存的上次数据源
-    if (qq != null && qq.isNotEmpty && (luoxueUserId == null || luoxueUserId.isEmpty)) {
+    if (hasShuiyuId && !hasLuoxueId) {
       _currentDataSource = 'shuiyu';
-      _currentUserId = 'shuiyu:$qq';
-    } else if (luoxueUserId != null && luoxueUserId.isNotEmpty && (qq == null || qq.isEmpty)) {
+      _currentUserId = shuiyuUserId;
+    } else if (hasLuoxueId && !hasShuiyuId) {
       _currentDataSource = 'luoxue';
       _currentUserId = luoxueUserId;
-    } else {
-      // 两者都有或都没有，使用缓存的上次数据源
+    } else if (hasShuiyuId && hasLuoxueId) {
+      // 两者都有，使用上次数据源
       _currentDataSource = lastDataSource;
-      if (_currentDataSource == 'shuiyu' && qq != null && qq.isNotEmpty) {
-        _currentUserId = 'shuiyu:$qq';
+      if (_currentDataSource == 'shuiyu') {
+        _currentUserId = shuiyuUserId;
       } else if (_currentDataSource == 'luoxue') {
         _currentUserId = luoxueUserId;
+      } else {
+        // 如果 lastDataSource 为空或无效，默认使用水鱼
+        _currentDataSource = 'shuiyu';
+        _currentUserId = shuiyuUserId;
+      }
+    } else {
+      // 都没有正式ID，fallback 到 cachedQQ
+      if (hasQQ) {
+        _currentDataSource = lastDataSource ?? 'shuiyu';
+        _currentUserId = 'shuiyu:$qq';
+      } else {
+        _currentDataSource = lastDataSource;
       }
     }
 
@@ -74,6 +91,7 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
     print('[DEBUG] 缓存的上次数据源: $lastDataSource');
     print('[DEBUG] 推断的当前数据源: $_currentDataSource');
     print('[DEBUG] 水鱼QQ: $qq');
+    print('[DEBUG] 水鱼用户ID: $shuiyuUserId');
     print('[DEBUG] 落雪用户ID: $luoxueUserId');
     print('[DEBUG] 当前用户ID: $_currentUserId');
   }
@@ -245,19 +263,14 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
 
           // Rating 信息
           SizedBox(
-            width: 120,
+            width: 140,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 // 总Rating
-                Text(
-                  item.totalRating.toString(),
-                  textAlign: TextAlign.right,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primaryText(brightness),
-                  ),
+                ColorUtil.buildRatingBadge(
+                  item.totalRating,
+                  height: 24,
                 ),
                 // Best35 和 Best15
                 Row(
@@ -566,18 +579,13 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
 
                   // Rating 信息
                   SizedBox(
-                    width: 120,
+                    width: 140,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(
-                          _currentUserRankItem!.totalRating.toString(),
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primaryText(brightness),
-                          ),
+                        ColorUtil.buildRatingBadge(
+                          _currentUserRankItem!.totalRating,
+                          height: 24,
                         ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,

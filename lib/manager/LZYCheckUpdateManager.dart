@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -16,6 +17,8 @@ class LZYCheckUpdateManager {
   // ==================== 检查更新配置 =====================
   final String pastebinRawUrl = ApiUrls.checkUpdateApi;
   final bool forceUpdate = false;
+  /// 兜底下载地址（检查更新失败时仍可复制）
+  static const String defaultDownloadUrl = 'https://wward.lanzouw.com/chiffonmai';
   // ======================================================
 
   /// 从 pastebin 获取在线配置
@@ -104,6 +107,7 @@ class LZYCheckUpdateManager {
           "latestVersion": latestVersion,
           "latestBuild": latestBuild,
           "updateLog": updateLog,
+          "downloadUrl": downloadUrl,
         };
       }
     } catch (e) {
@@ -122,6 +126,25 @@ class LZYCheckUpdateManager {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
+
+  /// 复制下载链接到剪贴板
+  void copyDownloadUrl(String url) {
+    Clipboard.setData(ClipboardData(text: url));
+  }
+
+  /// 构建复制下载链接按钮
+  Widget _buildCopyDownloadButton(BuildContext c, String url) {
+    return TextButton(
+      onPressed: () {
+        copyDownloadUrl(url);
+        Navigator.pop(c);
+        ScaffoldMessenger.of(c).showSnackBar(
+          const SnackBar(content: Text('下载链接已复制到剪贴板'), duration: Duration(seconds: 2)),
+        );
+      },
+      child: const Text('复制下载链接'),
+    );
   }
 
   Future<bool> shouldShowUpdateDialog() async {
@@ -161,6 +184,7 @@ class LZYCheckUpdateManager {
           title: Text("检查更新失败"),
           content: Text(info["message"] ?? "无法连接到服务器，请检查网络后重试"),
           actions: [
+            _buildCopyDownloadButton(c, defaultDownloadUrl),
             TextButton(
               onPressed: () {
                 Navigator.pop(c);
@@ -199,6 +223,7 @@ class LZYCheckUpdateManager {
             ],
           ),
           actions: [
+            _buildCopyDownloadButton(c, info["downloadUrl"] ?? defaultDownloadUrl),
             TextButton(
               onPressed: () {
                 Navigator.pop(c);
@@ -211,7 +236,7 @@ class LZYCheckUpdateManager {
       );
       return completer.future;
     }
-    
+
     // 如果有更新，显示更新提示
     if (info["hasUpdate"]) {
       showDialog(
@@ -251,6 +276,7 @@ class LZYCheckUpdateManager {
                 },
                 child: Text("3天内不提示"),
               ),
+            _buildCopyDownloadButton(c, info["downloadUrl"] ?? defaultDownloadUrl),
             TextButton(
               onPressed: () {
                 Navigator.pop(c);

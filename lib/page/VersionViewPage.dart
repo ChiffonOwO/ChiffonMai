@@ -266,6 +266,7 @@ class _VersionViewState extends State<VersionView> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     
     final titleFontSize = screenWidth * 0.06;
     final tableHeaderFontSize = screenWidth * 0.035;
@@ -332,7 +333,7 @@ class _VersionViewState extends State<VersionView> {
 
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: cardBgColor,
                     borderRadius: BorderRadius.circular(borderRadiusSmall),

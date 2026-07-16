@@ -304,6 +304,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
     final Color cardBgColor = Theme.of(context).colorScheme.surface.withOpacity(0.9);
     final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
     final double borderRadiusSmall = 8.0;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -350,7 +351,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
               // 主内容区域
               Expanded(
                 child: Container(
-                  margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                   decoration: BoxDecoration(
                     color: cardBgColor,
                     borderRadius: BorderRadius.circular(borderRadiusSmall),

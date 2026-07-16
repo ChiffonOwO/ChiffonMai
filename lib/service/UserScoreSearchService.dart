@@ -259,7 +259,7 @@ class UserScoreSearchService {
         if (_cachedSongs != null) {
           var foundSong = _cachedSongs!.where((s) => s.id == songId).firstOrNull;
           if (foundSong != null && foundSong.basicInfo.from != '') {
-            versionMatch = foundSong.basicInfo.from == version;
+            versionMatch = foundSong.basicInfo.from == version && !foundSong.isExtra;
           }
         }
         

@@ -1,0 +1,55 @@
+{
+  "log": {
+    "level": "info"
+  },
+  "dns": {},
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "address": [
+        "172.18.0.1/30"
+      ],
+      "platform": {
+        "http_proxy": {
+          "enabled": true,
+          "server": "proxy.maimai.lxns.net",
+          "server_port": 8080,
+          "bypass_domain": [],
+          "match_domain": [
+            "wahlap.com"
+          ]
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "http",
+      "tag": "maimai DX 查分器代理",
+      "server": "proxy.maimai.lxns.net",
+      "server_port": 8080
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ],
+  "route": {
+    "rules": [
+      {
+        "domain_suffix": [
+          "wahlap.com"
+        ],
+        "outbound": "maimai DX 查分器代理"
+      },
+      {
+        "ip_cidr": [
+          "0.0.0.0/0",
+          "::/0"
+        ],
+        "outbound": "direct"
+      }
+    ]
+  }
+}

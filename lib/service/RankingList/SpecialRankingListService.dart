@@ -352,7 +352,7 @@ class SpecialRankingListService {
         // 遍历歌曲，使用内存中的diff数据进行查询
         for (Song song in songs) {
           // 过滤掉maidata追加的歌曲
-          if (excludedSongIds.contains(song.id)) {
+          if (excludedSongIds.contains(song.id) || song.isExtra) {
             processedCount++;
             continue;
           }
@@ -529,18 +529,18 @@ class SpecialRankingListService {
         
         for (Song song in songs) {
           // 过滤掉maidata追加的歌曲
-          if (excludedSongIds.contains(song.id)) {
+          if (excludedSongIds.contains(song.id) || song.isExtra) {
             processedCount++;
             continue;
           }
           try {
             List<DiffData>? songDiffDataList = diffSong.charts[song.id];
-            
+
             if (songDiffDataList == null || songDiffDataList.isEmpty) {
               processedCount++;
               continue;
             }
-            
+
             // 只统计MASTER(3)和RE:MASTER(4)难度
             for (int i = 3; i <= 4 && i < song.ds.length; i++) {
               double officialDs = song.ds[i];
@@ -697,18 +697,18 @@ class SpecialRankingListService {
           
           for (Song song in songs) {
             // 过滤掉maidata追加的歌曲
-            if (excludedSongIds.contains(song.id)) {
+            if (excludedSongIds.contains(song.id) || song.isExtra) {
               processedCount++;
               continue;
             }
             try {
               List<DiffData>? songDiffDataList = diffSong.charts[song.id];
-              
+
               if (songDiffDataList == null || songDiffDataList.isEmpty) {
                 processedCount++;
                 continue;
               }
-              
+
               // 只统计EXPERT(2)难度
               int i = 2;
               if (i < song.ds.length) {
@@ -865,19 +865,19 @@ class SpecialRankingListService {
           int processedCount = 0;
           
           for (Song song in songs) {
-            if (excludedSongIds.contains(song.id)) {
+            if (excludedSongIds.contains(song.id) || song.isExtra) {
               processedCount++;
               continue;
             }
-            
+
             try {
               List<DiffData>? songDiffDataList = diffSong.charts[song.id];
-              
+
               if (songDiffDataList == null || songDiffDataList.isEmpty) {
                 processedCount++;
                 continue;
               }
-              
+
               // 遍历所有难度
               for (int i = 0; i < song.ds.length; i++) {
                 double officialDs = song.ds[i];
@@ -1033,19 +1033,19 @@ class SpecialRankingListService {
           int processedCount = 0;
           
           for (Song song in songs) {
-            if (excludedSongIds.contains(song.id)) {
+            if (excludedSongIds.contains(song.id) || song.isExtra) {
               processedCount++;
               continue;
             }
-            
+
             try {
               List<DiffData>? songDiffDataList = diffSong.charts[song.id];
-              
+
               if (songDiffDataList == null || songDiffDataList.isEmpty) {
                 processedCount++;
                 continue;
               }
-              
+
               // 只统计MASTER(3)和RE:MASTER(4)难度
               for (int i = 3; i <= 4 && i < song.ds.length; i++) {
                 double officialDs = song.ds[i];
@@ -1201,19 +1201,19 @@ class SpecialRankingListService {
           int processedCount = 0;
           
           for (Song song in songs) {
-            if (excludedSongIds.contains(song.id)) {
+            if (excludedSongIds.contains(song.id) || song.isExtra) {
               processedCount++;
               continue;
             }
-            
+
             try {
               List<DiffData>? songDiffDataList = diffSong.charts[song.id];
-              
+
               if (songDiffDataList == null || songDiffDataList.isEmpty) {
                 processedCount++;
                 continue;
               }
-              
+
               // 只统计EXPERT(2)难度
               int i = 2;
               if (i < song.ds.length) {
@@ -1370,24 +1370,24 @@ class SpecialRankingListService {
           int processedCount = 0;
           
           for (Song song in songs) {
-            if (excludedSongIds.contains(song.id)) {
+            if (excludedSongIds.contains(song.id) || song.isExtra) {
               processedCount++;
               continue;
             }
-            
+
             try {
               List<DiffData>? songDiffDataList = diffSong.charts[song.id];
-              
+
               if (songDiffDataList == null || songDiffDataList.isEmpty) {
                 processedCount++;
                 continue;
               }
-              
+
               // 遍历所有难度
               for (int i = 0; i < song.ds.length; i++) {
                 if (i < songDiffDataList.length) {
                   DiffData diffData = songDiffDataList[i];
-                  
+
                   // 计算dist数组所有元素的和
                   num sampleSum = diffData.dist.fold(0, (sum, element) => sum + element);
                   
@@ -1523,7 +1523,7 @@ class SpecialRankingListService {
         
         for (Song song in songs) {
           // 过滤掉maidata追加的歌曲
-          if (excludedSongIds.contains(song.id)) {
+          if (excludedSongIds.contains(song.id) || song.isExtra) {
             processedCount++;
             continue;
           }
@@ -1689,7 +1689,7 @@ class SpecialRankingListService {
         // 遍历歌曲
         for (Song song in songs) {
           // 过滤掉maidata追加的歌曲
-          if (excludedSongIds.contains(song.id)) {
+          if (excludedSongIds.contains(song.id) || song.isExtra) {
             processedCount++;
             continue;
           }
@@ -1874,7 +1874,7 @@ class SpecialRankingListService {
         // 遍历歌曲
         for (Song song in songs) {
           // 过滤掉maidata追加的歌曲
-          if (excludedSongIds.contains(song.id)) {
+          if (excludedSongIds.contains(song.id) || song.isExtra) {
             processedCount++;
             continue;
           }
@@ -2051,7 +2051,7 @@ class SpecialRankingListService {
         // 遍历歌曲
         for (Song song in songs) {
           // 过滤掉maidata追加的歌曲
-          if (excludedSongIds.contains(song.id)) {
+          if (excludedSongIds.contains(song.id) || song.isExtra) {
             processedCount++;
             continue;
           }
@@ -2205,7 +2205,7 @@ class SpecialRankingListService {
         
         for (Song song in songs) {
           // 排除从maidata追加的歌曲
-          if (excludedSongIds.contains(song.id)) {
+          if (excludedSongIds.contains(song.id) || song.isExtra) {
             excludedCount++;
             processedCount++;
             continue;

@@ -9,6 +9,8 @@ class RecommendationResult {
   final String riseTotalRating;
   final String songId;
   final int levelIndex;
+  final String type;
+  final int difficultyCount;
 
   RecommendationResult({
     required this.songTitle,
@@ -21,6 +23,8 @@ class RecommendationResult {
     required this.riseTotalRating,
     required this.songId,
     required this.levelIndex,
+    this.type = '',
+    this.difficultyCount = 0,
   });
 
   // 转换为JSON
@@ -36,6 +40,8 @@ class RecommendationResult {
       'riseTotalRating': riseTotalRating,
       'songId': songId,
       'levelIndex': levelIndex,
+      'type': type,
+      'difficultyCount': difficultyCount,
     };
   }
 
@@ -52,6 +58,8 @@ class RecommendationResult {
       riseTotalRating: json['riseTotalRating'] ?? '',
       songId: json['songId'] ?? '',
       levelIndex: json['levelIndex'] ?? 0,
+      type: json['type'] ?? '',
+      difficultyCount: json['difficultyCount'] ?? 0,
     );
   }
 }

@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
+import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 
 /// 徽章颜色数据
 class _BadgeColors {
@@ -42,6 +43,7 @@ class SongScoreShareService {
     required String fc,
     required String fs,
     required String rawRate,
+    int? jpegQuality,
   }) async {
     OverlayEntry? overlayEntry;
     try {
@@ -134,12 +136,23 @@ class SongScoreShareService {
         return null;
       }
 
-      Uint8List pngBytes = byteData.buffer.asUint8List();
+      Uint8List pngBytes = byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes);
       image.dispose();
       overlayEntry.remove();
 
+      // 根据质量参数决定最终格式
+      Uint8List finalBytes;
+      String extension;
+      if (jpegQuality != null) {
+        finalBytes = ImageEncodeUtil.pngToJpeg(pngBytes, quality: jpegQuality);
+        extension = 'jpg';
+      } else {
+        finalBytes = pngBytes;
+        extension = 'png';
+      }
+
       // 保存图片
-      return await _saveImage(pngBytes, songTitle, status.isGranted);
+      return await _saveImage(finalBytes, songTitle, status.isGranted, extension: extension);
     } catch (e) {
       debugPrint('SongScoreShare: Error: $e');
       overlayEntry?.remove();
@@ -716,10 +729,11 @@ class SongScoreShareService {
   }
 
   static Future<File?> _saveImage(
-    Uint8List pngBytes,
+    Uint8List imageBytes,
     String songTitle,
-    bool hasPermission,
-  ) async {
+    bool hasPermission, {
+    String extension = 'png',
+  }) async {
     Directory? directory;
 
     if (hasPermission) {
@@ -757,8 +771,8 @@ class SongScoreShareService {
     // Android: 尝试 MediaStore API
     if (Platform.isAndroid && hasPermission) {
       String? galleryPath = await _saveImageToGallery(
-        pngBytes,
-        'chiffonmai_${_sanitizeFileName(songTitle)}_${DateTime.now().millisecondsSinceEpoch}.png',
+        imageBytes,
+        'chiffonmai_${_sanitizeFileName(songTitle)}_${DateTime.now().millisecondsSinceEpoch}.$extension',
       );
       if (galleryPath != null) {
         await _notifySystemGallery(galleryPath);
@@ -771,9 +785,9 @@ class SongScoreShareService {
     }
 
     final file = File(
-      '${directory.path}/chiffonmai_${_sanitizeFileName(songTitle)}_${DateTime.now().millisecondsSinceEpoch}.png',
+      '${directory.path}/chiffonmai_${_sanitizeFileName(songTitle)}_${DateTime.now().millisecondsSinceEpoch}.$extension',
     );
-    await file.writeAsBytes(pngBytes);
+    await file.writeAsBytes(imageBytes);
 
     if (Platform.isAndroid) {
       await _notifySystemGallery(file.path);

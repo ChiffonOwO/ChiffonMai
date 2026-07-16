@@ -44,17 +44,7 @@ class _DailyRecommendPageState extends State<DailyRecommendPage> {
         forceRefresh: forceRefresh,
       );
       final displaySongs = songs.map((song) {
-        final levelIndex = _pickDisplayLevel(song);
-        final ds = levelIndex < song.ds.length ? song.ds[levelIndex] : 0.0;
-        final level = song.level.isNotEmpty && levelIndex < song.level.length
-            ? song.level[levelIndex]
-            : '';
-        return _SongDisplay(
-          song: song,
-          levelIndex: levelIndex,
-          ds: ds,
-          level: level,
-        );
+        return _SongDisplay(song: song);
       }).toList();
 
       if (mounted) {
@@ -72,15 +62,6 @@ class _DailyRecommendPageState extends State<DailyRecommendPage> {
     }
   }
 
-  /// 为歌曲挑选推荐的难度（优先最高难度）
-  int _pickDisplayLevel(Song song) {
-    final dsList = song.ds;
-    if (dsList.isEmpty) return 0;
-    for (int i = dsList.length - 1; i >= 0; i--) {
-      if (dsList[i] > 0) return i;
-    }
-    return dsList.length - 1;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,6 +69,7 @@ class _DailyRecommendPageState extends State<DailyRecommendPage> {
     final textPrimaryColor = Theme.of(context).colorScheme.onSurface;
     final cardBgColor = Theme.of(context).colorScheme.surface;
     final cardShadow = AppColors.defaultShadow(brightness);
+    final safeBottom = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -173,7 +155,7 @@ class _DailyRecommendPageState extends State<DailyRecommendPage> {
                             ),
                           )
                         : Container(
-                            margin: EdgeInsets.fromLTRB(8, 0, 8, 16),
+                            margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
                             decoration: BoxDecoration(
                               color: cardBgColor,
                               borderRadius: BorderRadius.circular(12),
@@ -211,17 +193,40 @@ class _DailyRecommendPageState extends State<DailyRecommendPage> {
                                   ...List.generate(_songs.length, (index) {
                                     final item = _songs[index];
                                     final song = item.song;
-                                    final accentColor =
-                                        ColorUtil.getCardColor(item.levelIndex);
-                                    final diffNames = [
-                                      'Basic',
-                                      'Advanced',
-                                      'Expert',
-                                      'Master',
-                                      'Re:Master'
+
+                                    // 用最高难度作为卡片主题色
+                                    int highestIdx = 0;
+                                    for (int i = song.ds.length - 1; i >= 0; i--) {
+                                      if (song.ds[i] > 0) { highestIdx = i; break; }
+                                    }
+                                    final accentColor = ColorUtil.getCardColor(highestIdx);
+                                    final diffNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'Re:MASTER'];
+                                    final diffColors = [
+                                      Colors.green,
+                                      Colors.yellow.shade700,
+                                      Colors.red,
+                                      Colors.purple,
+                                      const Color(0xFFCBA6F7),
                                     ];
-                                    final diffName =
-                                        diffNames[item.levelIndex.clamp(0, 4)];
+
+                                    // 构建所有难度的定数标签
+                                    final diffChips = <Widget>[];
+                                    for (int i = 0; i < song.ds.length; i++) {
+                                      if (song.ds[i] <= 0) continue;
+                                      final diffColor = i < diffColors.length ? diffColors[i] : Colors.grey;
+                                      diffChips.add(Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: diffColor.withAlpha(200),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          '${diffNames[i.clamp(0, 4)]} ${song.ds[i].toStringAsFixed(1)}',
+                                          style: const TextStyle(fontSize: 10,
+                                            fontWeight: FontWeight.bold, color: Colors.white),
+                                        ),
+                                      ));
+                                    }
 
                                     return GestureDetector(
                                       onTap: () {
@@ -230,19 +235,16 @@ class _DailyRecommendPageState extends State<DailyRecommendPage> {
                                           MaterialPageRoute(
                                             builder: (context) => SongInfoPage(
                                               songId: song.id,
-                                              initialLevelIndex:
-                                                  item.levelIndex,
+                                              initialLevelIndex: highestIdx,
                                               isDefaultLevelIndex: false,
                                             ),
                                           ),
                                         );
                                       },
                                       child: Container(
-                                        margin:
-                                            EdgeInsets.only(bottom: 12),
+                                        margin: EdgeInsets.only(bottom: 12),
                                         decoration: BoxDecoration(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(12),
                                           border: Border.all(
                                             color: accentColor.withAlpha(80),
                                             width: 2,
@@ -254,84 +256,45 @@ class _DailyRecommendPageState extends State<DailyRecommendPage> {
                                               padding: const EdgeInsets.only(left: 4),
                                               child: ClipRRect(
                                                 borderRadius: BorderRadius.circular(8),
-                                                child: CoverUtil
-                                                    .buildCoverWidgetWithContextRRect(
-                                                  context,
-                                                  song.id,
-                                                  90,
+                                                child: CoverUtil.buildCoverWidgetWithContextRRect(
+                                                  context, song.id, 90,
                                                 ),
                                               ),
                                             ),
                                             Expanded(
                                               child: Padding(
-                                                padding:
-                                                    const EdgeInsets.all(12),
+                                                padding: const EdgeInsets.all(12),
                                                 child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
                                                     Text(
                                                       song.basicInfo.title,
                                                       style: TextStyle(
                                                         fontSize: 16,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        color:
-                                                            textPrimaryColor,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: textPrimaryColor,
                                                       ),
                                                       maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
+                                                      overflow: TextOverflow.ellipsis,
                                                     ),
-                                                    SizedBox(height: 4),
+                                                    const SizedBox(height: 4),
                                                     Text(
                                                       song.basicInfo.artist,
                                                       style: TextStyle(
                                                         fontSize: 13,
-                                                        color: AppColors
-                                                            .secondaryText(brightness),
+                                                        color: AppColors.secondaryText(brightness),
                                                       ),
                                                       maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
+                                                      overflow: TextOverflow.ellipsis,
                                                     ),
-                                                    SizedBox(height: 8),
+                                                    const SizedBox(height: 8),
                                                     Wrap(
                                                       spacing: 4,
                                                       runSpacing: 4,
                                                       children: [
+                                                        ...diffChips,
                                                         Container(
-                                                          padding: EdgeInsets.symmetric(
-                                                              horizontal: 8, vertical: 2),
-                                                          decoration: BoxDecoration(
-                                                            color: accentColor,
-                                                            borderRadius: BorderRadius.circular(6),
-                                                          ),
-                                                          child: Text(
-                                                            '$diffName ${item.level}',
-                                                            style: const TextStyle(fontSize: 11,
-                                                                fontWeight: FontWeight.bold,
-                                                                color: Colors.white),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          padding: EdgeInsets.symmetric(
-                                                              horizontal: 6, vertical: 2),
-                                                          decoration: BoxDecoration(
-                                                            border: Border.all(
-                                                                color: accentColor, width: 1.5),
-                                                            borderRadius: BorderRadius.circular(6),
-                                                          ),
-                                                          child: Text(
-                                                            '定数 ${item.ds.toStringAsFixed(1)}',
-                                                            style: TextStyle(fontSize: 11,
-                                                                fontWeight: FontWeight.bold,
-                                                                color: accentColor),
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          padding: EdgeInsets.symmetric(
-                                                              horizontal: 6, vertical: 2),
+                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                           decoration: BoxDecoration(
                                                             border: Border.all(
                                                               color: song.type == 'DX' ? AppColors.warningOrange(brightness) : AppColors.linkBlue(brightness),
@@ -352,8 +315,7 @@ class _DailyRecommendPageState extends State<DailyRecommendPage> {
                                               ),
                                             ),
                                             Padding(
-                                              padding:
-                                                  const EdgeInsets.all(12),
+                                              padding: const EdgeInsets.all(12),
                                               child: Icon(
                                                 Icons.chevron_right,
                                                 color: AppColors.greyHint(brightness),
@@ -391,14 +353,6 @@ class _DailyRecommendPageState extends State<DailyRecommendPage> {
 /// 显示用的歌曲数据
 class _SongDisplay {
   final Song song;
-  final int levelIndex;
-  final double ds;
-  final String level;
 
-  _SongDisplay({
-    required this.song,
-    required this.levelIndex,
-    required this.ds,
-    required this.level,
-  });
+  _SongDisplay({required this.song});
 }

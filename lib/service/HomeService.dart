@@ -86,26 +86,20 @@ class HomeService {
         diffMusicManager.fetchAndUpdateDiffData(),
       ]);
       
-      // 第三阶段：并行初始化其他数据
-      onProgress('正在加载收藏品数据...');
+      // 第三阶段：并行初始化收藏品、标签、落雪歌曲、知识库等数据
+      onProgress('正在加载收藏品、标签、歌曲、知识库等数据...');
       final collectionsManager = CollectionsManager();
       final luoXueSongsManager = LuoXueSongsManager();
-      
+
       await Future.wait([
         collectionsManager.fetchTrophiesCollections(),
         collectionsManager.fetchIconsCollections(),
         collectionsManager.fetchPlatesCollections(),
         collectionsManager.fetchFramesCollections(),
+        RecommendByTagsService.initializeTags(),
+        luoXueSongsManager.getLuoXueSongs(),
+        KnowledgeManager().getKnowledgeData(),
       ]);
-      
-      onProgress('正在构建智能推荐标签系统...');
-      await RecommendByTagsService.initializeTags();
-      
-      onProgress('正在加载落雪歌曲数据...');
-      await luoXueSongsManager.getLuoXueSongs();
-      
-      onProgress('正在加载知识库数据...');
-      await KnowledgeManager().getKnowledgeData();
       
       // 建立落雪歌曲与缓存歌曲的映射
       onProgress('正在建立歌曲关联映射...');
