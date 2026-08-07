@@ -17,9 +17,11 @@ class ButtonItem {
 class ButtonCategory {
   final String name;
   final List<ButtonItem> items;
+  final IconData? icon;
 
   const ButtonCategory({
     required this.name,
     required this.items,
+    this.icon,
   });
 }

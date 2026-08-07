@@ -4,6 +4,7 @@ import '../../api/ApiUrls.dart';
 import '../../constant/CacheKeyConstant.dart';
 import '../../constant/CacheTimestampConstant.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 class RatingRankListService {
   // 缓存有效期：从常量文件读取（分钟转秒）
@@ -24,7 +25,7 @@ class RatingRankListService {
       if (limit != null) {
         url += '?limit=$limit';
       }
-      final response = await http.get(
+      final response = await ApiClient.get(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
       );
@@ -64,7 +65,7 @@ class RatingRankListService {
       if (limit != null) {
         url += '?limit=$limit';
       }
-      final response = await http.get(
+      final response = await ApiClient.get(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
       );
@@ -104,7 +105,7 @@ class RatingRankListService {
       if (limit != null) {
         url += '?limit=$limit';
       }
-      final response = await http.get(
+      final response = await ApiClient.get(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
       );
@@ -131,7 +132,7 @@ class RatingRankListService {
   // 获取指定用户排名
   static Future<int?> getUserRank(String userId) async {
     try {
-      final response = await http.get(
+      final response = await ApiClient.get(
         Uri.parse('${ApiUrls.RankingsBaseUrl}/user/$userId'),
         headers: {'Content-Type': 'application/json'},
       );
@@ -151,7 +152,7 @@ class RatingRankListService {
   // 获取指定用户详情
   static Future<RankItem?> getUserDetail(String userId) async {
     try {
-      final response = await http.get(
+      final response = await ApiClient.get(
         Uri.parse('${ApiUrls.RankingsBaseUrl}/user/detail/$userId'),
         headers: {'Content-Type': 'application/json'},
       );

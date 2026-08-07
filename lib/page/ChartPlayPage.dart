@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:simai_flutter/simai_flutter.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -10,6 +11,8 @@ class ChartPlayPage extends StatefulWidget {
   final String songId;
   final String songType;
   final String? selectedInote;
+  final String? bgImagePath;
+  final String? audioFilePath;
 
   const ChartPlayPage({
     super.key,
@@ -18,6 +21,8 @@ class ChartPlayPage extends StatefulWidget {
     required this.songId,
     required this.songType,
     this.selectedInote,
+    this.bgImagePath,
+    this.audioFilePath,
   });
 
   @override
@@ -29,6 +34,7 @@ class _ChartPlayPageState extends State<ChartPlayPage> {
   double _chartOffset = 0.0;
   Key _playerKey = UniqueKey();
   String? _audioUrl;
+  bool _isLocalAudio = false;
   ImageProvider? _bgImageProvider;
 
   @override
@@ -94,7 +100,11 @@ class _ChartPlayPageState extends State<ChartPlayPage> {
         
         Source? audioSource;
         if (_audioUrl != null) {
-          audioSource = UrlSource(_audioUrl!);
+          if (_isLocalAudio) {
+            audioSource = DeviceFileSource(_audioUrl!);
+          } else {
+            audioSource = UrlSource(_audioUrl!);
+          }
         }
 
         _controller = SimaiPlayerController(
@@ -112,6 +122,14 @@ class _ChartPlayPageState extends State<ChartPlayPage> {
   }
 
   Future<void> _loadAudioUrl() async {
+    // 优先使用本地音频文件
+    if (widget.audioFilePath != null && widget.audioFilePath!.isNotEmpty) {
+      _audioUrl = widget.audioFilePath;
+      _isLocalAudio = true;
+      debugPrint("Using local audio file: $_audioUrl");
+      return;
+    }
+
     try {
       final songPlayService = SongPlayService();
       final luoXueSongId = await songPlayService.findLuoXueSongId(
@@ -131,6 +149,13 @@ class _ChartPlayPageState extends State<ChartPlayPage> {
   }
 
   void _loadBackgroundImage() {
+    // 优先使用本地背景图片
+    if (widget.bgImagePath != null && widget.bgImagePath!.isNotEmpty) {
+      _bgImageProvider = FileImage(File(widget.bgImagePath!));
+      debugPrint("Using local background image: ${widget.bgImagePath}");
+      return;
+    }
+
     try {
       String coverPath = CoverUtil.buildCoverPath(widget.songId);
       _bgImageProvider = AssetImage(coverPath);
@@ -163,7 +188,11 @@ E
         
         Source? audioSource;
         if (_audioUrl != null) {
-          audioSource = UrlSource(_audioUrl!);
+          if (_isLocalAudio) {
+            audioSource = DeviceFileSource(_audioUrl!);
+          } else {
+            audioSource = UrlSource(_audioUrl!);
+          }
         }
 
         _controller = SimaiPlayerController(

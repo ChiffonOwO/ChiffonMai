@@ -8,6 +8,7 @@ import 'package:image/image.dart' as img;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constant/CacheKeyConstant.dart';
 import '../manager/DivingFish/MaimaiMusicDataManager.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 /// 曲绘识别服务
 /// 使用pHash（DCT感知哈希）+ 颜色特征进行图像相似度比对
@@ -287,7 +288,7 @@ class CoverRecognitionService {
     try {
       final url = _getCoverUrl(songId);
       debugPrint('尝试从网络获取曲绘: $url');
-      final response = await http.get(Uri.parse(url));
+      final response = await ApiClient.get(Uri.parse(url));
       if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
         final decoded = img.decodeImage(response.bodyBytes);
         if (decoded != null) {

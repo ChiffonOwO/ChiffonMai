@@ -21,6 +21,82 @@ class MaidataDecodeUtil {
   // 正则：匹配星星音符模式，如 1?<4[8:1]
   static final RegExp _patternStarNote = RegExp(r'^\d+\?[-<>^vpszwVpq]+(\d+\[.*\])?$');
 
+  /// 快速提取 shortId，无需完整解码（用于跳过已存在的歌曲）
+  static String? quickExtractShortId(String content) {
+    // 只取前几百个字符就够了，shortId 通常在文件开头
+    final head = content.length > 500 ? content.substring(0, 500) : content;
+    final match = RegExp(r'&shortid=(\d+)', caseSensitive: false).firstMatch(head);
+    return match?.group(1);
+  }
+
+  /// 在后台 isolate 中批量解码 maidata 文本
+  static List<Map<String, dynamic>> batchDecodeForIsolate(List<String> texts) {
+    final results = <Map<String, dynamic>>[];
+    for (final text in texts) {
+      try {
+        final data = decode(text);
+        if (data.shortId > 0 && data.title.isNotEmpty) {
+          results.add({
+            'title': data.title,
+            'wholeBpm': data.wholeBpm,
+            'artist': data.artist,
+            'shortId': data.shortId,
+            'genre': data.genre,
+            'cabinet': data.cabinet,
+            'version': data.version,
+            'charts': data.charts.map((c) => {
+              'difficultyIndex': c.difficultyIndex,
+              'level': c.level,
+              'charter': c.charter,
+              'inote': c.inote,
+              'stats': c.stats != null ? {
+                'total': c.stats!.total,
+                'tap': c.stats!.tap,
+                'hold': c.stats!.hold,
+                'slide': c.stats!.slide,
+                'breakNote': c.stats!.breakNote,
+                'touch': c.stats!.touch,
+              } : null,
+            }).toList(),
+          });
+        }
+      } catch (_) {
+        // 跳过解析失败的文本
+      }
+    }
+    return results;
+  }
+
+  /// 从 isolate 返回的 Map 重建 MaidataData
+  static MaidataData fromIsolateMap(Map<String, dynamic> map) {
+    return MaidataData(
+      title: map['title'] ?? '',
+      wholeBpm: map['wholeBpm'] ?? 0,
+      artist: map['artist'] ?? '',
+      artistId: 0,
+      shortId: map['shortId'] ?? 0,
+      genre: map['genre'] ?? '',
+      genreId: 0,
+      cabinet: map['cabinet'] ?? '',
+      version: map['version'] ?? '',
+      charts: (map['charts'] as List?)?.map((c) => ChartData(
+        difficultyIndex: c['difficultyIndex'] ?? 0,
+        level: c['level'] ?? '',
+        charter: c['charter'] ?? '',
+        inote: c['inote'] ?? '',
+        stats: c['stats'] != null ? NoteStats(
+          total: c['stats']['total'] ?? 0,
+          tap: c['stats']['tap'] ?? 0,
+          hold: c['stats']['hold'] ?? 0,
+          slide: c['stats']['slide'] ?? 0,
+          breakNote: c['stats']['breakNote'] ?? 0,
+          touch: c['stats']['touch'] ?? 0,
+        ) : null,
+      )).toList() ?? [],
+      rawContent: '',
+    );
+  }
+
   static MaidataData decode(String content) {
     Map<String, String> data = {};
     

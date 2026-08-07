@@ -31,8 +31,22 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _initTheme() async {
     await ThemeManager().loadThemePreference();
+    // 预加载背景图片到图像缓存，避免首帧缺失导致闪烁
+    await _precacheBackgroundImages();
     if (mounted) {
       setState(() => _themeLoaded = true);
+    }
+  }
+
+  /// 预加载全屏背景图片到 Flutter 图像缓存
+  Future<void> _precacheBackgroundImages() async {
+    try {
+      await Future.wait([
+        precacheImage(const AssetImage('assets/background.png'), context),
+        precacheImage(const AssetImage('assets/chiffon2.png'), context),
+      ]);
+    } catch (e) {
+      debugPrint('预加载背景图片失败: $e');
     }
   }
 
@@ -67,14 +81,18 @@ class _MyAppState extends State<MyApp> {
       );
     }
 
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: ThemeManager().notifier,
-      builder: (context, themeMode, _) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([ThemeManager().notifier, ThemeManager().pureBlackNotifier]),
+      builder: (context, _) {
+        final themeMode = ThemeManager().themeMode;
+        final pureBlack = ThemeManager().pureBlackEnabled;
         return MaterialApp(
           debugShowCheckedModeBanner: false,
           home: HomePage(onFirstFrameRendered: _loadFonts),
           theme: _buildThemeWithFonts(AppTheme.lightTheme()),
-          darkTheme: _buildThemeWithFonts(AppTheme.darkTheme()),
+          darkTheme: _buildThemeWithFonts(
+            pureBlack ? AppTheme.pureBlackTheme() : AppTheme.darkTheme(),
+          ),
           themeMode: themeMode,
           builder: (context, child) {
             return MediaQuery(

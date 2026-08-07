@@ -6,6 +6,7 @@ import 'package:my_first_flutter_app/constant/CacheTimestampConstant.dart';
 import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../constant/CacheKeyConstant.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 class CollectionsManager {
   // 单例模式
@@ -90,7 +91,7 @@ class CollectionsManager {
       );
       
       // 发送 GET 请求
-      final response = await http.get(uri);
+      final response = await ApiClient.get(uri);
       
       if (response.statusCode == 200) {
         // 打印响应头，查看 Content-Type

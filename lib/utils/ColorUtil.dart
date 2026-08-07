@@ -121,6 +121,9 @@ class ColorUtil {
       final cellL = boxL + boxW * i / 5;
       final cellR = boxL + boxW * (i + 1) / 5;
 
+      final digit = digits[i];
+      final isSpace = digit == ' ';
+
       digitWidgets.add(
         Positioned(
           left: width * cellL / _imgW,
@@ -128,16 +131,15 @@ class ColorUtil {
           right: width * (1 - cellR / _imgW),
           bottom: height * (1 - boxB / _imgH),
           child: Center(
-            child: FittedBox(
-              fit: BoxFit.contain,
-              child: Text(
-                digits[i],
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
+            child: isSpace
+                ? const SizedBox.shrink()
+                : Transform.translate(
+                    offset: Offset(0, height * 0.02),
+                    child: Image.asset(
+                      'assets/ratingnum/UI_NUM_Drating_$digit.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
           ),
         ),
       );

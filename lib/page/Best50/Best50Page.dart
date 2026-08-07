@@ -209,6 +209,9 @@ class _B50PageState extends State<B50Page> {
         _isLoading = false;
       });
 
+      _calculateTheoreticalBest50();
+      _loadTagDataAndCalculateStats();
+
       debugPrint('✅ 从游玩数据计算Best50完成: Best35=${best35.length}首, Best15=${best15.length}首, 总Rating=$totalRating');
     } catch (e) {
       debugPrint('Error calculating Best50 from play data: $e');

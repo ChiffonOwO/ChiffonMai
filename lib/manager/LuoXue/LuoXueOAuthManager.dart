@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../api/ApiUrls.dart';
 import '../../api/DeveloperToken.dart';
 import '../../constant/CacheKeyConstant.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 /// 落雪OAuth鉴权管理器
 /// 实现OAuth 2.0授权码流程（authorization_code + oob模式）
@@ -50,7 +51,7 @@ class LuoXueOAuthManager {
       debugPrint('redirect_uri: $_redirectUri');
       debugPrint('请求URL: ${ApiUrls.LuoXueOAuthTokenUrl}');
       
-      final response = await http.post(
+      final response = await ApiClient.post(
         Uri.parse(ApiUrls.LuoXueOAuthTokenUrl),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -113,7 +114,7 @@ class LuoXueOAuthManager {
     }
     
     try {
-      final response = await http.post(
+      final response = await ApiClient.post(
         Uri.parse(ApiUrls.LuoXueOAuthTokenUrl),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',

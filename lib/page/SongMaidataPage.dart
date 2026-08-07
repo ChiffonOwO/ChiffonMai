@@ -11,6 +11,7 @@ import '../service/SongMaidataPageService.dart';
 import '../service/SongPlayService.dart';
 import '../manager/MaidataManager.dart';
 import 'ChartPlayPage.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 class SongMaidataPage extends StatefulWidget {
   final String songId;
@@ -268,7 +269,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
     try {
       final networkUrl = CoverUtil.getNetworkCoverUrl(songId);
       debugPrint('[DEBUG][SongMaidataPage] 从网络获取曲绘: $networkUrl');
-      final response = await http.get(Uri.parse(networkUrl));
+      final response = await ApiClient.get(Uri.parse(networkUrl));
       if (response.statusCode == 200) {
         return response.bodyBytes;
       }
@@ -309,7 +310,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
 
       // 从网络下载
       debugPrint('[DEBUG][SongMaidataPage] 从网络下载音源: $audioUrl');
-      final response = await http.get(Uri.parse(audioUrl));
+      final response = await ApiClient.get(Uri.parse(audioUrl));
       if (response.statusCode == 200) {
         // 保存到缓存
         if (!await cacheDir.exists()) {

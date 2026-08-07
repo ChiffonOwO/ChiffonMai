@@ -7,6 +7,7 @@ import '../../api/ApiUrls.dart';
 import '../../entity/LuoXue/LuoXueSongEntity.dart';
 import '../../entity/DivingFish/Song.dart';
 import '../../constant/CacheKeyConstant.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 class LuoXueSongsManager {
   // 单例模式
@@ -28,7 +29,7 @@ class LuoXueSongsManager {
       }
 
       // 从API获取
-      final response = await http.get(Uri.parse(ApiUrls.LuoXueSongsApi));
+      final response = await ApiClient.get(Uri.parse(ApiUrls.LuoXueSongsApi));
       if (response.statusCode == 200) {
         String responseBody;
         try {

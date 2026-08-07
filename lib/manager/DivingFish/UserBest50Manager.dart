@@ -5,6 +5,7 @@ import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/UserBest50Entity.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/RecordItem.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 class UserBest50Manager {
   // API端点
@@ -25,7 +26,7 @@ class UserBest50Manager {
       };
       
       // 发送POST请求
-      final response = await http.post(
+      final response = await ApiClient.post(
         Uri.parse(_apiUrl),
         headers: {
           'Content-Type': 'application/json',

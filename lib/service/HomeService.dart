@@ -8,6 +8,7 @@ import 'package:my_first_flutter_app/manager/LuoXue/LuoXueSongsManager.dart';
 import 'package:my_first_flutter_app/manager/KnowledgeManager.dart';
 import 'package:my_first_flutter_app/manager/MaidataManager.dart';
 import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/UnionUniManager.dart';
 import 'package:my_first_flutter_app/service/ConnectivityService.dart';
 
 /// 首页服务类：处理首页相关的数据初始化和业务逻辑
@@ -99,6 +100,7 @@ class HomeService {
         RecommendByTagsService.initializeTags(),
         luoXueSongsManager.getLuoXueSongs(),
         KnowledgeManager().getKnowledgeData(),
+        UnionUniManager().fetchAndCache(),
       ]);
       
       // 建立落雪歌曲与缓存歌曲的映射

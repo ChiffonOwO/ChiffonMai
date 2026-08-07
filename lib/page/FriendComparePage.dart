@@ -126,7 +126,7 @@ class _FriendComparePageState extends State<FriendComparePage> {
                     Expanded(
                       child: Center(
                         child: Text(
-                          '好友战绩对比',
+                          '好友成绩对比',
                           style: TextStyle(
                             color: textPrimaryColor,
                             fontSize: 24,
@@ -182,14 +182,14 @@ class _FriendComparePageState extends State<FriendComparePage> {
                                       height: 16,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Colors.white,
+                                        color: Theme.of(context).colorScheme.onPrimary,
                                       ),
                                     )
                                   : Icon(Icons.compare_arrows),
                               label: Text('开始对比'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Theme.of(context).colorScheme.primary,
-                                foregroundColor: Colors.white,
+                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                                 padding: EdgeInsets.symmetric(
                                   horizontal: 20,
                                   vertical: 14,
@@ -335,11 +335,18 @@ class _FriendComparePageState extends State<FriendComparePage> {
   /// 构建摘要卡片
   Widget _buildSummaryCard(Color textColor, Color primaryColor, Brightness brightness) {
     final result = _result!;
+    final theme = Theme.of(context);
+    final containerColor = theme.colorScheme.primaryContainer;
+    final onContainerColor = theme.colorScheme.onPrimaryContainer;
+    final gradientColor2 = brightness == Brightness.light
+        ? containerColor.withValues(alpha: 0.7)
+        : containerColor.withValues(alpha: 0.85);
+
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [primaryColor, primaryColor.withValues(alpha: 0.75)],
+          colors: [containerColor, gradientColor2],
         ),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -347,11 +354,11 @@ class _FriendComparePageState extends State<FriendComparePage> {
         children: [
           // 好友昵称
           Text(
-            '${result.friendNickname} 的战绩对比',
+            '${result.friendNickname} 的成绩对比',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: onContainerColor,
             ),
           ),
           SizedBox(height: 12),
@@ -359,9 +366,9 @@ class _FriendComparePageState extends State<FriendComparePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildStatBadge('我的谱面', '${result.myTotalCharts}'),
-              _buildStatBadge('好友谱面', '${result.friendTotalCharts}'),
-              _buildStatBadge('共同谱面', '${result.commonCount}'),
+              _buildStatBadge('我的谱面', '${result.myTotalCharts}', onContainerColor),
+              _buildStatBadge('好友谱面', '${result.friendTotalCharts}', onContainerColor),
+              _buildStatBadge('共同谱面', '${result.commonCount}', onContainerColor),
             ],
           ),
           SizedBox(height: 12),
@@ -383,19 +390,19 @@ class _FriendComparePageState extends State<FriendComparePage> {
                 'Rating: ${result.myRating}',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.white.withAlpha(200),
+                  color: onContainerColor.withValues(alpha: 0.8),
                 ),
               ),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 12),
                 child: Icon(Icons.compare_arrows,
-                    color: Colors.white.withAlpha(180), size: 20),
+                    color: onContainerColor.withValues(alpha: 0.7), size: 20),
               ),
               Text(
                 '${result.friendRating}',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.white.withAlpha(200),
+                  color: onContainerColor.withValues(alpha: 0.8),
                 ),
               ),
             ],
@@ -405,7 +412,7 @@ class _FriendComparePageState extends State<FriendComparePage> {
     );
   }
 
-  Widget _buildStatBadge(String label, String value) {
+  Widget _buildStatBadge(String label, String value, Color textColor) {
     return Column(
       children: [
         Text(
@@ -413,14 +420,14 @@ class _FriendComparePageState extends State<FriendComparePage> {
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: textColor,
           ),
         ),
         Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.white.withAlpha(180),
+            color: textColor.withValues(alpha: 0.7),
           ),
         ),
       ],
@@ -431,9 +438,9 @@ class _FriendComparePageState extends State<FriendComparePage> {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withAlpha(60),
+        color: color.withAlpha(80),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withAlpha(120), width: 1),
+        border: Border.all(color: color.withAlpha(160), width: 1),
       ),
       child: Column(
         children: [
@@ -442,14 +449,14 @@ class _FriendComparePageState extends State<FriendComparePage> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: color,
             ),
           ),
           Text(
             label,
             style: TextStyle(
               fontSize: 12,
-              color: Colors.white.withAlpha(200),
+              color: color.withValues(alpha: 0.8),
             ),
           ),
         ],
@@ -527,7 +534,7 @@ class _FriendComparePageState extends State<FriendComparePage> {
 
   /// 难度 + 胜负筛选栏
   Widget _buildLevelFilter(Brightness brightness) {
-    const diffNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'RE:MAS'];
+    const diffNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'Re:MASTER'];
     final diffColors = [
       Colors.green, Color(0xFFFFCC00), Colors.red,
       Colors.purple.shade400, Colors.purple.shade200,
@@ -539,16 +546,14 @@ class _FriendComparePageState extends State<FriendComparePage> {
       children: [
         // 难度筛选
         Wrap(spacing: 6, runSpacing: 8, children: [
-          _buildDiffChip('全部', null, AppColors.greyHint(brightness),
-              selectedBg: Theme.of(context).colorScheme.surfaceContainerHighest),
+          _buildDiffChip('全部', null, AppColors.primaryText(brightness)),
           ...List.generate(5, (i) =>
               _buildDiffChip(diffNames[i], i, diffColors[i])),
         ]),
         SizedBox(height: 8),
         // 胜负筛选
         Wrap(spacing: 6, children: [
-          _buildResultChip('全部', null, AppColors.greyHint(brightness),
-              selectedBg: Theme.of(context).colorScheme.surfaceContainerHighest),
+          _buildResultChip('全部', null, AppColors.primaryText(brightness)),
           _buildResultChip('我赢', 'win', Colors.green),
           _buildResultChip('平局', 'tie', Colors.orange),
           _buildResultChip('好友赢', 'lose', Colors.red),
@@ -601,7 +606,7 @@ class _FriendComparePageState extends State<FriendComparePage> {
   Widget _buildComparisonList() {
     final brightness = Theme.of(context).brightness;
     final result = _result!;
-    const diffNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'RE:MAS'];
+    const diffNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'Re:MASTER'];
 
     var filtered = result.commonCharts;
     if (_filterLevelIndex != null) {

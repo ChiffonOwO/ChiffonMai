@@ -5,9 +5,13 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <!-- 可选：允许访问WiFi状态 -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <!-- GPS 定位（天气卡片） -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <!-- 传统存储权限（Android 12及以下） -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <!-- 相机权限 -->
     <uses-permission android:name="android.permission.CAMERA"/>
     <!-- 媒体权限（Android 13+） -->

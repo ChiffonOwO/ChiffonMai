@@ -10,6 +10,7 @@ import '../../constant/CacheTimestampConstant.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../MaidataManager.dart';
 import '../../service/ConnectivityService.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 class MaimaiMusicDataManager {
   static final MaimaiMusicDataManager _instance = MaimaiMusicDataManager._internal();
@@ -49,83 +50,111 @@ class MaimaiMusicDataManager {
         return false;
       }
 
-      // ── 1. 从 union API（更全）获取歌曲数据 ──
+      // ── 1. 并行获取水鱼 API 和 union API 的歌曲数据 ──
       List<Song> songs = [];
-      Set<String> unionSongIds = {};  // union API 中的歌曲ID集合
-      Set<String> oldSongIds = {};    // 旧水鱼 API 中的歌曲ID集合
 
+      // 同时发起两个请求
+      final dfFuture = ApiClient.get(Uri.parse(_apiUrl));
+      final unionFuture = ApiClient.get(Uri.parse(_unionApiUrl));
+
+      // 解析水鱼数据
+      List<Song>? dfSongs;
       try {
-        debugPrint('从 union API 获取全量歌曲数据...');
-        final unionResponse = await http.get(Uri.parse(_unionApiUrl));
-        if (unionResponse.statusCode == 200) {
-          songs = await _parseSongsInBackground(unionResponse.body);
-          unionSongIds = songs.map((s) => s.id).toSet();
-          debugPrint('Union API 返回 ${songs.length} 首歌曲');
+        final dfResponse = await dfFuture;
+        if (dfResponse.statusCode == 200) {
+          dfSongs = await _parseSongsInBackground(dfResponse.body);
+          debugPrint('水鱼 API 返回 ${dfSongs!.length} 首歌曲');
         } else {
-          debugPrint('Union API 请求失败，状态码: ${unionResponse.statusCode}，回退到水鱼API');
-        }
-      } catch (e) {
-        debugPrint('Union API 请求异常: $e，回退到水鱼API');
-      }
-
-      // ── 2. 从旧水鱼 API 获取歌曲数据（兜底+比对） ──
-      try {
-        final oldResponse = await http.get(Uri.parse(_apiUrl));
-        if (oldResponse.statusCode == 200) {
-          final oldSongs = await _parseSongsInBackground(oldResponse.body);
-          oldSongIds = oldSongs.map((s) => s.id).toSet();
-          debugPrint('水鱼 API 返回 ${oldSongs.length} 首歌曲');
-
-          // 如果 union API 没有数据，使用水鱼数据作为基础
-          if (songs.isEmpty) {
-            songs = oldSongs;
-            unionSongIds = oldSongIds.toSet();
-          } else {
-            // ── 合并：union为主，水鱼补充union中没有的歌曲 ──
-            final existingIds = songs.map((s) => s.id).toSet();
-            for (final oldSong in oldSongs) {
-              if (!existingIds.contains(oldSong.id)) {
-                songs.add(oldSong);
-              }
-            }
-            debugPrint('合并后共 ${songs.length} 首歌曲 (新增 ${songs.length - existingIds.length} 首来自水鱼)');
-          }
-        } else {
-          debugPrint('水鱼 API 请求失败，状态码: ${oldResponse.statusCode}');
-          if (songs.isEmpty) return false;
+          debugPrint('水鱼 API 请求失败，状态码: ${dfResponse.statusCode}');
         }
       } catch (e) {
         debugPrint('水鱼 API 请求异常: $e');
-        if (songs.isEmpty) return false;
       }
 
-      // ── 3. 标记 union API 独有的歌曲（不在旧API中）为 isExtra ──
-      // 水鱼 API 中没有的 union 歌曲 = 可能是非官方/补充歌曲，不参与推荐
-      final List<String> unionExtraIds = [];
-      if (oldSongIds.isNotEmpty) {
+      // 解析 union 数据
+      List<Song>? unionSongs;
+      try {
+        final unionResponse = await unionFuture;
+        if (unionResponse.statusCode == 200) {
+          unionSongs = await _parseSongsInBackground(unionResponse.body);
+          debugPrint('Union API 返回 ${unionSongs!.length} 首歌曲');
+        } else {
+          debugPrint('Union API 请求失败，状态码: ${unionResponse.statusCode}');
+        }
+      } catch (e) {
+        debugPrint('Union API 请求异常: $e');
+      }
+
+      // ── 2. 合并数据 ──
+      if (dfSongs != null) {
+        songs = dfSongs;
+      } else if (unionSongs != null) {
+        songs = unionSongs;
+      } else {
+        return false; // 两个 API 都失败了
+      }
+
+      if (unionSongs != null && dfSongs != null) {
+        // 水鱼为主，union 补充
+        final existingIds = songs.map((s) => s.id).toSet();
+
+        final unionSongMap = <String, Song>{};
+        for (final s in unionSongs) {
+          unionSongMap[s.id] = s;
+        }
+
+        // 从 union 补充 release_date
         for (int i = 0; i < songs.length; i++) {
-          final song = songs[i];
-          if (unionSongIds.contains(song.id) && !oldSongIds.contains(song.id)) {
-            // 该歌曲仅在 union API 中存在，标记为 extra
-            // 但不标记 maidata 追加的歌曲（cids全为0的那些）
-            final isMaidataSong = song.cids.isNotEmpty && song.cids.every((cid) => cid == 0);
-            if (!isMaidataSong) {
-              songs[i] = Song(
-                id: song.id,
-                title: song.title,
-                type: song.type,
-                ds: song.ds,
-                level: song.level,
-                cids: song.cids,
-                charts: song.charts,
-                basicInfo: song.basicInfo,
-                isExtra: true,
-              );
-              unionExtraIds.add(song.id);
-            }
+          final unionSong = unionSongMap[songs[i].id];
+          if (unionSong != null &&
+              unionSong.basicInfo.releaseDate.isNotEmpty &&
+              songs[i].basicInfo.releaseDate.isEmpty) {
+            final old = songs[i];
+            songs[i] = Song(
+              id: old.id, title: old.title, type: old.type,
+              ds: old.ds, level: old.level, cids: old.cids,
+              charts: old.charts,
+              basicInfo: BasicInfo(
+                title: old.basicInfo.title,
+                artist: old.basicInfo.artist,
+                genre: old.basicInfo.genre,
+                bpm: old.basicInfo.bpm,
+                releaseDate: unionSong.basicInfo.releaseDate,
+                from: old.basicInfo.from,
+                isNew: old.basicInfo.isNew,
+              ),
+              isExtra: old.isExtra,
+            );
           }
         }
-        debugPrint('标记了 ${unionExtraIds.length} 首 union 独有歌曲为 extra（不参与推荐）');
+
+        for (final unionSong in unionSongs) {
+          if (!existingIds.contains(unionSong.id)) {
+            final isMaidataSong = unionSong.cids.isNotEmpty && unionSong.cids.every((cid) => cid == 0);
+            songs.add(Song(
+              id: unionSong.id,
+              title: unionSong.title,
+              type: unionSong.type,
+              ds: unionSong.ds,
+              level: unionSong.level,
+              cids: unionSong.cids,
+              charts: unionSong.charts,
+              basicInfo: unionSong.basicInfo,
+              isExtra: isMaidataSong ? false : true,
+            ));
+          }
+        }
+        final unionExtraCount = songs.length - existingIds.length;
+        debugPrint('合并后共 ${songs.length} 首歌曲 (新增 $unionExtraCount 首 union 独有歌曲，已标记为 extra)');
+      }
+
+      // ── 3. 收集 union extra 歌曲 ID 列表 ──
+      final List<String> unionExtraIds = songs
+          .where((s) => s.isExtra)
+          .map((s) => s.id)
+          .toList();
+      if (unionExtraIds.isNotEmpty) {
+        debugPrint('共 ${unionExtraIds.length} 首 union 独有歌曲标记为 extra');
       }
 
       // ── 4. 保存 union extra 歌曲 ID 列表 ──
@@ -146,49 +175,57 @@ class MaimaiMusicDataManager {
           debugPrint('使用缓存的追加歌曲列表（共 ${cachedAddedSongIds.length} 首）');
         }
 
+        final existingIdSet = songs.map((s) => s.id).toSet();
+
+        // 第一遍：快速提取 shortId，只收集需要完整解码的文本
+        final List<String> textsNeedingDecode = [];
+        final List<String> correspondingIds = [];
+        for (final text in maidataTexts) {
+          final quickId = MaidataDecodeUtil.quickExtractShortId(text);
+          if (quickId == null) continue;
+
+          if (useCachedList && !cachedAddedSongIds.contains(quickId)) continue;
+          if (existingIdSet.contains(quickId)) continue;
+
+          textsNeedingDecode.add(text);
+          correspondingIds.add(quickId);
+        }
+
+        debugPrint('${maidataTexts.length} 首 maidata 中，${textsNeedingDecode.length} 首需要完整解码');
+
         int addedCount = 0;
-        List<String> newlyAddedSongIds = [];
+        final List<String> newlyAddedSongIds = [];
 
-        // 分批处理 maidata，每批50首
-        const batchSize = 50;
-        for (int i = 0; i < maidataTexts.length; i += batchSize) {
-          int end = i + batchSize;
-          if (end > maidataTexts.length) {
-            end = maidataTexts.length;
-          }
-          List<String> batch = maidataTexts.sublist(i, end);
+        if (textsNeedingDecode.isNotEmpty) {
+          // 第二遍：使用 compute() 在后台 isolate 中批量解码
+          const decodeBatchSize = 200;
+          for (int i = 0; i < textsNeedingDecode.length; i += decodeBatchSize) {
+            final end = (i + decodeBatchSize > textsNeedingDecode.length)
+                ? textsNeedingDecode.length
+                : i + decodeBatchSize;
+            final batch = textsNeedingDecode.sublist(i, end);
 
-          for (String text in batch) {
-            try {
-              MaidataData maidata = MaidataDecodeUtil.decode(text);
+            // 在后台 isolate 中解析
+            final List<Map<String, dynamic>> decodedMaps =
+                await compute(MaidataDecodeUtil.batchDecodeForIsolate, batch);
 
-              if (maidata.title.isEmpty) {
-                continue;
-              }
+            for (final map in decodedMaps) {
+              final maidata = MaidataDecodeUtil.fromIsolateMap(map);
+              final songId = maidata.shortId.toString();
 
-              String songId = maidata.shortId.toString();
+              if (existingIdSet.contains(songId)) continue;
 
-              if (useCachedList && !cachedAddedSongIds.contains(songId)) {
-                continue;
-              }
+              final newSong = _maidataToSong(maidata);
+              if (newSong == null) continue;
 
-              bool exists = songs.any((song) => song.id == songId);
-
-              if (!exists) {
-                Song? newSong = _maidataToSong(maidata);
-                if (newSong == null) {
-                  continue;
-                }
-                songs.add(newSong);
-                addedCount++;
-                newlyAddedSongIds.add(songId);
-              }
-            } catch (e) {
-              debugPrint('  解析 maidata 失败: $e');
+              songs.add(newSong);
+              existingIdSet.add(songId);
+              addedCount++;
+              newlyAddedSongIds.add(songId);
             }
-          }
 
-          await Future.delayed(Duration(milliseconds: 10));
+            debugPrint('  maidata 解码进度: ${end}/${textsNeedingDecode.length}');
+          }
         }
 
         if (!useCachedList && newlyAddedSongIds.isNotEmpty) {
@@ -218,19 +255,47 @@ class MaimaiMusicDataManager {
   
   Future<bool> refreshDataWithSmartMaidata() async {
     final maidataManager = MaidataManager();
-    
-    if (await hasValidAddedSongsCache()) {
-      List<String>? addedSongIds = await getAddedSongIds();
-      if (addedSongIds != null && addedSongIds.isNotEmpty) {
-        debugPrint('使用智能刷新：只获取 ${addedSongIds.length} 首追加歌曲的maidata');
-        List<String> maidataTexts = await maidataManager.fetchMaidataForSongIds(addedSongIds);
-        return await fetchAndUpdateMusicData(maidataTexts: maidataTexts);
+
+    // ── 检查全量缓存 TTL ──
+    final cacheValid = await maidataManager.isFullCacheValid();
+
+    if (cacheValid) {
+      debugPrint('maidata 缓存仍在 TTL 有效期内，计算增量...');
+
+      // 获取 union API 全量歌曲 ID 列表（轻量 API 调用）
+      List<String> unionSongIds = [];
+      try {
+        final unionResponse = await ApiClient.get(Uri.parse(_unionApiUrl));
+        if (unionResponse.statusCode == 200) {
+          final unionSongs = await _parseSongsInBackground(unionResponse.body);
+          unionSongIds = unionSongs.map((s) => s.id).toList();
+        }
+      } catch (e) {
+        debugPrint('获取 union 歌曲列表失败，跳过 maidata 刷新: $e');
+        return await fetchAndUpdateMusicData();
       }
+
+      // 计算缓存中缺失的歌曲 ID
+      final missingIds = unionSongIds
+          .where((id) => !maidataManager.hasCachedMaidata(id))
+          .toList();
+
+      if (missingIds.isEmpty) {
+        debugPrint('maidata 缓存完整（${maidataManager.cachedCount} 首），跳过刷新');
+        return await fetchAndUpdateMusicData();
+      }
+
+      debugPrint('缓存缺失 ${missingIds.length} 首，增量获取 maidata...');
+      final maidataTexts = await maidataManager.fetchMaidataForSongIds(missingIds);
+      // 同时更新 addedSongIds 缓存
+      await _saveAddedSongIds(missingIds);
+      return await fetchAndUpdateMusicData(maidataTexts: maidataTexts);
     }
-    
-    debugPrint('执行全量maidata获取...');
+
+    // ── 缓存过期：全量刷新 ──
+    debugPrint('maidata 缓存已过期，执行全量刷新...');
     await maidataManager.fetchAndCacheFullMaidata();
-    List<String> maidataTexts = maidataManager.getAllMaidataTexts();
+    final maidataTexts = maidataManager.getAllMaidataTexts();
     return await fetchAndUpdateMusicData(maidataTexts: maidataTexts);
   }
 

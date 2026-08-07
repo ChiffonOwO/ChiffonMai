@@ -4,6 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/DeveloperToken.dart';
 import 'package:intl/intl.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 
 class TranslateService {
@@ -133,7 +134,7 @@ class TranslateService {
         "Authorization": _buildAuth(timestamp, body),
       };
 
-      final res = await http.post(uri, headers: headers, body: body);
+      final res = await ApiClient.post(uri, headers: headers, body: body);
       
       // 打印响应信息以便调试
       debugPrint("响应状态码: ${res.statusCode}");

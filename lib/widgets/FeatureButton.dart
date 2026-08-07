@@ -7,12 +7,20 @@ import '../utils/AppConstants.dart';
 class FeatureButton extends StatelessWidget {
   final ButtonItem item;
   final VoidCallback onTap;
+  /// 是否已收藏（为 null 时不显示星标）
+  final bool? isFavorited;
+  /// 收藏切换回调
+  final VoidCallback? onToggleFavorite;
 
   const FeatureButton({
     super.key,
     required this.item,
     required this.onTap,
+    this.isFavorited,
+    this.onToggleFavorite,
   });
+
+  bool get _showStar => isFavorited != null && onToggleFavorite != null;
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +28,7 @@ class FeatureButton extends StatelessWidget {
     final screenHeight = MediaQuery.of(context).size.height;
     final brightness = Theme.of(context).brightness;
 
-    return SizedBox(
+    final button = SizedBox(
       height: screenHeight * 0.12,
       child: TextButton(
         style: TextButton.styleFrom(
@@ -111,6 +119,46 @@ class FeatureButton extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+
+    // 无星标模式：直接返回按钮
+    if (!_showStar) return button;
+
+    // 有星标模式：叠加星标按钮
+    return SizedBox(
+      height: screenHeight * 0.12,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(child: button),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: onToggleFavorite,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: isFavorited!
+                        ? Colors.amber.withValues(alpha: 0.2)
+                        : Colors.black.withValues(alpha: 0.05),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isFavorited! ? Icons.star : Icons.star_border,
+                    size: 18,
+                    color: isFavorited! ? Colors.amber : Colors.grey,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

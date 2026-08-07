@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../entity/FeatureModels.dart';
+import '../constant/CacheKeyConstant.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/AppTheme.dart';
 import '../utils/AppConstants.dart';
@@ -26,15 +29,55 @@ class FeatureCategoryPage extends StatefulWidget {
 
 class _FeatureCategoryPageState extends State<FeatureCategoryPage> {
   String _searchQuery = '';
+  Set<String> _favoriteTitles = {};
+  Timer? _saveTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFavorites();
+  }
+
+  @override
+  void dispose() {
+    _saveTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadFavorites() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList(CacheKeyConstant.favoriteFeatures) ?? [];
+    if (mounted) {
+      setState(() => _favoriteTitles = raw.toSet());
+    }
+  }
+
+  void _toggleFavorite(String title) {
+    setState(() {
+      if (_favoriteTitles.contains(title)) {
+        _favoriteTitles.remove(title);
+      } else {
+        _favoriteTitles.add(title);
+      }
+    });
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 300), _saveFavorites);
+  }
+
+  Future<void> _saveFavorites() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+        CacheKeyConstant.favoriteFeatures, _favoriteTitles.toList());
+  }
 
   List<ButtonItem> _buildItems(bool isLoggedIn) {
     // 根据当前登录状态动态替换"系统"分类中的登录/登出按钮
     List<ButtonItem> items = widget.category.items.map((item) {
       if (item.title == '登录水鱼' && isLoggedIn) {
-        return ButtonItem(icon: Icons.logout, title: '登出账号', subtitle: '清除水鱼登录状态');
+        return const ButtonItem(icon: Icons.logout, title: '登出账号', subtitle: '清除水鱼登录状态');
       }
       if (item.title == '登出账号' && !isLoggedIn) {
-        return ButtonItem(icon: Icons.login, title: '登录水鱼', subtitle: '获取ImportToken以便同步成绩');
+        return const ButtonItem(icon: Icons.login, title: '登录水鱼', subtitle: '获取ImportToken以便同步成绩');
       }
       return item;
     }).toList();
@@ -54,7 +97,7 @@ class _FeatureCategoryPageState extends State<FeatureCategoryPage> {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
+    final safeBottom = MediaQuery.of(context).padding.bottom;
     final Color textPrimaryColor = Theme.of(context).colorScheme.onSurface;
     final Color cardBgColor = Theme.of(context).colorScheme.surface.withValues(alpha: 0.9);
     final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
@@ -85,9 +128,12 @@ class _FeatureCategoryPageState extends State<FeatureCategoryPage> {
         ),
         itemCount: items.length,
         itemBuilder: (context, index) {
+          final item = items[index];
           return FeatureButton(
-            item: items[index],
-            onTap: () => widget.onFeatureTap(items[index]),
+            item: item,
+            onTap: () => widget.onFeatureTap(item),
+            isFavorited: _favoriteTitles.contains(item.title),
+            onToggleFavorite: () => _toggleFavorite(item.title),
           );
         },
       );
@@ -105,7 +151,7 @@ class _FeatureCategoryPageState extends State<FeatureCategoryPage> {
             children: [
               // 自定义顶部栏
               Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
+                padding: const EdgeInsets.fromLTRB(16, 48, 16, 8),
                 child: Row(
                   children: [
                     IconButton(
@@ -124,7 +170,7 @@ class _FeatureCategoryPageState extends State<FeatureCategoryPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 48), // 平衡返回按钮的宽度
+                    const SizedBox(width: 48),
                   ],
                 ),
               ),
@@ -141,10 +187,18 @@ class _FeatureCategoryPageState extends State<FeatureCategoryPage> {
                   child: Column(
                     children: [
                       // 分类内搜索栏
-                      QuickSearchBar(
-                        onChanged: (query) {
-                          setState(() => _searchQuery = query.toLowerCase());
-                        },
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          screenWidth * 0.03,
+                          screenHeight * 0.015,
+                          screenWidth * 0.03,
+                          0,
+                        ),
+                        child: QuickSearchBar(
+                          onChanged: (query) {
+                            setState(() => _searchQuery = query.toLowerCase());
+                          },
+                        ),
                       ),
                       // 功能按钮网格 — 监听登录状态实时切换按钮
                       Expanded(

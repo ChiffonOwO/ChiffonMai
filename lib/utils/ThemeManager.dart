@@ -15,6 +15,22 @@ class ThemeManager {
   /// 通知 UI 主题变化
   final ValueNotifier<ThemeMode> notifier = ValueNotifier(ThemeMode.light);
 
+  /// 纯黑模式（仅深色模式生效）
+  bool _pureBlackEnabled = false;
+  bool get pureBlackEnabled => _pureBlackEnabled;
+
+  /// 通知 UI 纯黑模式变化
+  final ValueNotifier<bool> pureBlackNotifier = ValueNotifier(false);
+
+  /// 背景覆层不透明度（0.0 ~ 1.0，浅色/深色模式共用）
+  /// 浅色模式：白色覆层，数值越高背景越淡，默认 0.55
+  /// 深色模式：暗色覆层，数值越高背景越暗
+  double _lightOverlayOpacity = 0.55;
+  double get lightOverlayOpacity => _lightOverlayOpacity;
+
+  /// 通知 UI 覆层透明度变化
+  final ValueNotifier<double> lightOverlayNotifier = ValueNotifier(0.55);
+
   bool _isLoaded = false;
   bool get isLoaded => _isLoaded;
 
@@ -25,11 +41,22 @@ class ThemeManager {
       final value = prefs.getString(CacheKeyConstant.themeMode) ?? 'light';
       _themeMode = _parseThemeMode(value);
       notifier.value = _themeMode;
+
+      _pureBlackEnabled = prefs.getBool(CacheKeyConstant.pureBlackEnabled) ?? false;
+      pureBlackNotifier.value = _pureBlackEnabled;
+
+      _lightOverlayOpacity = prefs.getDouble(CacheKeyConstant.lightOverlayOpacity) ?? 0.55;
+      lightOverlayNotifier.value = _lightOverlayOpacity;
+
       _isLoaded = true;
     } catch (e) {
       debugPrint('加载主题偏好失败: $e');
       _themeMode = ThemeMode.light;
       notifier.value = ThemeMode.light;
+      _pureBlackEnabled = false;
+      pureBlackNotifier.value = false;
+      _lightOverlayOpacity = 0.55;
+      lightOverlayNotifier.value = 0.55;
       _isLoaded = true;
     }
   }
@@ -43,6 +70,30 @@ class ThemeManager {
       await prefs.setString(CacheKeyConstant.themeMode, _themeModeToString(mode));
     } catch (e) {
       debugPrint('保存主题偏好失败: $e');
+    }
+  }
+
+  /// 切换纯黑模式
+  Future<void> setPureBlackEnabled(bool enabled) async {
+    _pureBlackEnabled = enabled;
+    pureBlackNotifier.value = enabled;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(CacheKeyConstant.pureBlackEnabled, enabled);
+    } catch (e) {
+      debugPrint('保存纯黑模式偏好失败: $e');
+    }
+  }
+
+  /// 设置背景覆层不透明度（浅色/深色模式共用）
+  Future<void> setLightOverlayOpacity(double opacity) async {
+    _lightOverlayOpacity = opacity.clamp(0.0, 1.0);
+    lightOverlayNotifier.value = _lightOverlayOpacity;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(CacheKeyConstant.lightOverlayOpacity, _lightOverlayOpacity);
+    } catch (e) {
+      debugPrint('保存覆层透明度失败: $e');
     }
   }
 

@@ -14,6 +14,7 @@ import 'package:my_first_flutter_app/manager/LuoXue/CollectionsManager.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 // 评论数据模型
 class CommentItem {
@@ -889,7 +890,7 @@ class SongInfoService {
       }
       debugPrint('SongInfoService: 从服务器获取评论，url=$url');
 
-      final response = await http.get(
+      final response = await ApiClient.get(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
       );
@@ -931,7 +932,7 @@ class SongInfoService {
     required String content,
   }) async {
     try {
-      final response = await http.post(
+      final response = await ApiClient.post(
         Uri.parse(ApiUrls.CommentsCreateUrl),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
@@ -992,7 +993,7 @@ class SongInfoService {
     required String originalId,
   }) async {
     try {
-      final response = await http.delete(
+      final response = await ApiClient.delete(
         Uri.parse('${ApiUrls.CommentsBaseUrl}/$commentId'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
@@ -1226,7 +1227,7 @@ class SongInfoService {
         if (identity != null)
           'userId': '${identity.dataSource}:${identity.originalId}',
       });
-      final response = await http.get(url);
+      final response = await ApiClient.get(url);
       if (response.statusCode == 200) {
         return json.decode(response.body);
       }
@@ -1306,7 +1307,7 @@ class SongInfoService {
       }
 
       final url = Uri.parse(ApiUrls.RatingsCreateUrl);
-      final response = await http.post(
+      final response = await ApiClient.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
@@ -1345,7 +1346,7 @@ class SongInfoService {
           .replace(queryParameters: {
         'userId': '${identity.dataSource}:${identity.originalId}',
       });
-      final response = await http.delete(
+      final response = await ApiClient.delete(
         url,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({

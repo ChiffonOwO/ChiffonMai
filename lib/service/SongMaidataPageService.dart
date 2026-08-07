@@ -8,6 +8,7 @@ import '../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../manager/MaidataManager.dart';
 import '../constant/CacheKeyConstant.dart';
 import '../constant/CacheTimestampConstant.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 // 匹配结果数据类（支持自定义标题用于构建URL）
 class MatchResult {
@@ -84,7 +85,7 @@ class SongMaidataPageService {
       Map<String, dynamic> indexData = await MaidataManager().getIndex();
       if (indexData.isEmpty) {
         // 缓存未命中，从服务器拉取
-        final response = await http.get(Uri.parse('${ApiUrls.MaidataServerPortUrl}/index.json'));
+        final response = await ApiClient.get(Uri.parse('${ApiUrls.MaidataServerPortUrl}/index.json'));
         if (response.statusCode == 200) {
           indexData = Map<String, dynamic>.from(
             (await compute(_parseJson, response.body)) as Map,
@@ -284,7 +285,7 @@ class SongMaidataPageService {
       String url = _buildMaidataUrl(match.id, customTitle: match.customUrlTitle, serverTitle: serverTitle);
       debugPrint('[DEBUG][Maidata] 尝试第 ${i + 1}/${matches.length} 个匹配: $url');
       
-      final response = await http.get(Uri.parse(url));
+      final response = await ApiClient.get(Uri.parse(url));
       
       if (response.statusCode == 200) {
         String content = _decodeResponse(response);
@@ -594,7 +595,7 @@ class SongMaidataPageService {
       String genreUrl = '${ApiUrls.MaidataServerPortUrl}/$mappedGenre/';
       debugPrint('[DEBUG][Maidata] 尝试获取文件夹列表: $genreUrl');
       
-      final response = await http.get(Uri.parse(genreUrl));
+      final response = await ApiClient.get(Uri.parse(genreUrl));
       if (response.statusCode != 200) {
         debugPrint('[DEBUG][Maidata] 无法获取文件夹列表: ${response.statusCode}');
         return null;
@@ -615,7 +616,7 @@ class SongMaidataPageService {
         debugPrint('[DEBUG][Maidata] 检查: $maidataUrl');
         
         try {
-          final maidataResponse = await http.get(Uri.parse(maidataUrl));
+          final maidataResponse = await ApiClient.get(Uri.parse(maidataUrl));
           
           if (maidataResponse.statusCode == 200) {
             String content = _decodeResponse(maidataResponse);
@@ -666,7 +667,7 @@ class SongMaidataPageService {
     List<String> candidateIds = [];
     
     try {
-      final response = await http.get(Uri.parse('${ApiUrls.MaidataServerPortUrl}/index.json'));
+      final response = await ApiClient.get(Uri.parse('${ApiUrls.MaidataServerPortUrl}/index.json'));
       
       if (response.statusCode == 200) {
         Map<String, dynamic> indexData = Map<String, dynamic>.from(

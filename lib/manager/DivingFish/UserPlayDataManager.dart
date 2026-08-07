@@ -5,6 +5,7 @@ import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/api/DeveloperToken.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../constant/CacheKeyConstant.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 class UserPlayDataManager {
   // 单例模式
@@ -30,7 +31,7 @@ class UserPlayDataManager {
       };
       
       // 发送 GET 请求
-      final response = await http.get(url, headers: headers);
+      final response = await ApiClient.get(url, headers: headers);
       
       if (response.statusCode == 200) {
         // 解析 JSON 数据

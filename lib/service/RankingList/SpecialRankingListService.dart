@@ -2163,6 +2163,76 @@ class SpecialRankingListService {
     return {};
   }
 
+  // BPM排行榜（按歌曲BPM降序）
+  Future<List<SpecialRankingEntry>> getBpmRanking({int limit = 100}) async {
+    return _buildBpmRanking(limit: limit, ascending: false);
+  }
+
+  // 反向BPM排行榜（按歌曲BPM升序，取BPM最低的）
+  Future<List<SpecialRankingEntry>> getReverseBpmRanking({int limit = 100}) async {
+    return _buildBpmRanking(limit: limit, ascending: true);
+  }
+
+  Future<List<SpecialRankingEntry>> _buildBpmRanking({
+    required int limit,
+    required bool ascending,
+  }) async {
+    List<SpecialRankingEntry> result = [];
+
+    try {
+      final songManager = MaimaiMusicDataManager();
+      List<Song>? songs = await songManager.getCachedSongs();
+
+      if (songs == null || songs.isEmpty) {
+        debugPrint('[SpecialRankingListService] No songs found for BPM ranking');
+        return result;
+      }
+
+      Set<String> excludedSongIds = await _getMaidataAddedSongIds();
+
+      List<Song> filtered = songs.where((s) {
+        if (excludedSongIds.contains(s.id) || s.isExtra) return false;
+        if (s.basicInfo.bpm <= 0) return false;
+        return true;
+      }).toList();
+
+      filtered.sort((a, b) => ascending
+          ? a.basicInfo.bpm.compareTo(b.basicInfo.bpm)
+          : b.basicInfo.bpm.compareTo(a.basicInfo.bpm));
+
+      // 按标题去重：同一首歌有 DX+SD 双版本时只保留第一个
+      final seenTitles = <String>{};
+      final deduped = <Song>[];
+      for (final s in filtered) {
+        if (seenTitles.add(s.title)) {
+          deduped.add(s);
+        }
+      }
+
+      final top = deduped.take(limit).toList();
+      for (int i = 0; i < top.length; i++) {
+        final song = top[i];
+        result.add(SpecialRankingEntry(
+          rank: i + 1,
+          songId: song.id,
+          songTitle: song.title,
+          songType: song.type,
+          difficultyIndex: 0,
+          difficultyLabel: '',
+          ds: 0,
+          breakCount: song.basicInfo.bpm,
+          updateTime: 0,
+        ));
+      }
+
+      debugPrint('[SpecialRankingListService] BPM ranking (asc=$ascending): ${result.length} entries');
+    } catch (e) {
+      debugPrint('[SpecialRankingListService] Error in BPM ranking: $e');
+    }
+
+    return result;
+  }
+
   // 更新谱面绝赞总数排行榜（需要先解析maidata）
   Future<void> updateAllSongBreakCounts({Function(int)? onProgress}) async {
     try {

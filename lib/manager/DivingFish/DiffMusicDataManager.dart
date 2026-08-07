@@ -5,6 +5,7 @@ import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/DiffSong.dart';
 import '../../constant/CacheKeyConstant.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 class DiffMusicDataManager {
   // 单例模式
@@ -22,7 +23,7 @@ class DiffMusicDataManager {
   Future<bool> fetchAndUpdateDiffData() async {
     try {
       // 发送 GET 请求
-      final response = await http.get(Uri.parse(_apiUrl));
+      final response = await ApiClient.get(Uri.parse(_apiUrl));
       
       if (response.statusCode == 200) {
         // 解析 JSON 数据

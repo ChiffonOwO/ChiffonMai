@@ -9,6 +9,7 @@ import '../../entity/LuoXue/LuoXueScore.dart';
 import '../../entity/DivingFish/RecordItem.dart';
 import '../../utils/LuoXueToDivingFishUtil.dart';
 import '../../constant/CacheKeyConstant.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 /// 落雪用户游玩数据管理器
 /// 使用OAuth鉴权访问落雪API
@@ -29,7 +30,7 @@ class LuoXueUserPlayDataManager {
   Future<LuoXuePlayer?> getPlayerInfo() async {
     try {
       final headers = await _oauthManager.getAuthHeaders();
-      final response = await http.get(
+      final response = await ApiClient.get(
         Uri.parse(ApiUrls.LuoXuePlayerApi),
         headers: headers,
       );
@@ -59,7 +60,7 @@ class LuoXueUserPlayDataManager {
   Future<List<LuoXueScore>?> getPlayerRecords() async {
     try {
       final headers = await _oauthManager.getAuthHeaders();
-      final response = await http.get(
+      final response = await ApiClient.get(
         Uri.parse(ApiUrls.LuoXuePlayerScoresApi),
         headers: headers,
       );

@@ -3,267 +3,146 @@
  * 用于处理字符串相关的操作
  */
 class StringUtil {
-  /**
-   * 格式化版本字符串
-   * @param version 版本字符串
-   * @return 格式化后的版本字符串
-   */
-  static String formatVersion(String version) {
-    if (version == 'maimai') {
-      return 'maimai';
+  // ═══════════════════════════════════════════════════════════════
+  // 版本格式化 — 私有辅助
+  // ═══════════════════════════════════════════════════════════════
+
+  /// 处理 isExtra / maimai DX 前缀 → 返回短名称。
+  /// 未命中返回 null，由调用方继续常规 lookup。
+  static String? _tryExtraOrDx(String version, bool isExtra) {
+    if (isExtra || version.startsWith('maimai DX ')) {
+      version = version.replaceFirst('maimai でらっくす ', '');
+      version = version.replaceFirst('maimai DX ', '');
+      version = version.replaceFirst(' PLUS', '+');
+      return version;
     }
-    if (version == 'maimai PLUS') {
-      return 'maimai+';
+    return null;
+  }
+
+  /// 旧代版本 → 短名称
+  static const Map<String, String> _oldSimple = {
+    'maimai': 'maimai',
+    'maimai PLUS': 'maimai+',
+  };
+
+  /// 旧代版本 → 详细名称（带 超/檄 等）
+  static const Map<String, String> _oldDetailed = {
+    'maimai': 'maimai 真',
+    'maimai PLUS': 'maimai+ 真',
+    'maimai GreeN': 'GreeN 超',
+    'maimai GreeN PLUS': 'GreeN+ 檄',
+    'maimai ORANGE': 'ORANGE 橙',
+    'maimai ORANGE PLUS': 'ORANGE+ 暁',
+    'maimai PiNK': 'PiNK 桃',
+    'maimai PiNK PLUS': 'PiNK+ 櫻',
+    'maimai MURASAKi': 'MURASAKi 紫',
+    'maimai MURASAKi PLUS': 'MURASAKi+ 菫',
+    'maimai MiLK': 'MiLK 白',
+    'MiLK PLUS': 'MiLK+ 雪',
+    'maimai FiNALE': 'FiNALE 輝',
+  };
+
+  /// DX 代（日文格式）后缀 → 短名称
+  static const Map<String, String> _dxSimple = {
+    '': 'DX 2020',
+    'Splash': 'DX 2021',
+    'UNiVERSE': 'DX 2022',
+    'FESTiVAL': 'DX 2023',
+    'BUDDiES': 'DX 2024',
+    'PRiSM': 'DX 2025',
+    'PRiSM PLUS': 'DX 2026',
+  };
+
+  /// DX 代（日文格式）后缀 → 详细名称（带 熊/華 等）
+  static const Map<String, String> _dxDetailed = {
+    '': 'DX 2020 熊/華',
+    'Splash': 'DX 2021 爽/煌',
+    'UNiVERSE': 'DX 2022 宙/星',
+    'FESTiVAL': 'DX 2023 祭/祝',
+    'BUDDiES': 'DX 2024 双/宴',
+    'PRiSM': 'DX 2025 鏡',
+    'PRiSM PLUS': 'DX 2026 彩',
+  };
+
+  /// 日文 DX 代 lookup（含 PLUS 变体，用于 -WithFlag 系列）
+  static String? _lookupDxWithPlus(String version, Map<String, String> map) {
+    const prefix = 'maimai でらっくす ';
+    if (!version.startsWith(prefix)) return null;
+    var suffix = version.substring(prefix.length);
+    if (map.containsKey(suffix)) return map[suffix];
+    // 对 2020-2024：同时检查 "X" 和 "X PLUS"
+    if (!suffix.endsWith(' PLUS')) {
+      final plusKey = '$suffix PLUS';
+      if (map.containsKey(plusKey)) return map[plusKey];
     }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059') {
-      return 'DX 2020';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 Splash') {
-      return 'DX 2021';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 UNiVERSE') {
-      return 'DX 2022';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 FESTiVAL') {
-      return 'DX 2023';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 BUDDiES') {
-      return 'DX 2024';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM') {
-      return 'DX 2025';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM PLUS') {
-      return 'DX 2026';
-    }
+    return null;
+  }
+
+  /// 日文 DX 代 lookup（精确匹配，用于 formatVersion / formatVersion2）
+  static String? _lookupDxExact(String version, Map<String, String> map) {
+    const prefix = 'maimai でらっくす ';
+    if (!version.startsWith(prefix)) return null;
+    final suffix = version.substring(prefix.length);
+    return map[suffix];
+  }
+
+  /// 通用后缀处理：PLUS → +，去除 maimai / でらっくす 前缀
+  static String _genericFallback(String version) {
     if (version.contains(' PLUS')) {
       version = version.replaceFirst(' PLUS', '+');
     }
     if (version.contains('maimai') && version != 'maimai') {
       version = version.replaceFirst('maimai ', '');
     }
-    if (version.contains('\u3067\u3089\u3063\u304f\u3059')) {
-      version = version.replaceFirst('\u3067\u3089\u3063\u304f\u3059 ', '');
+    if (version.contains('でらっくす')) {
+      version = version.replaceFirst('でらっくす ', '');
     }
     return version;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 公开 API
+  // ═══════════════════════════════════════════════════════════════
+
+  static String formatVersion(String version) {
+    final r = _tryExtraOrDx(version, false);
+    if (r != null) return r;
+    if (_oldSimple.containsKey(version)) return _oldSimple[version]!;
+    final dx = _lookupDxExact(version, _dxSimple);
+    if (dx != null) return dx;
+    return _genericFallback(version);
   }
 
   static String formatVersion2(String version) {
-    if (version == 'maimai') {
-      return 'maimai 真';
-    }
-    if (version == 'maimai PLUS') {
-      return 'maimai+ 真';
-    }
-    if (version == 'maimai GreeN'){
-      return 'GreeN 超';
-    }
-    if (version == 'maimai GreeN PLUS'){
-      return 'GreeN+ 檄';
-    }
-    if (version == 'maimai ORANGE'){
-      return 'ORANGE 橙';
-    }
-    if (version == 'maimai ORANGE PLUS'){
-      return 'ORANGE+ 暁';
-    }
-    if (version == 'maimai PiNK'){
-      return 'PiNK 桃';
-    }
-    if (version == 'maimai PiNK PLUS'){
-      return 'PiNK+ 櫻';
-    }
-    if (version == 'maimai MURASAKi'){
-      return 'MURASAKi 紫';
-    }
-    if (version == 'maimai MURASAKi'){
-      return 'MURASAKi 紫';
-    }
-    if (version == 'maimai MURASAKi PLUS'){
-      return 'MURASAKi+ 菫';
-    }
-    if (version == 'maimai MiLK'){
-      return 'MiLK 白';
-    }
-    if (version == 'MiLK PLUS'){
-      return 'MiLK+ 雪';
-    }
-    if (version == 'maimai FiNALE'){
-      return 'FiNALE 輝';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059') {
-      return 'DX 2020 熊/華';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 Splash') {
-      return 'DX 2021 爽/煌';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 UNiVERSE') {
-      return 'DX 2022 宙/星';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 FESTiVAL') {
-      return 'DX 2023 祭/祝';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 BUDDiES') {
-      return 'DX 2024 双/宴';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM') {
-      return 'DX 2025 镜';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM PLUS') {
-      return 'DX 2026 彩';
-    }
-    if (version == 'maimai DX PRiSM PLUS') {
-      return 'PRiSM+';
-    }
-    if (version == 'maimai DX CiRCLE') {
-      return 'CiRCLE';
-    }
-    if (version == 'maimai DX CiRCLE PLUS') {
-      return 'CiRCLE+';
-    }
+    final r = _tryExtraOrDx(version, false);
+    if (r != null) return r;
+    if (_oldDetailed.containsKey(version)) return _oldDetailed[version]!;
+    final dx = _lookupDxExact(version, _dxDetailed);
+    if (dx != null) return dx;
     return version;
   }
 
-
-  /**
-   * 格式化版本字符串（带额外歌标记）
-   * 与 [formatVersion] 逻辑相同，额外通过 isExtra 控制是否追标"额外"
-   * @param version 版本字符串
-   * @param isExtra 是否为额外歌
-   * @return 格式化后的版本字符串
-   */
   static String formatVersionWithFlag(String version, bool isExtra) {
-    if (version == 'maimai') {
-      return 'maimai';
-    }
-    if (version == 'maimai PLUS') {
-      return 'maimai+';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059'
-    || version == 'maimai \u3067\u3089\u3063\u304f\u3059 PLUS') {
-      return 'DX 2020';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 Splash'
-    || version == 'maimai \u3067\u3089\u3063\u304f\u3059 Splash PLUS') {
-      return 'DX 2021';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 UNiVERSE'
-    || version == 'maimai \u3067\u3089\u3063\u304f\u3059 UNiVERSE PLUS') {
-      return 'DX 2022';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 FESTiVAL'
-    || version == 'maimai \u3067\u3089\u3063\u304f\u3059 FESTiVAL PLUS') {
-      return 'DX 2023';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 BUDDiES'
-    || version == 'maimai \u3067\u3089\u3063\u304f\u3059 BUDDiES PLUS') {
-      return 'DX 2024';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM') {
-      return 'DX 2025';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM PLUS' && !isExtra) {
-      return 'DX 2026';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM PLUS' && isExtra) {
-      return 'PRiSM+';
-    }
-    if (version.contains(' PLUS')) {
-      version = version.replaceFirst(' PLUS', '+');
-    }
-    if (version.contains('maimai') && version != 'maimai') {
-      version = version.replaceFirst('maimai ', '');
-    }
-    if (version.contains('\u3067\u3089\u3063\u304f\u3059')) {
-      version = version.replaceFirst('\u3067\u3089\u3063\u304f\u3059 ', '');
-    }
-    return version;
+    final r = _tryExtraOrDx(version, isExtra);
+    if (r != null) return r;
+    if (_oldSimple.containsKey(version)) return _oldSimple[version]!;
+    final dx = _lookupDxWithPlus(version, _dxSimple);
+    if (dx != null) return dx;
+    return _genericFallback(version);
   }
 
-  /**
-   * 格式化版本字符串2（带额外歌标记）
-   * 与 [formatVersion2] 逻辑相同，额外通过 isExtra 控制是否追标"额外"
-   * @param version 版本字符串
-   * @param isExtra 是否为额外歌
-   * @return 格式化后的版本字符串
-   */
   static String formatVersion2WithFlag(String version, bool isExtra) {
-     if (version == 'maimai') {
-      return 'maimai 真';
-    }
-    if (version == 'maimai PLUS') {
-      return 'maimai+ 真';
-    }
-    if (version == 'maimai GreeN'){
-      return 'GreeN 超';
-    }
-    if (version == 'maimai GreeN PLUS'){
-      return 'GreeN+ 檄';
-    }
-    if (version == 'maimai ORANGE'){
-      return 'ORANGE 橙';
-    }
-    if (version == 'maimai ORANGE PLUS'){
-      return 'ORANGE+ 暁';
-    }
-    if (version == 'maimai PiNK'){
-      return 'PiNK 桃';
-    }
-    if (version == 'maimai PiNK PLUS'){
-      return 'PiNK+ 櫻';
-    }
-    if (version == 'maimai MURASAKi'){
-      return 'MURASAKi 紫';
-    }
-    if (version == 'maimai MURASAKi'){
-      return 'MURASAKi 紫';
-    }
-    if (version == 'maimai MURASAKi PLUS'){
-      return 'MURASAKi+ 菫';
-    }
-    if (version == 'maimai MiLK'){
-      return 'MiLK 白';
-    }
-    if (version == 'MiLK PLUS'){
-      return 'MiLK+ 雪';
-    }
-    if (version == 'maimai FiNALE'){
-      return 'FiNALE 輝';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059'
-    || version == 'maimai \u3067\u3089\u3063\u304f\u3059 PLUS') {
-      return 'DX 2020 熊/華';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 Splash'
-    || version == 'maimai \u3067\u3089\u3063\u304f\u3059 Splash PLUS') {
-      return 'DX 2021 爽/煌';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 UNiVERSE'
-    || version == 'maimai \u3067\u3089\u3063\u304f\u3059 UNiVERSE PLUS') {
-      return 'DX 2022 宙/星';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 FESTiVAL'
-    || version == 'maimai \u3067\u3089\u3063\u304f\u3059 FESTiVAL PLUS') {
-      return 'DX 2023 祭/祝';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 BUDDiES'
-    || version == 'maimai \u3067\u3089\u3063\u304f\u3059 BUDDiES PLUS') {
-      return 'DX 2024 双/宴';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM') {
-      return 'DX 2025 镜';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM PLUS' && !isExtra) {
-      return 'DX 2026 彩';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 PRiSM PLUS' && isExtra) {
-      return 'PRiSM+';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 CiRCLE') {
-      return 'CiRCLE';
-    }
-    if (version == 'maimai \u3067\u3089\u3063\u304f\u3059 CiRCLE PLUS') {
-      return 'CiRCLE+';
+    final r = _tryExtraOrDx(version, isExtra);
+    if (r != null) return r;
+    if (_oldDetailed.containsKey(version)) return _oldDetailed[version]!;
+    final dx = _lookupDxWithPlus(version, _dxDetailed);
+    if (dx != null) return dx;
+    // 日文 CiRCLE（仅 API 数据有，无 "maimai DX" 前缀）
+    const prefix = 'maimai でらっくす ';
+    if (version.startsWith(prefix)) {
+      final s = version.substring(prefix.length);
+      if (s == 'CiRCLE') return 'CiRCLE';
+      if (s == 'CiRCLE PLUS') return 'CiRCLE+';
     }
     return version;
   }
@@ -351,21 +230,21 @@ class StringUtil {
    */
   static String formatStars(num scoreRate) {
     if (scoreRate >= 0.99) {
-      return '\u27266';
+      return '✦6';
     } else if (scoreRate >= 0.98) {
-      return '\u27265.5';
+      return '✦5.5';
     } else if (scoreRate >= 0.97) {
-      return '\u27265';
+      return '✦5';
     } else if (scoreRate >= 0.95) {
-      return '\u27264';
+      return '✦4';
     } else if (scoreRate >= 0.93) {
-      return '\u27263';
+      return '✦3';
     } else if (scoreRate >= 0.90) {
-      return '\u27262';
+      return '✦2';
     } else if (scoreRate >= 0.85) {
-      return '\u27261';
+      return '✦1';
     } else {
-      return '\u27260';
+      return '✦0';
     }
   }
 
@@ -397,7 +276,7 @@ class StringUtil {
    * 将全角字符转换为半角字符
    * @param input 输入字符串
    * @return 转换后的半角字符串
-   * 
+   *
    * 全角字符范围：U+FF00-U+FFEF
    * 转换规则：全角字符的 Unicode 值减去 0xFEE0 得到对应的半角字符
    */
@@ -405,7 +284,7 @@ class StringUtil {
     if (input.isEmpty) {
       return input;
     }
-    
+
     StringBuffer result = StringBuffer();
     for (int i = 0; i < input.length; i++) {
       int charCode = input.codeUnitAt(i);

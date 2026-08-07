@@ -988,10 +988,10 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                               borderRadius: BorderRadius.circular(4),
                                             ),
                                             padding: EdgeInsets.symmetric(
-                                              horizontal: screenWidth * 0.04,
-                                              vertical: screenHeight * 0.008,
+                                              horizontal: screenWidth * 0.02,
+                                              vertical: screenHeight * 0.005,
                                             ),
-                                            minimumSize: Size(screenWidth * 0.2, 36),
+                                            minimumSize: Size(screenWidth * 0.15, 30),
                                             backgroundColor: AppColors.linkBlue(brightness),
                                             foregroundColor: Colors.white,
                                           ),

@@ -9,10 +9,11 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../manager/DivingFishProbeManager.dart';
 import '../../utils/AppTheme.dart';
 import '../../constant/CacheKeyConstant.dart';
+import '../../constant/LoadingTipsConstant.dart';
 
 /// 同步成绩到落雪（对话框形式，与"同步成绩到水鱼"一致）
 ///
-/// 通过输入机台 QR 码（SGWCMAID 开头），使用 Maimai Score Hub 的
+/// 通过输入登入二维码（SGWCMAID 开头），使用 Maimai Score Hub 的
 /// cabinet-score-jobs API 抓取成绩，然后导出到落雪（LXNS）平台。
 class UpdateLuoXueScorePage extends StatefulWidget {
   const UpdateLuoXueScorePage({super.key});
@@ -42,11 +43,14 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
   int _countdown = 5;
   bool _hasLxnsToken = false;
   bool _tokenChecked = false;
+  String _currentTip = '';
+  StreamSubscription<String>? _tipSub;
 
   @override
   void initState() {
     super.initState();
     _checkLxnsToken();
+    _currentTip = LoadingTipsConstant.getRandomLoadingTip();
   }
 
   @override
@@ -54,14 +58,17 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
     _qrController.dispose();
     _tokenController.dispose();
     _autoCloseTimer?.cancel();
+    _tipSub?.cancel();
+    LoadingTipsConstant.stopAutoSwitch();
     super.dispose();
   }
 
   Future<void> _checkLxnsToken() async {
-    final has = await DivingFishProbeManager().hasLxnsImportToken();
+    final prefs = await SharedPreferences.getInstance();
+    final local = prefs.getString(CacheKeyConstant.probeLxnsImportToken);
     if (mounted) {
       setState(() {
-        _hasLxnsToken = has == true;
+        _hasLxnsToken = local != null && local.isNotEmpty;
         _tokenChecked = true;
       });
     }
@@ -73,16 +80,20 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
       Fluttertoast.showToast(msg: '请输入落雪个人 API 密钥');
       return;
     }
+    // 先保存到本地缓存（无需 Hub 登录）
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(CacheKeyConstant.probeLxnsImportToken, token);
+    // 如果 Hub 已登录，同步绑定到 Hub
     final ok = await DivingFishProbeManager().setLxnsImportToken(token);
     if (mounted) {
+      setState(() {
+        _hasLxnsToken = true;
+        _tokenController.clear();
+      });
       if (ok) {
-        setState(() {
-          _hasLxnsToken = true;
-          _tokenController.clear();
-        });
         Fluttertoast.showToast(msg: '落雪 API 密钥已保存');
       } else {
-        Fluttertoast.showToast(msg: '保存失败，请检查网络后重试');
+        Fluttertoast.showToast(msg: '已本地保存，同步时将自动绑定到云端');
       }
     }
   }
@@ -90,35 +101,23 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
   Future<void> _startSync() async {
     final qrCode = _qrController.text.trim();
     if (qrCode.isEmpty) {
-      Fluttertoast.showToast(msg: '请先粘贴机台上的QR码字符串');
+      Fluttertoast.showToast(msg: '请先粘贴舞萌|中二登入二维码字符串');
       return;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final cachedToken = prefs.getString(CacheKeyConstant.probeAuthToken);
-
-    if (cachedToken == null || cachedToken.isEmpty) {
-      Fluttertoast.showToast(msg: '请先使用「同步成绩到水鱼」功能完成一次同步，以建立认证');
-      return;
-    }
-
+    // 获取落雪 token：优先从输入框，其次从本地缓存
+    String? lxnsToken;
     if (!_hasLxnsToken) {
       final inputToken = _tokenController.text.trim();
-      if (inputToken.isNotEmpty) {
-        final ok = await DivingFishProbeManager().setLxnsImportToken(inputToken);
-        if (ok) {
-          setState(() {
-            _hasLxnsToken = true;
-            _tokenController.clear();
-          });
-        } else {
-          Fluttertoast.showToast(msg: '保存落雪 API 密钥失败');
-          return;
-        }
-      } else {
+      if (inputToken.isEmpty) {
         Fluttertoast.showToast(msg: '请先设置落雪个人 API 密钥');
         return;
       }
+      lxnsToken = inputToken;
+    } else {
+      // 已保存过，从本地缓存加载（防止 Hub 侧未绑定）
+      final prefs = await SharedPreferences.getInstance();
+      lxnsToken = prefs.getString(CacheKeyConstant.probeLxnsImportToken);
     }
 
     setState(() {
@@ -129,8 +128,15 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
       _resultMessage = null;
     });
 
+    LoadingTipsConstant.startAutoSwitch(3);
+    _tipSub?.cancel();
+    _tipSub = LoadingTipsConstant.tipStream.listen((tip) {
+      if (mounted) setState(() => _currentTip = tip);
+    });
+
     final result = await DivingFishProbeManager().syncByCabinetQrToLxns(
       qrCode,
+      lxnsImportToken: lxnsToken,
       onProgress: (p) {
         if (!mounted) return;
         setState(() {
@@ -143,7 +149,17 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
 
     if (!mounted) return;
 
+    LoadingTipsConstant.stopAutoSwitch();
+    _tipSub?.cancel();
+
     if (result.isSuccess) {
+      // 同步成功后标记落雪 token 已保存
+      if (lxnsToken != null) {
+        setState(() {
+          _hasLxnsToken = true;
+          _tokenController.clear();
+        });
+      }
       setState(() {
         _currentStage = SyncStage.completed;
         _isDone = true;
@@ -168,16 +184,6 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
     if (_isDone) {
       _startAutoClose();
     }
-  }
-
-  void _cancelSync() {
-    DivingFishProbeManager().cancelSync();
-    setState(() {
-      _currentStage = SyncStage.cancelled;
-      _isDone = true;
-      _statusText = '同步已取消';
-    });
-    _startAutoClose();
   }
 
   void _startAutoClose() {
@@ -237,7 +243,7 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
             context: context,
             builder: (ctx) => AlertDialog(
               title: const Text('提示'),
-              content: const Text('剪贴板内容未以 SGWCMAID 开头，仍要填入吗？'),
+              content: const Text('剪贴板内容不是有效的登入二维码，仍要填入吗？'),
               actions: [
                 TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
                 TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('填入')),
@@ -322,7 +328,7 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
       case SyncStage.cancelled:
         return Icon(Icons.cancel, color: AppColors.greyHint(brightness), size: 36);
       default:
-        return Icon(Icons.sync, color: AppColors.linkBlue(brightness), size: 36);
+        return const SizedBox.shrink();
     }
   }
 
@@ -337,7 +343,7 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
     return AlertDialog(
       title: Row(
         children: [
-          Icon(Icons.cloud_sync, color: Theme.of(context).colorScheme.onSurface, size: 22),
+          Icon(Icons.qr_code_scanner, color: Theme.of(context).colorScheme.onSurface, size: 22),
           const SizedBox(width: 8),
           const Text('同步成绩到落雪'),
         ],
@@ -348,7 +354,7 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             // ===== 阶段 1：输入 QR 码 =====
-            if (!_isSyncing || _isDone) ...[
+            if (!_isSyncing && !_isDone) ...[
               Text(
                 '在舞萌|中二公众号请求并打开二维码，扫描后将字符串粘贴到下方：',
                 style: TextStyle(fontSize: 13, color: AppColors.greyHint(brightness)),
@@ -368,7 +374,7 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
                 controller: _qrController,
                 maxLines: 3,
                 decoration: InputDecoration(
-                  hintText: 'SGWCMAID...',
+                  hintText: '舞萌DX | 中二节奏 登入二维码(SGWCMAID...)',
                   hintStyle: TextStyle(fontSize: 13, color: AppColors.greyHint(brightness, shade: 400)),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   contentPadding: const EdgeInsets.all(12),
@@ -377,7 +383,7 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
             ],
 
             // ===== 落雪 API 密钥 =====
-            if (_tokenChecked && !_isSyncing || _isDone) ...[
+            if (_tokenChecked && !_isSyncing && !_isDone) ...[
               const SizedBox(height: 16),
               // 获取 API 密钥的指引（未设置时显示）
               if (!_hasLxnsToken)
@@ -500,10 +506,30 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
 
             // ===== 同步进度 =====
             if (_isSyncing) ...[
-              Center(child: _buildStageIcon(_currentStage, brightness)),
-              const SizedBox(height: 16),
-
+              // 同步中：警告 + 转圈
               if (!_isDone) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.warningOrange(brightness).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.warningOrange(brightness).withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 16, color: AppColors.warningOrange(brightness)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '同步进行中，请耐心等待，不要进行其他操作',
+                          style: TextStyle(fontSize: 12, color: AppColors.warningOrange(brightness)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.only(bottom: 12),
@@ -515,8 +541,14 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
                 ),
               ],
 
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+              // 完成/失败/取消：阶段图标
+              if (_isDone) ...[
+                const SizedBox(height: 8),
+                Center(child: _buildStageIcon(_currentStage, brightness)),
+                const SizedBox(height: 8),
+              ],
+
+              Center(
                 child: Text(
                   _statusText,
                   textAlign: TextAlign.center,
@@ -537,6 +569,13 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
                   LinearProgressIndicator(value: _progress, color: AppColors.linkBlue(brightness))
                 else
                   LinearProgressIndicator(color: AppColors.linkBlue(brightness)),
+                const SizedBox(height: 12),
+                Center(
+                  child: Text(
+                    _currentTip,
+                    style: TextStyle(fontSize: 12, color: AppColors.greyHint(brightness, shade: 600)),
+                  ),
+                ),
               ],
 
               if (_isDone && _resultMessage != null)
@@ -560,7 +599,7 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
             child: const Text('关闭'),
           ),
           ElevatedButton.icon(
-            icon: const Icon(Icons.cloud_sync, size: 18),
+            icon: const Icon(Icons.send, size: 18),
             label: const Text('开始同步'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.linkBlue(brightness),
@@ -569,13 +608,6 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
             onPressed: _startSync,
           ),
         ],
-
-        // 同步中：取消按钮
-        if (_isSyncing && !_isDone)
-          TextButton(
-            onPressed: _cancelSync,
-            child: Text('取消同步', style: TextStyle(color: AppColors.errorRed(brightness))),
-          ),
 
         // 完成/失败/取消：确定按钮
         if (_isDone)

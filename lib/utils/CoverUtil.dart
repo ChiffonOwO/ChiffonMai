@@ -7,9 +7,8 @@
  *   - <5 位：直接使用 `assets/cover/{songId}.webp`
  *   - 5 位：剔除第一个 '1' 及其后面连续的 '0'，直到遇到第一个非 '0' 数字
  *           例: 11312 → 1312, 10125 → 125, 10025 → 25
- *   - 6 位（方法1）：同 5 位规则
- *   - 6 位（方法2）：先剔除第一个 '1'，再应用 5 位规则
- *           例: 111234 → 方法1→11234, 方法2→1234
+ *   - 6 位：剔除前两位及其后面连续的 '0'，直到遇到第一个非 '0' 数字
+ *           例: 121634 → 1634, 110234 → 234, 100034 → 34
  */
 import 'package:flutter/material.dart';
 
@@ -43,6 +42,18 @@ class CoverUtil {
     return result.isEmpty ? '0' : result;
   }
 
+  /// 剔除前两位及其后面连续的 '0'，直到遇到第一个非 '0' 数字。
+  /// 若剔除后为空串则返回 '0'。
+  ///
+  /// 用于 6 位数 ID 处理。例: 121634→1634, 110234→234, 100000→0
+  static String _stripFirstTwoAndLeadingZeros(String id) {
+    if (id.length < 2) return id;
+    String result = id.substring(2);
+    // 剔除后面连续的 '0'
+    result = result.replaceAll(RegExp(r'^0+'), '');
+    return result.isEmpty ? '0' : result;
+  }
+
   // ===========================================================================
   // 本地曲绘路径（多级 fallback）
   // ===========================================================================
@@ -52,10 +63,13 @@ class CoverUtil {
   /// 规则：
   /// - <5 位：直接使用 songId
   /// - 5 位：剔除第一个 '1' 及后面连续的 '0'
-  /// - 6 位：同 5 位规则（方法1）
+  /// - 6 位：剔除前两位及后面连续的 '0'
   static String getLocalCoverPath(String songId) {
-    if (songId.length == 5 || songId.length == 6) {
+    if (songId.length == 5) {
       return buildCoverPath(_stripLeadingOneAndZeros(songId));
+    }
+    if (songId.length == 6) {
+      return buildCoverPath(_stripFirstTwoAndLeadingZeros(songId));
     }
     // <5 位：直接使用
     return buildCoverPath(songId);
@@ -63,8 +77,7 @@ class CoverUtil {
 
   /// 本地曲绘路径（备用路径1）
   ///
-  /// - 6 位：方法2 — 先剔除第一个 '1'，再应用 5 位规则（即再次调用
-  ///          _stripLeadingOneAndZeros），能处理更多连续 '1' 的情况
+  /// - 6 位：回退到 5 位规则（剔除第一个 '1' 及后面连续的 '0'）
   /// - 其他位数：与 [getLocalCoverPath] 相同
   static String getLocalCoverPathRetry1(String songId) {
     if (songId.length == 6) {
@@ -98,15 +111,15 @@ class CoverUtil {
   /// 构建网络曲绘 URL（所有本地加载均失败时的最终 fallback）
   ///
   /// 规则：
-  /// - 6 位 ID：去除第一位
+  /// - 6 位 ID：剔除前两位及后面连续的 '0'
   /// - 不足 5 位：前面补 '0' 至 5 位
   /// - 目标 URL：https://www.diving-fish.com/covers/{coverId}.png
   static String getNetworkCoverUrl(String songId) {
     String coverId = songId;
 
-    // 6 位数：去掉第一位
+    // 6 位数：剔除前两位及后面连续的 '0'
     if (coverId.length == 6) {
-      coverId = coverId.substring(1);
+      coverId = _stripFirstTwoAndLeadingZeros(coverId);
     }
     // 不足 5 位：前面补 0 至 5 位
     if (coverId.length < 5) {

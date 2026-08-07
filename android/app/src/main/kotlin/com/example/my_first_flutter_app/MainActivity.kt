@@ -2,12 +2,9 @@ package com.example.my_first_flutter_app
 
 import android.content.ContentValues
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
-import android.util.Base64
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -41,11 +38,15 @@ class MainActivity : FlutterActivity() {
 
     private fun saveImageToGallery(imageBytes: ByteArray, fileName: String): String? {
         try {
-            val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-            
+            // 根据文件扩展名判断 MIME 类型
+            val mimeType = when {
+                fileName.lowercase().endsWith(".jpg") || fileName.lowercase().endsWith(".jpeg") -> "image/jpeg"
+                else -> "image/png"
+            }
+
             val contentValues = ContentValues().apply {
                 put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
-                put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                put(MediaStore.Images.Media.MIME_TYPE, mimeType)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures")
                     put(MediaStore.Images.Media.IS_PENDING, 1)
@@ -54,7 +55,7 @@ class MainActivity : FlutterActivity() {
 
             val contentResolver = applicationContext.contentResolver
             var uri: Uri? = null
-            
+
             uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 contentResolver.insert(MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), contentValues)
             } else {
@@ -62,16 +63,17 @@ class MainActivity : FlutterActivity() {
             }
 
             if (uri != null) {
+                // 直接写入原始字节，不重新编码，保留 Dart 侧的 JPEG/PNG 编码结果
                 contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+                    outputStream.write(imageBytes)
                 }
-                
+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     contentValues.clear()
                     contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
                     contentResolver.update(uri, contentValues, null, null)
                 }
-                
+
                 return getPathFromUri(applicationContext, uri)
             }
         } catch (e: Exception) {

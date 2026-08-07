@@ -30,6 +30,8 @@ class LoadingTipsConstant {
     'CRH2A说：X X XXX',
     '水母念波说：(/≧▽≦/)',
     'Andy说：ChiFFoN在上机的时候接到了网站备案的审核电话',
+    '同时按2号键和7号键可以切换标准谱和DX谱',
+    '没打好怎么办？按住2367键三秒可以跳过（设置中要打开这个哦）',
   ];
 
   static int _currentIndex = 0;

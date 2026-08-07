@@ -40,6 +40,8 @@ import 'package:my_first_flutter_app/service/SongInfo/SongScoreShareService.dart
 import 'package:my_first_flutter_app/service/SongInfo/SongInfoExportToImgService.dart';
 import 'package:my_first_flutter_app/service/ChartNoteService.dart';
 import 'package:my_first_flutter_app/entity/ChartNote.dart';
+import 'package:my_first_flutter_app/entity/Union/UnionSong.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/UnionUniManager.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 
 class SongInfoPage extends StatefulWidget {
@@ -176,6 +178,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
   // 谱面评分相关状态
   double? _chartAverageScore;
   int _chartTotalVotes = 0;
+
+  // union uni 元数据（cn/jp 可游玩地区）
+  SongInfo? _uniInfo;
   double? _chartUserScore;
   Map<String, dynamic>? _chartUserRatingData;
   Map<String, int>? _chartRatingDistribution; // 评分分布：key 为 "5.0" 等，value 为投票数
@@ -247,6 +252,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
       // 加载评论
       _loadComments();
+
+      // 加载 union uni 元数据（cn/jp 可游玩地区）
+      _loadUniInfo();
 
       // 加载谱面评分数据
       _loadChartRating();
@@ -686,6 +694,81 @@ class _SongInfoPageState extends State<SongInfoPage> {
     final minutes = _referenceDurationSeconds! ~/ 60;
     final seconds = _referenceDurationSeconds! % 60;
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  // 格式化首次上线日期显示（"20190711" → "2019-07-11"）
+  Future<void> _loadUniInfo() async {
+    try {
+      final lookup = await UnionUniManager().getLookup();
+      if (lookup.isEmpty) {
+        debugPrint('[SongInfoPage] union uni 缓存为空');
+        return;
+      }
+
+      // 按照 CoverUtil 的曲绘路径规则生成候选 ID 列表
+      final rawId = widget.songId;
+      final candidates = <String>{
+        rawId,
+        CoverUtil.buildCoverPath(rawId).replaceAll(RegExp(r'assets/cover/|\.webp'), ''),
+        CoverUtil.getLocalCoverPath(rawId).replaceAll(RegExp(r'assets/cover/|\.webp'), ''),
+        CoverUtil.getLocalCoverPathRetry1(rawId).replaceAll(RegExp(r'assets/cover/|\.webp'), ''),
+        CoverUtil.getLocalCoverPathRetry2(rawId).replaceAll(RegExp(r'assets/cover/|\.webp'), ''),
+      }.where((id) => id.isNotEmpty && id != '0').toList();
+
+      String? foundId;
+      for (final tryId in candidates) {
+        if (lookup.containsKey(tryId)) {
+          foundId = tryId;
+          break;
+        }
+      }
+
+      if (foundId != null) {
+        final info = lookup[foundId]!;
+        debugPrint('[SongInfoPage] 通过 $foundId 找到 union 数据 (cn=${info.cn}, jp=${info.jp})');
+
+        // 合并 union albums 到歌曲别名列表并去重
+        if (info.albums.isNotEmpty && _songData != null) {
+          final title = _songData!['basic_info']['title'] ?? '';
+          if (title.isNotEmpty) {
+            final aliasMgr = SongAliasManager.instance;
+            final existing = Set<String>.from(aliasMgr.aliases[title] ?? []);
+            final added = <String>[];
+            for (final album in info.albums) {
+              if (album.isNotEmpty && existing.add(album)) {
+                added.add(album);
+              }
+            }
+            if (added.isNotEmpty) {
+              aliasMgr.aliases[title] = existing.toList();
+              debugPrint('[SongInfoPage] 从 union albums 补充 ${added.length} 个别名: $added');
+            }
+          }
+        }
+
+        if (mounted) setState(() => _uniInfo = info);
+      } else {
+        debugPrint('[SongInfoPage] 未找到 union 数据, 候选ID: $candidates');
+      }
+    } catch (e) {
+      debugPrint('[SongInfoPage] 加载 union uni 信息失败: $e');
+    }
+  }
+
+  String _formatReleaseDate(String raw) {
+    if (raw.isEmpty) return '未知';
+    // 支持 YYYYMMDD 格式
+    if (raw.length == 8) {
+      try {
+        final year = raw.substring(0, 4);
+        final month = raw.substring(4, 6);
+        final day = raw.substring(6, 8);
+        return '$year-$month-$day';
+      } catch (_) {
+        return raw;
+      }
+    }
+    return raw;
   }
 
   // 加载B站谱面确认播放量
@@ -1455,7 +1538,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
               return Container(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: AppColors.greyHint(brightness))),
+                  border: Border(bottom: BorderSide(color: AppColors.tableBorder(brightness))),
                   color:
                       isUserRecord ? AppColors.linkBlue(brightness) : Colors.transparent,
                 ),
@@ -1773,7 +1856,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
               return Container(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: AppColors.greyHint(brightness))),
+                  border: Border(bottom: BorderSide(color: AppColors.tableBorder(brightness))),
                   color:
                       isUserRecord ? AppColors.linkBlue(brightness) : Colors.transparent,
                 ),
@@ -2386,6 +2469,21 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                           basicInfo['from'], _songData?['is_extra'] == true)),
                                   _buildStatItem(
                                       '谱面谱师', currentChart['charter']),
+                                ],
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              // 统计信息行 - 首次上线 + 可游玩地区
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  _buildStatItem(
+                                      '首次上线',
+                                      _formatReleaseDate(
+                                          basicInfo['release_date'] ?? '')),
+                                  _buildPlayableRegionStat(context),
                                 ],
                               ),
 
@@ -3487,14 +3585,13 @@ class _SongInfoPageState extends State<SongInfoPage> {
                             ),
                           ),
                         ),
-                      const SizedBox(width: 4),
                       IconButton(
                         constraints: const BoxConstraints(
-                          minWidth: 32,
-                          minHeight: 32,
+                          minWidth: 28,
+                          minHeight: 28,
                         ),
                         padding: EdgeInsets.zero,
-                        icon: Icon(Icons.refresh, size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        icon: Icon(Icons.refresh, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
                         onPressed: _loadChartRating,
                         tooltip: '刷新评分',
                       ),
@@ -3783,7 +3880,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                       backgroundColor: accentColor,
                                       foregroundColor: Colors.white,
                                       disabledBackgroundColor: AppColors.greyHint(brightness),
-                                      disabledForegroundColor: AppColors.greyHint(brightness),
+                                      disabledForegroundColor: brightness == Brightness.dark
+                                          ? Colors.white54
+                                          : Colors.white70,
                                       padding: const EdgeInsets.symmetric(
                                           vertical: 10),
                                       shape: RoundedRectangleBorder(
@@ -4505,7 +4604,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         decoration: BoxDecoration(
                           color: isOwn
                               ? AppColors.linkBlue(brightness).withOpacity(0.1)
-                              : AppColors.greyHint(brightness),
+                              : brightness == Brightness.dark
+                                  ? Colors.grey.shade700
+                                  : Colors.grey.shade200,
                           borderRadius: BorderRadius.circular(18),
                         ),
                         child: Icon(
@@ -4513,7 +4614,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                           size: 20,
                           color: isOwn
                               ? AppColors.linkBlue(brightness)
-                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                              : brightness == Brightness.dark
+                                  ? Colors.grey[400]!
+                                  : Colors.grey.shade600,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -4866,7 +4969,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _selectedNoteType == noteType
                             ? _getAccentColor(_currentDiffIndex, brightness)
-                            : AppColors.greyHint(brightness),
+                            : Theme.of(context).colorScheme.surfaceContainerHighest,
                         foregroundColor: _selectedNoteType == noteType
                             ? Colors.white
                             : Theme.of(context).colorScheme.onSurface,
@@ -5721,6 +5824,57 @@ class _SongInfoPageState extends State<SongInfoPage> {
   }
 
   // 构建统计项
+  // 可游玩地区（CN/JP高亮），6位数ID（UTAGE）统一变灰
+  Widget _buildPlayableRegionStat(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final accentColor = _getAccentColor(_currentDiffIndex, brightness);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isUtage = widget.songId.length == 6;
+    final bool cn = isUtage ? false : (_uniInfo?.cn ?? false);
+    final bool jp = isUtage ? false : (_uniInfo?.jp ?? false);
+
+    return Expanded(
+      child: Column(
+        children: [
+          Text('可游玩地区', style: TextStyle(fontSize: 12, color: accentColor)),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildRegionBadge('CN', cn, screenWidth),
+              SizedBox(width: screenWidth * 0.02),
+              _buildRegionBadge('JP', jp, screenWidth),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRegionBadge(String label, bool active, double screenWidth) {
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.025, vertical: 2),
+      decoration: BoxDecoration(
+        color: active
+            ? AppColors.successGreen(brightness)
+            : (isDark ? Colors.grey.shade700 : Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: screenWidth * 0.033,
+          fontWeight: FontWeight.bold,
+          color: active
+              ? Colors.white
+              : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+        ),
+      ),
+    );
+  }
+
   Widget _buildStatItem(String label, String value, {Color? valueColor}) {
     // 获取当前难度的强调颜色
     final brightness = Theme.of(context).brightness;
@@ -6472,19 +6626,20 @@ class _SongInfoPageState extends State<SongInfoPage> {
   // 构建占位符
   Widget _buildPlaceholder() {
     final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(6),
-        color: AppColors.greyHint(brightness),
+        color: isDark ? Colors.grey.shade700 : Colors.grey.shade200,
       ),
       child: Text(
         '-',
         style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
-          color: AppColors.greyHint(brightness),
+          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
         ),
       ),
     );

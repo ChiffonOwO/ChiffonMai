@@ -5,6 +5,7 @@ import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/entity/DXRating/MaiTagsEntity.dart';
 import '../constant/CacheKeyConstant.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 class MaiTagsManager {
   // 单例模式
@@ -44,7 +45,7 @@ class MaiTagsManager {
       
       if (!isCacheValid) {
         // 从网络加载
-        final response = await http.get(
+        final response = await ApiClient.get(
           Uri.parse(TAGS_API_URL),
           // headers: TAGS_API_HEADERS,
         );
@@ -196,7 +197,7 @@ class MaiTagsManager {
   Future<void> refreshCache() async {
     try {
       // 从网络加载
-      final response = await http.get(
+      final response = await ApiClient.get(
         Uri.parse(TAGS_API_URL),
         // headers: TAGS_API_HEADERS,
       );

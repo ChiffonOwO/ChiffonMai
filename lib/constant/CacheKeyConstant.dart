@@ -13,6 +13,8 @@ class CacheKeyConstant {
 
   // Union API 独有歌曲（仅在新API中存在，不参与推荐系统）
   static const String unionExtraSongIds = 'union_extra_song_ids';
+  // Union uni 元数据缓存（含 cn/jp 可游玩地区等）
+  static const String unionUniCache = 'union_uni_cache';
   
   // 知识数据相关
   static const String knowledgeData = 'knowledge_data';
@@ -27,6 +29,9 @@ class CacheKeyConstant {
   static const String luoxueExpiresAt = 'luoxue_expires_at';
   static const String luoxueTokenType = 'luoxue_token_type';
   
+  // 收藏的功能相关
+  static const String favoriteFeatures = 'favorite_features';
+
   // 收藏数据相关
   static const String trophiesCollectionsCacheData = 'trophies_collections_cache_data';
   static const String iconsCollectionsCacheData = 'icons_collections_cache_data';
@@ -111,6 +116,11 @@ class CacheKeyConstant {
 
   // 主题设置
   static const String themeMode = 'theme_mode';
+  static const String pureBlackEnabled = 'pure_black_enabled';
+  static const String lightOverlayOpacity = 'light_overlay_opacity';
+
+  // 首页个人信息展示风格（true=卡片式，false=经典式）
+  static const String profileCardStyle = 'profile_card_style';
 
   // Maimai Score Hub 探针同步相关
   static const String probeAuthToken = 'probe_auth_token';
@@ -119,4 +129,5 @@ class CacheKeyConstant {
   static const String probeDivingFishToken = 'probe_diving_fish_token';
   static const String probeDivingFishImportToken = 'probe_diving_fish_import_token';
   static const String probeDivingFishBindQQ = 'probe_diving_fish_bind_qq';
+  static const String probeLxnsImportToken = 'probe_lxns_import_token';
 }

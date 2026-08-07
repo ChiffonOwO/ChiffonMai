@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/ThemeManager.dart';
 
 /**
  * 通用Widget工具类
@@ -258,67 +259,104 @@ class CommonWidgetUtil {
 
 // ============ 内部主题感知组件 ============
 
-/// 主题感知的背景图组件（StatefulWidget，可感知 Theme 变化）
-class _ThemeAwareBgWidget extends StatefulWidget {
+/// 主题感知的背景图组件（StatelessWidget）
+/// 性能：用 Stack + 半透明覆层代替 ColorFiltered + BlendMode.darken，避免 saveLayer
+/// - 浅色模式：白色半透明覆层使背景图变成若隐若现的纹理（不透明度用户可调）
+/// - 深色模式：深色半透明覆层压暗背景图
+/// - 纯黑模式：隐藏背景图，显示纯黑底色
+class _ThemeAwareBgWidget extends StatelessWidget {
   const _ThemeAwareBgWidget();
 
   @override
-  State<_ThemeAwareBgWidget> createState() => _ThemeAwareBgWidgetState();
-}
-
-class _ThemeAwareBgWidgetState extends State<_ThemeAwareBgWidget> {
-  @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return ColorFiltered(
-      colorFilter: isDark
-          ? const ColorFilter.mode(Color.fromARGB(170, 18, 18, 30), BlendMode.darken)
-          : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
-      child: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/background.png'),
-            fit: BoxFit.cover,
-            opacity: 1.0,
-          ),
-        ),
-      ),
+    // 用 ListenableBuilder 包裹，仅在覆层透明度变化时局部重建
+    return ListenableBuilder(
+      listenable: ThemeManager().lightOverlayNotifier,
+      builder: (context, _) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final isPureBlack = isDark && ThemeManager().pureBlackEnabled;
+        final opacity = ThemeManager().lightOverlayOpacity;
+        final overlayAlpha = (opacity * 255).round().clamp(0, 255);
+        final lightOverlay = Color.fromARGB(overlayAlpha, 255, 255, 255);
+        final darkOverlay = Color.fromARGB(overlayAlpha, 15, 15, 28);
+
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            // 纯黑模式：不加载背景图，只放纯黑底色
+            if (isPureBlack)
+              const Positioned.fill(child: ColoredBox(color: Colors.black))
+            else ...[
+              Image.asset(
+                'assets/background.png',
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+              ),
+              // 浅色/深色均添加覆层：浅色用白色洗淡，深色用暗色压暗
+              if (isDark)
+                Positioned.fill(child: ColoredBox(color: darkOverlay))
+              else
+                Positioned.fill(child: ColoredBox(color: lightOverlay)),
+            ],
+          ],
+        );
+      },
     );
   }
 }
 
-/// 主题感知的 chiffon 装饰组件
-class _ThemeAwareChiffonWidget extends StatefulWidget {
+/// 主题感知的 chiffon 装饰组件（StatelessWidget）
+/// 性能：用 Stack + 半透明覆层代替 ColorFiltered + BlendMode.darken，避免 saveLayer
+/// - 浅色模式：降低透明度，让装饰层更含蓄
+/// - 深色模式：大幅降低透明度并叠加暗色覆层
+/// - 纯黑模式：完全隐藏装饰层
+class _ThemeAwareChiffonWidget extends StatelessWidget {
   const _ThemeAwareChiffonWidget({super.key});
 
-  @override
-  State<_ThemeAwareChiffonWidget> createState() => _ThemeAwareChiffonWidgetState();
-}
+  static const double _darkOpacity = 0.35;
+  static const double _lightOpacity = 0.40;
 
-class _ThemeAwareChiffonWidgetState extends State<_ThemeAwareChiffonWidget> {
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Center(
-      child: Transform.translate(
-        offset: Offset(0, -MediaQuery.of(context).size.height * 0.03),
-        child: Transform.scale(
-          scale: 1,
-          child: ColorFiltered(
-            colorFilter: ColorFilter.mode(
-              isDark ? const Color.fromARGB(130, 10, 10, 25) : Colors.transparent,
-              BlendMode.darken,
-            ),
-            child: Image.asset(
-              'assets/chiffon2.png',
-              fit: BoxFit.cover,
-              opacity: AlwaysStoppedAnimation(isDark ? 0.35 : 1.0),
+    // 用 ListenableBuilder 包裹，仅在覆层透明度变化时局部重建
+    return ListenableBuilder(
+      listenable: ThemeManager().lightOverlayNotifier,
+      builder: (context, _) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final isPureBlack = isDark && ThemeManager().pureBlackEnabled;
+        final opacity = ThemeManager().lightOverlayOpacity;
+        final overlayAlpha = (opacity * 255).round().clamp(0, 255);
+        final darkOverlay = Color.fromARGB(overlayAlpha, 10, 10, 25);
+
+        // 纯黑模式：不显示装饰图
+        if (isPureBlack) {
+          return const SizedBox.shrink();
+        }
+
+        return Center(
+          child: Transform.translate(
+            offset: Offset(0, -MediaQuery.of(context).size.height * 0.03),
+            child: Transform.scale(
+              scale: 1,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Image.asset(
+                    'assets/chiffon2.png',
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                    opacity: AlwaysStoppedAnimation(
+                      isDark ? _darkOpacity : _lightOpacity,
+                    ),
+                  ),
+                  if (isDark)
+                    Positioned.fill(child: ColoredBox(color: darkOverlay)),
+                ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

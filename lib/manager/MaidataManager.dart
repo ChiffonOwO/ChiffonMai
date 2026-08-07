@@ -1,11 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api/ApiUrls.dart';
 import '../constant/CacheKeyConstant.dart';
 import '../constant/CacheTimestampConstant.dart';
 import 'package:jp_transliterate/jp_transliterate.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 class MaidataManager {
   static final MaidataManager _instance = MaidataManager._internal();
@@ -20,50 +22,27 @@ class MaidataManager {
     return result;
   }
 
+  /// 解码响应体为字符串。优先 UTF-8（覆盖绝大多数 maidata），
+  /// 失败时回退到 Shift-JIS。使用原生 String.contains 替代逐字符遍历，
+  /// 在全量刷新（1000+ 文件）时可节省数秒 CPU 时间。
   String _decodeContent(List<int> bytes) {
-    try {
-      String utf8Result = utf8.decode(bytes);
-      if (_isValidUtf8(utf8Result)) {
-        return utf8Result;
-      }
-    } catch (_) {}
+    // 快速路径：尝试 UTF-8（allowMalformed 不会抛异常）
+    final utf8Result = utf8.decode(bytes, allowMalformed: true);
+    // 仅检查替换字符 U+FFFD，这是编码失败的可靠信号
+    if (!utf8Result.contains('�')) {
+      return utf8Result;
+    }
 
+    // UTF-8 出现替换字符，尝试 Shift-JIS
     try {
-      String shiftJisResult = _decodeShiftJis(bytes);
-      if (shiftJisResult.isNotEmpty && !_containsInvalidChars(shiftJisResult)) {
+      final shiftJisResult = _decodeShiftJis(bytes);
+      if (shiftJisResult.isNotEmpty && !shiftJisResult.contains('�')) {
         return shiftJisResult;
       }
     } catch (_) {}
 
-    try {
-      String cp932Result = _decodeCp932(bytes);
-      if (cp932Result.isNotEmpty && !_containsInvalidChars(cp932Result)) {
-        return cp932Result;
-      }
-    } catch (_) {}
-
-    return utf8.decode(bytes, allowMalformed: true);
-  }
-
-  bool _isValidUtf8(String text) {
-    for (int i = 0; i < text.length; i++) {
-      int code = text.codeUnitAt(i);
-      if (code == 0xFFFD || code == 0xFFFE || code == 0xFFFF) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  bool _containsInvalidChars(String text) {
-    for (int i = 0; i < text.length; i++) {
-      int code = text.codeUnitAt(i);
-      if ((code >= 0xFDD0 && code <= 0xFDEF) || 
-          (code >= 0xFFFE && code <= 0xFFFF)) {
-        return true;
-      }
-    }
-    return false;
+    // 回退到 UTF-8 最佳努力结果
+    return utf8Result;
   }
 
   String _decodeShiftJis(List<int> bytes) {
@@ -134,39 +113,104 @@ class MaidataManager {
     return 0;
   }
 
-  String _decodeCp932(List<int> bytes) {
-    return _decodeShiftJis(bytes);
-  }
-
   Map<String, String> _cachedMaidata = {};
   Map<String, dynamic>? _indexData;
   bool _isInitialized = false;
 
+  /// songId → URL 映射缓存，避免增量刷新时重新抓取目录列表
+  Map<String, String> _idToUrlMap = {};
+
+  /// 全量缓存文件路径（应用私有目录，不占 SharedPreferences 的 XML 空间）
+  Future<File> _getCacheFile() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File('${dir.path}/maidata_full_cache.json');
+  }
+
+  /// URL 映射缓存文件
+  Future<File> _getUrlMapFile() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File('${dir.path}/maidata_url_map.json');
+  }
+
+  /// 加载 songId→URL 映射（如果存在）
+  Future<void> _loadUrlMap() async {
+    try {
+      final file = await _getUrlMapFile();
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        _idToUrlMap = await compute((String jsonStr) {
+          return Map<String, String>.from(json.decode(jsonStr) as Map);
+        }, content);
+      }
+    } catch (e) {
+      debugPrint('[DEBUG][MaidataManager] 加载URL映射失败: $e');
+      _idToUrlMap = {};
+    }
+  }
+
+  /// 保存 songId→URL 映射
+  Future<void> _saveUrlMap() async {
+    try {
+      final file = await _getUrlMapFile();
+      await file.writeAsString(json.encode(_idToUrlMap));
+    } catch (e) {
+      debugPrint('[DEBUG][MaidataManager] 保存URL映射失败: $e');
+    }
+  }
+
   Future<void> initialize() async {
     if (_isInitialized) return;
-    
-    await _loadFromCache();
+
+    await Future.wait([
+      _loadFromCache(),
+      _loadUrlMap(),
+    ]);
     _isInitialized = true;
   }
 
   Future<void> _loadFromCache() async {
     try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? cachedData = prefs.getString(CacheKeyConstant.maidataFullCache);
-      int? timestamp = prefs.getInt(CacheKeyConstant.maidataFullCacheTimestamp);
+      final prefs = await SharedPreferences.getInstance();
+      final timestamp = prefs.getInt(CacheKeyConstant.maidataFullCacheTimestamp);
 
-      if (cachedData != null && timestamp != null) {
-        int now = DateTime.now().millisecondsSinceEpoch;
+      if (timestamp != null) {
+        final now = DateTime.now().millisecondsSinceEpoch;
 
         if (now - timestamp < CacheTimestampConstant.maidataFullCacheMillis) {
-          _cachedMaidata = Map<String, String>.from(json.decode(cachedData) as Map);
-          debugPrint('[DEBUG][MaidataManager] 已加载全量缓存，共 ${_cachedMaidata.length} 首歌曲');
-          return;
+          final file = await _getCacheFile();
+          if (await file.exists()) {
+            // 文件 I/O + JSON 解码在后台 isolate 中执行，避免阻塞 UI 线程
+            final content = await file.readAsString();
+            _cachedMaidata = await compute((String jsonStr) {
+              return Map<String, String>.from(json.decode(jsonStr) as Map);
+            }, content);
+            debugPrint('[DEBUG][MaidataManager] 已加载全量缓存（文件），共 ${_cachedMaidata.length} 首歌曲');
+            return;
+          }
         } else {
           debugPrint('[DEBUG][MaidataManager] 全量缓存已过期，删除旧缓存');
-          await prefs.remove(CacheKeyConstant.maidataFullCache);
           await prefs.remove(CacheKeyConstant.maidataFullCacheTimestamp);
+          final file = await _getCacheFile();
+          if (await file.exists()) {
+            await file.delete();
+          }
         }
+      }
+
+      // 兼容旧版：尝试从 SharedPreferences 迁移旧数据
+      final legacyData = prefs.getString(CacheKeyConstant.maidataFullCache);
+      if (legacyData != null) {
+        debugPrint('[DEBUG][MaidataManager] 检测到旧版 SharedPreferences 缓存，正在迁移到文件...');
+        _cachedMaidata = await compute((String jsonStr) {
+          return Map<String, String>.from(json.decode(jsonStr) as Map);
+        }, legacyData);
+        // 异步写入文件并清理旧数据
+        final file = await _getCacheFile();
+        await file.writeAsString(legacyData);
+        await prefs.setInt(CacheKeyConstant.maidataFullCacheTimestamp, DateTime.now().millisecondsSinceEpoch);
+        await prefs.remove(CacheKeyConstant.maidataFullCache);
+        debugPrint('[DEBUG][MaidataManager] 旧缓存已迁移到文件，共 ${_cachedMaidata.length} 首歌曲');
+        return;
       }
     } catch (e) {
       debugPrint('[DEBUG][MaidataManager] 加载缓存失败: $e');
@@ -175,8 +219,8 @@ class MaidataManager {
 
   Future<void> fetchAndCacheFullMaidata() async {
     debugPrint('[DEBUG][MaidataManager] 开始获取全量maidata.txt...');
-    
-    List<String> genrePaths = [
+
+    final List<String> genrePaths = [
       '${ApiUrls.MaidataServerBaseUrl}/maimai',
       '${ApiUrls.MaidataServerBaseUrl}/niconicoボーカロイド',
       '${ApiUrls.MaidataServerBaseUrl}/ゲームバラエティ',
@@ -186,59 +230,72 @@ class MaidataManager {
     ];
 
     _cachedMaidata.clear();
-    
-    // 第一步：并行获取所有流派的文件夹列表
-    debugPrint('[DEBUG][MaidataManager] 并行获取所有流派文件夹列表...');
-    final List<List<String>> allFolderLists = await Future.wait(
-      genrePaths.map((path) => _getFoldersInPath(path)),
-    );
-    
-    // 收集所有文件夹URL
-    List<String> allFolderUrls = [];
-    for (int i = 0; i < genrePaths.length; i++) {
-      for (final folder in allFolderLists[i]) {
-        allFolderUrls.add('${genrePaths[i]}/$folder/maidata.txt');
-      }
-    }
-    debugPrint('[DEBUG][MaidataManager] 共发现 ${allFolderUrls.length} 个maidata.txt，开始并行获取...');
 
-    // 第二步：并行获取所有maidata.txt（控制并发数，避免同时太多请求）
-    const int concurrency = 50;
+    // 流水线模式：每个流派获取到文件夹列表后立即开始下载 maidata.txt，
+    // 而不是等所有流派列表都返回后再统一下载。重叠网络IO。
+    const int concurrency = 100;
     int totalFetched = 0;
-    int completedCount = 0;
-    final int totalCount = allFolderUrls.length;
+    final Map<String, String> newUrlMap = {}; // 重建 songId→URL 映射
 
-    for (int i = 0; i < allFolderUrls.length; i += concurrency) {
-      final batch = allFolderUrls.sublist(
-        i,
-        (i + concurrency > allFolderUrls.length) ? allFolderUrls.length : i + concurrency,
-      );
-      
-      final results = await Future.wait(
-        batch.map((url) => _fetchSingleMaidata(url)),
-      );
-      
-      for (final result in results) {
-        if (result != null) {
-          _cachedMaidata[result.$1] = result.$2;
-          totalFetched++;
+    final allGenreResults = await Future.wait(
+      genrePaths.map((genrePath) async {
+        final folders = await _getFoldersInPath(genrePath);
+        if (folders.isEmpty) return <(String, String)>[];
+
+        final urls = folders.map((f) => '$genrePath/$f/maidata.txt').toList();
+        final results = <(String, String)>[];
+
+        for (int i = 0; i < urls.length; i += concurrency) {
+          final end = (i + concurrency > urls.length) ? urls.length : i + concurrency;
+          final batch = urls.sublist(i, end);
+          final batchResults = await Future.wait(batch.map((url) => _fetchSingleMaidata(url)));
+          for (int j = 0; j < batchResults.length; j++) {
+            final r = batchResults[j];
+            if (r != null) {
+              results.add(r);
+              // 记录 songId→URL 映射，供增量刷新使用
+              newUrlMap[r.$1] = batch[j];
+            }
+          }
         }
+        return results;
+      }),
+    );
+
+    // 汇总所有流派结果写入缓存
+    for (final genreResults in allGenreResults) {
+      for (final (songId, content) in genreResults) {
+        _cachedMaidata[songId] = content;
+        totalFetched++;
       }
-      
-      completedCount += batch.length;
-      debugPrint('[DEBUG][MaidataManager] 获取进度: $completedCount/$totalCount');
     }
+
+    // 保存 URL 映射（异步，不阻塞主流程）
+    _idToUrlMap = newUrlMap;
+    _saveUrlMap();
 
     debugPrint('[DEBUG][MaidataManager] 全量缓存获取完成，共 $totalFetched 首歌曲');
 
-    try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString(CacheKeyConstant.maidataFullCache, json.encode(_cachedMaidata));
-      await prefs.setInt(CacheKeyConstant.maidataFullCacheTimestamp, DateTime.now().millisecondsSinceEpoch);
-      debugPrint('[DEBUG][MaidataManager] 已保存到SharedPreferences');
-    } catch (e) {
-      debugPrint('[DEBUG][MaidataManager] 保存缓存失败: $e');
-    }
+    // 非阻塞保存：JSON 编码在后台 isolate 中执行，写入文件而非 SharedPreferences
+    // 文件直接写入比 SharedPreferences XML 快 10-100 倍（尤其是几十 MB 的大数据）
+    final cacheCopy = Map<String, String>.from(_cachedMaidata);
+    compute((Map<String, String> data) {
+      return json.encode(data);
+    }, cacheCopy).then((encoded) async {
+      try {
+        final file = await _getCacheFile();
+        await file.writeAsString(encoded);
+        // 仅将轻量的时间戳存到 SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(CacheKeyConstant.maidataFullCacheTimestamp, DateTime.now().millisecondsSinceEpoch);
+        // 清除可能残留的旧版 SharedPreferences 大缓存
+        await prefs.remove(CacheKeyConstant.maidataFullCache);
+        final sizeMB = (encoded.length / 1024 / 1024).toStringAsFixed(1);
+        debugPrint('[DEBUG][MaidataManager] 已保存到文件（共 ${_cachedMaidata.length} 首，约 $sizeMB MB）');
+      } catch (e) {
+        debugPrint('[DEBUG][MaidataManager] 保存缓存失败: $e');
+      }
+    });
 
     // 同时刷新index缓存，确保shortId映射是最新的
     _fetchAndCacheIndex();
@@ -247,7 +304,7 @@ class MaidataManager {
   /// 获取单个maidata.txt并返回 (songId, content) 或 null
   Future<(String, String)?> _fetchSingleMaidata(String url) async {
     try {
-      final response = await http.get(Uri.parse(url));
+      final response = await ApiClient.get(Uri.parse(url));
       if (response.statusCode == 200) {
         String content = _decodeContent(response.bodyBytes);
         String? songId = _extractSongId(content);
@@ -265,7 +322,7 @@ class MaidataManager {
     List<String> folders = [];
     
     try {
-      final response = await http.get(Uri.parse(path));
+      final response = await ApiClient.get(Uri.parse(path));
       
       if (response.statusCode == 200) {
         String decodedBody = _decodeContent(response.bodyBytes);
@@ -357,11 +414,31 @@ class MaidataManager {
 
   bool get isCacheReady => _cachedMaidata.isNotEmpty;
 
+  /// 检查全量 maidata 缓存是否在有效期内（TTL）
+  Future<bool> isFullCacheValid() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final timestamp = prefs.getInt(CacheKeyConstant.maidataFullCacheTimestamp);
+      if (timestamp == null) return false;
+
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (now - timestamp >= CacheTimestampConstant.maidataFullCacheMillis) {
+        return false;
+      }
+
+      final file = await _getCacheFile();
+      return await file.exists();
+    } catch (e) {
+      debugPrint('[MaidataManager] 检查缓存有效性失败: $e');
+      return false;
+    }
+  }
+
   List<String> getAllMaidataTexts() {
     return _cachedMaidata.values.map((content) => _cleanMaidataContent(content)).toList();
   }
   
-  // 根据歌曲ID列表获取对应的maidata（并行优化版）
+  // 根据歌曲ID列表获取对应的maidata（URL映射 + 流水线优化版）
   Future<List<String>> fetchMaidataForSongIds(List<String> songIds) async {
     debugPrint('[DEBUG][MaidataManager] 开始获取指定歌曲ID的maidata（共 ${songIds.length} 首）');
 
@@ -381,9 +458,47 @@ class MaidataManager {
       return result;
     }
 
-    debugPrint('[DEBUG][MaidataManager] 缓存未命中 ${remainingIds.length} 首，开始并行获取...');
+    int fetchedCount = 0;
 
-    // 1. 并行获取所有流派路径的文件夹列表
+    // 优先通过 URL 映射直接获取（跳过目录抓取）
+    final List<String> directUrls = [];
+    for (final id in remainingIds) {
+      final url = _idToUrlMap[id];
+      if (url != null) {
+        directUrls.add(url);
+      }
+    }
+
+    if (directUrls.isNotEmpty) {
+      debugPrint('[DEBUG][MaidataManager] URL映射命中 $directUrls.length 首，直接获取（跳过目录扫描）...');
+
+      const mapBatchSize = 80;
+      for (int i = 0; i < directUrls.length; i += mapBatchSize) {
+        final end = (i + mapBatchSize < directUrls.length) ? i + mapBatchSize : directUrls.length;
+        final batch = directUrls.sublist(i, end);
+        final batchResults = await Future.wait(batch.map((url) => _fetchSingleMaidata(url)));
+
+        for (final r in batchResults) {
+          if (r == null) continue;
+          final (songId, content) = r;
+          if (remainingIds.remove(songId)) {
+            _cachedMaidata[songId] = content;
+            result.add(_cleanMaidataContent(content));
+            fetchedCount++;
+          }
+        }
+      }
+    }
+
+    if (remainingIds.isEmpty) {
+      debugPrint('[DEBUG][MaidataManager] 全部通过URL映射获取完成（共 $fetchedCount 首）');
+      return result;
+    }
+
+    debugPrint('[DEBUG][MaidataManager] URL映射未覆盖 ${remainingIds.length} 首，回退到目录扫描...');
+
+    // 回退：扫描目录查找剩余歌曲
+    final baseUrl = ApiUrls.MaidataServerBaseUrl;
     const genrePaths = <String>[
       '/maimai',
       '/niconicoボーカロイド',
@@ -392,44 +507,41 @@ class MaidataManager {
       '/オンゲキCHUNITHM',
       '/宴会場',
     ];
-    final baseUrl = ApiUrls.MaidataServerBaseUrl;
 
-    final genreResults = await Future.wait(
-      genrePaths.map((path) => _getFoldersInPath('$baseUrl$path')),
+    await Future.wait(
+      genrePaths.map((path) async {
+        if (remainingIds.isEmpty) return;
+
+        final folders = await _getFoldersInPath('$baseUrl$path');
+        if (folders.isEmpty || remainingIds.isEmpty) return;
+
+        final urls = folders.map((f) => '$baseUrl$path/$f/maidata.txt').toList();
+
+        const batchSize = 50;
+        for (int i = 0; i < urls.length && remainingIds.isNotEmpty; i += batchSize) {
+          final end = (i + batchSize < urls.length) ? i + batchSize : urls.length;
+          final batch = urls.sublist(i, end);
+
+          final batchResults = await Future.wait(batch.map((url) => _fetchSingleMaidata(url)));
+
+          for (int j = 0; j < batchResults.length; j++) {
+            final r = batchResults[j];
+            if (r == null) continue;
+            final (songId, content) = r;
+            // 同时更新 URL 映射供下次使用
+            _idToUrlMap[songId] = batch[j];
+            if (remainingIds.remove(songId)) {
+              _cachedMaidata[songId] = content;
+              result.add(_cleanMaidataContent(content));
+              fetchedCount++;
+            }
+          }
+        }
+      }),
     );
 
-    // 2. 收集所有 maidata.txt URL
-    final List<String> allUrls = [];
-    for (int i = 0; i < genrePaths.length; i++) {
-      for (final folder in genreResults[i]) {
-        allUrls.add('$baseUrl${genrePaths[i]}/$folder/maidata.txt');
-      }
-    }
-
-    debugPrint('[DEBUG][MaidataManager] 共收集 ${allUrls.length} 个maidata.txt URL，开始并行批量获取...');
-
-    // 3. 并行批量获取（每批 15 个并发），找到所有目标后提前终止
-    const batchSize = 15;
-    int fetchedCount = 0;
-
-    for (int i = 0; i < allUrls.length && remainingIds.isNotEmpty; i += batchSize) {
-      final end = (i + batchSize < allUrls.length) ? i + batchSize : allUrls.length;
-      final batch = allUrls.sublist(i, end);
-
-      final batchResults = await Future.wait(
-        batch.map((url) => _fetchSingleMaidata(url)),
-      );
-
-      for (final r in batchResults) {
-        if (r == null) continue;
-        final (songId, content) = r;
-        if (remainingIds.remove(songId)) {
-          _cachedMaidata[songId] = content;
-          result.add(_cleanMaidataContent(content));
-          fetchedCount++;
-        }
-      }
-    }
+    // 异步保存更新后的 URL 映射
+    _saveUrlMap();
 
     debugPrint('[DEBUG][MaidataManager] 指定歌曲maidata获取完成，成功获取 $fetchedCount 首（含缓存共 ${result.length} 首）');
     return result;
@@ -470,7 +582,7 @@ class MaidataManager {
 
   Future<void> _fetchAndCacheIndex() async {
     try {
-      final response = await http.get(Uri.parse('${ApiUrls.MaidataServerPortUrl}/index.json'));
+      final response = await ApiClient.get(Uri.parse('${ApiUrls.MaidataServerPortUrl}/index.json'));
       if (response.statusCode == 200) {
         String content = _decodeContent(response.bodyBytes);
         _indexData = Map<String, dynamic>.from(json.decode(content) as Map);
@@ -566,7 +678,13 @@ class MaidataManager {
     _isInitialized = false;
 
     try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
+      // 删除文件缓存
+      final file = await _getCacheFile();
+      if (await file.exists()) {
+        await file.delete();
+      }
+      // 清除 SharedPreferences 中的时间戳及可能的旧版全量缓存
+      final prefs = await SharedPreferences.getInstance();
       await prefs.remove(CacheKeyConstant.maidataFullCache);
       await prefs.remove(CacheKeyConstant.maidataFullCacheTimestamp);
       await prefs.remove(CacheKeyConstant.maidataIndexCache);

@@ -188,13 +188,14 @@ class LZYCheckUpdateManager {
             TextButton(
               onPressed: () {
                 Navigator.pop(c);
-                completer.complete();
               },
               child: Text("确定"),
             ),
           ],
         ),
-      );
+      ).then((_) {
+        if (!completer.isCompleted) completer.complete();
+      });
       return completer.future;
     }
     
@@ -227,13 +228,14 @@ class LZYCheckUpdateManager {
             TextButton(
               onPressed: () {
                 Navigator.pop(c);
-                completer.complete();
               },
               child: Text("确定"),
             ),
           ],
         ),
-      );
+      ).then((_) {
+        if (!completer.isCompleted) completer.complete();
+      });
       return completer.future;
     }
 
@@ -263,7 +265,6 @@ class LZYCheckUpdateManager {
               TextButton(
                 onPressed: () {
                   Navigator.pop(c);
-                  completer.complete();
                 },
                 child: Text("稍后"),
               ),
@@ -272,7 +273,6 @@ class LZYCheckUpdateManager {
                 onPressed: () async {
                   await recordDismissTime();
                   Navigator.pop(c);
-                  completer.complete();
                 },
                 child: Text("3天内不提示"),
               ),
@@ -280,14 +280,15 @@ class LZYCheckUpdateManager {
             TextButton(
               onPressed: () {
                 Navigator.pop(c);
-                completer.complete();
                 openDownloadPage(info["downloadUrl"]);
               },
               child: Text("立即下载"),
             ),
           ],
         ),
-      );
+      ).then((_) {
+        if (!completer.isCompleted) completer.complete();
+      });
       return completer.future;
     }
     

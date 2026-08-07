@@ -1,7 +1,10 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'dart:io';
+import 'package:charset/charset.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:path_provider/path_provider.dart';
 import 'ChartPlayPage.dart';
 
 class PersonalizedChartPlayConfigure extends StatefulWidget {
@@ -13,9 +16,10 @@ class PersonalizedChartPlayConfigure extends StatefulWidget {
 
 class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayConfigure> {
   String? _maidataContent;
-  File? _bgImageFile;
-  File? _audioFile;
+  String? _bgImagePath;   // 已复制到应用内部目录的路径
+  String? _audioFilePath; // 已复制到应用内部目录的路径
   List<String> _inoteList = [];
+  Directory? _workDir;
 
   static const Map<String, String> inoteDifficultyMap = {
     '2': 'BASIC',
@@ -49,57 +53,138 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
     return inoteList;
   }
 
+  /// 获取（或创建）自定义谱面播放的临时工作目录
+  Future<Directory> _getWorkDir() async {
+    if (_workDir != null) return _workDir!;
+    final appDir = await getApplicationDocumentsDirectory();
+    _workDir = Directory('${appDir.path}/custom_chart_play');
+    if (!_workDir!.existsSync()) {
+      _workDir!.createSync(recursive: true);
+    }
+    return _workDir!;
+  }
+
+  /// 将用户选择的文件复制到应用内部目录，避免 Android scoped storage 限制
+  Future<String> _copyToAppDir(File sourceFile, String prefix) async {
+    final workDir = await _getWorkDir();
+    final ext = sourceFile.path.split('.').last;
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final destPath = '${workDir.path}/${prefix}_$timestamp.$ext';
+    final destFile = File(destPath);
+    await sourceFile.copy(destFile.path);
+    return destPath;
+  }
+
   Future<void> _selectMaidataFile() async {
-    FilePickerResult? result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['txt'],
-    );
-    if (result != null) {
-      File file = File(result.files.single.path!);
-      try {
-        String content = await file.readAsString();
-        setState(() {
-          _maidataContent = content;
-          _inoteList = _parseInoteList(content);
-        });
+    try {
+      FilePickerResult? result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['txt'],
+      );
+      if (result != null) {
+        final file = File(result.files.single.path!);
+        try {
+          final bytes = await file.readAsBytes();
+
+          // 自动检测编码：先尝试 UTF-8，失败则尝试 Shift-JIS（日谱社区常用编码）
+          String content;
+          try {
+            content = utf8.decode(bytes);
+            // 检查是否含有替换字符（解码失败标志）
+            if (content.contains('�')) {
+              throw const FormatException('UTF-8 decode produced replacement characters');
+            }
+          } catch (_) {
+            // UTF-8 失败，尝试 Shift-JIS
+            debugPrint('UTF-8 decode failed, trying Shift-JIS...');
+            content = shiftJis.decode(bytes);
+          }
+
+          setState(() {
+            _maidataContent = content;
+            _inoteList = _parseInoteList(content);
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('已加载maidata，解析到 ${_inoteList.length} 个难度')),
+          );
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('读取失败: 文件编码不受支持，请使用UTF-8或Shift-JIS编码')),
+          );
+          debugPrint('maidata read error: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('文件选择失败: $e');
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('已加载maidata，解析到 ${_inoteList.length} 个难度')),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('读取失败: $e')),
+          SnackBar(content: Text('无法打开文件选择器: $e')),
         );
       }
     }
   }
 
   Future<void> _selectBgImage() async {
-    FilePickerResult? result = await FilePicker.pickFiles(
-      type: FileType.image,
-      allowedExtensions: ['png', 'jpg', 'jpeg'],
-    );
-    if (result != null) {
-      setState(() {
-        _bgImageFile = File(result.files.single.path!);
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已选择曲绘')),
+    try {
+      FilePickerResult? result = await FilePicker.pickFiles(
+        type: FileType.image,
       );
+      if (result != null && mounted) {
+        final sourceFile = File(result.files.single.path!);
+        try {
+          final appPath = await _copyToAppDir(sourceFile, 'bg');
+          setState(() => _bgImagePath = appPath);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('已选择曲绘')),
+          );
+        } catch (e) {
+          debugPrint('bg image copy error: $e');
+          // fallback：直接使用原始路径
+          setState(() => _bgImagePath = sourceFile.path);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('已选择曲绘（使用原始路径）')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('图片选择失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法打开图片选择器: $e')),
+        );
+      }
     }
   }
 
   Future<void> _selectAudioFile() async {
-    FilePickerResult? result = await FilePicker.pickFiles(
-      type: FileType.audio,
-      allowedExtensions: ['mp3', 'wav', 'ogg'],
-    );
-    if (result != null) {
-      setState(() {
-        _audioFile = File(result.files.single.path!);
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已选择音源')),
+    try {
+      FilePickerResult? result = await FilePicker.pickFiles(
+        type: FileType.audio,
       );
+      if (result != null && mounted) {
+        final sourceFile = File(result.files.single.path!);
+        try {
+          final appPath = await _copyToAppDir(sourceFile, 'audio');
+          setState(() => _audioFilePath = appPath);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('已选择音源')),
+          );
+        } catch (e) {
+          debugPrint('audio file copy error: $e');
+          // fallback：直接使用原始路径
+          setState(() => _audioFilePath = sourceFile.path);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('已选择音源（使用原始路径）')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('音频选择失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('无法打开音频选择器: $e')),
+        );
+      }
     }
   }
 
@@ -151,6 +236,8 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
                               songId: 'custom',
                               songType: 'custom',
                               selectedInote: inote,
+                              bgImagePath: _bgImagePath,
+                              audioFilePath: _audioFilePath,
                             ),
                           ),
                         );
@@ -179,10 +266,19 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
   void _clearSelection() {
     setState(() {
       _maidataContent = null;
-      _bgImageFile = null;
-      _audioFile = null;
+      _bgImagePath = null;
+      _audioFilePath = null;
       _inoteList = [];
     });
+    // 清理临时工作目录
+    if (_workDir != null && _workDir!.existsSync()) {
+      try {
+        _workDir!.deleteSync(recursive: true);
+        _workDir = null;
+      } catch (e) {
+        debugPrint('cleanup work dir error: $e');
+      }
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('已清除选择')),
     );
@@ -222,7 +318,7 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
               title: '选择曲绘图片',
               description: '可选，谱面背景图片（png/jpg）',
               icon: Icons.image,
-              selectedFile: _bgImageFile?.path.split('\\').last,
+              selectedFile: _bgImagePath?.split('\\').last,
               onPressed: _selectBgImage,
               required: false,
             ),
@@ -232,7 +328,7 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
               title: '选择音源文件',
               description: '可选，谱面背景音乐（mp3/wav/ogg）',
               icon: Icons.audio_file,
-              selectedFile: _audioFile?.path.split('\\').last,
+              selectedFile: _audioFilePath?.split('\\').last,
               onPressed: _selectAudioFile,
               required: false,
             ),

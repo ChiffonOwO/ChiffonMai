@@ -7,6 +7,7 @@ import '../api/ApiUrls.dart';
 import '../entity/KnowledgeEntity.dart';
 import '../constant/CacheKeyConstant.dart';
 import '../constant/CacheTimestampConstant.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 class KnowledgeManager {
   static final KnowledgeManager _instance = KnowledgeManager._internal();
@@ -35,7 +36,7 @@ class KnowledgeManager {
 
   // 从网络获取知识数据
   Future<KnowledgeEntity> _fetchKnowledgeData() async {
-    final response = await http.get(Uri.parse(ApiUrls.knowledgeApi));
+    final response = await ApiClient.get(Uri.parse(ApiUrls.knowledgeApi));
     if (response.statusCode == 200) {
       final jsonData = json.decode(response.body);
       // 服务端直接返回知识条目的列表

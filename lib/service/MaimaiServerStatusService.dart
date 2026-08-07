@@ -5,6 +5,7 @@ import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/entity/AWMC/MaimaiServerStatusEntity.dart';
 import 'package:my_first_flutter_app/entity/AWMC/MaimaiServerStatusTitleEntity.dart';
 import '../constant/CacheTimestampConstant.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 // 服务器状态服务
 class MaimaiServerStatusService {
@@ -28,7 +29,7 @@ class MaimaiServerStatusService {
       }
 
       // 从API获取数据
-      final response = await http.get(Uri.parse(ApiUrls.ServerStatusApi));
+      final response = await ApiClient.get(Uri.parse(ApiUrls.ServerStatusApi));
       
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
@@ -63,7 +64,7 @@ class MaimaiServerStatusService {
       }
 
       // 从API获取数据
-      final response = await http.get(Uri.parse(ApiUrls.ServerStatusTitleApi));
+      final response = await ApiClient.get(Uri.parse(ApiUrls.ServerStatusTitleApi));
       
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);

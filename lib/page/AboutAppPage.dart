@@ -126,6 +126,12 @@ class _AboutAppPageState extends State<AboutAppPage> {
                                   height: 1.6,
                                 ),
                               ),
+                              TableConfig(
+                                wrapper: (child) => SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: child,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -223,8 +229,8 @@ class _AboutAppPageState extends State<AboutAppPage> {
 | 🔄 刷新数据 | 手动刷新当前页面数据，确保展示的是最新数据 |
 | 🔔 检查更新 | 自动检测是否有新版本可用，及时提示用户更新，保障功能正常使用 |
 | 📋 问卷反馈 | 内置问卷调查入口，用户可反馈建议助力APP改进 |
-| 🔄 同步成绩到水鱼 | 将成绩同步到水鱼查分器，支持机台QR码和DXNet Bot两种方式 |
-| 🔄 同步成绩到落雪 | 通过机台QR码同步成绩到落雪平台 |
+| 🔄 同步成绩到水鱼 | 通过舞萌/中二登入二维码同步成绩到水鱼查分器 |
+| 🔄 同步成绩到落雪 | 通过登入二维码同步成绩到落雪平台 |
 
 ---
 

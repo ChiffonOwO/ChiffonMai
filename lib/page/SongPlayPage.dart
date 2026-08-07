@@ -29,6 +29,7 @@ class SongPlayPage extends StatefulWidget {
 class _SongPlayPageState extends State<SongPlayPage> {
   // 播放状态
   bool _isPlaying = false;
+  bool _wasCompleted = false;
   // 播放进度
   double _progress = 0.0;
   // 总时长（秒）
@@ -60,7 +61,9 @@ class _SongPlayPageState extends State<SongPlayPage> {
   @override
   void dispose() {
     _timer?.cancel();
+    _audioPlayer?.stop();
     _audioPlayer?.dispose();
+    _audioPlayer = null;
     super.dispose();
   }
 
@@ -101,12 +104,12 @@ class _SongPlayPageState extends State<SongPlayPage> {
       if (await musicManager.hasCachedData()) {
         final songs = await musicManager.getCachedSongs();
         if (songs != null) {
-          final song = songs.firstWhere(
-            (s) => s.id == widget.songId,
-          );
-          setState(() {
-            _artist = song.basicInfo.artist;
-          });
+          final match = songs.where((s) => s.id == widget.songId);
+          if (match.isNotEmpty && mounted) {
+            setState(() {
+              _artist = match.first.basicInfo.artist;
+            });
+          }
         }
       }
     } catch (e) {
@@ -217,6 +220,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
       _audioPlayer!.onPlayerComplete.listen((_) {
         setState(() {
           _isPlaying = false;
+          _wasCompleted = true;
           _currentDuration = _totalDuration;
           _progress = 1.0;
         });
@@ -242,13 +246,17 @@ class _SongPlayPageState extends State<SongPlayPage> {
         _timer?.cancel();
       } else {
         // 播放
-        if (_currentDuration == 0) {
-          // 首次播放
+        final playerState = _audioPlayer!.state;
+        if (_wasCompleted || _currentDuration == 0 ||
+            playerState == PlayerState.completed ||
+            playerState == PlayerState.stopped) {
+          // 播放完毕/首次播放/播放器已停止：重新 play()（resume 在 completed/stopped 状态无效）
           if (_cachedFilePath != null && _cachedFilePath!.isNotEmpty) {
             await _audioPlayer!.play(DeviceFileSource(_cachedFilePath!));
           } else {
             await _audioPlayer!.play(UrlSource(_audioUrl!));
           }
+          _wasCompleted = false;
         } else {
           // 继续播放
           await _audioPlayer!.resume();
@@ -290,6 +298,15 @@ class _SongPlayPageState extends State<SongPlayPage> {
     });
   }
 
+  // 停止播放并返回
+  void _stopAndPop() {
+    _timer?.cancel();
+    _audioPlayer?.stop();
+    _audioPlayer?.dispose();
+    _audioPlayer = null;
+    if (mounted) Navigator.of(context).pop();
+  }
+
   // 格式化时间
   String _formatDuration(int seconds) {
     int minutes = seconds ~/ 60;
@@ -306,7 +323,12 @@ class _SongPlayPageState extends State<SongPlayPage> {
     final double borderRadiusSmall = 8.0;
     final safeBottom = MediaQuery.of(context).padding.bottom;
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _stopAndPop();
+      },
+      child: Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
@@ -325,9 +347,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
                     // 返回按钮
                     IconButton(
                       icon: Icon(Icons.arrow_back, color: textPrimaryColor),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
+                      onPressed: _stopAndPop,
                     ),
                     // 标题
                     Expanded(
@@ -450,6 +470,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
                                       _progress = value;
                                       _currentDuration =
                                           (_totalDuration * value).round();
+                                      _wasCompleted = false;
                                     });
                                   },
                                   onChangeEnd: (value) async {
@@ -513,6 +534,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
             ],
           ),
         ],
+      ),
       ),
     );
   }

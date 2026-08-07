@@ -5,6 +5,8 @@ class ApiUrls {
   static const String MusicDataApi = 'https://www.diving-fish.com/api/maimaidxprober/music_data';
   /// 更全的歌曲数据API端点（union），作为全量歌曲数据的主要来源
   static const String UnionMusicDataApi = 'https://union.godserver.cn//api/union/musics';
+  /// union 歌曲元数据（含 cn/jp 可游玩地区、releaseDate 等）
+  static const String UnionUniApi = 'https://union.godserver.cn//api/union/uni';
   static const String TagDataApi = 'https://miruku.dxrating.net/api/v1/tags';
   static const String SongAliasApi = 'https://www.yuzuchan.moe/api/maimaidx/maimaidxalias';
   static const String DXRatingSongAliasApi = 'https://miruku.dxrating.net/api/v1/aliases';
@@ -51,6 +53,7 @@ class ApiUrls {
   static const String CommentsByUserUrl = '$CommentsBaseUrl/user';
   static const String CommentsCreateUrl = '$CommentsBaseUrl/create';
   static const String CommentsClearCacheUrl = '$CommentsBaseUrl/clear-cache';
+  static const String CommentsRecentUrl = '$CommentsBaseUrl/recent';
 
   // B站播放量 Redis 缓存 API
   static const String BiliRedisBaseUrl = 'http://chiffonmai.cloud:3000/api/bilibili';
@@ -105,4 +108,5 @@ class ApiUrls {
   static const String RatingsByChartUrl = '$RatingsBaseUrl/chart';
   static const String RatingsCreateUrl = '$RatingsBaseUrl/create';
   static const String RatingsDeleteUrl = '$RatingsBaseUrl';
+  static const String RatingsRecentUrl = '$RatingsBaseUrl/recent';
 }

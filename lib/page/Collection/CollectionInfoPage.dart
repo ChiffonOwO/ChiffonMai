@@ -17,6 +17,7 @@ import '../../utils/StringUtil.dart';
 import '../../utils/TranslationUtil.dart';
 import '../../utils/AppTheme.dart';
 import '../SongInfoPage.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 class CollectionInfoPage extends StatefulWidget {
   final int collectionId;
@@ -120,7 +121,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
       }
 
       // 下载图片
-      final response = await http.get(Uri.parse(imageUrl));
+      final response = await ApiClient.get(Uri.parse(imageUrl));
       if (response.statusCode != 200) {
         _showToast('图片下载失败');
         return;

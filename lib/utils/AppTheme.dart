@@ -28,6 +28,18 @@ class AppTheme {
     tertiary: Color.fromARGB(210, 100, 100, 80),
   );
 
+  static const ColorScheme pureBlackColorScheme = ColorScheme.dark(
+    primary: Color(0xFFE0E0E0),
+    onPrimary: Colors.black,
+    surface: Color(0xFF111111),
+    onSurface: Color(0xFFCCCCCC),
+    surfaceContainerHighest: Color(0xFF1A1A1A),
+    outline: Color(0xFF555555),
+    secondary: Color(0xFFBBBBBB),
+    onSurfaceVariant: Color(0xFFBBBBBB),
+    tertiary: Color(0xFF333333),
+  );
+
   // ========== ThemeData 构建 ==========
 
   static ThemeData lightTheme() {
@@ -131,6 +143,59 @@ class AppTheme {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: darkColorScheme.primary, width: 2),
+        ),
+      ),
+    );
+  }
+
+  static ThemeData pureBlackTheme() {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: pureBlackColorScheme,
+      scaffoldBackgroundColor: Colors.black,
+      cardTheme: CardThemeData(
+        color: pureBlackColorScheme.surface,
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      appBarTheme: AppBarThemeData(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: IconThemeData(color: pureBlackColorScheme.primary),
+        titleTextStyle: TextStyle(
+          color: pureBlackColorScheme.primary,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: pureBlackColorScheme.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: pureBlackColorScheme.primary,
+          foregroundColor: Colors.black,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: pureBlackColorScheme.primary,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: pureBlackColorScheme.surface,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: pureBlackColorScheme.outline),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: pureBlackColorScheme.primary, width: 2),
         ),
       ),
     );

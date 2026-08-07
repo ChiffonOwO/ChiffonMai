@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api/ApiUrls.dart';
 import '../constant/CacheKeyConstant.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 // =============================================================================
 // 调试开关
@@ -527,12 +528,12 @@ class DivingFishProbeManager {
     _cancelled = true;
   }
 
-  /// 通过机台 QR 码（SGWCMAID 开头）一键同步成绩到水鱼
+  /// 通过舞萌|中二 登入二维码（SGWCMAID 开头）一键同步成绩到水鱼
   ///
   /// 使用 Maimai Score Hub 的 cabinet-score-jobs API，
-  /// 无需 Bot 好友关系即可直接从机台抓取成绩。
+  /// 无需 Bot 好友关系即可直接从公众号抓取成绩。
   ///
-  /// [qrCode] 机台上扫到的 QR 码字符串（以 SGWCMAID 开头）
+  /// [qrCode] 舞萌|中二公众号生成的登入二维码字符串（以 SGWCMAID 开头）
   /// [onProgress] 进度回调
   /// [timeout] 最大等待时间，默认 5 分钟
   Future<SyncResult> syncByCabinetQr(
@@ -552,13 +553,30 @@ class DivingFishProbeManager {
       return SyncResult.failure('同步已在进行中，请稍后重试');
     }
 
-    // 恢复或检查认证 token
+    // 恢复或检查认证 token；若无则直接用 QR 码登录 Hub
     final hasToken = await _ensureAuthToken();
     if (!hasToken) {
-      _log('✗ 无认证 token，无法使用机台直同步');
-      return SyncResult.failure(
-        '尚未建立认证，请先使用「同步成绩到水鱼」完成一次 NET QR 同步',
-      );
+      _log('── Step 0: Hub 认证 ──');
+      _emit(onProgress, const SyncProgress(
+        stage: SyncStage.authenticating,
+        message: '正在验证二维码...',
+      ));
+
+      final loginData = await _loginByQr(qrCode);
+      if (loginData == null) {
+        _log('✗ Hub 登录失败: loginData 为 null');
+        return SyncResult.failure('二维码无效或已过期，请重新扫描');
+      }
+
+      _authToken = loginData['token'] as String?;
+      _friendCode = (loginData['user'] as Map<String, dynamic>?)?.tryGet<String>('friendCode');
+
+      if (_authToken == null) {
+        _log('✗ Hub 登录失败: token 为 null');
+        return SyncResult.failure('Hub 认证失败，请稍后重试');
+      }
+
+      _log('✓ Hub 认证成功，friendCode=$_friendCode');
     }
 
     _isSyncing = true;
@@ -570,13 +588,13 @@ class DivingFishProbeManager {
       _log('── Step 1: 创建 Cabinet Score Job ──');
       _emit(onProgress, const SyncProgress(
         stage: SyncStage.requesting,
-        message: '正在提交机台二维码...',
+        message: '正在提交二维码...',
       ));
 
       final createResult = await _createCabinetScoreJob(qrCode);
       if (createResult == null) {
         _log('✗ 创建 Cabinet Job 失败');
-        return SyncResult.failure('提交机台二维码失败，请检查网络后重试');
+        return SyncResult.failure('提交二维码失败，请检查网络后重试');
       }
 
       final jobId = createResult['jobId'] as String?;
@@ -610,7 +628,7 @@ class DivingFishProbeManager {
         if (elapsed > timeout) {
           _log('✗ Cabinet Job 轮询超时: ${elapsed.inSeconds}s, 共 $_pollCount 次');
           return SyncResult.failure(
-            '同步超时——机台成绩抓取耗时超过 ${timeout.inMinutes} 分钟，请稍后重试',
+            '同步超时——成绩抓取耗时超过 ${timeout.inMinutes} 分钟，请稍后重试',
           );
         }
 
@@ -648,7 +666,7 @@ class DivingFishProbeManager {
         if (status == 'failed') {
           _log('✗ Cabinet Job 失败: $errorMsg');
           _log('  完整 job 响应: $job');
-          return SyncResult.failure(errorMsg.isNotEmpty ? errorMsg : '机台同步失败');
+          return SyncResult.failure(errorMsg.isNotEmpty ? errorMsg : '同步失败');
         }
 
         // 完毕
@@ -822,7 +840,7 @@ class DivingFishProbeManager {
     String? jwtToken;
 
     try {
-      final loginResponse = await http.post(
+      final loginResponse = await ApiClient.post(
         Uri.parse(ApiUrls.DivingFishLoginApi),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
@@ -867,7 +885,7 @@ class DivingFishProbeManager {
     _log('  GET ${ApiUrls.DivingFishProfileApi}');
 
     try {
-      final profileResponse = await http.get(
+      final profileResponse = await ApiClient.get(
         Uri.parse(ApiUrls.DivingFishProfileApi),
         headers: {
           'Content-Type': 'application/json',
@@ -952,7 +970,7 @@ class DivingFishProbeManager {
 
     try {
       _log('  GET ${ApiUrls.DivingFishProfileApi}');
-      final response = await http.get(
+      final response = await ApiClient.get(
         Uri.parse(ApiUrls.DivingFishProfileApi),
         headers: {
           'Content-Type': 'application/json',
@@ -1441,7 +1459,7 @@ class DivingFishProbeManager {
 
   /// POST /me/cabinet-score-jobs (authorized)
   ///
-  /// 为当前已认证用户创建机台 QR 直同步任务。
+  /// 为当前已认证用户创建 cabinet score job。
   /// 返回 `{ jobId, job }`，失败返回 null。
   Future<Map<String, dynamic>?> _createCabinetScoreJob(String qrCode) async {
     if (_authToken == null) {
@@ -1486,7 +1504,7 @@ class DivingFishProbeManager {
 
   /// GET /me/cabinet-score-jobs/{jobId} (authorized)
   ///
-  /// 查询机台 QR 直同步 job 状态。
+  /// 查询 cabinet score job 状态。
   Future<Map<String, dynamic>?> _pollCabinetJobStatus(String jobId) async {
     final uri = Uri.parse('${ApiUrls.MaimaiHubCabinetScoreJobsUrl}/$jobId');
     final headers = <String, String>{
@@ -1514,7 +1532,7 @@ class DivingFishProbeManager {
 
   /// GET /me/cabinet-score-jobs/active (authorized)
   ///
-  /// 查询当前活跃的机台同步 job。
+  /// 查询当前活跃的 cabinet score job。
   Future<Map<String, dynamic>?> getActiveCabinetScoreJob() async {
     if (_authToken == null) return null;
 
@@ -1636,7 +1654,7 @@ class DivingFishProbeManager {
     return _exportToLxns();
   }
 
-  /// 通过机台 QR 码同步成绩并导出到落雪（LXNS）
+  /// 通过登入二维码同步成绩并导出到落雪（LXNS）
   ///
   /// 合并 cabinet sync + LXNS export，适用于「同步成绩到落雪」功能。
   /// 与 [syncByCabinetQr] 的区别：导出到落雪而非水鱼。
@@ -1644,6 +1662,7 @@ class DivingFishProbeManager {
     String qrCode, {
     void Function(SyncProgress progress)? onProgress,
     Duration timeout = const Duration(minutes: 5),
+    String? lxnsImportToken,
   }) async {
     _log('══════════════════════════════════════════');
     _log('syncByCabinetQrToLxns 开始');
@@ -1654,29 +1673,57 @@ class DivingFishProbeManager {
       return SyncResult.failure('同步已在进行中，请稍后重试');
     }
 
-    // 恢复或检查认证 token
-    final hasToken = await _ensureAuthToken();
-    if (!hasToken) {
-      _log('✗ 无认证 token，无法使用机台直同步');
-      return SyncResult.failure(
-        '尚未建立认证，请先使用「同步成绩到水鱼」完成一次 NET QR 同步',
-      );
-    }
-
     _isSyncing = true;
     _cancelled = false;
     _pollCount = 0;
 
     try {
+      // ===== Step 0: Hub 认证（用 QR 码直接登录 Hub，无需经过水鱼）=====
+      final hasToken = await _ensureAuthToken();
+      if (!hasToken) {
+        _log('── Step 0: Hub 认证 ──');
+        _emit(onProgress, const SyncProgress(
+          stage: SyncStage.authenticating,
+          message: '正在验证二维码...',
+        ));
+
+        final loginData = await _loginByQr(qrCode);
+        if (loginData == null) {
+          _log('✗ Hub 登录失败: loginData 为 null');
+          return SyncResult.failure('二维码无效或已过期，请重新扫描');
+        }
+
+        _authToken = loginData['token'] as String?;
+        _friendCode = (loginData['user'] as Map<String, dynamic>?)?.tryGet<String>('friendCode');
+
+        if (_authToken == null) {
+          _log('✗ Hub 登录失败: token 为 null');
+          return SyncResult.failure('Hub 认证失败，请稍后重试');
+        }
+
+        _log('✓ Hub 认证成功');
+      }
+
+      // ===== Step 0.5: 设置落雪 importToken（如果有新传入的）=====
+      if (lxnsImportToken != null && lxnsImportToken.isNotEmpty) {
+        _log('── Step 0.5: 绑定落雪 importToken ──');
+        final setOk = await setLxnsImportToken(lxnsImportToken);
+        if (!setOk) {
+          _log('✗ 落雪 importToken 绑定失败');
+          return SyncResult.failure('落雪 API 密钥设置失败，请检查网络后重试');
+        }
+        _log('✓ 落雪 importToken 已绑定');
+      }
+
       // ===== Step 1: 创建 Cabinet Score Job =====
       _emit(onProgress, const SyncProgress(
         stage: SyncStage.requesting,
-        message: '正在提交机台二维码...',
+        message: '正在提交二维码...',
       ));
 
       final createResult = await _createCabinetScoreJob(qrCode);
       if (createResult == null) {
-        return SyncResult.failure('提交机台二维码失败，请检查网络后重试');
+        return SyncResult.failure('提交二维码失败，请检查网络后重试');
       }
 
       final jobId = createResult['jobId'] as String?;
@@ -1726,7 +1773,7 @@ class DivingFishProbeManager {
           lastDetailsFetched = detailsFetched;
 
           if (status == 'failed') {
-            return SyncResult.failure(errorMsg.isNotEmpty ? errorMsg : '机台同步失败');
+            return SyncResult.failure(errorMsg.isNotEmpty ? errorMsg : '同步失败');
           }
 
           if (status == 'completed') {
@@ -1949,7 +1996,7 @@ class DivingFishProbeManager {
           totalDiffs: totalDiffs,
         );
 
-      // ── Cabinet 阶段（机台 QR 直同步） ──
+      // ── Cabinet 阶段 ──
       case 'queued':
         return SyncProgress(
           stage: SyncStage.requesting,
@@ -1958,7 +2005,7 @@ class DivingFishProbeManager {
       case 'qr_auth':
         return SyncProgress(
           stage: SyncStage.authenticating,
-          message: '正在验证机台二维码...',
+          message: '正在验证二维码...',
         );
       case 'preview':
         return SyncProgress(
@@ -1968,7 +2015,7 @@ class DivingFishProbeManager {
       case 'login':
         return SyncProgress(
           stage: SyncStage.scraping,
-          message: '正在登录机台...',
+          message: '正在登录...',
         );
       case 'get_music':
         return SyncProgress(
@@ -1982,7 +2029,7 @@ class DivingFishProbeManager {
       case 'logout':
         return SyncProgress(
           stage: SyncStage.scraping,
-          message: '正在登出机台...',
+          message: '正在登出...',
         );
       case 'cleanup':
         return SyncProgress(
