@@ -255,7 +255,7 @@ class PaiziProgressService {
       case 1: return 'ADVANCED';
       case 2: return 'EXPERT';
       case 3: return 'MASTER';
-      case 4: return 'RE:MASTER';
+      case 4: return 'Re:MASTER';
       default: return difficulty.toString();
     }
   }

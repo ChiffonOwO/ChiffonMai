@@ -16,7 +16,7 @@ import '../../service/Best50/PersonalizedBest50ConvertToImgService.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
-import 'package:my_first_flutter_app/entity/DXRating/MaiTagsEntity.dart';
+import 'package:my_first_flutter_app/entity/DXRating/MaiTagsModel.dart';
 import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 

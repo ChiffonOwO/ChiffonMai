@@ -7,6 +7,7 @@ import 'package:my_first_flutter_app/service/KaleidXScope/KaleidXScopeInfoServic
 import 'package:my_first_flutter_app/service/KaleidXScope/KaleidXScopeSelectService.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
+import 'package:my_first_flutter_app/entity/KaleidXScope/KaleidXScopeGate.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 
@@ -32,6 +33,8 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
   // 特殊歌曲缓存（只在页面初始化时加载一次）
   Song? _specialSong11808;
   Song? _specialSong11809;
+
+  KaleidXScopeGate? _gateData;
 
   // 自定义常量
   late double _borderRadiusSmall;
@@ -108,6 +111,8 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
     });
 
     try {
+      _gateData = await _service.fetchGateData();
+      if (_gateData == null) return;
       final songs = await _service.getYellowGateSongs();
       setState(() {
         _songs = songs;
@@ -134,23 +139,15 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
 
   // 加载特殊歌曲（完美挑战曲和隐藏歌曲）
   Future<void> _loadSpecialSongs() async {
+    if (_gateData == null) return;
     final allSongs = await MaimaiMusicDataManager().getCachedSongs();
     if (allSongs == null) return;
-
-    try {
-      _specialSong11808 = allSongs.firstWhere(
-        (song) => song.id.toString() == '11808',
-      );
-    } catch (e) {
-      _specialSong11808 = null;
-    }
-
-    try {
-      _specialSong11809 = allSongs.firstWhere(
-        (song) => song.id.toString() == '11809',
-      );
-    } catch (e) {
-      _specialSong11809 = null;
+    for (final ss in _gateData!.specialSongs) {
+      try {
+        final song = allSongs.firstWhere((s) => s.id.toString() == ss.songId.toString());
+        if (ss.role == 'perfect') { _specialSong11808 = song; }
+        else if (ss.role == 'hidden') { _specialSong11809 = song; }
+      } catch (e) {}
     }
   }
 
@@ -198,7 +195,7 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
           ),
           SizedBox(height: _paddingS),
           Text(
-            '黄门门扉',
+            _gateData?.doorName ?? '黄门门扉',
             style: TextStyle(
               fontSize: _textSizeM,
               fontWeight: FontWeight.bold,
@@ -212,9 +209,9 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
                 color: AppColors.greyHint(brightness),
               ),
               children: [
-                TextSpan(text: '完成'),
+                // TextSpan(text: '完成'),
                 TextSpan(
-                  text: '七彩区域（なないろちほー）',
+                  text: _gateData?.prerequisite ?? '七彩区域（なないろちほー）',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 TextSpan(text: '（门扉必要条件）'),
@@ -231,7 +228,7 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
             ),
           ),
           Text(
-            '在门更新之后，使用随机选曲，随出一次以下曲目池中的任意一首并游玩',
+            _gateData?.keyRequirement ?? '在门更新之后，使用随机选曲，随出一次以下曲目池中的任意一首并游玩',
             style: TextStyle(
               fontSize: _textSizeS,
               color: AppColors.greyHint(brightness),
@@ -254,26 +251,36 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
             ),
           ),
           Text(
-            '第一首：启程区域随机选曲',
+            '第一首：${_gateData?.track1Desc ?? "启程区域随机选曲"}',
             style: TextStyle(
               fontSize: _textSizeS,
               color: AppColors.greyHint(brightness),
             ),
           ),
           Text(
-            '第二首：启程区域随机完美挑战曲、MAXRAGE和UniTas',
+            '第二首：${_gateData?.track2Desc ?? "启程区域随机完美挑战曲、MAXRAGE和UniTas"}',
             style: TextStyle(
               fontSize: _textSizeS,
               color: AppColors.greyHint(brightness),
             ),
           ),
           Text(
-            '第三首：Åntinomiε',
+            '第三首：${_gateData?.track3Desc ?? "Åntinomiε"}',
             style: TextStyle(
               fontSize: _textSizeS,
               color: AppColors.greyHint(brightness),
             ),
           ),
+          if (_gateData?.guideNote != null) ...[
+            SizedBox(height: _paddingS),
+            Text(
+              _gateData!.guideNote!,
+              style: TextStyle(
+                fontSize: _textSizeS,
+                color: AppColors.greyHint(brightness),
+              ),
+            ),
+          ],
           SizedBox(height: _paddingS),
           Text(
             '完美挑战曲为',
@@ -286,7 +293,7 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
           _buildSpecialSongCard(11808),
           SizedBox(height: _paddingS),
           Text(
-            '黄门门扉的隐藏歌曲为',
+            '${_gateData?.doorName ?? '黄门门扉'}的隐藏歌曲为',
             style: TextStyle(
               fontSize: _textSizeM,
               fontWeight: FontWeight.bold,
@@ -300,10 +307,10 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
   }
 
   // 构建单个挑战区域
-  Widget _buildChallengeSection(Map<String, dynamic> challenge) {
+  Widget _buildChallengeSection(KaleidXScopeChallenge challenge) {
     final brightness = Theme.of(context).brightness;
-    final String name = challenge['name'];
-    final List<dynamic> phases = challenge['phases'];
+    final String name = challenge.name;
+    final List<ChallengePhase> phases = challenge.phases;
     final double progressBarFontSize = 10.0 * (MediaQuery.of(context).size.width / 375.0);
 
     return Container(
@@ -335,7 +342,7 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
             ),
             child: Row(
               children: phases.map((phase) {
-                final String type = phase['type'];
+                final String type = phase.difficulty;
                 final Color color =
                     KaleidXScopeSelectService.getDifficultyColor(type);
 
@@ -362,10 +369,10 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
           SizedBox(height: _paddingXS),
           Column(
             children: phases.map((phase) {
-              final String type = phase['type'];
-              final String startDate = phase['startDate'];
-              final String? endDate = phase['endDate'];
-              final int lifeTarget = phase['lifeTarget'];
+              final String type = phase.difficulty;
+              final String startDate = phase.startDate;
+              final String? endDate = phase.endDate;
+              final int lifeTarget = phase.lifeTarget;
               final Color color =
                   KaleidXScopeSelectService.getDifficultyColor(type);
 
@@ -413,13 +420,11 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 完美挑战
-        _buildChallengeSection(yellowService.KaleidXScopeInfoServiceYELLOW.yellowPerfectChallenge),
-        SizedBox(height: _paddingL),
-
-        // 黄门挑战
-        _buildChallengeSection(yellowService.KaleidXScopeInfoServiceYELLOW.yellowGateChallenge),
-        SizedBox(height: _paddingL),
+        if (_gateData != null)
+          for (final challenge in _gateData!.challenges) ...[
+            _buildChallengeSection(challenge),
+            SizedBox(height: _paddingL),
+          ],
       ],
     );
   }
@@ -638,7 +643,7 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
                             overflow: TextOverflow.ellipsis,
                           ),
                           SizedBox(height: _paddingXS * 0.25),
-                          // 第三行：第3,4,5个定数（EXPERT/MASTER/RE:MASTER）
+                          // 第三行：第3,4,5个定数（EXPERT/MASTER/Re:MASTER）
                           Text(
                             _getDsDisplay(song.ds),
                             style: TextStyle(

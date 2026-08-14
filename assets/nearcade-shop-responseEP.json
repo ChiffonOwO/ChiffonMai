@@ -1,0 +1,61 @@
+{
+    "shops": [
+        {
+            "_id": "string",
+            "id": -9007199254740991,
+            "name": "string",
+            "comment": "string",
+            "address": {
+                "general": [],
+                "detailed": "",
+                "region": [
+                    "string"
+                ]
+            },
+            "openingHours": [
+                [
+                    {
+                        "hour": 0,
+                        "minute": 0
+                    },
+                    {
+                        "hour": 0,
+                        "minute": 0
+                    }
+                ]
+            ],
+            "games": [
+                {
+                    "gameId": -9007199254740991,
+                    "titleId": -9007199254740991,
+                    "name": "string",
+                    "version": "string",
+                    "comment": "",
+                    "quantity": 1,
+                    "cost": ""
+                }
+            ],
+            "location": {
+                "type": "Point",
+                "coordinates": [
+                    -180,
+                    -180
+                ]
+            },
+            "timezone": {
+                "name": "string",
+                "offset": 0
+            },
+            "isOpen": true,
+            "isClaimed": true,
+            "ownerId": "string",
+            "isLocked": true,
+            "createdAt": "2019-08-24T14:15:22.123Z",
+            "updatedAt": "2019-08-24T14:15:22.123Z"
+        }
+    ],
+    "totalCount": -9007199254740991,
+    "currentPage": -9007199254740991,
+    "hasNextPage": true,
+    "hasPrevPage": true
+}

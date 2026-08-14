@@ -73,6 +73,7 @@ class CacheKeyConstant {
   static const String kaleidXBlackGateMarkedSongs = 'kaleidx_black_gate_marked_songs';
   static const String kaleidXBlueGateMarkedSongs = 'kaleidx_blue_gate_marked_songs';
   static const String kaleidXYellowGateMarkedSongs = 'kaleidx_yellow_gate_marked_songs';
+  static const String kaleidXRedGateMarkedSongs = 'kaleidx_red_gate_marked_songs';
   
   // 上次更新使用的数据源
   static const String lastDataSource = 'last_data_source';

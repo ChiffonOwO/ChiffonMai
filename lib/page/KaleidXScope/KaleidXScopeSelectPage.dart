@@ -5,6 +5,7 @@ import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPageBLUE.
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPageWHITE.dart';
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPagePURPLE.dart';
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPageYELLOW.dart';
+import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPageRED.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 
 class KaleidXScopeSelectPage extends StatefulWidget {
@@ -22,6 +23,7 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
     {'image': 'assets/kaleidxscope/purple.webp', 'title': '紫の扉（紫色之门）', 'type': 'purple'},
     {'image': 'assets/kaleidxscope/black.webp', 'title': '黑の扉（黑色之门）', 'type': 'black'},
     {'image': 'assets/kaleidxscope/yellow.webp', 'title': '黄の扉（黄色之门）', 'type': 'yellow'},
+    {'image': 'assets/kaleidxscope/red.webp', 'title': '赤の扉（红色之门）', 'type': 'red'},
   ];
 
   @override
@@ -139,6 +141,13 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) => KaleidXScopeInfoPageYELLOW(),
+                                      ),
+                                    );
+                                  } else if (item['type'] == 'red') {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => KaleidXScopeInfoPageRED(),
                                       ),
                                     );
                                   } else {

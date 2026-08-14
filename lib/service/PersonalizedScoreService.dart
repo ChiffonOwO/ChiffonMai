@@ -382,7 +382,7 @@ class PersonalizedScoreService {
       case 1: return 'ADVANCED';
       case 2: return 'EXPERT';
       case 3: return 'MASTER';
-      case 4: return 'RE:MASTER';
+      case 4: return 'Re:MASTER';
       default: return difficulty.toString();
     }
   }
@@ -396,6 +396,7 @@ class PersonalizedScoreService {
   static const String _keyCharter = 'level_score_charter';
   static const String _keyVersion = 'level_score_version';
   static const String _keyArtist = 'level_score_artist';
+  static const String _keyGenre = 'level_score_genre';
   static const String _keyUseLevelDisplay = 'level_score_use_level_display';
 
   // 保存用户选择的选项
@@ -409,6 +410,7 @@ class PersonalizedScoreService {
     required String? charter,
     String? version,
     String? artist,
+    String? genre,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyLevel, level ?? '');
@@ -420,6 +422,7 @@ class PersonalizedScoreService {
     await prefs.setString(_keyCharter, charter ?? '');
     await prefs.setString(_keyVersion, version ?? '');
     await prefs.setString(_keyArtist, artist ?? '');
+    await prefs.setString(_keyGenre, genre ?? '');
   }
 
   // 获取保存的用户选项
@@ -435,6 +438,7 @@ class PersonalizedScoreService {
       'charter': prefs.getString(_keyCharter) ?? '',
       'version': prefs.getString(_keyVersion) ?? '',
       'artist': prefs.getString(_keyArtist) ?? '',
+      'genre': prefs.getString(_keyGenre) ?? '',
     };
   }
 
@@ -477,6 +481,33 @@ class PersonalizedScoreService {
     }
   }
 
+  // 获取所有流派及其歌曲数量
+  Future<Map<String, int>> getGenreCounts() async {
+    try {
+      final songs = await getAllSongs();
+      if (songs == null) return {};
+
+      Map<String, int> genreCounts = {};
+      for (final song in songs) {
+        if (song.id.length == 6 && int.tryParse(song.id) != null) {
+          continue;
+        }
+        if (_isMaidataSong(song)) {
+          continue;
+        }
+        final genre = song.basicInfo.genre;
+        if (genre.isNotEmpty) {
+          genreCounts[genre] = (genreCounts[genre] ?? 0) + 1;
+        }
+      }
+
+      return genreCounts;
+    } catch (e) {
+      debugPrint('获取流派列表时出错: $e');
+      return {};
+    }
+  }
+
   // 根据曲师获取歌曲及其完成状态
   Future<List<Map<String, dynamic>>> getSongsByArtist(
     String artist,
@@ -501,6 +532,67 @@ class PersonalizedScoreService {
       }
 
       if (song.basicInfo.artist != artist) {
+        continue;
+      }
+
+      if (difficulty == -1) {
+        for (int i = 0; i < song.ds.length; i++) {
+          final completed = isSongCompletedSync(int.parse(song.id), i, titleType);
+          result.add({
+            'song': song,
+            'completed': completed,
+            'difficulty': i,
+          });
+        }
+      } else {
+        if (difficulty < song.ds.length) {
+          final completed = await isSongCompleted(int.parse(song.id), difficulty, titleType);
+          result.add({
+            'song': song,
+            'completed': completed,
+            'difficulty': difficulty,
+          });
+        }
+      }
+    }
+
+    result.sort((a, b) {
+      final songA = a['song'] as Song;
+      final songB = b['song'] as Song;
+      final diffA = a['difficulty'] as int;
+      final diffB = b['difficulty'] as int;
+      double dsA = songA.ds.length > diffA ? songA.ds[diffA] : -1;
+      double dsB = songB.ds.length > diffB ? songB.ds[diffB] : -1;
+      return dsB.compareTo(dsA);
+    });
+
+    return result;
+  }
+
+  // 根据流派获取歌曲及其完成状态
+  Future<List<Map<String, dynamic>>> getSongsByGenre(
+    String genre,
+    String titleType,
+    int difficulty,
+  ) async {
+    await _initRecordsCache();
+
+    final songs = await getAllSongs();
+    if (songs == null) {
+      return [];
+    }
+
+    final result = <Map<String, dynamic>>[];
+
+    for (final song in songs) {
+      if (song.id.length == 6 && int.tryParse(song.id) != null) {
+        continue;
+      }
+      if (_isMaidataSong(song)) {
+        continue;
+      }
+
+      if (song.basicInfo.genre != genre) {
         continue;
       }
 

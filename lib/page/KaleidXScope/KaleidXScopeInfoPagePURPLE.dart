@@ -7,6 +7,7 @@ import 'package:my_first_flutter_app/service/KaleidXScope/KaleidXScopeInfoServic
 import 'package:my_first_flutter_app/service/KaleidXScope/KaleidXScopeSelectService.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
+import 'package:my_first_flutter_app/entity/KaleidXScope/KaleidXScopeGate.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 
@@ -31,6 +32,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
 
   // 特殊歌曲缓存（隐藏歌曲）
   Song? _specialSong11749;
+  KaleidXScopeGate? _gateData;
 
   // 自定义常量
   late double _borderRadiusSmall;
@@ -99,6 +101,9 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
     });
 
     try {
+      _gateData = await _service.fetchGateData();
+      if (_gateData == null) return;
+
       final songs = await _service.getPurpleGateSongs();
       setState(() {
         _songs = songs;
@@ -122,15 +127,21 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
   }
 
   Future<void> _loadSpecialSongs() async {
+    if (_gateData == null) return;
     final allSongs = await MaimaiMusicDataManager().getCachedSongs();
     if (allSongs == null) return;
 
-    try {
-      _specialSong11749 = allSongs.firstWhere(
-        (song) => song.id.toString() == '11749',
-      );
-    } catch (e) {
-      _specialSong11749 = null;
+    for (final ss in _gateData!.specialSongs) {
+      try {
+        final song = allSongs.firstWhere((s) => s.id.toString() == ss.songId.toString());
+        if (ss.role == 'perfect') {
+          _specialSong11749 = song;
+        } else if (ss.role == 'hidden') {
+          _specialSong11749 = song;
+        }
+      } catch (e) {
+        // song not found in cache
+      }
     }
   }
 
@@ -180,7 +191,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
               ),
               SizedBox(height: _paddingS),
               Text(
-                '紫门门扉',
+                _gateData?.doorName ?? '紫门门扉',
                 style: TextStyle(
                   fontSize: _textSizeM,
                   fontWeight: FontWeight.bold,
@@ -196,7 +207,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                   children: [
                     TextSpan(text: '完成'),
                     TextSpan(
-                      text: '紫蔷薇区域10',
+                      text: _gateData?.prerequisite ?? '紫蔷薇区域10',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     TextSpan(text: '（门扉必要条件）'),
@@ -212,20 +223,22 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                   color: Colors.orange[700],
                 ),
               ),
-              Text(
-                '设置[アウル]为队长，单人连续游玩3首 / 双人连续游玩4首下方曲目池中的歌曲。不限难度，不能重复',
-                style: TextStyle(
-                  fontSize: _textSizeS,
-                  color: AppColors.greyHint(brightness),
+              if (_gateData?.keyRequirement != null)
+                Text(
+                  _gateData!.keyRequirement!,
+                  style: TextStyle(
+                    fontSize: _textSizeS,
+                    color: AppColors.greyHint(brightness),
+                  ),
                 ),
-              ),
-              Text(
-                '可：选择/不可：跳过，段位认定和宴会场',
-                style: TextStyle(
-                  fontSize: _textSizeS,
-                  color: AppColors.greyHint(brightness),
+              if (_gateData?.guideNote != null && _gateData!.guideNote!.isNotEmpty)
+                Text(
+                  _gateData!.guideNote!,
+                  style: TextStyle(
+                    fontSize: _textSizeS,
+                    color: AppColors.greyHint(brightness),
+                  ),
                 ),
-              ),
               SizedBox(height: _paddingS),
               Text(
                 'KALEIDXSCOPE模式',
@@ -236,21 +249,21 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                 ),
               ),
               Text(
-                '第一首：所有区域歌曲',
+                '第一首：${_gateData?.track1Desc ?? "所有区域歌曲"}',
                 style: TextStyle(
                   fontSize: _textSizeS,
                   color: AppColors.greyHint(brightness),
                 ),
               ),
               Text(
-                '第二首：所有区域内的完美挑战曲',
+                '第二首：${_gateData?.track2Desc ?? "所有区域内的完美挑战曲"}',
                 style: TextStyle(
                   fontSize: _textSizeS,
                   color: AppColors.greyHint(brightness),
                 ),
               ),
               Text(
-                '第三首：固定，即为隐藏歌曲',
+                '第三首：${_gateData?.track3Desc ?? "固定，即为隐藏歌曲"}',
                 style: TextStyle(
                   fontSize: _textSizeS,
                   color: AppColors.greyHint(brightness),
@@ -258,7 +271,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
               ),
               SizedBox(height: _paddingS),
               Text(
-                '紫の扉的隐藏歌曲为',
+                '${_gateData?.doorName ?? "紫门门扉"}的隐藏歌曲为',
                 style: TextStyle(
                   fontSize: _textSizeM,
                   fontWeight: FontWeight.bold,
@@ -271,9 +284,11 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
         ),
         SizedBox(height: _paddingL),
 
-        // 紫门挑战
-        _buildChallengeSection(purpleService.KaleidXScopeInfoServicePURPLE.purpleGateChallenge),
-        SizedBox(height: _paddingL),
+        if (_gateData != null)
+          for (final challenge in _gateData!.challenges) ...[
+            _buildChallengeSection(challenge),
+            SizedBox(height: _paddingL),
+          ],
         Divider(color: AppColors.tableBorder(brightness), thickness: 1),
         SizedBox(height: _paddingS),
       ],
@@ -281,10 +296,10 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
   }
 
   // 构建单个挑战区域
-  Widget _buildChallengeSection(Map<String, dynamic> challenge) {
+  Widget _buildChallengeSection(KaleidXScopeChallenge challenge) {
     final brightness = Theme.of(context).brightness;
-    final String name = challenge['name'];
-    final List<dynamic> phases = challenge['phases'];
+    final String name = challenge.name;
+    final phases = challenge.phases;
     final double progressBarFontSize = 10.0 * (MediaQuery.of(context).size.width / 375.0);
 
     return Container(
@@ -316,16 +331,15 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
             ),
             child: Row(
               children: phases.map((phase) {
-                final String type = phase['type'];
                 final Color color =
-                    KaleidXScopeSelectService.getDifficultyColor(type);
+                    KaleidXScopeSelectService.getDifficultyColor(phase.difficulty);
 
               return Expanded(
                 child: Container(
                   color: color,
                   child: Center(
                     child: Text(
-                      '$type',
+                      phase.difficulty,
                       style: TextStyle(
                         fontSize: progressBarFontSize,
                         fontWeight: FontWeight.bold,
@@ -343,19 +357,15 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
         SizedBox(height: _paddingXS),
         Column(
           children: phases.map((phase) {
-            final String type = phase['type'];
-            final String startDate = phase['startDate'];
-            final String? endDate = phase['endDate'];
-            final int lifeTarget = phase['lifeTarget'];
             final Color color =
-                KaleidXScopeSelectService.getDifficultyColor(type);
+                KaleidXScopeSelectService.getDifficultyColor(phase.difficulty);
 
             return Padding(
               padding: EdgeInsets.symmetric(vertical: _paddingXS * 0.5),
               child: Row(
                 children: [
                   Text(
-                    '${startDate}${endDate != null ? ' - $endDate' : ' - 后续'}:',
+                    '${phase.startDate}${phase.endDate != null ? ' - ${phase.endDate}' : ' - 后续'}:',
                     style: TextStyle(
                       fontSize: _textSizeS,
                       color: AppColors.greyHint(brightness),
@@ -363,7 +373,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                   ),
                   SizedBox(width: _paddingS),
                   Text(
-                    type,
+                    phase.difficulty,
                     style: TextStyle(
                       fontSize: _textSizeS,
                       fontWeight: FontWeight.bold,
@@ -372,7 +382,7 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
                   ),
                   SizedBox(width: _paddingXS),
                   Text(
-                    'LIFE $lifeTarget',
+                    'LIFE ${phase.lifeTarget}',
                     style: TextStyle(
                       fontSize: _textSizeS,
                       fontWeight: FontWeight.bold,

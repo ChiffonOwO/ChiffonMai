@@ -337,7 +337,7 @@ class AppColors {
         return const Color(0xFFE91E63);
       case 'MASTER':
         return const Color(0xFF9966CC);
-      case 'RE:MASTER':
+      case 'Re:MASTER':
       case 'REMASTER':
         return const Color(0xFF9C27B0);
       default:
@@ -356,7 +356,7 @@ class AppColors {
         return const Color(0xFFFCE4EC);
       case 'MASTER':
         return const Color(0xFFE9D8FF);
-      case 'RE:MASTER':
+      case 'Re:MASTER':
       case 'REMASTER':
         return const Color(0xFFF3E5F5);
       default:
@@ -375,7 +375,7 @@ class AppColors {
         return const Color(0xFFF8BBD0);
       case 'MASTER':
         return const Color(0xFFD4BFFF);
-      case 'RE:MASTER':
+      case 'Re:MASTER':
       case 'REMASTER':
         return const Color(0xFFE1BEE7);
       default:

@@ -141,7 +141,7 @@ class DailyRecommendService {
   int _pickAnyBestLevel(Song song) {
     final dsList = song.ds;
     if (dsList.isEmpty) return -1;
-    // 优先 MASTER 或 RE:MASTER
+    // 优先 MASTER 或 Re:MASTER
     for (int i = dsList.length - 1; i >= 0; i--) {
       if (dsList[i] > 0) return i;
     }

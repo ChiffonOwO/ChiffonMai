@@ -11,6 +11,7 @@
  *           例: 121634 → 1634, 110234 → 234, 100034 → 34
  */
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 
 class CoverUtil {
   // ===========================================================================
@@ -127,6 +128,34 @@ class CoverUtil {
     }
 
     return 'https://www.diving-fish.com/covers/$coverId.png';
+  }
+
+  // ===========================================================================
+  // 曲绘资源解析（供 ImageProvider / 视频导出等需要真实可加载资源处使用）
+  // ===========================================================================
+
+  /// 解析曲绘的 [ImageProvider]，采用与 [buildCoverWidget] 一致的多级 fallback：
+  /// 原始 songId → 本地主路径 → 备用路径1 → 备用路径2 → 网络曲绘。
+  ///
+  /// 本地路径通过 [rootBundle.load] 实际探测是否存在，命中即返回 [AssetImage]；
+  /// 否则回退到网络曲绘（[NetworkImage]），与歌曲详情页的行为一致。
+  static Future<ImageProvider> resolveCoverProvider(String songId) async {
+    final localCandidates = <String>[
+      buildCoverPath(songId),
+      getLocalCoverPath(songId),
+      getLocalCoverPathRetry1(songId),
+      getLocalCoverPathRetry2(songId),
+    ];
+    for (final path in localCandidates) {
+      try {
+        await rootBundle.load(path);
+        return AssetImage(path);
+      } catch (_) {
+        // 本地资源不存在，继续尝试下一条候选路径
+      }
+    }
+    // 本地无真实曲绘，回退到网络曲绘（与 buildCoverWidget 的网络兜底一致）
+    return NetworkImage(getNetworkCoverUrl(songId));
   }
 
   // ===========================================================================

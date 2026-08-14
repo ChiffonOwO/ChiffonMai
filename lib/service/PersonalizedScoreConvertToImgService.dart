@@ -24,6 +24,7 @@ class PersonalizedScoreConvertToImg {
     required String? selectedCharter,
     required String? selectedVersion,
     required String? selectedArtist,
+    required String? selectedGenre,
     required String mode,
     required String? selectedTitleType,
     required int? selectedDifficulty,
@@ -59,6 +60,7 @@ class PersonalizedScoreConvertToImg {
           selectedCharter: selectedCharter,
           selectedVersion: selectedVersion,
           selectedArtist: selectedArtist,
+          selectedGenre: selectedGenre,
           mode: mode,
           selectedTitleType: selectedTitleType,
           selectedDifficulty: selectedDifficulty,
@@ -261,6 +263,7 @@ class PersonalizedScoreConvertToImg {
     required String? selectedCharter,
     required String? selectedVersion,
     required String? selectedArtist,
+    required String? selectedGenre,
     required String mode,
     required String? selectedTitleType,
     required int? selectedDifficulty,
@@ -300,7 +303,7 @@ class PersonalizedScoreConvertToImg {
     final completionRate = totalCount > 0 ? (completedCount / totalCount * 100) : 0;
 
     // 统计各难度完成情况
-    final difficultyNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'RE:MASTER'];
+    final difficultyNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'Re:MASTER'];
     List<Map<String, dynamic>> difficultyStats = [];
     for (int d = 0; d < difficultyNames.length; d++) {
       final diffSongs = songsWithStatus.where((item) => (item['difficulty'] as int) == d).toList();
@@ -367,6 +370,8 @@ class PersonalizedScoreConvertToImg {
       titleText = '个性化成绩查询 - 谱师:${selectedCharter ?? ''} ${selectedTitleType ?? ''}(${getDifficultyName(selectedDifficulty ?? -1)})';
     } else if (mode == 'version') {
       titleText = '个性化成绩查询 - 版本:${StringUtil.formatVersion2(selectedVersion ?? '')} ${selectedTitleType ?? ''}(${getDifficultyName(selectedDifficulty ?? -1)})';
+    } else if (mode == 'genre') {
+      titleText = '个性化成绩查询 - 流派:${selectedGenre ?? ''} ${selectedTitleType ?? ''}(${getDifficultyName(selectedDifficulty ?? -1)})';
     } else {
       titleText = '个性化成绩查询 - 曲师:${selectedArtist ?? ''} ${selectedTitleType ?? ''}(${getDifficultyName(selectedDifficulty ?? -1)})';
     }
@@ -429,7 +434,7 @@ class PersonalizedScoreConvertToImg {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${mode == 'level' ? 'Lv.${selectedLevel ?? ''}' : mode == 'charter' ? '谱师:${selectedCharter ?? ''}' : mode == 'version' ? '版本:${StringUtil.formatVersion2(selectedVersion ?? '')}' : '曲师:${selectedArtist ?? ''}'} ${selectedTitleType ?? ''}(${getDifficultyName(selectedDifficulty ?? -1)})统计',
+                    '${mode == 'level' ? 'Lv.${selectedLevel ?? ''}' : mode == 'charter' ? '谱师:${selectedCharter ?? ''}' : mode == 'version' ? '版本:${StringUtil.formatVersion2(selectedVersion ?? '')}' : mode == 'genre' ? '流派:${selectedGenre ?? ''}' : '曲师:${selectedArtist ?? ''}'} ${selectedTitleType ?? ''}(${getDifficultyName(selectedDifficulty ?? -1)})统计',
                     style: TextStyle(
                       fontSize: sectionTitleFontSize,
                       fontWeight: FontWeight.bold,

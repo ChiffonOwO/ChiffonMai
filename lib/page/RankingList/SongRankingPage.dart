@@ -424,7 +424,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
       case 3:
         return 'MASTER';
       case 4:
-        return 'RE:MASTER';
+        return 'Re:MASTER';
       default:
         return 'BASIC';
     }
@@ -441,7 +441,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
     } else if (lowerLabel.contains('master') && !lowerLabel.contains('re:')) {
       return 'MASTER';
     } else if (lowerLabel.contains('re:master')) {
-      return 'RE:MASTER';
+      return 'Re:MASTER';
     } else if (lowerLabel.contains('utage')) {
       return 'UTAGE';
     }

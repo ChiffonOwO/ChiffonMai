@@ -372,7 +372,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
       1: {'label': 'ADVANCED', 'color': AppColors.difficultyForegroundByIndex(1), 'bgColor': AppColors.difficultyBackgroundByIndex(1)},
       2: {'label': 'EXPERT', 'color': AppColors.difficultyForegroundByIndex(2), 'bgColor': AppColors.difficultyBackgroundByIndex(2)},
       3: {'label': 'MASTER', 'color': AppColors.difficultyForegroundByIndex(3), 'bgColor': AppColors.difficultyBackgroundByIndex(3)},
-      4: {'label': 'RE:MASTER', 'color': AppColors.difficultyForegroundByIndex(4), 'bgColor': AppColors.difficultyBackgroundByIndex(4)},
+      4: {'label': 'Re:MASTER', 'color': AppColors.difficultyForegroundByIndex(4), 'bgColor': AppColors.difficultyBackgroundByIndex(4)},
     };
     
     return Wrap(
@@ -591,7 +591,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   SizedBox(height: 1),
-                                  // 第三行：第3,4,5个定数（EXPERT/MASTER/RE:MASTER）
+                                  // 第三行：第3,4,5个定数（EXPERT/MASTER/Re:MASTER）
                                   Text(
                                     _getDsDisplay(dsList),
                                     style: TextStyle(

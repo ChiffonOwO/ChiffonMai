@@ -15,7 +15,7 @@ import '../../manager/DivingFish/UserBest50Manager.dart';
 import '../../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../../manager/DivingFish/UserPlayDataManager.dart';
 import '../../manager/MaiTagsManager.dart';
-import '../../entity/DXRating/MaiTagsEntity.dart';
+import '../../entity/DXRating/MaiTagsModel.dart';
 import '../SongInfoPage.dart';
 import '../../utils/CoverUtil.dart';
 import '../../utils/TextStyleUtil.dart';

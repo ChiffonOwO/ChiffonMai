@@ -67,8 +67,10 @@ dependencies:
   pinyin: ^3.3.0
   kana_kit: ^2.1.1
   jp_transliterate: ^1.0.5
-  simai_flutter: ^0.2.5
+  simai_flutter: ^0.4.1
   redis: ^4.0.0
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
   mysql1: ^0.20.0
 
   # flutter_soloud: ^3.4.10

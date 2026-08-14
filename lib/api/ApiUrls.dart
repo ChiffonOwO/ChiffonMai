@@ -24,6 +24,8 @@ class ApiUrls {
   static const String ServerStatusTitleApi = 'https://status.awmc.cc/api/status-page/maimai';
   static const String checkUpdateApi = 'https://chiffonmai.cloud/app_version.json';
   static const String knowledgeApi = 'http://chiffonmai.cloud:3000/api/knowledge';
+  static const String NearCadeShopsApi = 'https://nearcade.cn/api/shops';
+  static const String NearCadeRegionsApi = 'https://nearcade.cn/api/regions';
   
   // 多人游戏服务器地址
   static const String MultiplayerServerUrl = 'ws://chiffonmai.cloud:3000';
@@ -46,6 +48,12 @@ class ApiUrls {
   // 排行榜 API 地址
   static const String RankingsBaseUrl = 'http://chiffonmai.cloud:3000/api/rankings';
   static const String RankingsUpdateUrl = '$RankingsBaseUrl/update';
+
+  // 单曲排行榜 API 地址（达成率/DX分数）
+  static const String SongRankingsBaseUrl = 'http://chiffonmai.cloud:3000/api/song-rankings';
+
+  // 万花镜 API 地址
+  static const String KaleidXScopeBaseUrl = 'http://chiffonmai.cloud:3000/api/kaleidxscope';
 
   // 歌曲评论 API 地址
   static const String CommentsBaseUrl = 'http://chiffonmai.cloud:3000/api/comments';

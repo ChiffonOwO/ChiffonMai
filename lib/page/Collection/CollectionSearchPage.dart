@@ -193,7 +193,10 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: false, // 防止键盘弹出时调整布局
-      body: Stack(
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Stack(
         children: [
           // 背景
           CommonWidgetUtil.buildCommonBgWidget(),
@@ -559,6 +562,7 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
             ],
           ),
         ],
+      ),
       ),
     );
   }

@@ -2136,13 +2136,33 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                           ),
                                         ],
                                       ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: CoverUtil
-                                            .buildCoverWidgetWithContext(
-                                                context,
-                                                widget.songId.toString(),
-                                                120),
+                                      child: Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            child: CoverUtil
+                                                .buildCoverWidgetWithContext(
+                                                    context,
+                                                    widget.songId.toString(),
+                                                    120),
+                                          ),
+                                          if (widget.songId == '11820' ||
+                                              widget.songId == '11821')
+                                            Positioned(
+                                              top: -2,
+                                              left: -14,
+                                              child: Image.asset(
+                                                'assets/cover/UI_Long_Song.webp',
+                                                width: MediaQuery.of(context)
+                                                        .size
+                                                        .width *
+                                                    0.16,
+                                                fit: BoxFit.contain,
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                     ),
                                   ),
@@ -2468,7 +2488,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                       StringUtil.formatVersion2WithFlag(
                                           basicInfo['from'], _songData?['is_extra'] == true)),
                                   _buildStatItem(
-                                      '谱面谱师', currentChart['charter']),
+                                      '谱师', currentChart['charter']),
                                 ],
                               ),
 
@@ -5905,7 +5925,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
           ),
           const SizedBox(height: 4),
           // 为超出容器宽度的文本添加水平滚动
-          (label == '谱面谱师' || label == '曲师' || label == '类别')
+          (label == '谱师' || label == '曲师' || label == '类别')
               ? LayoutBuilder(
                   builder: (context, constraints) {
                     // 计算文本宽度
@@ -7076,7 +7096,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
     final levels = _songData!['level'];
     final isUtage = widget.songId.length == 6;
     final rawLevel = (levels[_currentDiffIndex] ?? '').toString();
-    const diffNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'RE:MASTER'];
+    const diffNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'Re:MASTER'];
     final diffName = isUtage ? 'UTAGE' : diffNames[_currentDiffIndex.clamp(0, 4)];
 
     final TextEditingController controller = TextEditingController(
@@ -7407,9 +7427,13 @@ class _SongInfoPageState extends State<SongInfoPage> {
                             margin: EdgeInsets.only(bottom: 12),
                             padding: EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey[200]!),
+                              border: Border.all(
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.grey.shade700
+                                    : Colors.grey.shade200,
+                              ),
                               borderRadius: BorderRadius.circular(8),
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.surface,
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -7441,13 +7465,14 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 16,
+                                          color: Theme.of(context).colorScheme.onSurface,
                                         ),
                                       ),
                                     ),
                                     Icon(
                                       Icons.arrow_forward_ios,
                                       size: 16,
-                                      color: Colors.grey[400],
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                                     ),
                                   ],
                                 ),
@@ -7458,7 +7483,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                     child: Text(
                                       item['description'],
                                       style: TextStyle(
-                                        color: Colors.grey[600],
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                                         fontSize: 14,
                                       ),
                                     ),
@@ -8021,7 +8046,7 @@ class _BookmarkFolderSelectorDialogState
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
-    final levelNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'RE:MASTER', 'UTAGE'];
+    final levelNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'Re:MASTER', 'UTAGE'];
     final bool isUtage = widget.chart.songId.length == 6;
     final String levelName;
     if (isUtage) {
@@ -8259,7 +8284,7 @@ class _BookmarkFolderSelectorDialogState
           bgColor = isDark ? const Color(0xFF2A1A3D) : Colors.purple.shade100;
           textColor = isDark ? const Color(0xFFCE93D8) : Colors.purple.shade700;
           break;
-        case 4: // RE:MASTER
+        case 4: // Re:MASTER
           bgColor = isDark ? const Color(0xFF2A1A3D) : Colors.purple.shade100;
           textColor = isDark ? const Color(0xFFCE93D8) : Colors.purple.shade700;
           break;

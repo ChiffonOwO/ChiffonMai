@@ -620,56 +620,36 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                         },
                       ),
                     ),
-                    // 操作菜单靠右
+                    // 操作按钮靠右
                     if (!_isLoading && _maidataContent.isNotEmpty)
                       Align(
                         alignment: Alignment.centerRight,
-                        child: PopupMenuButton<String>(
-                          icon: Icon(Icons.more_vert, color: textPrimaryColor),
-                          offset: const Offset(0, 40),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          onSelected: (value) {
-                            switch (value) {
-                              case 'copy':
-                                _copyToClipboard();
-                                break;
-                              case 'render':
-                                _navigateToChartPlay();
-                                break;
-                              case 'export':
-                                if (!_isExporting) _exportToZip();
-                                break;
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: 'copy',
-                              child: ListTile(
-                                leading: Icon(Icons.copy),
-                                title: Text('复制'),
-                                dense: true,
-                                contentPadding: EdgeInsets.zero,
-                              ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.copy, color: textPrimaryColor, size: 20),
+                              onPressed: _copyToClipboard,
+                              tooltip: '复制',
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.all(4),
+                              constraints: const BoxConstraints(),
                             ),
-                            const PopupMenuItem(
-                              value: 'render',
-                              child: ListTile(
-                                leading: Icon(Icons.play_circle_outline),
-                                title: Text('渲染'),
-                                dense: true,
-                                contentPadding: EdgeInsets.zero,
-                              ),
+                            IconButton(
+                              icon: Icon(_isExporting ? Icons.hourglass_empty : Icons.download, color: textPrimaryColor, size: 20),
+                              onPressed: _isExporting ? null : _exportToZip,
+                              tooltip: '导出',
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.all(4),
+                              constraints: const BoxConstraints(),
                             ),
-                            PopupMenuItem(
-                              value: 'export',
-                              child: ListTile(
-                                leading: Icon(Icons.download),
-                                title: Text(_isExporting ? '导出中...' : '导出'),
-                                dense: true,
-                                contentPadding: EdgeInsets.zero,
-                              ),
+                            IconButton(
+                              icon: Icon(Icons.play_circle_outline, color: textPrimaryColor, size: 20),
+                              onPressed: _navigateToChartPlay,
+                              tooltip: '渲染',
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.all(4),
+                              constraints: const BoxConstraints(),
                             ),
                           ],
                         ),

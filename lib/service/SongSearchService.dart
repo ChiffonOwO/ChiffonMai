@@ -77,6 +77,54 @@ class SongSearchService {
     }).toList();
   }
 
+  // 获取所有谱师列表（去重，按名称排序）
+  static Future<List<String>> getCharterList() async {
+    try {
+      final allSongs = await loadAllSongs();
+      if (allSongs == null) return [];
+
+      final Set<String> charters = {};
+      for (final song in allSongs) {
+        if (song.id.length == 6 && int.tryParse(song.id) != null) continue;
+        if (song.isExtra) continue;
+        if (song.cids.isNotEmpty && song.cids.every((cid) => cid == 0)) continue;
+        for (final chart in song.charts) {
+          final charter = chart.charter.trim();
+          if (charter.isNotEmpty) {
+            charters.add(charter);
+          }
+        }
+      }
+      return charters.toList()..sort();
+    } catch (e) {
+      debugPrint('获取谱师列表时出错: $e');
+      return [];
+    }
+  }
+
+  // 获取所有曲师列表（去重，按名称排序）
+  static Future<List<String>> getArtistList() async {
+    try {
+      final allSongs = await loadAllSongs();
+      if (allSongs == null) return [];
+
+      final Set<String> artists = {};
+      for (final song in allSongs) {
+        if (song.id.length == 6 && int.tryParse(song.id) != null) continue;
+        if (song.isExtra) continue;
+        if (song.cids.isNotEmpty && song.cids.every((cid) => cid == 0)) continue;
+        final artist = song.basicInfo.artist.trim();
+        if (artist.isNotEmpty) {
+          artists.add(artist);
+        }
+      }
+      return artists.toList()..sort();
+    } catch (e) {
+      debugPrint('获取曲师列表时出错: $e');
+      return [];
+    }
+  }
+
   // 根据标签筛选歌曲（支持复选，满足所选标签集中的一个即可）
   static Future<List<Song>> filterSongsByTags(List<int> selectedTagIds) async {
     if (selectedTagIds.isEmpty) {

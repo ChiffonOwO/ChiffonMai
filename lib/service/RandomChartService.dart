@@ -64,7 +64,7 @@ class RandomChartService {
           }
         }
         
-        // 如果MASTER不满足，检查RE:MASTER难度（索引4）
+        // 如果MASTER不满足，检查Re:MASTER难度（索引4）
         if (!hasValidMasterDs && song.ds.length > 4) {
           double remasterDs = song.ds[4];
           bool meetsMin = minDs == null || remasterDs >= minDs;
@@ -129,7 +129,7 @@ class RandomChartService {
             bool meetsMax = maxDs == null || ds <= maxDs;
             if (requireMaster) {
               String level = song.level[i];
-              if ((level == 'MASTER' || level == 'RE:MASTER') && meetsMin && meetsMax) {
+              if ((level == 'MASTER' || level == 'Re:MASTER') && meetsMin && meetsMax) {
                 return true;
               }
             } else if (meetsMin && meetsMax) {
@@ -149,7 +149,7 @@ class RandomChartService {
           var song = dsTest[i];
           debugPrint('[RandomChartService]   ${song.id}: ${song.basicInfo.title} - ${song.basicInfo.from} - ${song.basicInfo.genre}');
           for (int j = 0; j < song.ds.length; j++) {
-            if ((!requireMaster || (song.level[j] == 'MASTER' || song.level[j] == 'RE:MASTER'))) {
+            if ((!requireMaster || (song.level[j] == 'MASTER' || song.level[j] == 'Re:MASTER'))) {
               debugPrint('[RandomChartService]     ${song.level[j]}: ${song.ds[j]}');
             }
           }

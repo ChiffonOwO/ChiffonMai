@@ -4,6 +4,7 @@ import 'package:my_first_flutter_app/page/HomePage.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/ThemeManager.dart';
 import 'package:my_first_flutter_app/service/ConnectivityService.dart';
+import 'package:my_first_flutter_app/utils/SwipeBackDetector.dart';
 
 void main() {
   GoogleFonts.config.allowRuntimeFetching = true;
@@ -19,6 +20,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   bool _fontsLoaded = false;
   bool _themeLoaded = false;
 
@@ -88,6 +90,7 @@ class _MyAppState extends State<MyApp> {
         final pureBlack = ThemeManager().pureBlackEnabled;
         return MaterialApp(
           debugShowCheckedModeBanner: false,
+          navigatorKey: _navigatorKey,
           home: HomePage(onFirstFrameRendered: _loadFonts),
           theme: _buildThemeWithFonts(AppTheme.lightTheme()),
           darkTheme: _buildThemeWithFonts(
@@ -95,13 +98,16 @@ class _MyAppState extends State<MyApp> {
           ),
           themeMode: themeMode,
           builder: (context, child) {
-            return MediaQuery(
-              data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
-              child: DefaultTextStyle(
-                style: _fontsLoaded
-                    ? GoogleFonts.notoSansSc()
-                    : const TextStyle(),
-                child: child!,
+            return SwipeBackDetector(
+              navigatorKey: _navigatorKey,
+              child: MediaQuery(
+                data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
+                child: DefaultTextStyle(
+                  style: _fontsLoaded
+                      ? GoogleFonts.notoSansSc()
+                      : const TextStyle(),
+                  child: child!,
+                ),
               ),
             );
           },

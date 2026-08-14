@@ -76,7 +76,7 @@ class SpecialRankingListService {
   // 定数差值排行榜相关缓存key
   static const String diffCacheKey = 'special:difficulty_diff_ranking_remote';
 
-  // MASTER/RE:MASTER定数差值排行榜相关缓存key
+  // MASTER/Re:MASTER定数差值排行榜相关缓存key
   static const String masterDiffCacheKey = 'special:master_diff_ranking_remote';
 
   // EXPERT定数差值排行榜相关缓存key
@@ -85,7 +85,7 @@ class SpecialRankingListService {
   // 反向定数差值排行榜相关缓存key
   static const String reverseDiffCacheKey = 'special:reverse_diff_ranking_remote';
 
-  // 反向MASTER/RE:MASTER定数差值排行榜相关缓存key
+  // 反向MASTER/Re:MASTER定数差值排行榜相关缓存key
   static const String reverseMasterDiffCacheKey = 'special:reverse_master_diff_ranking_remote';
 
   // 反向EXPERT定数差值排行榜相关缓存key
@@ -100,7 +100,7 @@ class SpecialRankingListService {
   // 平均达成排行榜相关缓存key
   static const String avgAchievementCacheKey = 'special:avg_achievement_ranking_remote';
 
-  // MASTER/RE:MASTER平均达成排行榜相关缓存key
+  // MASTER/Re:MASTER平均达成排行榜相关缓存key
   static const String masterAvgAchievementCacheKey = 'special:master_avg_achievement_ranking_remote';
 
   // EXPERT平均达成排行榜相关缓存key
@@ -448,7 +448,7 @@ class SpecialRankingListService {
     return result;
   }
 
-  // 获取MASTER/RE:MASTER定数差值排行榜（只统计levelIndex为3和4的谱面）
+  // 获取MASTER/Re:MASTER定数差值排行榜（只统计levelIndex为3和4的谱面）
   Future<List<SpecialRankingEntry>> getMasterDifficultyDiffRanking({
     int limit = 100,
     Function(int)? onProgress,
@@ -521,7 +521,7 @@ class SpecialRankingListService {
         // 获取需要排除的maidata追加歌曲ID
         Set<String> excludedSongIds = await _getMaidataAddedSongIds();
         
-        // 用于存储定数差值（只统计MASTER/RE:MASTER，即levelIndex为3和4）
+        // 用于存储定数差值（只统计MASTER/Re:MASTER，即levelIndex为3和4）
         List<Map<String, dynamic>> diffList = [];
         
         int totalSongs = songs.length;
@@ -541,7 +541,7 @@ class SpecialRankingListService {
               continue;
             }
 
-            // 只统计MASTER(3)和RE:MASTER(4)难度
+            // 只统计MASTER(3)和Re:MASTER(4)难度
             for (int i = 3; i <= 4 && i < song.ds.length; i++) {
               double officialDs = song.ds[i];
               double ratedDs = 0.0;
@@ -956,7 +956,7 @@ class SpecialRankingListService {
     return result;
   }
 
-  // 获取反向MASTER/RE:MASTER定数差值排行榜
+  // 获取反向MASTER/Re:MASTER定数差值排行榜
   Future<List<SpecialRankingEntry>> getReverseMasterDifficultyDiffRanking({
     int limit = 100,
     Function(int)? onProgress,
@@ -1026,7 +1026,7 @@ class SpecialRankingListService {
           // 获取需要排除的maidata追加歌曲ID
           Set<String> excludedSongIds = await _getMaidataAddedSongIds();
           
-          // 用于存储定数差值（只统计MASTER/RE:MASTER，即levelIndex为3和4）
+          // 用于存储定数差值（只统计MASTER/Re:MASTER，即levelIndex为3和4）
           List<Map<String, dynamic>> diffList = [];
           
           int totalSongs = songs.length;
@@ -1046,7 +1046,7 @@ class SpecialRankingListService {
                 continue;
               }
 
-              // 只统计MASTER(3)和RE:MASTER(4)难度
+              // 只统计MASTER(3)和Re:MASTER(4)难度
               for (int i = 3; i <= 4 && i < song.ds.length; i++) {
                 double officialDs = song.ds[i];
                 double ratedDs = 0.0;
@@ -1792,7 +1792,7 @@ class SpecialRankingListService {
     return result;
   }
 
-  // 获取MASTER/RE:MASTER平均达成排行榜
+  // 获取MASTER/Re:MASTER平均达成排行榜
   Future<List<SpecialRankingEntry>> getMasterAvgAchievementRanking({
     int limit = 100,
     Function(int)? onProgress,
@@ -1888,7 +1888,7 @@ class SpecialRankingListService {
               continue;
             }
             
-            // 只统计MASTER/RE:MASTER难度（levelIndex为3和4）
+            // 只统计MASTER/Re:MASTER难度（levelIndex为3和4）
             for (int i = 3; i <= 4 && i < song.ds.length; i++) {
               // 使用索引匹配
               double avgAchievement = 0.0;
@@ -2365,8 +2365,8 @@ class SpecialRankingListService {
 
   // 获取显示用的难度索引（跳过EASY）
   int _getDisplayDifficultyIndex(String songId, int maimaiIndex) {
-    // maidata的difficultyIndex是2-6（对应BASIC, ADVANCED, EXPERT, MASTER, RE:MASTER）和7（EASY）
-    // 显示用的是0-4（跳过EASY，对应BASIC, ADVANCED, EXPERT, MASTER, RE:MASTER）
+    // maidata的difficultyIndex是2-6（对应BASIC, ADVANCED, EXPERT, MASTER, Re:MASTER）和7（EASY）
+    // 显示用的是0-4（跳过EASY，对应BASIC, ADVANCED, EXPERT, MASTER, Re:MASTER）
     
     // UTAGE歌曲只有一个难度
     if (songId.length == 6) {
@@ -2393,7 +2393,7 @@ class SpecialRankingListService {
       case 1: return 'ADVANCED';
       case 2: return 'EXPERT';
       case 3: return 'MASTER';
-      case 4: return 'RE:MASTER';
+      case 4: return 'Re:MASTER';
       default: return 'UNKNOWN';
     }
   }

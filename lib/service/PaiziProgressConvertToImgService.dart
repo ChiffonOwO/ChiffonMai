@@ -291,7 +291,7 @@ class PaiziProgressConvertToImg {
     final completionRate = totalCount > 0 ? (completedCount / totalCount * 100) : 0;
 
     // 统计各难度完成情况（仅在 ALL 模式下使用）
-    final difficultyNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'RE:MASTER'];
+    final difficultyNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'Re:MASTER'];
     List<Map<String, dynamic>> difficultyStats = [];
     for (int d = 0; d < difficultyNames.length; d++) {
       final diffSongs = songsWithStatus.where((item) => (item['difficulty'] as int) == d).toList();

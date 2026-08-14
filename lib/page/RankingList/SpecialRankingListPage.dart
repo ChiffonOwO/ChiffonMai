@@ -15,15 +15,15 @@ class SpecialRankingListPage extends StatefulWidget {
 enum RankingType {
   breakCount, // 绝赞数排行榜
   difficultyDiff, // 定数差值排行榜
-  masterDiff, // MASTER/RE:MASTER定数差值排行榜
+  masterDiff, // MASTER/Re:MASTER定数差值排行榜
   expertDiff, // EXPERT定数差值排行榜
   reverseDiff, // 反向定数差值排行榜
-  reverseMasterDiff, // 反向MASTER/RE:MASTER定数差值排行榜
+  reverseMasterDiff, // 反向MASTER/Re:MASTER定数差值排行榜
   reverseExpertDiff, // 反向EXPERT定数差值排行榜
   sampleCount, // 样本总数排行榜
   noteCount, // 物量排行榜
   avgAchievement, // 平均达成排行榜
-  masterAvgAchievement, // MASTER/RE:MASTER平均达成排行榜
+  masterAvgAchievement, // MASTER/Re:MASTER平均达成排行榜
   expertAvgAchievement, // EXPERT平均达成排行榜
   bpmRanking, // BPM排行榜（最高）
   reverseBpmRanking, // 反向BPM排行榜（最低）
@@ -161,13 +161,13 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
       case RankingType.difficultyDiff:
         return '定数差值排行榜';
       case RankingType.masterDiff:
-        return 'MASTER/RE:MASTER定数差值排行榜';
+        return 'MASTER/Re:MASTER定数差值排行榜';
       case RankingType.expertDiff:
         return 'EXPERT定数差值排行榜';
       case RankingType.reverseDiff:
         return '反向定数差值排行榜';
       case RankingType.reverseMasterDiff:
-        return '反向MASTER/RE:MASTER定数差值排行榜';
+        return '反向MASTER/Re:MASTER定数差值排行榜';
       case RankingType.reverseExpertDiff:
         return '反向EXPERT定数差值排行榜';
       case RankingType.sampleCount:
@@ -177,7 +177,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
       case RankingType.avgAchievement:
         return '平均达成率排行榜';
       case RankingType.masterAvgAchievement:
-        return 'MASTER/RE:MASTER平均达成率排行榜';
+        return 'MASTER/Re:MASTER平均达成率排行榜';
       case RankingType.expertAvgAchievement:
         return 'EXPERT平均达成率排行榜';
       case RankingType.bpmRanking:
@@ -289,8 +289,8 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                 ),
                 _buildDialogTile(
                   brightness,
-                  'MASTER/RE:MASTER定数差值排行榜',
-                  '只统计MASTER/RE:MASTER难度',
+                  'MASTER/Re:MASTER定数差值排行榜',
+                  '只统计MASTER/Re:MASTER难度',
                   RankingType.masterDiff,
                 ),
                 _buildDialogTile(
@@ -307,8 +307,8 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                 ),
                 _buildDialogTile(
                   brightness,
-                  '反向MASTER/RE:MASTER定数差值排行榜',
-                  '只统计MASTER/RE:MASTER难度',
+                  '反向MASTER/Re:MASTER定数差值排行榜',
+                  '只统计MASTER/Re:MASTER难度',
                   RankingType.reverseMasterDiff,
                 ),
                 _buildDialogTile(
@@ -337,8 +337,8 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                 ),
                 _buildDialogTile(
                   brightness,
-                  'MASTER/RE:MASTER平均达成率排行榜',
-                  '只统计MASTER/RE:MASTER难度',
+                  'MASTER/Re:MASTER平均达成率排行榜',
+                  '只统计MASTER/Re:MASTER难度',
                   RankingType.masterAvgAchievement,
                 ),
                 _buildDialogTile(

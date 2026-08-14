@@ -66,9 +66,16 @@ class StringUtil {
 
   /// 日文 DX 代 lookup（含 PLUS 变体，用于 -WithFlag 系列）
   static String? _lookupDxWithPlus(String version, Map<String, String> map) {
-    const prefix = 'maimai でらっくす ';
-    if (!version.startsWith(prefix)) return null;
-    var suffix = version.substring(prefix.length);
+    const prefixWithSpace = 'maimai でらっくす ';
+    const prefixNoSpace = 'maimai でらっくす';
+    String suffix;
+    if (version.startsWith(prefixWithSpace)) {
+      suffix = version.substring(prefixWithSpace.length);
+    } else if (version == prefixNoSpace) {
+      suffix = '';
+    } else {
+      return null;
+    }
     if (map.containsKey(suffix)) return map[suffix];
     // 对 2020-2024：同时检查 "X" 和 "X PLUS"
     if (!suffix.endsWith(' PLUS')) {
@@ -80,9 +87,16 @@ class StringUtil {
 
   /// 日文 DX 代 lookup（精确匹配，用于 formatVersion / formatVersion2）
   static String? _lookupDxExact(String version, Map<String, String> map) {
-    const prefix = 'maimai でらっくす ';
-    if (!version.startsWith(prefix)) return null;
-    final suffix = version.substring(prefix.length);
+    const prefixWithSpace = 'maimai でらっくす ';
+    const prefixNoSpace = 'maimai でらっくす';
+    String suffix;
+    if (version.startsWith(prefixWithSpace)) {
+      suffix = version.substring(prefixWithSpace.length);
+    } else if (version == prefixNoSpace) {
+      suffix = '';
+    } else {
+      return null;
+    }
     return map[suffix];
   }
 

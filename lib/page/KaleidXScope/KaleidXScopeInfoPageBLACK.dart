@@ -8,6 +8,7 @@ import 'package:my_first_flutter_app/service/KaleidXScope/KaleidXScopeInfoServic
 import 'package:my_first_flutter_app/constant/CacheKeyConstant.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
+import 'package:my_first_flutter_app/entity/KaleidXScope/KaleidXScopeGate.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 
@@ -35,6 +36,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
   // 特殊歌曲缓存
   Song? _specialSong11752; // 完美挑战曲
   Song? _specialSong11753; // 隐藏歌曲
+  KaleidXScopeGate? _gateData;
 
   // 自定义常量
   late double _borderRadiusSmall;
@@ -104,6 +106,10 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
     });
 
     try {
+      // 先获取门数据
+      _gateData = await _service.fetchGateData();
+      if (_gateData == null) return;
+
       final songs = await _service.getBlackGateSongs();
       setState(() {
         _songs = songs;
@@ -155,23 +161,21 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
   }
 
   Future<void> _loadSpecialSongs() async {
+    if (_gateData == null) return;
     final allSongs = await MaimaiMusicDataManager().getCachedSongs();
     if (allSongs == null) return;
 
-    try {
-      _specialSong11752 = allSongs.firstWhere(
-        (song) => song.id.toString() == '11752',
-      );
-    } catch (e) {
-      _specialSong11752 = null;
-    }
-
-    try {
-      _specialSong11753 = allSongs.firstWhere(
-        (song) => song.id.toString() == '11753',
-      );
-    } catch (e) {
-      _specialSong11753 = null;
+    for (final ss in _gateData!.specialSongs) {
+      try {
+        final song = allSongs.firstWhere((s) => s.id.toString() == ss.songId.toString());
+        if (ss.role == 'perfect') {
+          _specialSong11752 = song;
+        } else if (ss.role == 'hidden') {
+          _specialSong11753 = song;
+        }
+      } catch (e) {
+        // song not found in cache
+      }
     }
   }
 
@@ -321,108 +325,103 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
   // 挑战进度区域
   Widget _buildChallengeProgress() {
     final brightness = Theme.of(context).brightness;
-    final challenge = blackService.KaleidXScopeInfoServiceBLACK.blackGateChallenge;
-    final String name = challenge['name'] as String;
-    final List<dynamic> phases = challenge['phases'] as List<dynamic>;
-    final double progressBarFontSize = 10.0 * (MediaQuery.of(context).size.width / 375.0);
+    final challenges = _gateData?.challenges ?? [];
+    if (challenges.isEmpty) return const SizedBox.shrink();
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(_borderRadiusSmall),
-        border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
-      ),
-      padding: EdgeInsets.all(_paddingM),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            name,
-            style: TextStyle(
-              fontSize: _textSizeL,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
+    return Column(
+      children: challenges.map((challenge) {
+        final String name = challenge.name;
+        final phases = challenge.phases;
+        final double progressBarFontSize = 10.0 * (MediaQuery.of(context).size.width / 375.0);
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(_borderRadiusSmall),
+            border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
           ),
-          SizedBox(height: _paddingS),
-
-          // 进度条
-          Container(
-            height: _progressBarHeight,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(_progressBarHeight / 2),
-              border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
-            ),
-            child: Row(
-              children: phases.map((phase) {
-                final String type = phase['type'];
-                final Color color = _getDifficultyColor(type);
-
-                return Expanded(
-                  child: Container(
-                    color: color,
-                    child: Center(
-                      child: Text(
-                        '$type',
-                        style: TextStyle(
-                          fontSize: progressBarFontSize,
-                          fontWeight: FontWeight.bold,
-                          color: brightness == Brightness.dark ? Colors.white : Colors.black87,
+          padding: EdgeInsets.all(_paddingM),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name,
+                style: TextStyle(
+                  fontSize: _textSizeL,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              SizedBox(height: _paddingS),
+              Container(
+                height: _progressBarHeight,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(_progressBarHeight / 2),
+                  border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
+                ),
+                child: Row(
+                  children: phases.map((phase) {
+                    final Color color = _getDifficultyColor(phase.difficulty);
+                    return Expanded(
+                      child: Container(
+                        color: color,
+                        child: Center(
+                          child: Text(
+                            phase.difficulty,
+                            style: TextStyle(
+                              fontSize: progressBarFontSize,
+                              fontWeight: FontWeight.bold,
+                              color: brightness == Brightness.dark ? Colors.white : Colors.black87,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-
-          // 阶段详情
-          SizedBox(height: _paddingXS),
-          Column(
-            children: phases.map((phase) {
-              final String type = phase['type'];
-              final String startDate = phase['startDate'];
-              final String? endDate = phase['endDate'];
-              final int lifeTarget = phase['lifeTarget'];
-              final Color textColor = _getDifficultyTextColor(type);
-
-              return Padding(
-                padding: EdgeInsets.symmetric(vertical: _paddingXS * 0.5),
-                child: Row(
-                  children: [
-                    Text(
-                      '${startDate}${endDate != null ? ' - $endDate' : ' - 后续'}:',
-                      style: TextStyle(
-                        fontSize: _textSizeS,
-                        color: AppColors.greyHint(brightness),
-                      ),
-                    ),
-                    SizedBox(width: _paddingXS),
-                    Text(
-                      type,
-                      style: TextStyle(
-                        fontSize: _textSizeS,
-                        fontWeight: FontWeight.bold,
-                        color: textColor,
-                      ),
-                    ),
-                    SizedBox(width: _paddingXS),
-                    Text(
-                      'LIFE $lifeTarget',
-                      style: TextStyle(
-                        fontSize: _textSizeS,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                  ],
+                    );
+                  }).toList(),
                 ),
-              );
-            }).toList(),
+              ),
+              SizedBox(height: _paddingXS),
+              Column(
+                children: phases.map((phase) {
+                  final Color textColor = _getDifficultyTextColor(phase.difficulty);
+                  return Padding(
+                    padding: EdgeInsets.symmetric(vertical: _paddingXS * 0.5),
+                    child: Row(
+                      children: [
+                        Text(
+                          '${phase.startDate}${phase.endDate != null ? ' - ${phase.endDate}' : ' - 后续'}:',
+                          style: TextStyle(
+                            fontSize: _textSizeS,
+                            color: AppColors.greyHint(brightness),
+                          ),
+                        ),
+                        SizedBox(width: _paddingXS),
+                        Text(
+                          phase.difficulty,
+                          style: TextStyle(
+                            fontSize: _textSizeS,
+                            fontWeight: FontWeight.bold,
+                            color: textColor,
+                          ),
+                        ),
+                        SizedBox(width: _paddingXS),
+                        Text(
+                          'LIFE ${phase.lifeTarget}',
+                          style: TextStyle(
+                            fontSize: _textSizeS,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      }).toList(),
     );
   }
 

@@ -2369,7 +2369,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                       StringUtil.formatVersion2(
                                           basicInfo['from'])),
                                   _buildStatItem(
-                                      '谱面谱师', currentChart['charter']),
+                                      '谱师', currentChart['charter']),
                                 ],
                               ),
 
@@ -5717,7 +5717,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
           ),
           const SizedBox(height: 4),
           // 为超出容器宽度的文本添加水平滚动
-          (label == '谱面谱师' || label == '曲师' || label == '类别')
+          (label == '谱师' || label == '曲师' || label == '类别')
               ? LayoutBuilder(
                   builder: (context, constraints) {
                     // 计算文本宽度

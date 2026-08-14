@@ -255,7 +255,7 @@ class _RecentCommentsPageState extends State<RecentCommentsPage> {
   }
 
   String _getDifficultyLabel(int? levelIndex) {
-    const labels = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'RE:MASTER'];
+    const labels = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'Re:MASTER'];
     if (levelIndex == null || levelIndex < 0 || levelIndex >= labels.length) {
       return '?';
     }

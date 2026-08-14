@@ -235,7 +235,7 @@ class _RecentRatingsPageState extends State<RecentRatingsPage> {
   Widget _buildDifficultyTag(int difficultyIndex, String songId, Brightness brightness) {
     Color bgColor;
     Color textColor;
-    const labels = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'RE:MASTER'];
+    const labels = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'Re:MASTER'];
     final label = (difficultyIndex >= 0 && difficultyIndex < labels.length)
         ? labels[difficultyIndex]
         : '?';

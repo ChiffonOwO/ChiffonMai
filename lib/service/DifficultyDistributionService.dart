@@ -38,7 +38,7 @@ class DifficultyDistributionService {
   DifficultyDistributionService._internal();
 
   /// 计算指定难度级别的定数分布
-  /// [levelIndex] 难度索引: 0-4 对应 BASIC~RE:MASTER, -1 表示全部
+  /// [levelIndex] 难度索引: 0-4 对应 BASIC~Re:MASTER, -1 表示全部
   /// [allSongs] 全曲库
   /// [userPlayData] 可选，用户游玩数据（用于区分已玩/未玩）
   static List<DistributionBucket> calculateDistribution({

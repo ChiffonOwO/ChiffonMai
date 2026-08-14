@@ -31,7 +31,7 @@ class SongMaidataPageService {
     '3': 'ADVANCED',
     '4': 'EXPERT',
     '5': 'MASTER',
-    '6': 'RE:MASTER',
+    '6': 'Re:MASTER',
     '7': 'UTAGE',
   };
 
@@ -41,7 +41,7 @@ class SongMaidataPageService {
     '3': 0xFFFF9800,       // ADVANCED - 橙色
     '4': 0xFFF44336,       // EXPERT - 红色
     '5': 0xFF9C27B0,       // MASTER - 紫色
-    '6': 0xFFCE93D8,       // RE:MASTER - 淡紫色
+    '6': 0xFFCE93D8,       // Re:MASTER - 淡紫色
     '7': 0xFFFF4081,       // UTAGE - 粉色
   };
 

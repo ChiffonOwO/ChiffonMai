@@ -12,7 +12,7 @@ import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/UserPlayDataEntity.dart';
-import 'package:my_first_flutter_app/entity/DXRating/MaiTagsEntity.dart';
+import 'package:my_first_flutter_app/entity/DXRating/MaiTagsModel.dart';
 import 'SongInfoPage.dart';
 
 /// 收藏夹管理页面：查看所有收藏夹、创建/重命名/删除收藏夹，浏览收藏夹内的谱面
@@ -979,7 +979,7 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
           bgColor = Colors.purple.shade100;
           textColor = Colors.purple.shade700;
           break;
-        case 4: // RE:MASTER
+        case 4: // Re:MASTER
           bgColor = Colors.purple.shade100;
           textColor = Colors.purple.shade300;
           break;
@@ -1012,7 +1012,7 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
       'ADVANCED',
       'EXPERT',
       'MASTER',
-      'RE:MASTER',
+      'Re:MASTER',
       'UTAGE'
     ];
     final bool isUtage = chart.songId.length == 6;

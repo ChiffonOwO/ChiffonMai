@@ -719,7 +719,7 @@ class ChartData {
       case 3: return 'ADVANCED';
       case 4: return 'EXPERT';
       case 5: return 'MASTER';
-      case 6: return 'RE:MASTER';
+      case 6: return 'Re:MASTER';
       default: return 'UNKNOWN';
     }
   }

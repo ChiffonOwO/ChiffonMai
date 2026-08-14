@@ -18,6 +18,7 @@ class FeatureRegistry {
       const ButtonItem(icon: Icons.leaderboard, title: 'Best50查询', subtitle: '我去,龙币!'),
       const ButtonItem(icon: Icons.analytics, title: '拟合Best50查询', subtitle: '我w55怎么拟合才w52?!'),
       const ButtonItem(icon: Icons.person_search_outlined, title: '个性化Best50查询', subtitle: '我超，名刀50!'),
+      const ButtonItem(icon: Icons.analytics_outlined, title: '个性化拟合Best50查询', subtitle: '按标签筛选的拟合Best50'),
       const ButtonItem(icon: Icons.leaderboard, title: '排行榜(仅供参考)', subtitle: '总Rating排行榜'),
       const ButtonItem(icon: Icons.leaderboard_outlined, title: '特殊排行榜', subtitle: '各种有意思的排行榜'),
     ]),
@@ -48,6 +49,7 @@ class FeatureRegistry {
       const ButtonItem(icon: Icons.today, title: '每日推荐', subtitle: '每日推荐歌曲'),
       const ButtonItem(icon: Icons.people, title: '好友对比', subtitle: '对比你和好友的成绩差异'),
       const ButtonItem(icon: Icons.map, title: '全国音游地图', subtitle: '看看哪里有你想玩的机台'),
+      const ButtonItem(icon: Icons.public, title: '全球音游街机地图', subtitle: '查看NearCade全球街机店铺'),
     ]),
     ButtonCategory(name: '系统', icon: Icons.settings, items: [
       const ButtonItem(icon: Icons.file_upload_sharp, title: '刷新数据', subtitle: '刷新你的舞萌数据'),

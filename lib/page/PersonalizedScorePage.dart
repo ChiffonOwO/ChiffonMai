@@ -50,6 +50,10 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
   Map<String, int>? _artistCounts;
   String? _selectedArtist;
 
+  // 流派相关
+  Map<String, int>? _genreCounts;
+  String? _selectedGenre;
+
   String? _selectedLevel;
   String? _selectedTitleType;
   int? _selectedDifficulty;
@@ -136,7 +140,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
 
       // 设置保存的模式
       final savedMode = savedOptions['mode'] as String;
-      _mode = ['level', 'charter', 'version', 'artist'].contains(savedMode) ? savedMode : 'level';
+      _mode = ['level', 'charter', 'version', 'artist', 'genre'].contains(savedMode) ? savedMode : 'level';
 
       // 设置保存的谱师（如果谱师存在）
       final savedCharter = savedOptions['charter'] as String;
@@ -162,6 +166,17 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
         _selectedArtist = _artistCounts!.keys.first;
       }
 
+      // 获取流派列表
+      _genreCounts = await _service.getGenreCounts();
+
+      // 设置保存的流派
+      final savedGenre = savedOptions['genre'] as String;
+      if (savedGenre.isNotEmpty && _genreCounts != null && _genreCounts!.containsKey(savedGenre)) {
+        _selectedGenre = savedGenre;
+      } else if (_genreCounts != null && _genreCounts!.isNotEmpty) {
+        _selectedGenre = _genreCounts!.keys.first;
+      }
+
       // 设置保存的显示模式
       _showListMode = savedOptions['showListMode'] as bool;
       _useLevelDisplay = savedOptions['useLevelDisplay'] as bool;
@@ -177,9 +192,8 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
     }
   }
 
-  @override
-  void dispose() {
-    // 保存用户选择的选项
+  /// 持久化保存当前所有选项到 SharedPreferences
+  void _saveOptions() {
     _service.saveSelectedOptions(
       level: _selectedLevel,
       titleType: _selectedTitleType,
@@ -190,7 +204,13 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
       charter: _selectedCharter,
       version: _selectedVersion,
       artist: _selectedArtist,
+      genre: _selectedGenre,
     );
+  }
+
+  @override
+  void dispose() {
+    _saveOptions();
     super.dispose();
   }
 
@@ -248,6 +268,13 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
         if (_selectedArtist == null) return;
         result = await _service.getSongsByArtist(
           _selectedArtist!,
+          _selectedTitleType!,
+          _selectedDifficulty!,
+        );
+      } else if (_mode == 'genre') {
+        if (_selectedGenre == null) return;
+        result = await _service.getSongsByGenre(
+          _selectedGenre!,
           _selectedTitleType!,
           _selectedDifficulty!,
         );
@@ -470,16 +497,16 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
           ),
           onPressed: () => _showModeDialog(),
           child: Text(
-            _mode == 'level' ? '等级' : _mode == 'charter' ? '谱师' : _mode == 'version' ? '版本' : '曲师',
+            _mode == 'level' ? '等级' : _mode == 'charter' ? '谱师' : _mode == 'version' ? '版本' : _mode == 'genre' ? '流派' : '曲师',
             style: TextStyle(fontSize: _textSizeM),
           ),
         ),
 
         SizedBox(height: _paddingM),
 
-        // 选择等级/谱师/版本/曲师
+        // 选择等级/谱师/版本/曲师/流派
         Text(
-          _mode == 'level' ? '选择等级' : _mode == 'charter' ? '选择谱师' : _mode == 'version' ? '选择版本' : '选择曲师',
+          _mode == 'level' ? '选择等级' : _mode == 'charter' ? '选择谱师' : _mode == 'version' ? '选择版本' : _mode == 'genre' ? '选择流派' : '选择曲师',
           style: TextStyle(
             fontSize: _textSizeM,
             fontWeight: FontWeight.bold,
@@ -503,6 +530,8 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
               _showCharterDialog();
             } else if (_mode == 'version') {
               _showVersionDialog();
+            } else if (_mode == 'genre') {
+              _showGenreDialog();
             } else {
               _showArtistDialog();
             }
@@ -514,7 +543,9 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                     ? (_selectedCharter != null ? _selectedCharter! : '请选择谱师')
                     : _mode == 'version'
                         ? (_selectedVersion != null ? StringUtil.formatVersion2(_selectedVersion!) : '请选择版本')
-                        : (_selectedArtist != null ? _selectedArtist! : '请选择曲师'),
+                        : _mode == 'genre'
+                            ? (_selectedGenre != null ? _selectedGenre! : '请选择流派')
+                            : (_selectedArtist != null ? _selectedArtist! : '请选择曲师'),
             style: TextStyle(fontSize: _textSizeM),
           ),
         ),
@@ -643,6 +674,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                       _mode = 'level';
                       _cachedSongsWithStatus = null;
                     });
+                    _saveOptions();
                     await _loadSongsWithStatus();
                   },
                 ),
@@ -660,6 +692,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                         _selectedCharter = _charterCounts!.keys.first;
                       });
                     }
+                    _saveOptions();
                     await _loadSongsWithStatus();
                   },
                 ),
@@ -677,6 +710,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                         _selectedVersion = VersionListConstant.standardVersions.first;
                       });
                     }
+                    _saveOptions();
                     await _loadSongsWithStatus();
                   },
                 ),
@@ -694,6 +728,25 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                         _selectedArtist = _artistCounts!.keys.first;
                       });
                     }
+                    _saveOptions();
+                    await _loadSongsWithStatus();
+                  },
+                ),
+                ListTile(
+                  title: Center(child: Text('流派')),
+                  selected: _mode == 'genre',
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    setState(() {
+                      _mode = 'genre';
+                      _cachedSongsWithStatus = null;
+                    });
+                    if (_selectedGenre == null && _genreCounts != null && _genreCounts!.isNotEmpty) {
+                      setState(() {
+                        _selectedGenre = _genreCounts!.keys.first;
+                      });
+                    }
+                    _saveOptions();
                     await _loadSongsWithStatus();
                   },
                 ),
@@ -749,6 +802,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                       _selectedCharter = entry.key;
                       _cachedSongsWithStatus = null;
                     });
+                    _saveOptions();
                     await _loadSongsWithStatus();
                   },
                 );
@@ -789,6 +843,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                       _selectedVersion = version;
                       _cachedSongsWithStatus = null;
                     });
+                    _saveOptions();
                     await _loadSongsWithStatus();
                   },
                 );
@@ -852,6 +907,71 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                       _selectedArtist = entry.key;
                       _cachedSongsWithStatus = null;
                     });
+                    _saveOptions();
+                    await _loadSongsWithStatus();
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text('取消'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 显示流派选择对话框
+  void _showGenreDialog() {
+    if (_genreCounts == null || _genreCounts!.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('提示'),
+            content: Text('没有找到流派数据'),
+            actions: [
+              TextButton(
+                child: Text('确定'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
+
+    // 按出现次数排序
+    List<MapEntry<String, int>> sortedGenres = _genreCounts!.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Center(child: Text('选择流派')),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: sortedGenres.map((entry) {
+                return ListTile(
+                  title: Center(child: Text('${entry.key} (${entry.value}首)')),
+                  selected: _selectedGenre == entry.key,
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    setState(() {
+                      _selectedGenre = entry.key;
+                      _cachedSongsWithStatus = null;
+                    });
+                    _saveOptions();
                     await _loadSongsWithStatus();
                   },
                 );
@@ -910,6 +1030,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                       _selectedLevel = level;
                       _cachedSongsWithStatus = null;
                     });
+                    _saveOptions();
                     // 更新等级选项（确保当前选中的等级在选项列表中）
                     await _updateLevelOptions();
                     await _loadSongsWithStatus();
@@ -950,6 +1071,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
           _mode == 'level' ? '当前等级没有匹配的歌曲'
               : _mode == 'charter' ? '当前谱师没有匹配的歌曲'
               : _mode == 'version' ? '当前版本没有匹配的歌曲'
+              : _mode == 'genre' ? '当前流派没有匹配的歌曲'
               : '当前曲师没有匹配的歌曲',
           style: TextStyle(
             fontSize: _textSizeM,
@@ -1199,6 +1321,8 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
       title = '谱师${_selectedCharter}(${difficultyName})的${_selectedTitleType}称号统计';
     } else if (_mode == 'version') {
       title = '版本${StringUtil.formatVersion2(_selectedVersion!)}(${difficultyName})的${_selectedTitleType}称号统计';
+    } else if (_mode == 'genre') {
+      title = '流派${_selectedGenre}(${difficultyName})的${_selectedTitleType}称号统计';
     } else {
       title = '曲师${_selectedArtist}(${difficultyName})的${_selectedTitleType}称号统计';
     }
@@ -1432,7 +1556,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
           // 过滤后无数据时显示提示
           Center(
             child: Text(
-              _filterMode == 'completed' ? '暂无已完成歌曲' : _filterMode == 'uncompleted' ? '暂无未完成歌曲' : (_mode == 'level' ? '当前等级没有匹配的歌曲' : _mode == 'charter' ? '当前谱师没有匹配的歌曲' : _mode == 'version' ? '当前版本没有匹配的歌曲' : '当前曲师没有匹配的歌曲'),
+              _filterMode == 'completed' ? '暂无已完成歌曲' : _filterMode == 'uncompleted' ? '暂无未完成歌曲' : (_mode == 'level' ? '当前等级没有匹配的歌曲' : _mode == 'charter' ? '当前谱师没有匹配的歌曲' : _mode == 'version' ? '当前版本没有匹配的歌曲' : _mode == 'genre' ? '当前流派没有匹配的歌曲' : '当前曲师没有匹配的歌曲'),
               style: TextStyle(
                 fontSize: _textSizeM,
                 color: AppColors.greyHint(Theme.of(context).brightness),
@@ -1743,6 +1867,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
         selectedCharter: _selectedCharter,
         selectedVersion: _selectedVersion,
         selectedArtist: _selectedArtist,
+        selectedGenre: _selectedGenre,
         mode: _mode,
         selectedTitleType: _selectedTitleType,
         selectedDifficulty: _selectedDifficulty,

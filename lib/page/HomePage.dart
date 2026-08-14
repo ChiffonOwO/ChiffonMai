@@ -44,6 +44,8 @@ import 'VersionViewPage.dart' hide AppConstants;
 import 'Best50/Best50Page.dart';
 import 'Best50/DiffBest50Page.dart';
 import 'Best50/PersonalizedBest50Page.dart';
+import 'Best50/PersonalizedDiffBest50Page.dart';
+import 'GlobalArcadeMapPage.dart';
 import 'Collection/CollectionSearchPage.dart';
 import 'GuessChartGame/GuessChartByAliaPage.dart';
 import 'GuessChartGame/GuessChartByBlurredCoverPage.dart';
@@ -145,7 +147,6 @@ class _HomePageState extends State<HomePage> {
   String _featureSearchQuery = '';
 
   // 收藏的功能
-  int _favoriteCount = 0;
   Set<String> _favoriteTitles = {};
 
   // 后台初始化状态
@@ -362,7 +363,6 @@ class _HomePageState extends State<HomePage> {
     if (mounted) {
       setState(() {
         _favoriteTitles = raw.toSet();
-        _favoriteCount = raw.length;
       });
     }
   }
@@ -374,7 +374,6 @@ class _HomePageState extends State<HomePage> {
       } else {
         _favoriteTitles.add(title);
       }
-      _favoriteCount = _favoriteTitles.length;
     });
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(
@@ -402,6 +401,13 @@ class _HomePageState extends State<HomePage> {
 
   List<ButtonCategory> get _buttonCategories =>
       FeatureRegistry.allCategories(_isDivingFishLoggedIn);
+
+  /// 已收藏的功能项（扁平化所有分类中的已收藏项）
+  List<ButtonItem> get _favoritedItems =>
+      _buttonCategories
+          .expand((c) => c.items)
+          .where((item) => _favoriteTitles.contains(item.title))
+          .toList();
 
   @override
   Widget build(BuildContext context) {
@@ -481,39 +487,15 @@ class _HomePageState extends State<HomePage> {
                         setState(() => _featureSearchQuery = query.toLowerCase());
                       },
                     ),
-                    // 功能中心标题
-                    Center(
-                      child: Padding(
-                        padding: EdgeInsets.only(bottom: screenHeight * 0.01),
-                        child: Text(
-                          "功能中心",
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.045,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
                     // 分类按钮区域（支持搜索过滤）
                     if (_featureSearchQuery.isEmpty) ...[
-                      // 搜索为空：收藏的功能卡片（置顶）
-                      _buildCategoryCard(
-                        const ButtonCategory(name: '收藏的功能', icon: Icons.star, items: []),
-                        context,
-                        overrideCount: _favoriteCount,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (ctx) => FavoriteFeaturesPage(
-                                allCategories: _buttonCategories,
-                                onFeatureTap: _handleFeatureTap,
-                              ),
-                            ),
-                          ).then((_) => _loadFavoriteCount());
-                        },
-                      ),
+                      // 搜索为空：收藏的功能区域（置顶，直接显示入口）
+                      _buildFavoriteFeaturesSection(context),
+                      if (_favoritedItems.isNotEmpty) ...[
+                        SizedBox(height: screenHeight * 0.012),
+                        const Divider(height: 1, thickness: 1),
+                        SizedBox(height: screenHeight * 0.012),
+                      ],
                       // 大类导航卡片
                       ..._buttonCategories.map((category) => _buildCategoryCard(category, context)),
                     ],
@@ -1268,8 +1250,15 @@ class _HomePageState extends State<HomePage> {
                           ElevatedButton(
                             onPressed: () async {
                               final url = LuoXueUserPlayDataManager().getAuthorizationUrl();
-                              if (await canLaunchUrl(Uri.parse(url))) {
-                                await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                              try {
+                                if (await canLaunchUrl(Uri.parse(url))) {
+                                  await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                                } else {
+                                  _launchUrlFallback(url);
+                                }
+                              } catch (e) {
+                                debugPrint('打开落雪授权链接失败: $e');
+                                _launchUrlFallback(url);
                               }
                             },
                             child: Text('点击授权'),
@@ -2833,13 +2822,7 @@ class _HomePageState extends State<HomePage> {
     final currentMode = ThemeManager().themeMode;
     final isDark = currentMode == ThemeMode.dark;
     return GestureDetector(
-      onTap: () {
-        if (isDark) {
-          ThemeManager().setThemeMode(ThemeMode.light);
-        } else {
-          ThemeManager().setThemeMode(ThemeMode.dark);
-        }
-      },
+      onTap: () => _showThemeDialog(),
       child: Container(
         width: 36,
         height: 36,
@@ -3097,8 +3080,15 @@ class _HomePageState extends State<HomePage> {
                 GestureDetector(
                   onTap: () async {
                     final uri = Uri.parse('https://maimai.lxns.net/user/profile?tab=thirdparty');
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    try {
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      } else {
+                        _launchUrlFallback(uri.toString());
+                      }
+                    } catch (e) {
+                      debugPrint('打开落雪第三方绑定链接失败: $e');
+                      _launchUrlFallback(uri.toString());
                     }
                   },
                   child: Text.rich(
@@ -3584,6 +3574,12 @@ class _HomePageState extends State<HomePage> {
         MaterialPageRoute(builder: (context) => PersonalizedBest50Page()),
       );
     }
+    if (item.title == '个性化拟合Best50查询'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => PersonalizedDiffBest50Page()),
+      );
+    }
     if (item.title == '舞萌百科'){
       Navigator.push(
         context,
@@ -3628,8 +3624,15 @@ class _HomePageState extends State<HomePage> {
     }
     if (item.title == '问卷调查') {
       final uri = Uri.parse('https://wj.qq.com/s2/26540572/7828/');
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      try {
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          _launchUrlFallback(uri.toString());
+        }
+      } catch (e) {
+        debugPrint('打开问卷调查链接失败: $e');
+        _launchUrlFallback(uri.toString());
       }
     }
     if (item.title == '同步成绩到水鱼') {
@@ -3828,9 +3831,22 @@ class _HomePageState extends State<HomePage> {
     }
     if (item.title == '全国音游地图'){
       final uri = Uri.parse('https://map.bemanicn.com/');
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      try {
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          _launchUrlFallback(uri.toString());
+        }
+      } catch (e) {
+        debugPrint('打开全国音游地图失败: $e');
+        _launchUrlFallback(uri.toString());
       }
+    }
+    if (item.title == '全球音游街机地图'){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => GlobalArcadeMapPage()),
+      );
     }
     if (item.title == '最近评论'){
       Navigator.push(
@@ -3850,6 +3866,118 @@ class _HomePageState extends State<HomePage> {
         MaterialPageRoute(builder: (context) => const DataBackupPage()),
       );
     }
+  }
+
+  /// 打开外部链接失败时的降级处理：复制链接到剪贴板并提示用户
+  void _launchUrlFallback(String url) {
+    Clipboard.setData(ClipboardData(text: url));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('无法打开浏览器，链接已复制到剪贴板，请手动粘贴到浏览器打开'),
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: '知道了',
+            onPressed: () {},
+          ),
+        ),
+      );
+    }
+  }
+
+  // 构建收藏的功能区域（首页直接显示已收藏功能的入口按钮）
+  Widget _buildFavoriteFeaturesSection(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final brightness = Theme.of(context).brightness;
+    final items = _favoritedItems;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 标题行：星标图标 + "收藏的功能" + 管理链接
+        Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: screenWidth * 0.01,
+            vertical: screenHeight * 0.006,
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.star, size: screenWidth * 0.045, color: Colors.amber),
+              SizedBox(width: screenWidth * 0.02),
+              Text(
+                '收藏的功能',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: screenWidth * 0.038,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (ctx) => FavoriteFeaturesPage(
+                        allCategories: _buttonCategories,
+                        onFeatureTap: _handleFeatureTap,
+                      ),
+                    ),
+                  ).then((_) => _loadFavoriteCount());
+                },
+                icon: Icon(Icons.tune, size: screenWidth * 0.035,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                label: Text(
+                  '管理',
+                  style: TextStyle(
+                    fontSize: screenWidth * 0.03,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // 内容区：有收藏则显示功能按钮网格，无收藏则显示引导提示
+        if (items.isNotEmpty)
+          GridView.builder(
+            padding: EdgeInsets.zero,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: AppConstants.crossAxisCount,
+              crossAxisSpacing: screenWidth * 0.02,
+              mainAxisSpacing: screenHeight * 0.01,
+              childAspectRatio: screenWidth > 600 ? 1.3 : 1.2,
+            ),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return FeatureButton(
+                item: item,
+                onTap: () => _handleFeatureTap(item),
+                isFavorited: true,
+                onToggleFavorite: () => _toggleFavorite(item.title),
+              );
+            },
+          )
+        else
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01),
+            child: Center(
+              child: Text(
+                '点击分类中的 ⭐ 星标即可收藏功能，收藏后直接显示在此处',
+                style: TextStyle(
+                  fontSize: screenWidth * 0.03,
+                  color: AppColors.greyHint(brightness),
+                ),
+              ),
+            ),
+          ),
+        SizedBox(height: screenHeight * 0.004),
+      ],
+    );
   }
 
   // 构建分类区域（分类标题 + 分隔条 + 按钮网格）

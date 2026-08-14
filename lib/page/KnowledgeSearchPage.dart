@@ -107,11 +107,14 @@ class _KnowledgeSearchPageState extends State<KnowledgeSearchPage> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: false, // 防止键盘弹出时调整布局
-      body: Stack(
-        children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Stack(
+          children: [
+            // 背景
+            CommonWidgetUtil.buildCommonBgWidget(),
+            CommonWidgetUtil.buildCommonChiffonBgWidget(context),
 
           // 页面内容
           Column(
@@ -277,6 +280,7 @@ class _KnowledgeSearchPageState extends State<KnowledgeSearchPage> {
             ],
           ),
         ],
+      ),
       ),
     );
   }

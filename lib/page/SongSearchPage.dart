@@ -4,7 +4,7 @@ import 'package:my_first_flutter_app/service/SongSearchService.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
-import 'package:my_first_flutter_app/entity/DXRating/MaiTagsEntity.dart';
+import 'package:my_first_flutter_app/entity/DXRating/MaiTagsModel.dart';
 import 'dart:async';
 
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
@@ -47,6 +47,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
   List<String> _selectedVersions = [];
   List<String> _selectedGenres = [];
   List<int> _selectedTagIds = [];
+  String? _selectedCharter;
+  String? _selectedArtist;
   
   // 标签数据
   Map<int, String> _tagIdToNameMap = {};
@@ -64,10 +66,47 @@ class _SongSearchPageState extends State<SongSearchPage> {
   // 流派列表
   List<String> _genreList = GenreListConstant.genreList;
 
+  // 谱师列表
+  List<String> _charterList = [];
+  bool _isLoadingCharters = false;
+
+  // 曲师列表
+  List<String> _artistList = [];
+  bool _isLoadingArtists = false;
+
   @override
   void initState() {
     super.initState();
     _loadTagData();
+    _loadFilterLists();
+  }
+
+  // 加载谱师和曲师列表
+  Future<void> _loadFilterLists() async {
+    setState(() {
+      _isLoadingCharters = true;
+      _isLoadingArtists = true;
+    });
+    try {
+      final charters = await SongSearchService.getCharterList();
+      final artists = await SongSearchService.getArtistList();
+      if (mounted) {
+        setState(() {
+          _charterList = charters;
+          _artistList = artists;
+          _isLoadingCharters = false;
+          _isLoadingArtists = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('加载筛选列表失败: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingCharters = false;
+          _isLoadingArtists = false;
+        });
+      }
+    }
   }
 
   @override
@@ -108,7 +147,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
         _maxLevelController.text.isEmpty &&
         _selectedVersions.isEmpty &&
         _selectedGenres.isEmpty &&
-        _selectedTagIds.isEmpty;
+        _selectedTagIds.isEmpty &&
+        _selectedCharter == null &&
+        _selectedArtist == null;
 
     if (allFiltersEmpty) {
       setState(() {
@@ -184,6 +225,21 @@ class _SongSearchPageState extends State<SongSearchPage> {
       if (_selectedGenres.isNotEmpty) {
         filteredResults = filteredResults.where((song) {
           return _selectedGenres.contains(song.basicInfo.genre);
+        }).toList();
+      }
+
+      // 应用谱师筛选（歌曲的任意谱面包含所选谱师即可）
+      if (_selectedCharter != null) {
+        filteredResults = filteredResults.where((song) {
+          return song.charts.any(
+              (chart) => chart.charter == _selectedCharter);
+        }).toList();
+      }
+
+      // 应用曲师筛选
+      if (_selectedArtist != null) {
+        filteredResults = filteredResults.where((song) {
+          return song.basicInfo.artist == _selectedArtist;
         }).toList();
       }
 
@@ -798,6 +854,233 @@ class _SongSearchPageState extends State<SongSearchPage> {
     );
   }
 
+  // 构建谱师筛选组件（点击弹出对话框，单选，支持搜索）
+  Widget _buildCharterFilter(double screenWidth, double screenHeight) {
+    return _buildDialogFilterRow(
+      screenWidth: screenWidth,
+      label: '谱师筛选',
+      displayValue: _selectedCharter,
+      placeholder: '请选择谱师',
+      dialogTitle: '选择谱师',
+      searchHint: '搜索谱师',
+      dialogSearchHint: '输入谱师名称筛选...',
+      isLoadingList: _isLoadingCharters,
+      fullList: _charterList,
+      onSelected: (value) {
+        setState(() => _selectedCharter = value);
+        _debouncedFilter();
+      },
+      onClear: () {
+        setState(() => _selectedCharter = null);
+        _debouncedFilter();
+      },
+    );
+  }
+
+  // 构建曲师筛选组件（点击弹出对话框，单选，支持搜索）
+  Widget _buildArtistFilter(double screenWidth, double screenHeight) {
+    return _buildDialogFilterRow(
+      screenWidth: screenWidth,
+      label: '曲师筛选',
+      displayValue: _selectedArtist,
+      placeholder: '请选择曲师',
+      dialogTitle: '选择曲师',
+      searchHint: '搜索曲师',
+      dialogSearchHint: '输入曲师名称筛选...',
+      isLoadingList: _isLoadingArtists,
+      fullList: _artistList,
+      onSelected: (value) {
+        setState(() => _selectedArtist = value);
+        _debouncedFilter();
+      },
+      onClear: () {
+        setState(() => _selectedArtist = null);
+        _debouncedFilter();
+      },
+    );
+  }
+
+  /// 通用的「点击弹出对话框单选」筛选行
+  Widget _buildDialogFilterRow({
+    required double screenWidth,
+    required String label,
+    required String? displayValue,
+    required String placeholder,
+    required String dialogTitle,
+    required String searchHint,
+    required String dialogSearchHint,
+    required bool isLoadingList,
+    required List<String> fullList,
+    required ValueChanged<String?> onSelected,
+    required VoidCallback onClear,
+  }) {
+    return InkWell(
+      onTap: () => _showSingleSelectDialog(
+        title: dialogTitle,
+        searchHint: dialogSearchHint,
+        selectedValue: displayValue,
+        fullList: fullList,
+        isLoadingList: isLoadingList,
+        onSelected: onSelected,
+        onClear: onClear,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: screenWidth * 0.035,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Flexible(
+                    child: Text(
+                      displayValue ?? placeholder,
+                      style: TextStyle(
+                        fontSize: screenWidth * 0.03,
+                        color: displayValue != null
+                            ? AppColors.linkBlue(Theme.of(context).brightness)
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (displayValue != null) ...[
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: onClear,
+                      child: Icon(Icons.close, size: screenWidth * 0.04,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                  Icon(Icons.chevron_right, size: screenWidth * 0.04,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 弹出单选搜索对话框
+  void _showSingleSelectDialog({
+    required String title,
+    required String searchHint,
+    required String? selectedValue,
+    required List<String> fullList,
+    required bool isLoadingList,
+    required ValueChanged<String?> onSelected,
+    required VoidCallback onClear,
+  }) {
+    final searchController = TextEditingController();
+    String filterQuery = '';
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final query = filterQuery.toLowerCase();
+            final filtered = query.isEmpty
+                ? fullList
+                : fullList.where((e) => e.toLowerCase().contains(query)).toList();
+
+            return AlertDialog(
+              title: Text(title),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: searchController,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          hintText: searchHint,
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                        ),
+                        onChanged: (v) => setDialogState(() => filterQuery = v),
+                      ),
+                      const SizedBox(height: 12),
+                      if (isLoadingList)
+                        const Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 400),
+                          child: ListView.builder(
+                            shrinkWrap: false,
+                            itemCount: filtered.length,
+                            itemBuilder: (_, i) {
+                              final item = filtered[i];
+                              final isSelected = item == selectedValue;
+                              return ListTile(
+                                title: Text(item,
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? AppColors.linkBlue(Theme.of(context).brightness)
+                                          : null,
+                                      fontWeight: isSelected ? FontWeight.bold : null,
+                                    )),
+                                trailing: isSelected
+                                    ? Icon(Icons.check,
+                                        color: AppColors.linkBlue(Theme.of(context).brightness))
+                                    : null,
+                                onTap: () {
+                                  onSelected(item);
+                                  Navigator.pop(ctx);
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      if (selectedValue != null) ...[
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextButton(
+                            onPressed: () {
+                              onClear();
+                              Navigator.pop(ctx);
+                            },
+                            child: const Text('清除选择'),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('取消'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
@@ -812,10 +1095,13 @@ class _SongSearchPageState extends State<SongSearchPage> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Stack(
+          children: [
+            CommonWidgetUtil.buildCommonBgWidget(),
+            CommonWidgetUtil.buildCommonChiffonBgWidget(context),
 
           Column(
             children: [
@@ -880,7 +1166,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                 _debouncedSearch(value);
                               },
                               decoration: InputDecoration(
-                                hintText: '输入歌曲标题、艺术家、BPM、谱师、别名、歌曲ID',
+                                hintText: '歌名/BPM/谱师/曲师/别名/歌曲ID/...',
                                 hintStyle: TextStyle(fontSize: smallFontSize),
                                 prefixIcon: const Icon(Icons.search),
                                 border: OutlineInputBorder(
@@ -914,6 +1200,14 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                     _buildGenreFilter(screenWidth, screenHeight),
                                     SizedBox(height: screenHeight * 0.01),
 
+                                    // 谱师筛选
+                                    _buildCharterFilter(screenWidth, screenHeight),
+                                    SizedBox(height: screenHeight * 0.01),
+
+                                    // 曲师筛选
+                                    _buildArtistFilter(screenWidth, screenHeight),
+                                    SizedBox(height: screenHeight * 0.01),
+
                                     // 标签筛选
                                     _buildTagFilter(screenWidth, screenHeight),
                                     SizedBox(height: screenHeight * 0.01),
@@ -925,6 +1219,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                       _selectedVersions.isNotEmpty ||
                                       _selectedGenres.isNotEmpty ||
                                       _selectedTagIds.isNotEmpty ||
+                                      _selectedCharter != null ||
+                                      _selectedArtist != null ||
                                       _minLevelController.text.isNotEmpty ||
                                       _maxLevelController.text.isNotEmpty) &&
                                   !_isSearching &&
@@ -955,6 +1251,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                               _selectedVersions.clear();
                                               _selectedGenres.clear();
                                               _selectedTagIds.clear();
+                                              _selectedCharter = null;
+                                              _selectedArtist = null;
                                               _showAllFilters = true;
                                               _performSearch('');
                                             });
@@ -1157,7 +1455,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
         ],
       ),
         ],
-      )
+      ),
+    ),
     );
   }
 

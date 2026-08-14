@@ -468,10 +468,10 @@ class SongInfoExportToImgService {
 
           const SizedBox(height: 10),
 
-          // 信息行2: 谱面谱师
+          // 信息行2: 谱师
           Row(
             children: [
-              _buildStatItem('谱面谱师', charter),
+              _buildStatItem('谱师', charter),
             ],
           ),
 

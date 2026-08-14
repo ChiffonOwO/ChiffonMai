@@ -26,7 +26,7 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
     '3': 'ADVANCED',
     '4': 'EXPERT',
     '5': 'MASTER',
-    '6': 'RE:MASTER',
+    '6': 'Re:MASTER',
     '7': 'UTAGE',
   };
 

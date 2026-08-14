@@ -270,7 +270,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
       case 1: return Color(0xFFFFCC00); // ADVANCED - 深黄色
       case 2: return Colors.pink;
       case 3: return Colors.purple;
-      case 4: return Colors.purple.shade200; // RE:MASTER - 紫色浅色调
+      case 4: return Colors.purple.shade200; // Re:MASTER - 紫色浅色调
       default: return Colors.grey;
     }
   }
