@@ -29,9 +29,12 @@ jobs:
       # ---- 构建未签名 App ----
       # flutter build ios 会因未配置 Development Team 而强制失败（工具链检查，
       # 与 Xcode 签名设置无关），因此改用 xcodebuild 直接构建。
-      # 工程的 Release 配置已设 CODE_SIGNING_ALLOWED = NO，无需证书/Team。
+      # 注意：Runner 里的 Flutter Run Script 需要 $FLUTTER_ROOT，
+      # 它由 flutter 命令注入、裸 xcodebuild 不会自动带上，需手动导出。
       - name: 构建未签名 iOS App
         run: |
+          export FLUTTER_ROOT="$(dirname "$(dirname "$(which flutter)")")"
+          echo "FLUTTER_ROOT=$FLUTTER_ROOT"
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
             -scheme Runner \
