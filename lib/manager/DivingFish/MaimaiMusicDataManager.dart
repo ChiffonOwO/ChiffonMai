@@ -13,14 +13,17 @@ import '../../service/ConnectivityService.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 class MaimaiMusicDataManager {
-  static final MaimaiMusicDataManager _instance = MaimaiMusicDataManager._internal();
+  static final MaimaiMusicDataManager _instance =
+      MaimaiMusicDataManager._internal();
   factory MaimaiMusicDataManager() => _instance;
   MaimaiMusicDataManager._internal();
 
   static const String _apiUrl = ApiUrls.MusicDataApi;
   static const String _unionApiUrl = ApiUrls.UnionMusicDataApi;
 
-  final MultiplayerCloudBaseService _cloudService = MultiplayerCloudBaseService();
+  final MultiplayerCloudBaseService _cloudService =
+      MultiplayerCloudBaseService();
+  Future<void>? _maidataRefreshFuture;
 
   // 使用 compute 进行后台 JSON 解析
   Future<List<Song>> _parseSongsInBackground(String responseBody) async {
@@ -30,6 +33,34 @@ class MaimaiMusicDataManager {
   static List<Song> _parseSongs(String responseBody) {
     final List<dynamic> jsonList = json.decode(responseBody);
     return jsonList.map((json) => Song.fromJson(json)).toList();
+  }
+
+  Future<http.Response?> _fetchMusicSource(String url, String source) async {
+    try {
+      return await ApiClient.get(Uri.parse(url));
+    } catch (e) {
+      debugPrint('$source API 请求异常: $e');
+      return null;
+    }
+  }
+
+  Future<List<Song>?> _parseMusicSource(
+    http.Response? response,
+    String source,
+  ) async {
+    if (response == null) return null;
+    if (response.statusCode != 200) {
+      debugPrint('$source API 请求失败，状态码: ${response.statusCode}');
+      return null;
+    }
+    try {
+      final songs = await _parseSongsInBackground(response.body);
+      debugPrint('$source API 返回 ${songs.length} 首歌曲');
+      return songs;
+    } catch (e) {
+      debugPrint('$source API 数据解析失败: $e');
+      return null;
+    }
   }
 
   // 使用 compute 进行后台 JSON 编码
@@ -53,37 +84,17 @@ class MaimaiMusicDataManager {
       // ── 1. 并行获取水鱼 API 和 union API 的歌曲数据 ──
       List<Song> songs = [];
 
-      // 同时发起两个请求
-      final dfFuture = ApiClient.get(Uri.parse(_apiUrl));
-      final unionFuture = ApiClient.get(Uri.parse(_unionApiUrl));
-
-      // 解析水鱼数据
-      List<Song>? dfSongs;
-      try {
-        final dfResponse = await dfFuture;
-        if (dfResponse.statusCode == 200) {
-          dfSongs = await _parseSongsInBackground(dfResponse.body);
-          debugPrint('水鱼 API 返回 ${dfSongs!.length} 首歌曲');
-        } else {
-          debugPrint('水鱼 API 请求失败，状态码: ${dfResponse.statusCode}');
-        }
-      } catch (e) {
-        debugPrint('水鱼 API 请求异常: $e');
-      }
-
-      // 解析 union 数据
-      List<Song>? unionSongs;
-      try {
-        final unionResponse = await unionFuture;
-        if (unionResponse.statusCode == 200) {
-          unionSongs = await _parseSongsInBackground(unionResponse.body);
-          debugPrint('Union API 返回 ${unionSongs!.length} 首歌曲');
-        } else {
-          debugPrint('Union API 请求失败，状态码: ${unionResponse.statusCode}');
-        }
-      } catch (e) {
-        debugPrint('Union API 请求异常: $e');
-      }
+      // 网络请求与两份大 JSON 的 isolate 解析都并行执行。
+      final responses = await Future.wait<http.Response?>([
+        _fetchMusicSource(_apiUrl, '水鱼'),
+        _fetchMusicSource(_unionApiUrl, 'Union'),
+      ]);
+      final parsed = await Future.wait<List<Song>?>([
+        _parseMusicSource(responses[0], '水鱼'),
+        _parseMusicSource(responses[1], 'Union'),
+      ]);
+      final dfSongs = parsed[0];
+      final unionSongs = parsed[1];
 
       // ── 2. 合并数据 ──
       if (dfSongs != null) {
@@ -111,8 +122,12 @@ class MaimaiMusicDataManager {
               songs[i].basicInfo.releaseDate.isEmpty) {
             final old = songs[i];
             songs[i] = Song(
-              id: old.id, title: old.title, type: old.type,
-              ds: old.ds, level: old.level, cids: old.cids,
+              id: old.id,
+              title: old.title,
+              type: old.type,
+              ds: old.ds,
+              level: old.level,
+              cids: old.cids,
               charts: old.charts,
               basicInfo: BasicInfo(
                 title: old.basicInfo.title,
@@ -130,7 +145,8 @@ class MaimaiMusicDataManager {
 
         for (final unionSong in unionSongs) {
           if (!existingIds.contains(unionSong.id)) {
-            final isMaidataSong = unionSong.cids.isNotEmpty && unionSong.cids.every((cid) => cid == 0);
+            final isMaidataSong = unionSong.cids.isNotEmpty &&
+                unionSong.cids.every((cid) => cid == 0);
             songs.add(Song(
               id: unionSong.id,
               title: unionSong.title,
@@ -145,14 +161,13 @@ class MaimaiMusicDataManager {
           }
         }
         final unionExtraCount = songs.length - existingIds.length;
-        debugPrint('合并后共 ${songs.length} 首歌曲 (新增 $unionExtraCount 首 union 独有歌曲，已标记为 extra)');
+        debugPrint(
+            '合并后共 ${songs.length} 首歌曲 (新增 $unionExtraCount 首 union 独有歌曲，已标记为 extra)');
       }
 
       // ── 3. 收集 union extra 歌曲 ID 列表 ──
-      final List<String> unionExtraIds = songs
-          .where((s) => s.isExtra)
-          .map((s) => s.id)
-          .toList();
+      final List<String> unionExtraIds =
+          songs.where((s) => s.isExtra).map((s) => s.id).toList();
       if (unionExtraIds.isNotEmpty) {
         debugPrint('共 ${unionExtraIds.length} 首 union 独有歌曲标记为 extra');
       }
@@ -169,7 +184,8 @@ class MaimaiMusicDataManager {
         debugPrint('开始解析 maidata 并追加缺失歌曲...');
 
         List<String>? cachedAddedSongIds = await _getCachedAddedSongIds();
-        bool useCachedList = cachedAddedSongIds != null && await _isAddedSongsCacheValid();
+        bool useCachedList =
+            cachedAddedSongIds != null && await _isAddedSongsCacheValid();
 
         if (useCachedList) {
           debugPrint('使用缓存的追加歌曲列表（共 ${cachedAddedSongIds.length} 首）');
@@ -191,7 +207,8 @@ class MaimaiMusicDataManager {
           correspondingIds.add(quickId);
         }
 
-        debugPrint('${maidataTexts.length} 首 maidata 中，${textsNeedingDecode.length} 首需要完整解码');
+        debugPrint(
+            '${maidataTexts.length} 首 maidata 中，${textsNeedingDecode.length} 首需要完整解码');
 
         int addedCount = 0;
         final List<String> newlyAddedSongIds = [];
@@ -230,7 +247,8 @@ class MaimaiMusicDataManager {
 
         if (!useCachedList && newlyAddedSongIds.isNotEmpty) {
           await _saveAddedSongIds(newlyAddedSongIds);
-          debugPrint('已保存追加歌曲列表到缓存（有效期 ${CacheTimestampConstant.maidataAddedSongsCacheDays} 天）');
+          debugPrint(
+              '已保存追加歌曲列表到缓存（有效期 ${CacheTimestampConstant.maidataAddedSongsCacheDays} 天）');
         }
 
         if (addedCount > 0) {
@@ -252,51 +270,47 @@ class MaimaiMusicDataManager {
       return false;
     }
   }
-  
-  Future<bool> refreshDataWithSmartMaidata() async {
+
+  Future<bool> refreshDataWithSmartMaidata({
+    bool forceMaidataRefresh = false,
+  }) async {
     final maidataManager = MaidataManager();
 
-    // ── 检查全量缓存 TTL ──
-    final cacheValid = await maidataManager.isFullCacheValid();
-
-    if (cacheValid) {
-      debugPrint('maidata 缓存仍在 TTL 有效期内，计算增量...');
-
-      // 获取 union API 全量歌曲 ID 列表（轻量 API 调用）
-      List<String> unionSongIds = [];
-      try {
-        final unionResponse = await ApiClient.get(Uri.parse(_unionApiUrl));
-        if (unionResponse.statusCode == 200) {
-          final unionSongs = await _parseSongsInBackground(unionResponse.body);
-          unionSongIds = unionSongs.map((s) => s.id).toList();
-        }
-      } catch (e) {
-        debugPrint('获取 union 歌曲列表失败，跳过 maidata 刷新: $e');
-        return await fetchAndUpdateMusicData();
+    if (forceMaidataRefresh) {
+      final activeRefresh = _maidataRefreshFuture;
+      if (activeRefresh != null) {
+        await activeRefresh;
       }
-
-      // 计算缓存中缺失的歌曲 ID
-      final missingIds = unionSongIds
-          .where((id) => !maidataManager.hasCachedMaidata(id))
-          .toList();
-
-      if (missingIds.isEmpty) {
-        debugPrint('maidata 缓存完整（${maidataManager.cachedCount} 首），跳过刷新');
-        return await fetchAndUpdateMusicData();
-      }
-
-      debugPrint('缓存缺失 ${missingIds.length} 首，增量获取 maidata...');
-      final maidataTexts = await maidataManager.fetchMaidataForSongIds(missingIds);
-      // 同时更新 addedSongIds 缓存
-      await _saveAddedSongIds(missingIds);
-      return await fetchAndUpdateMusicData(maidataTexts: maidataTexts);
+      await maidataManager.fetchAndCacheFullMaidata();
+      return fetchAndUpdateMusicData(
+        maidataTexts: maidataManager.getAllMaidataTexts(),
+      );
     }
 
-    // ── 缓存过期：全量刷新 ──
-    debugPrint('maidata 缓存已过期，执行全量刷新...');
-    await maidataManager.fetchAndCacheFullMaidata();
-    final maidataTexts = maidataManager.getAllMaidataTexts();
-    return await fetchAndUpdateMusicData(maidataTexts: maidataTexts);
+    // 普通“刷新数据”只等待水鱼/union 曲库。maidata 是体积很大的辅助数据，
+    // 有效期内无需扫描；过期后在主刷新完成后转入后台维护。
+    final result = await fetchAndUpdateMusicData();
+    if (!await maidataManager.isFullCacheValid()) {
+      _scheduleMaidataRefresh(maidataManager);
+    }
+    return result;
+  }
+
+  void _scheduleMaidataRefresh(MaidataManager manager) {
+    if (_maidataRefreshFuture != null) return;
+    _maidataRefreshFuture = _refreshMaidataCache(manager);
+  }
+
+  Future<void> _refreshMaidataCache(MaidataManager manager) async {
+    try {
+      debugPrint('maidata 缓存无效，开始后台更新，不阻塞本次数据刷新');
+      await manager.fetchAndCacheFullMaidata();
+      debugPrint('maidata 后台缓存更新完成');
+    } catch (e) {
+      debugPrint('maidata 后台缓存更新失败: $e');
+    } finally {
+      _maidataRefreshFuture = null;
+    }
   }
 
   Future<bool> hasCachedData() async {
@@ -309,7 +323,7 @@ class MaimaiMusicDataManager {
     try {
       final prefs = await SharedPreferences.getInstance();
       final songsJson = prefs.getString(CacheKeyConstant.cachedSongs);
-      
+
       if (songsJson != null && songsJson.isNotEmpty) {
         // 使用 compute 在后台解析
         return await compute((String jsonStr) {
@@ -320,7 +334,7 @@ class MaimaiMusicDataManager {
     } catch (e) {
       debugPrint('读取本地缓存时出错: $e');
     }
-    
+
     return null;
   }
 
@@ -333,7 +347,7 @@ class MaimaiMusicDataManager {
     } catch (e) {
       debugPrint('根据ID获取缓存歌曲数据时出错: $e');
     }
-    
+
     return null;
   }
 
@@ -348,9 +362,10 @@ class MaimaiMusicDataManager {
         debugPrint('没有缓存的歌曲数据可上传');
         return false;
       }
-      
-      List<Map<String, dynamic>> songMaps = songs.map((song) => song.toJson()).toList();
-      
+
+      List<Map<String, dynamic>> songMaps =
+          songs.map((song) => song.toJson()).toList();
+
       await _cloudService.uploadSongs(songMaps);
       debugPrint('成功将 ${songs.length} 首歌曲上传到服务器');
       return true;
@@ -372,14 +387,14 @@ class MaimaiMusicDataManager {
     if (maidata.title.isEmpty) {
       return null;
     }
-    
+
     return MaidataDecodeUtil.toSong(maidata);
   }
 
   Future<int> parseAndAppendMaidata(String maidataText) async {
     try {
       MaidataData maidata = MaidataDecodeUtil.decode(maidataText);
-      
+
       if (maidata.title.isEmpty) {
         debugPrint('Maidata 解析失败：标题为空');
         return 0;
@@ -392,11 +407,11 @@ class MaimaiMusicDataManager {
       }
 
       List<Song> existingSongs = await getCachedSongs() ?? [];
-      
-      bool exists = existingSongs.any((song) => 
-        song.id == newSong.id || 
-        song.title == newSong.title && song.basicInfo.artist == newSong.basicInfo.artist
-      );
+
+      bool exists = existingSongs.any((song) =>
+          song.id == newSong.id ||
+          song.title == newSong.title &&
+              song.basicInfo.artist == newSong.basicInfo.artist);
 
       if (exists) {
         debugPrint('歌曲 "${newSong.title}" 已存在于缓存中，跳过');
@@ -404,12 +419,12 @@ class MaimaiMusicDataManager {
       }
 
       existingSongs.add(newSong);
-      
+
       final songsJson = await _encodeSongsInBackground(existingSongs);
-      
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(CacheKeyConstant.cachedSongs, songsJson);
-      
+
       debugPrint('成功追加歌曲 "${newSong.title}" 到缓存');
       return 1;
     } catch (e) {
@@ -427,10 +442,11 @@ class MaimaiMusicDataManager {
     return count;
   }
 
-  Future<List<String>> getMissingSongIdsFromMaidata(List<String> maidataTexts) async {
+  Future<List<String>> getMissingSongIdsFromMaidata(
+      List<String> maidataTexts) async {
     List<String> missingIds = [];
     List<Song> existingSongs = await getCachedSongs() ?? [];
-    
+
     for (String text in maidataTexts) {
       try {
         MaidataData maidata = MaidataDecodeUtil.decode(text);
@@ -438,12 +454,12 @@ class MaimaiMusicDataManager {
         if (songId.isEmpty || songId == '0') {
           songId = maidata.title.hashCode.toString();
         }
-        
-        bool exists = existingSongs.any((song) => 
-          song.id == songId || 
-          song.title == maidata.title && song.basicInfo.artist == maidata.artist
-        );
-        
+
+        bool exists = existingSongs.any((song) =>
+            song.id == songId ||
+            song.title == maidata.title &&
+                song.basicInfo.artist == maidata.artist);
+
         if (!exists && maidata.title.isNotEmpty) {
           missingIds.add(songId);
         }
@@ -451,10 +467,10 @@ class MaimaiMusicDataManager {
         debugPrint('解析 Maidata 时出错: $e');
       }
     }
-    
+
     return missingIds;
   }
-  
+
   Future<List<String>?> _getCachedAddedSongIds() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -467,31 +483,35 @@ class MaimaiMusicDataManager {
     }
     return null;
   }
-  
+
   Future<void> _saveAddedSongIds(List<String> songIds) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(CacheKeyConstant.maidataAddedSongs, json.encode(songIds));
-      await prefs.setInt(CacheKeyConstant.maidataAddedSongsTimestamp, DateTime.now().millisecondsSinceEpoch);
+      await prefs.setString(
+          CacheKeyConstant.maidataAddedSongs, json.encode(songIds));
+      await prefs.setInt(CacheKeyConstant.maidataAddedSongsTimestamp,
+          DateTime.now().millisecondsSinceEpoch);
     } catch (e) {
       debugPrint('保存追加歌曲列表失败: $e');
     }
   }
-  
+
   Future<bool> _isAddedSongsCacheValid() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      int? timestamp = prefs.getInt(CacheKeyConstant.maidataAddedSongsTimestamp);
+      int? timestamp =
+          prefs.getInt(CacheKeyConstant.maidataAddedSongsTimestamp);
       if (timestamp != null) {
         int now = DateTime.now().millisecondsSinceEpoch;
-        return now - timestamp < CacheTimestampConstant.maidataAddedSongsCacheMillis;
+        return now - timestamp <
+            CacheTimestampConstant.maidataAddedSongsCacheMillis;
       }
     } catch (e) {
       debugPrint('检查追加歌曲缓存有效性失败: $e');
     }
     return false;
   }
-  
+
   Future<void> clearAddedSongsCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -502,7 +522,7 @@ class MaimaiMusicDataManager {
       debugPrint('清除追加歌曲缓存失败: $e');
     }
   }
-  
+
   Future<bool> hasValidAddedSongsCache() async {
     List<String>? cachedIds = await _getCachedAddedSongIds();
     if (cachedIds == null || cachedIds.isEmpty) {
@@ -510,7 +530,7 @@ class MaimaiMusicDataManager {
     }
     return _isAddedSongsCacheValid();
   }
-  
+
   Future<List<String>?> getAddedSongIds() async {
     if (await hasValidAddedSongsCache()) {
       return _getCachedAddedSongIds();
@@ -524,7 +544,8 @@ class MaimaiMusicDataManager {
   Future<void> _saveUnionExtraSongIds(List<String> songIds) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(CacheKeyConstant.unionExtraSongIds, json.encode(songIds));
+      await prefs.setString(
+          CacheKeyConstant.unionExtraSongIds, json.encode(songIds));
     } catch (e) {
       debugPrint('保存 union extra 歌曲ID失败: $e');
     }

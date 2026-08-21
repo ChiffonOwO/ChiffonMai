@@ -124,6 +124,9 @@ class StringUtil {
     if (_oldSimple.containsKey(version)) return _oldSimple[version]!;
     final dx = _lookupDxExact(version, _dxSimple);
     if (dx != null) return dx;
+    // dxrating 数据无空格前缀：maimaiでらっくす( PLUS) → DX(+)
+    if (version == 'maimaiでらっくす') return 'DX';
+    if (version == 'maimaiでらっくす PLUS') return 'DX+';
     return _genericFallback(version);
   }
 

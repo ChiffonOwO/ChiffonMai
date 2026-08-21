@@ -1192,6 +1192,11 @@ class DivingFishProbeManager {
   // ===========================================================================
 
   /// POST /auth/qr-login
+  ///
+  /// 新 API 返回两种形态：
+  ///   - `{ kind: 'fast', token, user }` 立即登录成功；
+  ///   - `{ kind: 'async', attemptId }` 需要轮询 `/auth/qr-login/{attemptId}`。
+  /// 统一归一化为 `{ token, user }`（token/user 可为 null）返回，便于调用方不变。
   Future<Map<String, dynamic>?> _loginByQr(String qrCode) async {
     final url = ApiUrls.MaimaiHubLoginByQrUrl;
     final body = json.encode({'qrCode': qrCode});
@@ -1208,22 +1213,90 @@ class DivingFishProbeManager {
 
       _log('  ← HTTP ${response.statusCode} (${response.body.length} 字节)');
 
-      if (response.statusCode == 201) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        final user = data['user'];
-        final friendCode = user is Map<String, dynamic> ? user.tryGet<String>('friendCode') : null;
-        _log('  ✓ 返回 token=${data['token'] != null ? '***' : 'null'}, friendCode=${friendCode ?? 'null'}');
-        return data;
+      if (response.statusCode != 201) {
+        _log('  ✗ 状态码异常: ${response.statusCode}');
+        _log('  Response body: ${_truncateBody(response.body)}');
+        return null;
       }
 
-      _log('  ✗ 状态码异常: ${response.statusCode}');
-      _log('  Response body: ${_truncateBody(response.body)}');
-      return null;
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      final kind = data.tryGet<String>('kind') ?? 'fast';
+
+      if (kind == 'async') {
+        final attemptId = data.tryGet<String>('attemptId');
+        if (attemptId == null || attemptId.isEmpty) {
+          _log('  ✗ async 登录但缺少 attemptId');
+          return null;
+        }
+        _log('  ✓ QR 登录为异步，attemptId=$attemptId');
+        return _pollLoginByQr(attemptId);
+      }
+
+      final user = data['user'];
+      final friendCode = user is Map<String, dynamic> ? user.tryGet<String>('friendCode') : null;
+      _log('  ✓ fast 登录，token=${data['token'] != null ? '***' : 'null'}, friendCode=${friendCode ?? 'null'}');
+      return data;
     } catch (e, stack) {
       _log('  ✗ 网络异常: $e');
       _log('  Stack: $stack');
       return null;
     }
+  }
+
+  /// 轮询 GET /auth/qr-login/{attemptId}，直到 matched / failed / 超时。
+  ///
+  /// matched 时返回 `{ token, user }`；failed / 超时返回 null。
+  Future<Map<String, dynamic>?> _pollLoginByQr(String attemptId) async {
+    final pollUrl = '${ApiUrls.MaimaiHubLoginByQrUrl}/$attemptId';
+    final startTime = DateTime.now();
+    const pollTimeout = Duration(minutes: 3);
+
+    _log('  开始轮询 QR 登录: $pollUrl');
+
+    while (!_cancelled) {
+      if (DateTime.now().difference(startTime) > pollTimeout) {
+        _log('  ✗ QR 登录轮询超时（${pollTimeout.inMinutes} 分钟）');
+        return null;
+      }
+
+      await Future.delayed(_pollInterval);
+
+      try {
+        final response = await _getFollowRedirects(
+          Uri.parse(pollUrl),
+          headers: {'Content-Type': 'application/json'},
+        );
+
+        if (response.statusCode != 200) {
+          _log('  ✗ QR 登录轮询 HTTP ${response.statusCode}');
+          continue;
+        }
+
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        final status = data.tryGet<String>('status') ?? '';
+
+        if (status == 'matched') {
+          final token = data.tryGet<String>('token');
+          final user = data['user'];
+          final friendCode = user is Map<String, dynamic> ? user.tryGet<String>('friendCode') : null;
+          _log('  ✓ QR 登录 matched，token=${token != null ? '***' : 'null'}, friendCode=${friendCode ?? 'null'}');
+          return {'token': token, 'user': user};
+        }
+
+        if (status == 'failed') {
+          final err = data.tryGet<String>('error') ?? '';
+          _log('  ✗ QR 登录 failed: ${err.isNotEmpty ? err : status}');
+          return null;
+        }
+
+        _log('  QR 登录轮询: status=$status');
+      } catch (e, stack) {
+        _log('  ✗ QR 登录轮询异常: $e');
+        _log('  Stack: $stack');
+      }
+    }
+
+    return null;
   }
 
   /// POST /me/dxnet-jobs (authorized)
@@ -1988,7 +2061,7 @@ class DivingFishProbeManager {
           completedDiffs: completedDiffs,
           totalDiffs: totalDiffs,
         );
-      case 'fetch_friend_list':
+      case 'get_full_friend_list':
         return SyncProgress(
           stage: SyncStage.scraping,
           message: '正在拉取好友列表...',

@@ -1,3 +1,13 @@
+// ===========================================================================
+// 说明：完整的生产 server.js 内联了「水鱼 OAuth 代理 /api/prober/*」
+// （后端持有 client_secret 换票并代理查分器成绩读取）。本模板为精简骨架，未包含该段。
+//
+// 敏感项优先读环境变量，其次用 server.js 内默认值（server.js 已被 .gitignore 排除）：
+//   DIVING_FISH_OAUTH_CLIENT_ID     水鱼账号 OAuth 应用 client_id
+//   DIVING_FISH_OAUTH_CLIENT_SECRET 水鱼账号 OAuth 应用 client_secret
+//   GATEWAY_API_KEY                 App↔后端 OAuth 代理的 API key
+//   PROBER_SUBJECT_MODE             可选 'ref'(默认、长期) / 'qq'(仅过渡期)
+// ===========================================================================
 const express = require('express');
 const http = require('http');
 const https = require('https');

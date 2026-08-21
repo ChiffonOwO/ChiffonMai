@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/ProberException.dart';
 import 'package:my_first_flutter_app/service/FriendCompareService.dart';
 import 'package:my_first_flutter_app/entity/FriendComparisonResult.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
@@ -85,6 +87,19 @@ class _FriendComparePageState extends State<FriendComparePage> {
         // 保存到历史记录
         _service.saveHistory(friendQQ, result);
         _loadHistory();
+      }
+    } on ProberException catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.message;
+          _isLoading = false;
+        });
+      }
+      // 好友未授权时，自动打开绑定链接引导其授权一次
+      if (e.code == 'CONSENT_REQUIRED' &&
+          e.bindingUrl != null &&
+          e.bindingUrl!.isNotEmpty) {
+        launchUrl(Uri.parse(e.bindingUrl!), mode: LaunchMode.externalApplication);
       }
     } catch (e) {
       if (mounted) {

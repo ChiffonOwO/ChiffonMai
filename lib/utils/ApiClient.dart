@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io' show HttpClient;
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart' show IOClient;
+import 'package:my_first_flutter_app/api/ApiUrls.dart';
 
 /// 带超时和连接池复用的 HTTP 客户端，所有 API 调用统一使用此类。
 ///
@@ -31,11 +32,15 @@ class ApiClient {
     _sharedClient = null;
   }
 
-  /// 合并默认 gzip 请求头
-  static Map<String, String> _mergeHeaders(Map<String, String>? headers) {
+  /// 合并默认请求头。
+  /// 对自家后端（chiffonmai.cloud）附加网关/OAuth 代理鉴权头 `x-prober-key`。
+  static Map<String, String> _mergeHeaders(Uri url, Map<String, String>? headers) {
     final merged = <String, String>{
       'Accept-Encoding': 'gzip',
     };
+    if (url.host == 'chiffonmai.cloud') {
+      merged['x-prober-key'] = ApiUrls.ProberApiKey;
+    }
     if (headers != null) {
       merged.addAll(headers);
     }
@@ -46,7 +51,7 @@ class ApiClient {
     Map<String, String>? headers,
     Duration timeout = _defaultTimeout,
   }) {
-    return _client.get(url, headers: _mergeHeaders(headers)).timeout(timeout);
+    return _client.get(url, headers: _mergeHeaders(url, headers)).timeout(timeout);
   }
 
   static Future<http.Response> post(Uri url, {
@@ -55,7 +60,7 @@ class ApiClient {
     Encoding? encoding,
     Duration timeout = _defaultTimeout,
   }) {
-    return _client.post(url, headers: _mergeHeaders(headers), body: body, encoding: encoding).timeout(timeout);
+    return _client.post(url, headers: _mergeHeaders(url, headers), body: body, encoding: encoding).timeout(timeout);
   }
 
   static Future<http.Response> put(Uri url, {
@@ -64,7 +69,7 @@ class ApiClient {
     Encoding? encoding,
     Duration timeout = _defaultTimeout,
   }) {
-    return _client.put(url, headers: _mergeHeaders(headers), body: body, encoding: encoding).timeout(timeout);
+    return _client.put(url, headers: _mergeHeaders(url, headers), body: body, encoding: encoding).timeout(timeout);
   }
 
   static Future<http.Response> delete(Uri url, {
@@ -73,6 +78,6 @@ class ApiClient {
     Encoding? encoding,
     Duration timeout = _defaultTimeout,
   }) {
-    return _client.delete(url, headers: _mergeHeaders(headers), body: body, encoding: encoding).timeout(timeout);
+    return _client.delete(url, headers: _mergeHeaders(url, headers), body: body, encoding: encoding).timeout(timeout);
   }
 }

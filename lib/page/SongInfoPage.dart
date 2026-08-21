@@ -40,8 +40,9 @@ import 'package:my_first_flutter_app/service/SongInfo/SongScoreShareService.dart
 import 'package:my_first_flutter_app/service/SongInfo/SongInfoExportToImgService.dart';
 import 'package:my_first_flutter_app/service/ChartNoteService.dart';
 import 'package:my_first_flutter_app/entity/ChartNote.dart';
-import 'package:my_first_flutter_app/entity/Union/UnionSong.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/UnionUniManager.dart';
+import 'package:my_first_flutter_app/entity/DXRating/DXDataEntity.dart';
+import 'package:my_first_flutter_app/manager/DXDataManager.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 
 class SongInfoPage extends StatefulWidget {
@@ -67,6 +68,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
   Map<String, dynamic>? _userData;
   List<dynamic>? _tagData;
   List<dynamic>? _tagSongsData;
+
+  // 定数历史（dxrating 静态数据）
+  DXDataEntity? _dxData;
 
   // Maidata解析的物量统计（优先使用）
   Map<int, List<int>> _maidataNoteCounts =
@@ -179,8 +183,6 @@ class _SongInfoPageState extends State<SongInfoPage> {
   double? _chartAverageScore;
   int _chartTotalVotes = 0;
 
-  // union uni 元数据（cn/jp 可游玩地区）
-  SongInfo? _uniInfo;
   double? _chartUserScore;
   Map<String, dynamic>? _chartUserRatingData;
   Map<String, int>? _chartRatingDistribution; // 评分分布：key 为 "5.0" 等，value 为投票数
@@ -195,6 +197,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
     _currentDiffIndex = widget.initialLevelIndex;
     _commentInputController.addListener(_onCommentInputChanged);
     _loadData();
+    _loadDxData();
   }
 
   @override
@@ -310,6 +313,210 @@ class _SongInfoPageState extends State<SongInfoPage> {
       // 检查当前谱面是否有笔记
       _checkNoteStatus();
     }
+  }
+
+  // 加载定数历史静态数据
+  Future<void> _loadDxData() async {
+    final data = await DXDataManager().load();
+    if (mounted && data != null) {
+      setState(() {
+        _dxData = data;
+      });
+    }
+  }
+
+  // 难度索引 → dxrating 难度名
+  static const List<String> _dxDifficultyNames = [
+    'basic', 'advanced', 'expert', 'master', 'remaster',
+  ];
+
+  // 定数历史起始版本：maimai でらっくす PLUS（DX PLUS）及之后
+  static const String _dxHistoryStartDate = '2020-01-23';
+
+  // 找到当前歌曲（标题 + 类型 + 当前难度）对应的 sheet
+  DXDataSheet? _findMatchedSheet() {
+    final dxData = _dxData;
+    final songData = _songData;
+    if (dxData == null || songData == null) return null;
+
+    final songTitle = songData['basic_info']?['title']?.toString() ?? '';
+    final songType = songData['type']?.toString() ?? '';
+    final sheetType = songType == 'DX' ? 'dx' : 'std';
+    final difficultyName = _dxDifficultyNames[_currentDiffIndex.clamp(0, 4).toInt()];
+
+    for (final song in dxData.songs) {
+      if (song.title != songTitle) continue;
+      for (final sheet in song.sheets) {
+        if (sheet.type != sheetType) continue;
+        if (sheet.difficulty != difficultyName) continue;
+        return sheet;
+      }
+    }
+    return null;
+  }
+
+  // 构建当前歌曲（标题 + 类型 + 当前难度）的定数历史
+  List<({String version, double value})> _buildDxHistory() {
+    final dxData = _dxData;
+    if (dxData == null) return [];
+    final matchedSheet = _findMatchedSheet();
+    if (matchedSheet == null) return [];
+
+    // 版本 → 定数（multiverInternalLevelValue 为主，补上自身版本）
+    final Map<String, double> versionValue = {
+      ...matchedSheet.multiverInternalLevelValue,
+      matchedSheet.version: matchedSheet.internalLevelValue,
+    };
+
+    final versionOrder = <String, int>{};
+    final versionReleaseDate = <String, String>{};
+    for (int i = 0; i < dxData.versions.length; i++) {
+      versionOrder[dxData.versions[i].version] = i;
+      versionReleaseDate[dxData.versions[i].version] =
+          dxData.versions[i].releaseDate;
+    }
+
+    // 只保留 DX PLUS（含）之后的版本
+    final entries = versionValue.entries
+        .where((e) =>
+            (versionReleaseDate[e.key] ?? '').compareTo(_dxHistoryStartDate) >= 0)
+        .toList()
+      ..sort((a, b) =>
+          (versionOrder[a.key] ?? 999).compareTo(versionOrder[b.key] ?? 999));
+    return entries.map((e) => (version: e.key, value: e.value)).toList();
+  }
+
+  // 定数历史表格（横向滑动，2行：版本列表 + 对应定数）
+  Widget _buildDxHistoryTable() {
+    final entries = _buildDxHistory();
+    if (entries.isEmpty) return const SizedBox.shrink();
+
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // 计算每个版本（除第一个外）相对前一个版本的定数变化方向：1=升 -1=降 0=不变 null=首个
+    final directions = <int?>[null];
+    for (int i = 1; i < entries.length; i++) {
+      final prev = entries[i - 1].value;
+      final curr = entries[i].value;
+      if (curr > prev) {
+        directions.add(1);
+      } else if (curr < prev) {
+        directions.add(-1);
+      } else {
+        directions.add(0);
+      }
+    }
+
+    // 版本表头单元格（仅保留底部一条横线分隔）
+    Widget headerCell(String text) {
+      return Container(
+        width: 84,
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: colorScheme.outlineVariant),
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+      );
+    }
+
+    // 定数单元格（带相对前一版本的变化箭头）
+    Widget valueCell(String text, int? direction) {
+      String arrow = '';
+      TextStyle arrowStyle = const TextStyle();
+      if (direction != null) {
+        if (direction > 0) {
+          arrow = '↑';
+          arrowStyle = const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: Colors.redAccent,
+          );
+        } else if (direction < 0) {
+          arrow = '↓';
+          arrowStyle = const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: Colors.blueAccent,
+          );
+        } else {
+          arrow = '→';
+          arrowStyle = const TextStyle(color: Colors.grey);
+        }
+      }
+
+      return Container(
+        width: 84,
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        alignment: Alignment.center,
+        child: Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: text,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              if (arrow.isNotEmpty)
+                TextSpan(text: ' $arrow', style: arrowStyle),
+            ],
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '定数历史',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  for (int i = 0; i < entries.length; i++)
+                    headerCell(StringUtil.formatVersion(entries[i].version)),
+                ],
+              ),
+              Row(
+                children: [
+                  for (int i = 0; i < entries.length; i++)
+                    valueCell(entries[i].value.toStringAsFixed(1), directions[i]),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   // 加载相关收藏品数量
@@ -745,8 +952,6 @@ class _SongInfoPageState extends State<SongInfoPage> {
             }
           }
         }
-
-        if (mounted) setState(() => _uniInfo = info);
       } else {
         debugPrint('[SongInfoPage] 未找到 union 数据, 候选ID: $candidates');
       }
@@ -2552,6 +2757,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                           : '-'),
                                 ],
                               ),
+
+                              const SizedBox(height: 16),
+
+                              // 定数历史（横向滑动表格）
+                              _buildDxHistoryTable(),
 
                               const SizedBox(height: 20),
 
@@ -5844,27 +6054,36 @@ class _SongInfoPageState extends State<SongInfoPage> {
   }
 
   // 构建统计项
-  // 可游玩地区（CN/JP高亮），6位数ID（UTAGE）统一变灰
+  // 可游玩地区：使用 dxdata 的 serverIds（cn/jp/intl/usa），命中则点亮
   Widget _buildPlayableRegionStat(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final accentColor = _getAccentColor(_currentDiffIndex, brightness);
     final screenWidth = MediaQuery.of(context).size.width;
-    final isUtage = widget.songId.length == 6;
-    final bool cn = isUtage ? false : (_uniInfo?.cn ?? false);
-    final bool jp = isUtage ? false : (_uniInfo?.jp ?? false);
+
+    final serverIds = _findMatchedSheet()?.serverIds ?? const <String>[];
+    const regionLabels = <String>['CN', 'JP', 'INTL', 'USA'];
+    const regionIds = <String>['cn', 'jp', 'intl', 'usa'];
 
     return Expanded(
       child: Column(
         children: [
           Text('可游玩地区', style: TextStyle(fontSize: 12, color: accentColor)),
           const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildRegionBadge('CN', cn, screenWidth),
-              SizedBox(width: screenWidth * 0.02),
-              _buildRegionBadge('JP', jp, screenWidth),
-            ],
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (int i = 0; i < regionLabels.length; i++) ...[
+                  if (i > 0) SizedBox(width: screenWidth * 0.012),
+                  _buildRegionBadge(
+                    regionLabels[i],
+                    serverIds.contains(regionIds[i]),
+                    screenWidth,
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ),
@@ -5875,7 +6094,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
     final brightness = Theme.of(context).brightness;
     final isDark = brightness == Brightness.dark;
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.025, vertical: 2),
+      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.018, vertical: 2),
       decoration: BoxDecoration(
         color: active
             ? AppColors.successGreen(brightness)

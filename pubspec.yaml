@@ -120,6 +120,7 @@ flutter:
     - assets/userinfobg2.png
     - assets/chiffon2.png
     - assets/cover_manifest.json
+    - assets/dxrating_dxdata.json
     - assets/res/
   # To add assets to your application, add an assets section, like this:
   # assets:

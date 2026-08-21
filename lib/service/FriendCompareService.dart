@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../manager/DivingFish/UserPlayDataManager.dart';
+import '../manager/DivingFish/DivingFishOAuthManager.dart';
+import '../manager/DivingFish/ProberException.dart';
 import '../entity/FriendComparisonResult.dart';
 
 /// 好友战绩对比服务
@@ -29,6 +31,8 @@ class FriendCompareService {
     Map<String, dynamic>? myData;
     try {
       myData = await userPlayDataManager.fetchUserPlayData(myQQ);
+    } on ProberException {
+      rethrow; // 未授权/配额等直接透传
     } catch (e) {
       debugPrint('获取自己数据失败: $e');
       throw Exception('获取自己数据失败，请检查网络连接');
@@ -44,13 +48,24 @@ class FriendCompareService {
     Map<String, dynamic>? friendData;
     try {
       friendData = await userPlayDataManager.fetchUserPlayData(friendQQ);
+    } on ProberException catch (e) {
+      // 恢复本地缓存
+      if (cachedBackup != null) {
+        await userPlayDataManager.restoreCache(cachedBackup);
+      }
+      // 好友未授权时生成绑定链接，引导好友授权一次
+      if (e.code == 'CONSENT_REQUIRED') {
+        final link = await DivingFishOAuthManager().startBinding(friendQQ);
+        throw ProberException.consentRequired(bindingUrl: link.isEmpty ? null : link);
+      }
+      rethrow;
     } catch (e) {
       debugPrint('获取好友数据失败: $e');
       // 恢复本地缓存
       if (cachedBackup != null) {
         await userPlayDataManager.restoreCache(cachedBackup);
       }
-      throw Exception('获取好友数据失败，请检查 QQ 号是否正确（好友需要在水鱼查分器注册）');
+      throw Exception('获取好友数据失败，请检查 QQ 号是否正确');
     }
 
     if (friendData == null || friendData['records'] == null) {
