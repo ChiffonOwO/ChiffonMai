@@ -26,20 +26,24 @@ jobs:
           flutter pub get
           cd ios && pod install && cd ..
 
-      # ---- 构建未签名 IPA ----
-      # --no-codesign 会跳过代码签名，无需证书 / Provisioning Profile。
-      # 产出的 .ipa 为未签名包，可通过 AltStore / Sideloadly / TrollStore 等侧载。
-      - name: 构建未签名 iOS IPA
+      # ---- 构建未签名 App ----
+      # flutter build ios --no-codesign 无需 Development Team / 证书即可出包，
+      # 因为缺少 Team 时 flutter build ipa 会在归档阶段失败。
+      - name: 构建未签名 iOS App
         run: |
-          flutter build ipa \
-            --release \
-            --no-codesign \
-            --build-name=${{ github.ref_type == 'tag' && github.ref_name || '1.11.1' }} \
-            --build-number=${{ github.run_number }}
+          flutter build ios --release --no-codesign
+
+      # ---- 手动组装未签名 IPA ----
+      # 未签名产物是 Runner.app，需手动用 zip 打包成 .ipa。
+      - name: 打包为未签名 IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r app-unsigned.ipa Payload
 
       # ---- 上传 IPA ----
       - name: 上传 IPA 为 Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-unsigned.ipa
-          path: build/ios/ipa/*.ipa
+          path: app-unsigned.ipa
