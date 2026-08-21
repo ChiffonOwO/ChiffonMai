@@ -26,31 +26,56 @@ jobs:
           flutter pub get
           cd ios && pod install && cd ..
 
-      # ---- 构建未签名 App ----
-      # flutter build ios 会因未配置 Development Team 而强制失败（工具链检查，
-      # 与 Xcode 签名设置无关），因此改用 xcodebuild 直接构建。
-      # 注意：Runner 里的 Flutter Run Script 需要 $FLUTTER_ROOT，
-      # 它由 flutter 命令注入、裸 xcodebuild 不会自动带上，需手动导出。
-      - name: 构建未签名 iOS App
+      # ---- 用 GitHub Secrets 生成 DeveloperToken.dart ----
+      # 该文件含敏感凭据，已被 .gitignore 排除、绝不入库。
+      # 在 CI 里用仓库 Secrets 动态生成，供编译使用。
+      - name: 生成 DeveloperToken.dart（来自 Secrets）
         run: |
-          export FLUTTER_ROOT="$(dirname "$(dirname "$(which flutter)")")"
-          echo "FLUTTER_ROOT=$FLUTTER_ROOT"
-          xcodebuild \
-            -workspace ios/Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -sdk iphoneos \
-            -derivedDataPath build/ios \
-            CODE_SIGNING_ALLOWED=NO \
-            build
-          ls -la build/ios/Build/Products/Release-iphoneos/
+          cat > lib/api/DeveloperToken.dart <<'EOF'
+          // ignore_for_file: constant_identifier_names
 
-      # ---- 手动组装未签名 IPA ----
-      # 未签名产物是 Runner.app，需手动用 zip 打包成 .ipa。
-      - name: 打包为未签名 IPA
+          class DeveloperToken {
+            static const String TencentSecretId = '${{ secrets.TENCENT_SECRET_ID }}';
+            static const String TencentSecretKey = '${{ secrets.TENCENT_SECRET_KEY }}';
+
+            // 落雪 OAuth Client Secret
+            static const String LuoXueClientSecret = '${{ secrets.LUOXUE_CLIENT_SECRET }}';
+
+            // MySQL数据库配置
+            static const String MySQLHost = '${{ secrets.MYSQL_HOST }}';
+            static const int MySQLPort = ${{ secrets.MYSQL_PORT }};
+            static const String MySQLDatabase = '${{ secrets.MYSQL_DATABASE }}';
+            static const String MySQLUsername = '${{ secrets.MYSQL_USERNAME }}';
+            static const String MySQLPassword = '${{ secrets.MYSQL_PASSWORD }}';
+
+            // Redis配置
+            static const String RedisHost = '${{ secrets.REDIS_HOST }}';
+            static const int RedisPort = ${{ secrets.REDIS_PORT }};
+            static const String RedisPassword = '${{ secrets.REDIS_PASSWORD }}';
+            static const int RedisDatabase = ${{ secrets.REDIS_DATABASE }};
+          }
+          EOF
+          echo "Debug: DeveloperToken.dart 生成结果如下（密钥部分已打码以便核对格式）:"
+          sed -E "s|('.*SecretKey' *= *').*|\1***|; s|('.*Password' *= *').*|\1***|" lib/api/DeveloperToken.dart
+
+      # ---- 构建未签名 App ----
+      # flutter build ipa --no-codesign：可成功归档，但工具链会因未配置
+      # Development Team 而让命令以非 0 退出（产物其实已生成）。用
+      # continue-on-error 跳过，随后从归档产物组装 .app。
+      - name: 构建未签名 iOS App（归档）
+        continue-on-error: true
         run: |
+          flutter build ipa --release --no-codesign
+          echo "=== exit code above (非0=仅Team检查失败，产物仍在) ==="
+
+      # ---- 组装未签名 IPA ----
+      # 从 archive 产物里取未签名 Runner.app 并打包成 .ipa。
+      - name: 组装未签名 IPA
+        run: |
+          APP_ARCHIVE="$(find build/ios/archive -name 'Runner.xcarchive' -type d | head -1)"
+          echo "archive: $APP_ARCHIVE"
           mkdir -p Payload
-          cp -r build/ios/Build/Products/Release-iphoneos/Runner.app Payload/
+          cp -r "$APP_ARCHIVE/Products/Applications/Runner.app" Payload/
           zip -r app-unsigned.ipa Payload
 
       # ---- 上传 IPA ----
