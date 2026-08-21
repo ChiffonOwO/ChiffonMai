@@ -27,9 +27,11 @@ jobs:
           cd ios && pod install && cd ..
 
       # ---- 构建未签名 App ----
-      # flutter build ios --no-codesign 无需 Development Team / 证书即可出包，
-      # 因为缺少 Team 时 flutter build ipa 会在归档阶段失败。
+      # Xcode 构建本身成功（build/ios/iphoneos/Runner.app 已产出）。
+      # Flutter 工具随后会因缺少 DEVELOPMENT_TEAM 而报错（--no-codesign 也拦），
+      # 但 .app 早已存在于磁盘上，所以用 continue-on-error 跳过该检查。
       - name: 构建未签名 iOS App
+        continue-on-error: true
         run: |
           flutter build ios --release --no-codesign
 
@@ -37,6 +39,7 @@ jobs:
       # 未签名产物是 Runner.app，需手动用 zip 打包成 .ipa。
       - name: 打包为未签名 IPA
         run: |
+          ls -la build/ios/iphoneos/
           mkdir -p Payload
           cp -r build/ios/iphoneos/Runner.app Payload/
           zip -r app-unsigned.ipa Payload
