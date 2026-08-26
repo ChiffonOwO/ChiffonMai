@@ -20,6 +20,8 @@ class ApiUrls {
   static const String TagDataApi = 'https://miruku.dxrating.net/api/v1/tags';
   static const String SongAliasApi = 'https://www.yuzuchan.moe/api/maimaidx/maimaidxalias';
   static const String DXRatingSongAliasApi = 'https://miruku.dxrating.net/api/v1/aliases';
+  /// dxrating 全量数据（曲库/标签/别名/谱面定数等，直连）
+  static const String DXDataApi = 'https://miruku.dxrating.net/api/v1/dxdata';
   /// 用户完整游玩数据（经 OAuth 代理）
   static const String UserPlayDataApi = '$ProberBaseUrl/records';
 

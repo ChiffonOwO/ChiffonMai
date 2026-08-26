@@ -195,8 +195,9 @@ class SongRankingService {
   Future<void> updateSongRankings(
     String playerId,
     String playerName,
-    List<Map<String, dynamic>> records,
-  ) async {
+    List<Map<String, dynamic>> records, {
+    void Function(int sentBatches, int totalBatches)? onBatchProgress,
+  }) async {
     try {
       // 预加载所有歌曲数据用于校验
       final songs = await MaimaiMusicDataManager().getCachedSongs();
@@ -259,24 +260,65 @@ class SongRankingService {
 
       debugPrint('[SongRankingService] Sending ${payloadRecords.length} records to server for player $playerId');
 
-      final response = await ApiClient.post(
-        Uri.parse('${ApiUrls.SongRankingsBaseUrl}/update'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'playerId': playerId,
-          'playerName': playerName,
-          'records': payloadRecords,
-        }),
-      );
+      // 单包超 100KB 会被 express 默认 body-parser 拦截（413 PayloadTooLarge），
+      // 这里按记录数分批上传，每批 500 条 ≈ 60-75KB，留足余量。
+      const int batchSize = 500;
+      final totalBatches = (payloadRecords.length / batchSize).ceil();
+      int totalUpdated = 0;
+      int totalSkipped = 0;
+      int failedBatches = 0;
 
-      if (response.statusCode == 200) {
-        final body = json.decode(response.body);
-        if (body['success'] == true) {
-          debugPrint('[SongRankingService] Server updated: ${body['updatedCount']} records, skipped: ${body['skippedCount']}');
+      debugPrint(
+          '[SongRankingService] Splitting into $totalBatches batches (≤$batchSize records each)');
+
+      for (int i = 0; i < payloadRecords.length; i += batchSize) {
+        final end = (i + batchSize > payloadRecords.length)
+            ? payloadRecords.length
+            : i + batchSize;
+        final batch = payloadRecords.sublist(i, end);
+        final batchIndex = (i ~/ batchSize) + 1;
+
+        debugPrint(
+            '[SongRankingService] → batch $batchIndex/$totalBatches (${batch.length} records)');
+
+        onBatchProgress?.call(batchIndex, totalBatches);
+
+        try {
+          final response = await ApiClient.post(
+            Uri.parse('${ApiUrls.SongRankingsBaseUrl}/update'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'playerId': playerId,
+              'playerName': playerName,
+              'records': batch,
+            }),
+          );
+
+          if (response.statusCode == 200) {
+            final body = json.decode(response.body);
+            if (body['success'] == true) {
+              totalUpdated += (body['updatedCount'] as int?) ?? 0;
+              totalSkipped += (body['skippedCount'] as int?) ?? 0;
+              debugPrint(
+                  '[SongRankingService] ✓ batch $batchIndex: updated=${body['updatedCount']}, skipped=${body['skippedCount']}');
+            } else {
+              failedBatches++;
+              debugPrint(
+                  '[SongRankingService] ✗ batch $batchIndex rejected: ${body['error'] ?? 'unknown'}');
+            }
+          } else {
+            failedBatches++;
+            debugPrint(
+                '[SongRankingService] ✗ batch $batchIndex HTTP ${response.statusCode}: ${response.body}');
+          }
+        } catch (e) {
+          failedBatches++;
+          debugPrint('[SongRankingService] ✗ batch $batchIndex error: $e');
         }
-      } else {
-        debugPrint('[SongRankingService] Server returned ${response.statusCode}: ${response.body}');
       }
+
+      debugPrint(
+          '[SongRankingService] All batches done for $playerId: $totalUpdated updated, $totalSkipped skipped, $failedBatches failed');
     } catch (e) {
       debugPrint('[SongRankingService] Error updating rankings: $e');
     }

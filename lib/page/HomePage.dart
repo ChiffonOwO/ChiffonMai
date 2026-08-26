@@ -71,6 +71,8 @@ import 'SingleRatingCalculatorPage.dart';
 import 'SongSearchPage.dart';
 import 'UserScoreSearchPage.dart';
 import 'AboutAppPage.dart';
+import 'SupportDeveloperPage.dart';
+import 'FriendLinksPage.dart';
 import 'CoverRecognitionPage.dart';
 import 'DataBackupPage.dart';
 import 'DailyRecommendPage.dart';
@@ -409,8 +411,16 @@ class _HomePageState extends State<HomePage> {
   List<ButtonCategory> get _buttonCategories =>
       FeatureRegistry.allCategories(_isDivingFishLoggedIn);
 
+  /// 不参与首页搜索和收藏的分类名集合
+  static const Set<String> _excludedFromSearch = {'友情链接'};
+
+  /// 参与首页搜索和收藏的分类（已过滤掉 _excludedFromSearch 中的项）
+  List<ButtonCategory> get _searchableCategories => _buttonCategories
+      .where((c) => !_excludedFromSearch.contains(c.name))
+      .toList();
+
   /// 已收藏的功能项（扁平化所有分类中的已收藏项）
-  List<ButtonItem> get _favoritedItems => _buttonCategories
+  List<ButtonItem> get _favoritedItems => _searchableCategories
       .expand((c) => c.items)
       .where((item) => _favoriteTitles.contains(item.title))
       .toList();
@@ -507,12 +517,30 @@ class _HomePageState extends State<HomePage> {
                             SizedBox(height: screenHeight * 0.012),
                           ],
                           // 大类导航卡片
-                          ..._buttonCategories.map((category) =>
-                              _buildCategoryCard(category, context)),
+                          ..._buttonCategories.map((category) {
+                            // 友情链接：点击直接进入友链页面，跳过 FeatureCategoryPage 中间层
+                            if (category.name == '友情链接') {
+                              return _buildCategoryCard(
+                                category,
+                                context,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (ctx) =>
+                                          const FriendLinksPage(),
+                                    ),
+                                  );
+                                },
+                              );
+                            }
+                            return _buildCategoryCard(category, context);
+                          }),
                         ],
                         if (_featureSearchQuery.isNotEmpty)
                           // 搜索有内容：显示匹配的功能按钮（保持原有分类分组行为）
-                          ..._buttonCategories.where((category) {
+                          // 注：友情链接等被排除的分类（_excludedFromSearch）不会出现在搜索结果中
+                          ..._searchableCategories.where((category) {
                             return category.items.any((item) =>
                                 item.title
                                     .toLowerCase()
@@ -1241,6 +1269,9 @@ class _HomePageState extends State<HomePage> {
     String currentLoadingTip = LoadingTipsConstant.getRandomLoadingTip();
     bool isFirstBuild = true;
 
+    bool? isAuthorized;
+    bool isCheckingAuth = isDivingFishLoggedIn;
+
     // 排行榜相关选项
     bool participateRankings = false;
     bool showNickname = false;
@@ -1274,6 +1305,16 @@ class _HomePageState extends State<HomePage> {
             // 只在第一次构建时初始化
             if (isFirstBuild) {
               isFirstBuild = false;
+              if (isDivingFishLoggedIn) {
+                DivingFishOAuthManager()
+                    .checkAuthorization(bindQQ)
+                    .then((result) {
+                  setState(() {
+                    isAuthorized = result;
+                    isCheckingAuth = false;
+                  });
+                });
+              }
               // 启动定时切换
               LoadingTipsConstant.startAutoSwitch(3);
               // 监听加载提示切换
@@ -1375,38 +1416,86 @@ class _HomePageState extends State<HomePage> {
                               if (isDivingFishLoggedIn)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          '读取成绩需先授权本应用，未授权时刷新会失败',
-                                          style: TextStyle(
-                                              fontSize: 12,
-                                              color: AppColors.greyHint(
+                                  child: () {
+                                    if (isCheckingAuth) {
+                                      return Row(
+                                        children: [
+                                          SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '正在检查授权状态...',
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                color: AppColors.greyHint(
+                                                    brightness)),
+                                          ),
+                                        ],
+                                      );
+                                    }
+                                    if (isAuthorized == true) {
+                                      return Row(
+                                        children: [
+                                          Icon(Icons.check_circle,
+                                              size: 16,
+                                              color: AppColors.successGreen(
                                                   brightness)),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            '已授权',
+                                            style: TextStyle(
+                                                fontSize: 13,
+                                                color: AppColors.successGreen(
+                                                    brightness)),
+                                          ),
+                                        ],
+                                      );
+                                    }
+                                    return Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            '读取成绩需先授权本应用，未授权时刷新会失败',
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                color: AppColors.greyHint(
+                                                    brightness)),
+                                          ),
                                         ),
-                                      ),
-                                      TextButton(
-                                        onPressed: () async {
-                                          final qq = qqController.text.trim();
-                                          if (qq.isEmpty) {
+                                        TextButton(
+                                          onPressed: () async {
+                                            final qq =
+                                                qqController.text.trim();
+                                            if (qq.isEmpty) {
+                                              Fluttertoast.showToast(
+                                                  msg: '未找到 QQ 号');
+                                              return;
+                                            }
+                                            final ok =
+                                                await DivingFishOAuthManager()
+                                                    .openBindingLink(qq);
+                                            if (!mounted) return;
                                             Fluttertoast.showToast(
-                                                msg: '未找到 QQ 号');
-                                            return;
-                                          }
-                                          final ok =
-                                              await DivingFishOAuthManager()
-                                                  .openBindingLink(qq);
-                                          if (!mounted) return;
-                                          Fluttertoast.showToast(
-                                              msg: ok
-                                                  ? '已打开授权链接，请在浏览器中完成授权后重新刷新'
-                                                  : '发起授权失败，请稍后重试');
-                                        },
-                                        child: const Text('去授权'),
-                                      ),
-                                    ],
-                                  ),
+                                                msg: ok
+                                                    ? '已打开授权链接，请在浏览器中完成授权后重新刷新'
+                                                    : '发起授权失败，请稍后重试');
+                                            if (ok) {
+                                              final authResult =
+                                                  await DivingFishOAuthManager()
+                                                      .checkAuthorization(qq);
+                                              isAuthorized = authResult;
+                                              setState(() {});
+                                            }
+                                          },
+                                          child: const Text('去授权'),
+                                        ),
+                                      ],
+                                    );
+                                  }(),
                                 ),
                             ],
                           ),
@@ -1829,6 +1918,11 @@ class _HomePageState extends State<HomePage> {
                 userId,
                 displayNickname,
                 recordsMap,
+                onBatchProgress: (sent, total) {
+                  // 排行榜总进度落在 95-99% 区间
+                  final percent = 95 + ((sent * 4) ~/ total).clamp(0, 4);
+                  onProgress(percent, '上传单曲排行榜 $sent/$total...');
+                },
               );
             }
           } else {
@@ -1997,26 +2091,57 @@ class _HomePageState extends State<HomePage> {
     }
 
     // 获取从maidata追加的歌曲ID列表
-    final addedSongIds = await musicManager.getAddedSongIds() ?? [];
+    final rawAddedIds = await musicManager.getAddedSongIds() ?? [];
+
+    // 防御：addedSongIds 缓存历史上曾出现污染（包含水鱼主库 ID）。
+    // 若条目数与主库歌曲数接近则视为不可信，直接跳过该过滤以避免 Best 上限被误算为 0。
+    final addedSongIds =
+        rawAddedIds.length > songs.length * 0.5 ? <String>[] : rawAddedIds;
+    if (rawAddedIds.length != addedSongIds.length) {
+      debugPrint(
+          '警告: addedSongIds 缓存异常（${rawAddedIds.length} 条，占主库 ${(rawAddedIds.length / songs.length * 100).toStringAsFixed(1)}%），已自动跳过该过滤');
+    }
+
+    // 各维度筛除数量（用于诊断「过滤后为空」的根因）
+    final droppedByAdded = <String>{};
+    int droppedByExtra = 0;
+    int droppedBySixDigitId = 0;
 
     // 过滤掉ID为6位数的歌曲和从maidata追加的歌曲
     final filteredSongs = songs.where((song) {
       // 过滤掉从maidata追加的歌曲
       if (addedSongIds.contains(song.id)) {
+        droppedByAdded.add(song.id);
         return false;
       }
       // 过滤掉union API独有的歌曲
       if (song.isExtra) {
+        droppedByExtra++;
         return false;
       }
-      // 过滤掉ID为6位数的歌曲
+      // 过滤掉ID为6位数的歌曲（宴会场）
       final id = song.id;
       if (id.length == 6 && RegExp(r'^\d+$').hasMatch(id)) {
-        final numId = int.parse(id);
-        return numId < 100000 || numId > 999999;
+        droppedBySixDigitId++;
+        return false;
       }
       return true;
     }).toList();
+
+    debugPrint('=== Rating 上限过滤统计 ===');
+    debugPrint('原始歌曲数: ${songs.length}');
+    debugPrint('  - 被 addedSongIds 剔除: ${droppedByAdded.length}');
+    debugPrint('  - 被 isExtra 剔除: $droppedByExtra');
+    debugPrint('  - 被 6 位 ID 剔除: $droppedBySixDigitId');
+    debugPrint('过滤后剩余: ${filteredSongs.length}');
+
+    // 兜底：若过滤后为空（一般是 addedSongIds 缓存污染或歌曲ID格式异常），
+    // 退回默认上限，避免误报"数据异常"
+    if (filteredSongs.isEmpty) {
+      debugPrint('警告: 过滤后歌曲为空，使用默认Rating上限避免误报');
+      return RatingLimits(
+          best35Limit: 12000, best15Limit: 5000, best50Limit: 17000);
+    }
 
     // 根据is_new分类
     final best35Candidates =
@@ -2244,6 +2369,11 @@ class _HomePageState extends State<HomePage> {
               userId,
               displayNickname,
               records.cast<Map<String, dynamic>>(),
+              onBatchProgress: (sent, total) {
+                // 排行榜总进度落在 95-99% 区间
+                final percent = 95 + ((sent * 4) ~/ total).clamp(0, 4);
+                onProgress(percent, '上传单曲排行榜 $sent/$total...');
+              },
             );
           }
         }
@@ -4133,6 +4263,12 @@ class _HomePageState extends State<HomePage> {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const AboutAppPage()),
+      );
+    }
+    if (item.title == '支持开发者') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const SupportDeveloperPage()),
       );
     }
     if (item.title == '问卷调查') {

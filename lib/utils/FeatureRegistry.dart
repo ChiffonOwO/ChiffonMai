@@ -51,6 +51,13 @@ class FeatureRegistry {
       const ButtonItem(icon: Icons.map, title: '全国音游地图', subtitle: '看看哪里有你想玩的机台'),
       const ButtonItem(icon: Icons.public, title: '全球音游街机地图', subtitle: '查看NearCade全球街机店铺'),
     ]),
+    ButtonCategory(name: '友情链接', icon: Icons.handshake_outlined, items: [
+      const ButtonItem(
+        icon: Icons.link,
+        title: '查看友情链接',
+        subtitle: '推荐同好/同行项目',
+      ),
+    ]),
     ButtonCategory(name: '系统', icon: Icons.settings, items: [
       const ButtonItem(icon: Icons.file_upload_sharp, title: '刷新数据', subtitle: '刷新你的舞萌数据'),
       const ButtonItem(icon: Icons.cleaning_services, title: '刷新maidata', subtitle: '手动刷新所有maidata数据'),
@@ -64,6 +71,7 @@ class FeatureRegistry {
       const ButtonItem(icon: Icons.update, title: '检查更新', subtitle: '检查应用是否有新版本'),
       const ButtonItem(icon: Icons.info_outline, title: '关于本APP', subtitle: '了解ChiffonMai的方方面面'),
       const ButtonItem(icon: Icons.poll_outlined, title: '问卷调查', subtitle: '助力ChiffonMai更上一层楼!'),
+      const ButtonItem(icon: Icons.volunteer_activism, title: '支持开发者', subtitle: '你的支持是我更新的动力'),
       const ButtonItem(icon: Icons.manage_accounts, title: '账号管理', subtitle: '查看已绑定的水鱼账号信息'),
       const ButtonItem(icon: Icons.backup, title: '数据备份', subtitle: '导出/导入本地数据'),
       const ButtonItem(icon: Icons.comment, title: '最近评论', subtitle: '查看全站最近50条评论'),
