@@ -108,6 +108,9 @@ class CacheKeyConstant {
   static const String luoxueUserId = 'luoxue_user_id';
   static const String shuiyuUserId = 'shuiyu_user_id';
 
+  // 用户当前选中的姓名框 ID（用于姓名框选择与导出图片显示）
+  static const String selectedPlateIdCache = 'selected_plate_id_cache';
+
   // 首页后台初始化时间戳（用于控制初始化频率）
   static const String lastInitializationTimestamp = 'last_initialization_timestamp';
 

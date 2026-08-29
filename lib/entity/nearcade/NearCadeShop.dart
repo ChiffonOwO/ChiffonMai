@@ -163,7 +163,7 @@ class Shop {
         games: (json['games'] as List<dynamic>?)
             ?.map((e) => Game.fromJson(e as Map<String, dynamic>))
             .toList() ?? [],
-        shopId: json['shopId'] as int? ?? 0,
+        shopId: json['id'] as int? ?? 0,
         isClaimed: json['isClaimed'] as bool?,
         isLocked: json['isLocked'] as bool?,
         isOpen: json['isOpen'] as bool?,

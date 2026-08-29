@@ -175,6 +175,10 @@ class _HomePageState extends State<HomePage> {
   int _selectedAvatarId = 1;
   List<Collection> _avatarIcons = [];
 
+  // 姓名框选择器
+  int? _selectedPlateId;
+  List<Collection> _avatarPlates = [];
+
   // 初始化方法，用于从本地存储加载数据
   @override
   void initState() {
@@ -183,6 +187,8 @@ class _HomePageState extends State<HomePage> {
     _loadUserData();
     _loadCachedAvatarId();
     _fetchAvatarIcons();
+    _loadCachedPlateId();
+    _fetchAvatarPlates();
     _autoCheckUpdate();
     _checkDivingFishLoginStatus();
     _loadFavoriteCount();
@@ -667,6 +673,43 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // 从本地加载姓名框 ID
+  Future<void> _loadCachedPlateId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getInt(CacheKeyConstant.selectedPlateIdCache);
+      if (mounted) setState(() => _selectedPlateId = cached);
+    } catch (e) {
+      debugPrint('加载姓名框ID失败: $e');
+    }
+  }
+
+  // 保存姓名框 ID（传 null 表示清除）
+  Future<void> _savePlateId(int? id) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (id == null) {
+        await prefs.remove(CacheKeyConstant.selectedPlateIdCache);
+      } else {
+        await prefs.setInt(CacheKeyConstant.selectedPlateIdCache, id);
+      }
+    } catch (e) {
+      debugPrint('保存姓名框ID失败: $e');
+    }
+  }
+
+  // 获取姓名框列表
+  Future<void> _fetchAvatarPlates() async {
+    try {
+      final collectionData = await CollectionsManager().fetchPlatesCollections();
+      if (collectionData?.plates != null && mounted) {
+        setState(() => _avatarPlates = collectionData!.plates!);
+      }
+    } catch (e) {
+      debugPrint('获取姓名框列表失败: $e');
+    }
+  }
+
   // 构建经典式个人信息区域（userinfobg2 风格）
   List<Widget> _buildClassicProfile(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -771,7 +814,7 @@ class _HomePageState extends State<HomePage> {
     final brightness = Theme.of(context).brightness;
 
     return GestureDetector(
-      onTap: _showAvatarPicker,
+      onTap: _showCollectionPicker,
       child: Container(
         width: avatarSize,
         height: avatarSize,
@@ -942,7 +985,7 @@ class _HomePageState extends State<HomePage> {
               children: [
                 // 头像
                 GestureDetector(
-                  onTap: _showAvatarPicker,
+                  onTap: _showCollectionPicker,
                   child: Container(
                     width: avatarSize,
                     height: avatarSize,
@@ -1040,203 +1083,52 @@ class _HomePageState extends State<HomePage> {
   }
 
   // 显示头像选择对话框
-  void _showAvatarPicker() {
-    if (_avatarIcons.isEmpty) {
-      Fluttertoast.showToast(msg: '头像数据尚未加载，请先刷新数据');
+  // 显示头像 / 姓名框 选择抽屉（顶部带 tab）
+  void _showCollectionPicker() {
+    if (_avatarIcons.isEmpty && _avatarPlates.isEmpty) {
+      Fluttertoast.showToast(msg: '收藏品数据尚未加载，请先刷新数据');
       return;
     }
 
-    final screenSize = MediaQuery.of(context).size;
-    final crossAxisCount = 4;
-    final selectedId = _selectedAvatarId;
+    // 关键：activeTab 和 searchController 都放进独立的 StatefulWidget (CollectionPickerSheet)
+    // 不能直接放在 showModalBottomSheet.builder 的局部作用域里。
+    // ModalBottomSheetRoute.buildPage 在某些场景（例如父级 setState、键盘弹起触发
+    // MediaQuery 变化、输入法焦点切换等）会被多次调用，每次调用会重新执行 builder，
+    // 导致局部变量 `int activeTab = 0` 反复重新声明 → tab 状态被重置回 0（头像）。
+    // 症状：用户在「姓名框」tab 下输入文字时，tab 莫名跳回「头像」。
+    // 修复：把状态搬到 StatefulWidget 的 State 里，生命周期跟 sheet 实例绑定。
     final TextEditingController searchController = TextEditingController();
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        final brightness = Theme.of(ctx).brightness;
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            // 根据关键词过滤头像列表
-            final keyword = searchController.text.trim().toLowerCase();
-            final filteredIcons = keyword.isEmpty
-                ? List<Collection>.from(_avatarIcons)
-                : _avatarIcons.where((icon) {
-                    final matchName = icon.name.toLowerCase().contains(keyword);
-                    final matchDesc =
-                        icon.description?.toLowerCase().contains(keyword) ??
-                            false;
-                    return matchName || matchDesc;
-                  }).toList();
-            // 将当前选中的头像移到最前面（只移动第一个匹配项）
-            final selectedIndex =
-                filteredIcons.indexWhere((icon) => icon.id == selectedId);
-            if (selectedIndex > 0) {
-              final selected = filteredIcons.removeAt(selectedIndex);
-              filteredIcons.insert(0, selected);
-            }
-
-            return Container(
-              height: screenSize.height * 0.65,
-              decoration: BoxDecoration(
-                color: Theme.of(ctx).colorScheme.surface,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              child: Column(
-                children: [
-                  // 标题栏
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                    child: Row(
-                      children: [
-                        const Text('选择头像',
-                            style: TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold)),
-                        const Spacer(),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () {
-                            searchController.dispose();
-                            Navigator.of(ctx).pop();
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  // 搜索栏
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: TextField(
-                      controller: searchController,
-                      onChanged: (_) => setSheetState(() {}),
-                      decoration: InputDecoration(
-                        hintText: '输入头像名称或描述搜索...',
-                        prefixIcon: const Icon(Icons.search, size: 20),
-                        suffixIcon: searchController.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear, size: 18),
-                                onPressed: () {
-                                  searchController.clear();
-                                  setSheetState(() {});
-                                },
-                              )
-                            : null,
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                            vertical: 10, horizontal: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(
-                              color: AppColors.tableBorder(brightness)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(
-                              color: AppColors.tableBorder(brightness)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(
-                              color: Theme.of(context).colorScheme.onSurface),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // 搜索结果数量
-                  if (keyword.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          '找到 ${filteredIcons.length} 个头像',
-                          style: TextStyle(
-                              fontSize: 13,
-                              color:
-                                  AppColors.greyHint(brightness, shade: 600)),
-                        ),
-                      ),
-                    ),
-                  const Divider(height: 1),
-                  // 头像网格
-                  Expanded(
-                    child: filteredIcons.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.search_off,
-                                    size: 48,
-                                    color: AppColors.greyHint(brightness,
-                                        shade: 400)),
-                                const SizedBox(height: 8),
-                                Text('未找到匹配的头像',
-                                    style: TextStyle(
-                                        color: AppColors.greyHint(brightness,
-                                            shade: 500))),
-                              ],
-                            ),
-                          )
-                        : GridView.builder(
-                            padding: const EdgeInsets.all(12),
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: crossAxisCount,
-                              crossAxisSpacing: 8,
-                              mainAxisSpacing: 8,
-                              childAspectRatio: 1,
-                            ),
-                            itemCount: filteredIcons.length,
-                            itemBuilder: (ctx, index) {
-                              final iconItem = filteredIcons[index];
-                              final isSelected = iconItem.id == selectedId;
-                              return GestureDetector(
-                                onTap: () {
-                                  _saveAvatarId(iconItem.id);
-                                  setState(
-                                      () => _selectedAvatarId = iconItem.id);
-                                  searchController.dispose();
-                                  Navigator.of(ctx).pop();
-                                },
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: isSelected
-                                          ? AppColors.warningOrange(brightness)
-                                          : AppColors.tableBorder(brightness),
-                                      width: isSelected ? 3 : 1,
-                                    ),
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: CachedNetworkImage(
-                                      imageUrl:
-                                          'https://assets2.lxns.net/maimai/icon/${iconItem.id}.png',
-                                      placeholder: (ctx, url) => const Center(
-                                          child: CircularProgressIndicator(
-                                              strokeWidth: 2)),
-                                      errorWidget: (ctx, url, err) =>
-                                          const Icon(Icons.error, size: 20),
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
+      builder: (ctx) => CollectionPickerSheet(
+        searchController: searchController,
+        avatarIcons: _avatarIcons,
+        avatarPlates: _avatarPlates,
+        selectedAvatarId: _selectedAvatarId,
+        selectedPlateId: _selectedPlateId,
+        onAvatarPicked: (id) async {
+          await _saveAvatarId(id);
+          if (mounted) setState(() => _selectedAvatarId = id);
+          if (ctx.mounted) Navigator.of(ctx).pop();
+        },
+        onPlatePicked: (id) async {
+          await _savePlateId(id);
+          if (mounted) setState(() => _selectedPlateId = id);
+          if (ctx.mounted) Navigator.of(ctx).pop();
+        },
+      ),
+    ).then((_) {
+      // 弹窗完全关闭后再 dispose：close 按钮 / item 点击 / barrier 点击 / back 键
+      // 任何方式关闭都会触发这里，确保 controller 生命周期严格包住弹窗生命周期。
+      searchController.dispose();
+    });
   }
+
+  // 收藏品选择 tab 按钮已迁移到独立的 CollectionPickerSheet StatefulWidget
+  //（避免 showModalBottomSheet.builder 多次调用时局部变量 activeTab 被重置的 bug）
 
   // 保存上次更新使用的数据源
   Future<void> _saveLastDataSource(String dataSource) async {
@@ -1828,7 +1720,7 @@ class _HomePageState extends State<HomePage> {
 
         // 第二阶段：令牌获取成功后，并行执行所有独立的数据刷新请求
         int completedCount = 0;
-        const totalParallelTasks = 6; // alias 改为后台执行，不计入并行任务数
+        const totalParallelTasks = 7; // alias 改为后台执行，不计入并行任务数
         void updateParallelProgress(String message) {
           completedCount++;
           final progress =
@@ -1844,6 +1736,8 @@ class _HomePageState extends State<HomePage> {
         final playerInfoFuture = LuoXueUserPlayDataManager().getPlayerInfo();
         final playerRecordsFuture =
             LuoXueUserPlayDataManager().getPlayerRecordsAsRecordItems();
+        // 收藏品（称号 / 头像 / 姓名框 / 背景）刷新：牌子进度等页面依赖此缓存
+        final collectionsFuture = CollectionsManager().refreshAllCollections();
 
         saveDataSourceFuture.then((_) => updateParallelProgress('数据源已保存'));
         musicFuture.then((_) => updateParallelProgress('歌曲数据已刷新'));
@@ -1851,6 +1745,7 @@ class _HomePageState extends State<HomePage> {
         tagsFuture.then((_) => updateParallelProgress('标签数据已刷新'));
         playerInfoFuture.then((_) => updateParallelProgress('玩家信息已获取'));
         playerRecordsFuture.then((_) => updateParallelProgress('玩家成绩已获取'));
+        collectionsFuture.then((_) => updateParallelProgress('收藏品数据已刷新'));
 
         await Future.wait([
           saveDataSourceFuture,
@@ -1859,6 +1754,7 @@ class _HomePageState extends State<HomePage> {
           tagsFuture,
           playerInfoFuture,
           playerRecordsFuture,
+          collectionsFuture,
         ]);
         SongAliasManager.instance.refresh();
         UnionUniManager().fetchAndCache();
@@ -2257,7 +2153,7 @@ class _HomePageState extends State<HomePage> {
       onProgress(10, '正在并行刷新数据...');
 
       int completedCount = 0;
-      const totalParallelTasks = 5; // alias 改为后台执行，不计入并行任务数
+      const totalParallelTasks = 6; // alias 改为后台执行，不计入并行任务数
       void updateParallelProgress(String message) {
         completedCount++;
         final progress =
@@ -2270,17 +2166,21 @@ class _HomePageState extends State<HomePage> {
       final diffFuture = DiffMusicDataManager().fetchAndUpdateDiffData();
       final tagsFuture = RecommendByTagsService.initializeTags();
       final userPlayDataFuture = UserPlayDataManager().fetchUserPlayData(qq);
+      // 收藏品（称号 / 头像 / 姓名框 / 背景）刷新：牌子进度等页面依赖此缓存
+      final collectionsFuture = CollectionsManager().refreshAllCollections();
 
       musicFuture.then((_) => updateParallelProgress('歌曲数据已刷新'));
       diffFuture.then((_) => updateParallelProgress('难度数据已刷新'));
       tagsFuture.then((_) => updateParallelProgress('标签数据已刷新'));
       userPlayDataFuture.then((_) => updateParallelProgress('用户数据已获取'));
+      collectionsFuture.then((_) => updateParallelProgress('收藏品数据已刷新'));
 
       await Future.wait([
         musicFuture,
         diffFuture,
         tagsFuture,
         userPlayDataFuture,
+        collectionsFuture,
       ]);
       SongAliasManager.instance.refresh();
       UnionUniManager().fetchAndCache();
@@ -3299,7 +3199,7 @@ class _HomePageState extends State<HomePage> {
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 背景强度（浅色/深色模式共用）
+                // 背景透明度（浅色/深色模式共用）
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Column(
@@ -3308,7 +3208,7 @@ class _HomePageState extends State<HomePage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('背景强度',
+                          Text('背景透明度',
                               style: TextStyle(
                                   color:
                                       Theme.of(context).colorScheme.onSurface,
@@ -3453,14 +3353,27 @@ class _HomePageState extends State<HomePage> {
                         ? Text(errorMsg,
                             style: TextStyle(
                                 color: AppColors.errorRed(brightness)))
-                        : profile != null
-                            ? Column(mainAxisSize: MainAxisSize.min, children: [
-                                _buildAccountInfo(profile, dialogContext),
-                                _buildDivingFishAuthSection(
-                                    dialogContext, brightness, profile),
-                                _buildLxnsTokenSection(brightness),
-                              ])
-                            : const Text('暂无数据'),
+                        : Column(mainAxisSize: MainAxisSize.min, children: [
+                            // 已登录水鱼：显示账号信息 + 水鱼授权状态
+                            if (profile != null) ...[
+                              _buildAccountInfo(profile, dialogContext),
+                              _buildDivingFishAuthSection(
+                                  dialogContext, brightness, profile),
+                            ] else
+                              // 未登录水鱼：友好提示用户去登录水鱼（落雪 token 仍可操作）
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                child: Text(
+                                  '未登录水鱼账号，仅显示落雪相关设置',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.greyHint(brightness),
+                                  ),
+                                ),
+                              ),
+                            // 始终显示：落雪 API 密钥管理（不依赖水鱼登录）
+                            _buildLxnsTokenSection(brightness),
+                          ]),
               ),
               actions: [
                 TextButton(
@@ -3795,7 +3708,9 @@ class _HomePageState extends State<HomePage> {
     final prefs = await SharedPreferences.getInstance();
     final jwt = prefs.getString(CacheKeyConstant.probeDivingFishToken);
     if (jwt == null || jwt.isEmpty) {
-      throw Exception('未登录水鱼，请先在首页点击「登录水鱼」');
+      // 未登录水鱼：返回 null，由弹窗决定渲染降级 UI；
+      // 落雪 token 区块始终会渲染，不受影响。
+      return null;
     }
     final response = await ApiClient.get(
       Uri.parse(ApiUrls.DivingFishProfileApi),
@@ -5020,6 +4935,301 @@ class _HomePageState extends State<HomePage> {
           Fluttertoast.showToast(msg: '扫码失败: $e');
         }
       },
+    );
+  }
+}
+
+// 收藏品选择抽屉（头像 / 姓名框 tab + 搜索 + 网格）
+//
+// 关键设计：必须是独立的 StatefulWidget，不能用 showModalBottomSheet.builder
+// 内联的 StatefulBuilder + 局部 `int activeTab = 0`。
+// 原因：ModalBottomSheetRoute.buildPage 在某些场景（父级 setState、键盘弹起、
+// MediaQuery 变化、输入法焦点切换）会被多次调用，每次调用都会重新执行 builder，
+// 导致局部 `int activeTab = 0` 反复重新声明 → tab 状态被重置回 0（头像）。
+// 症状：用户在「姓名框」tab 下输入文字时，tab 莫名跳回「头像」。
+//
+// 修复：把状态搬到 State 字段里，生命周期跟 sheet 实例绑定，builder 被多次调用也安全。
+class CollectionPickerSheet extends StatefulWidget {
+  final TextEditingController searchController;
+  final List<Collection> avatarIcons;
+  final List<Collection> avatarPlates;
+  final int? selectedAvatarId;
+  final int? selectedPlateId;
+  final ValueChanged<int> onAvatarPicked;
+  final ValueChanged<int> onPlatePicked;
+
+  const CollectionPickerSheet({
+    super.key,
+    required this.searchController,
+    required this.avatarIcons,
+    required this.avatarPlates,
+    required this.selectedAvatarId,
+    required this.selectedPlateId,
+    required this.onAvatarPicked,
+    required this.onPlatePicked,
+  });
+
+  @override
+  State<CollectionPickerSheet> createState() => _CollectionPickerSheetState();
+}
+
+class _CollectionPickerSheetState extends State<CollectionPickerSheet> {
+  // 状态放到 State 字段里，跟 sheet 实例生命周期绑定
+  int _activeTab = 0; // 0=头像, 1=姓名框
+
+  void _switchTab(int tab) {
+    setState(() {
+      _activeTab = tab;
+      widget.searchController.clear();
+    });
+  }
+
+  Widget _buildTabButton({
+    required BuildContext ctx,
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    final brightness = Theme.of(ctx).brightness;
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isActive
+                ? AppColors.warningOrange(brightness).withValues(alpha: 0.15)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isActive
+                  ? AppColors.warningOrange(brightness)
+                  : AppColors.tableBorder(brightness),
+              width: isActive ? 2 : 1,
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              color: isActive
+                  ? AppColors.warningOrange(brightness)
+                  : AppColors.primaryText(brightness),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final screenSize = MediaQuery.of(context).size;
+
+    final List<Collection> currentList =
+        _activeTab == 0 ? widget.avatarIcons : widget.avatarPlates;
+    final int? currentSelectedId = _activeTab == 0
+        ? widget.selectedAvatarId
+        : widget.selectedPlateId;
+    final String searchHint = _activeTab == 0
+        ? '输入头像名称或描述搜索...'
+        : '输入姓名框名称或描述搜索...';
+    final String emptyText =
+        _activeTab == 0 ? '未找到匹配的头像' : '未找到匹配的姓名框';
+
+    // 根据关键词过滤
+    final keyword = widget.searchController.text.trim().toLowerCase();
+    final filteredItems = keyword.isEmpty
+        ? List<Collection>.from(currentList)
+        : currentList.where((c) {
+            final matchName = c.name.toLowerCase().contains(keyword);
+            final matchDesc =
+                c.description?.toLowerCase().contains(keyword) ?? false;
+            return matchName || matchDesc;
+          }).toList();
+    // 将当前选中项移到最前面
+    final selectedIndex =
+        filteredItems.indexWhere((c) => c.id == currentSelectedId);
+    if (selectedIndex > 0) {
+      final selected = filteredItems.removeAt(selectedIndex);
+      filteredItems.insert(0, selected);
+    }
+
+    return Container(
+      height: screenSize.height * 0.65,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: Column(
+        children: [
+          // 标题栏 + 关闭按钮
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                Text('选择收藏品',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryText(brightness))),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+          // tab 切换
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                _buildTabButton(
+                  ctx: context,
+                  label: '头像',
+                  isActive: _activeTab == 0,
+                  onTap: () => _switchTab(0),
+                ),
+                const SizedBox(width: 8),
+                _buildTabButton(
+                  ctx: context,
+                  label: '姓名框',
+                  isActive: _activeTab == 1,
+                  onTap: () => _switchTab(1),
+                ),
+              ],
+            ),
+          ),
+          // 搜索栏
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: TextField(
+              controller: widget.searchController,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                hintText: searchHint,
+                prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: widget.searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () {
+                          widget.searchController.clear();
+                          setState(() {});
+                        },
+                      )
+                    : null,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                    vertical: 10, horizontal: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                      color: AppColors.tableBorder(brightness)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                      color: AppColors.tableBorder(brightness)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.onSurface),
+                ),
+              ),
+            ),
+          ),
+          // 搜索结果数量
+          if (keyword.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '找到 ${filteredItems.length} 个${_activeTab == 0 ? "头像" : "姓名框"}',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.greyHint(brightness, shade: 600)),
+                ),
+              ),
+            ),
+          const Divider(height: 1),
+          // 网格
+          Expanded(
+            child: filteredItems.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.search_off,
+                            size: 48,
+                            color: AppColors.greyHint(brightness, shade: 400)),
+                        const SizedBox(height: 8),
+                        Text(emptyText,
+                            style: TextStyle(
+                                color: AppColors.greyHint(brightness,
+                                    shade: 500))),
+                      ],
+                    ),
+                  )
+                : GridView.builder(
+                    padding: const EdgeInsets.all(12),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3, // 3 列：姓名框更宽松（头像也用 3 列）
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                      childAspectRatio: 1,
+                    ),
+                    itemCount: filteredItems.length,
+                    itemBuilder: (ctx, index) {
+                      final item = filteredItems[index];
+                      final isSelected = item.id == currentSelectedId;
+                      final imageUrl = _activeTab == 0
+                          ? 'https://assets2.lxns.net/maimai/icon/${item.id}.png'
+                          : 'https://assets2.lxns.net/maimai/plate/${item.id}.png';
+                      return GestureDetector(
+                        onTap: () {
+                          if (_activeTab == 0) {
+                            widget.onAvatarPicked(item.id);
+                          } else {
+                            widget.onPlatePicked(item.id);
+                          }
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.warningOrange(brightness)
+                                  : AppColors.tableBorder(brightness),
+                              width: isSelected ? 3 : 1,
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              placeholder: (ctx, url) => const Center(
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2)),
+                              errorWidget: (ctx, url, err) =>
+                                  const Icon(Icons.error, size: 20),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

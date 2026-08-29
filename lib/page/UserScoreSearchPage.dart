@@ -8,6 +8,7 @@ import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'SongInfoPage.dart';
 import '../utils/CoverUtil.dart';
+import 'package:my_first_flutter_app/widgets/B50GameCardWidget.dart';
 import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
 
 class UserScoreSearchPage extends StatefulWidget {
@@ -46,7 +47,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   // 当前选中的按钮索引
   int _selectedButtonIndex = 0;
   
-  // 缓存DX分达成率，避免重复计算
+  // 缓存DX分数达成率，避免重复计算
   Map<dynamic, double> _dxRateCache = {};
   
   // 当前排序方式
@@ -755,7 +756,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
     int star2 = 0; // 2星
     int star1 = 0; // 1星
     
-    // 计算星数时，先缓存DX分达成率，避免重复计算
+    // 计算星数时，先缓存DX分数达成率，避免重复计算
     Map<dynamic, double> dxRateMap = {};
     
     for (var record in records) {
@@ -798,7 +799,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
       if (record.containsKey('dxScore')) {
         // ignore: unused_local_variable
         int dxScore = int.tryParse(record['dxScore'].toString()) ?? 0;
-        // 计算DX分达成率
+        // 计算DX分数达成率
         double rate;
         if (dxRateMap.containsKey(record)) {
           rate = dxRateMap[record]!;
@@ -836,7 +837,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
     };
   }
   
-  // 使用UserScoreSearchService中的方法计算DX分达成率
+  // 使用UserScoreSearchService中的方法计算DX分数达成率
   double _calculateDXScoreRate(dynamic record) {
     return _service.calculateDXScoreRateSync(record);
   }
@@ -1749,6 +1750,12 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   
   // 构建列表网格（2列）
   Widget _buildListGrid() {
+    // 按当前页里实际最大 ID 位数作为占位宽度：无 6 位则严格用 5 位，5 位 ID 与 chip 之间不留空
+    final int maxIdLength = _pagedSongs.isEmpty
+        ? 5
+        : _pagedSongs
+            .map((s) => (s['song_id'] ?? 0).toString().length)
+            .reduce((a, b) => a > b ? a : b);
     return GridView.builder(
       shrinkWrap: true,
       physics: NeverScrollableScrollPhysics(),
@@ -1761,61 +1768,59 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
       ),
       itemCount: _pagedSongs.length,
       itemBuilder: (context, index) {
-        return _buildListCard(_pagedSongs[index]);
+        return _buildListCard(_pagedSongs[index], maxIdLength: maxIdLength);
       },
     );
   }
-  
-  // 构建列表卡片（参考Best50Page的卡片样式）
-  Widget _buildListCard(Map<String, dynamic> song) {
-    final brightness = Theme.of(context).brightness;
-    double screenWidth = MediaQuery.of(context).size.width;
-    int songId = int.tryParse(song['song_id']?.toString() ?? '0') ?? 0;
-    int levelIndex = song['level_index'] ?? 0;
-    String type = song['type']?.toString() ?? '';
-    double difficulty = double.tryParse(song['ds']?.toString() ?? '0') ?? 0;
-    String title = song['title']?.toString() ?? '未知歌曲';
-    double achievementRate = double.tryParse(song['achievements']?.toString() ?? '0') ?? 0;
-    int score = song['dxScore'] ?? 0;
-    int rating = song['ra'] ?? 0;
-    String fc = song['fc']?.toString() ?? '';
-    String fs = song['fs']?.toString() ?? '';
-    String rate = song['rate']?.toString() ?? '';
-    
+
+  // 构建列表卡片：委托至通用 B50GameCardWidget，与 Best50 页面保持同一卡片样式。
+  // 仍保留 GestureDetector 以便点击跳转到 SongInfoPage。
+  // [maxIdLength] 由 _buildListGrid 在整个分页里统一计算，保证同页所有卡 ID 严格对齐。
+  Widget _buildListCard(Map<String, dynamic> song, {required int maxIdLength}) {
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final int songId = int.tryParse(song['song_id']?.toString() ?? '0') ?? 0;
+    final int levelIndex = song['level_index'] ?? 0;
+    final String type = song['type']?.toString() ?? '';
+    final double difficulty = double.tryParse(song['ds']?.toString() ?? '0') ?? 0;
+    final String title = song['title']?.toString() ?? '未知歌曲';
+    final double achievementRate =
+        double.tryParse(song['achievements']?.toString() ?? '0') ?? 0;
+    final int score = song['dxScore'] ?? 0;
+    final int rating = song['ra'] ?? 0;
+    final String fc = song['fc']?.toString() ?? '';
+    final String fs = song['fs']?.toString() ?? '';
+    final String rate = song['rate']?.toString() ?? '';
+
     Color cardColor;
     if (songId.toString().length == 6) {
       cardColor = Color(0xFFFFB3D1);
     } else {
       cardColor = ColorUtil.getCardColor(levelIndex);
     }
-    
+
     bool dxMode = type == 'DX';
     bool isUtage = songId.toString().length == 6;
-    
-    double rateValue = 0.0;
+
+    // 取 DX 分达成率（同步缓存）与对应的星级显示
+    double rateValue;
     if (_dxRateCache.containsKey(song)) {
       rateValue = _dxRateCache[song]!;
     } else {
       rateValue = _calculateDXScoreRate(song);
       _dxRateCache[song] = rateValue;
     }
-    
-    String stars = StringUtil.formatStars(rateValue);
-    Color starsColor = ColorUtil.getStarsColor(stars);
-    
-    String fcText = fc.isNotEmpty ? StringUtil.formatFC(fc) : '-';
-    String fsText = fs.isNotEmpty ? StringUtil.formatFS(fs) : '-';
-    String rateText = StringUtil.formatRate(rate);
-    String grade = '$rateText | $fcText | $fsText';
-    
-    double coverSize = screenWidth * 0.12;
-    double songNameFontSize = screenWidth * 0.035;
-    double decimalMainFontSize = screenWidth * 0.04;
-    double decimalSmallFontSize = screenWidth * 0.03;
-    double otherFontSize = screenWidth * 0.025;
-    double gradeFontSize = screenWidth * 0.022;
-    double dxFontSize = screenWidth * 0.025;
-    
+    final String stars = StringUtil.formatStars(rateValue);
+    final Color starsColor = ColorUtil.getStarsColor(stars);
+
+    // 取 maxScore（notes * 3），直接复用 service 已有的同步方法
+    final int maxScore = _service.calculateMaxScoreSync(song);
+
+    // 单卡片宽度（2 列布局，与 _buildListGrid 的 crossAxisCount=2 对应）
+    final double cardW = (screenWidth - screenWidth * 0.01) / 2;
+    // 导出图片基准卡片宽度：1700 / 5 列 - 间距 ≈ 335
+    const double refCardWidth = 335.0;
+    final double scale = cardW / refCardWidth;
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -1829,165 +1834,24 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
           ),
         );
       },
-      child: Container(
-        decoration: BoxDecoration(
-          color: cardColor,
-          border: Border.all(color: Colors.black, width: 2.0),
-          borderRadius: BorderRadius.circular(8.0),
-        ),
-        padding: EdgeInsets.all(screenWidth * 0.02),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: coverSize,
-                  height: coverSize,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: Colors.black, width: 1.0),
-                  ),
-                  child: CoverUtil.buildCoverWidgetWithContext(context, songId.toString(), coverSize),
-                ),
-                SizedBox(height: screenWidth * 0.01),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (isUtage)
-                      Text(
-                        'UT',
-                        style: TextStyle(
-                          fontSize: dxFontSize,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.red,
-                        ),
-                      ),
-                    if (dxMode && !isUtage)
-                      Text(
-                        'DX',
-                        style: TextStyle(
-                          fontSize: dxFontSize,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.warningOrange(brightness),
-                        ),
-                      ),
-                    if (!dxMode && !isUtage)
-                      Text(
-                        'ST',
-                        style: TextStyle(
-                          fontSize: dxFontSize,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.linkBlue(brightness),
-                        ),
-                      ),
-                    SizedBox(width: screenWidth * 0.01),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(
-                          difficulty.toString().split('.')[0],
-                          style: TextStyle(
-                            fontSize: decimalMainFontSize * 0.9,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            
-                          ),
-                        ),
-                        if (difficulty.toString().split('.').length > 1)
-                          Text(
-                            '.${difficulty.toString().split('.')[1]}',
-                            style: TextStyle(
-                              fontSize: decimalSmallFontSize * 0.9,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            SizedBox(width: screenWidth * 0.02),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: songNameFontSize,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                  SizedBox(height: screenWidth * 0.007),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        achievementRate.toStringAsFixed(4).split('.')[0],
-                        style: TextStyle(
-                          fontSize: decimalMainFontSize,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        '.${achievementRate.toStringAsFixed(4).split('.')[1]}%',
-                        style: TextStyle(
-                          fontSize: decimalSmallFontSize,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      Text(
-                        '$rating | $score | ',
-                        style: TextStyle(
-                          fontSize: otherFontSize,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        stars,
-                        style: TextStyle(
-                          fontSize: otherFontSize,
-                          color: starsColor,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    grade,
-                    style: TextStyle(
-                      fontSize: gradeFontSize,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+      child: B50GameCardWidget(
+        cardColor: cardColor,
+        songName: title,
+        achievementRate: achievementRate,
+        difficulty: difficulty,
+        dxMode: dxMode,
+        isUtage: isUtage,
+        score: score,
+        maxScore: maxScore,
+        rating: rating,
+        stars: stars,
+        fc: fc,
+        fs: fs,
+        rate: rate,
+        songId: songId,
+        starsColor: starsColor,
+        maxIdLength: maxIdLength,
+        scale: scale,
       ),
     );
   }

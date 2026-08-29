@@ -12,9 +12,9 @@ import '../../service/Best50/DiffBest50Service.dart';
 import '../../service/Best50/DiffBest50ConvertToImgService.dart';
 import '../../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../SongInfoPage.dart';
-import '../../utils/CoverUtil.dart';
 import '../../utils/TextStyleUtil.dart';
 import '../../utils/AppTheme.dart';
+import '../../widgets/B50GameCardWidget.dart';
 import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 
@@ -433,7 +433,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '拟合Best50 平均达成率/DX分达成率',
+                  '拟合Best50 平均达成率/DX分数达成率',
                   style: TextStyle(
                     fontSize: MediaQuery.of(context).size.width * 0.04,
                     fontWeight: FontWeight.bold,
@@ -442,7 +442,9 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
                   ),
                 ),
                 _buildDualDecimalText(
-                    diffBest50AchievementAverage, diffBest50ScoreRateAverage * 100),
+                    diffBest50AchievementAverage,
+                    diffBest50ScoreRateAverage * 100,
+                    scoreRate: diffBest50ScoreRateAverage),
                 SizedBox(height: 8.0),
                 // 模式说明
                 Text(
@@ -487,7 +489,9 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
     );
   }
 
-  // 构建游戏卡片（支持多参数传入，确保响应式显示）
+  // 构建游戏卡片（委托至通用 widget B50GameCardWidget，
+  // 内部按 refCardWidth=335 缩放，scale 取当前屏幕上单卡实际可见宽度 / 335）。
+  // 注：原 useOfficialDiff（黄星标记）已废弃，统一不在卡片中显示。
   Widget _buildGameCard({
     required Color cardColor,
     String songName = '未知歌曲',
@@ -496,210 +500,41 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
     bool dxMode = false,
     bool isUtage = false,
     int score = 0,
+    int maxScore = 0,
     int rating = 0,
     String stars = '',
-    String grade = '',
+    String fc = '',
+    String fs = '',
+    String rate = '',
     int? songId,
     Color starsColor = Colors.white,
-    bool useOfficialDiff = false, // 新增：标记是否使用了官方定数
+    int maxIdLength = 5,
   }) {
-    final brightness = Theme.of(context).brightness;
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        border: Border.all(color: Colors.black, width: 2.0),
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      padding: EdgeInsets.all(cardPadding),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          // 根据宽度动态调整字体大小（3个断点）
-          double songNameFontSize = fontSizeBase;
-          double decimalMainFontSize = screenWidth * 0.04;
-          double decimalSmallFontSize = screenWidth * 0.03;
-          double otherFontSize = screenWidth * 0.025;
-          double gradeFontSize = screenWidth * 0.022;
-          double dxFontSize = screenWidth * 0.025;
+    final screenW = MediaQuery.of(context).size.width;
+    // 页面 2 列布局，单卡可见宽度 ≈ (屏幕宽 - 极小间距) / 2
+    final double refCardWidth = 335.0;
+    final double cardW = (screenW - screenW * 0.01) / 2;
+    final double scale = cardW / refCardWidth;
+    final int id = songId ?? 0;
 
-          double coverSize = screenWidth * 0.12;
-
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 曲绘和难度
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: coverSize,
-                    height: coverSize,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      border: Border.all(color: Colors.black, width: 1.0),
-                    ),
-                    child: songId != null
-                        ? CoverUtil.buildCoverWidgetWithContext(context, songId.toString(), coverSize)
-                        : Center(
-                            child: Text('曲绘',
-                                style: TextStyle(fontSize: coverSize * 0.24)),
-                          ),
-                  ),
-                  SizedBox(height: screenWidth * 0.01),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (isUtage)
-                        Text(
-                          'UT',
-                          style: TextStyle(
-                            fontSize: dxFontSize,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.red,
-                          ),
-                        ),
-                      if (dxMode && !isUtage)
-                        Text(
-                          'DX',
-                          style: TextStyle(
-                            fontSize: dxFontSize,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.warningOrange(brightness),
-                          ),
-                        ),
-                      if (!dxMode && !isUtage)
-                        Text(
-                          'ST',
-                          style: TextStyle(
-                            fontSize: dxFontSize,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.linkBlue(brightness),
-                          ),
-                        ),
-                      SizedBox(width: screenWidth * 0.01),
-                      // 难度显示（使用动态字体大小）- 增大整体字号
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            difficulty.toStringAsFixed(2).split('.')[0],
-                            style: TextStyle(
-                              fontSize: decimalMainFontSize * 0.9,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          Text(
-                            '.${difficulty.toStringAsFixed(2).split('.')[1]}',
-                            style: TextStyle(
-                              fontSize: decimalSmallFontSize * 0.9,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          // 使用官方定数时显示标记
-                          if (useOfficialDiff)
-                            Text(
-                              '*',
-                              style: TextStyle(
-                                fontSize: decimalSmallFontSize * 0.7,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.yellow,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              SizedBox(width: screenWidth * 0.02),
-
-              // 右侧信息
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 歌曲名称：字数过多时显示省略号
-                    Text(
-                      songName,
-                      style: TextStyle(
-                        fontSize: songNameFontSize,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                    SizedBox(height: screenWidth * 0.007),
-
-                    // 达成率：使用动态字体大小
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(
-                          achievementRate.toStringAsFixed(4).split('.')[0],
-                          style: TextStyle(
-                            fontSize: decimalMainFontSize,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          '.${achievementRate.toStringAsFixed(4).split('.')[1]}%',
-                          style: TextStyle(
-                            fontSize: decimalSmallFontSize,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    // 评级、分数、星数：缩小字体完全显示
-                    Row(
-                      children: [
-                        Text(
-                          '$rating | $score | ',
-                          style: TextStyle(
-                            fontSize: otherFontSize,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          stars,
-                          style: TextStyle(
-                            fontSize: otherFontSize,
-                            color: starsColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    // 等级：缩小字体完全显示
-                    Text(
-                      grade,
-                      style: TextStyle(
-                        fontSize: gradeFontSize,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+    return B50GameCardWidget(
+      cardColor: cardColor,
+      songName: songName,
+      achievementRate: achievementRate,
+      difficulty: difficulty,
+      dxMode: dxMode,
+      isUtage: isUtage,
+      score: score,
+      maxScore: maxScore,
+      rating: rating,
+      stars: stars,
+      fc: fc,
+      fs: fs,
+      rate: rate,
+      songId: id,
+      starsColor: starsColor,
+      maxIdLength: maxIdLength,
+      scale: scale,
     );
   }
 
@@ -749,11 +584,17 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
   Widget _buildDualDecimalText(double value1, double value2,
       {int decimalPlaces1 = 4,
       int decimalPlaces2 = 2,
-      Color? color}) {
+      Color? color,
+      double? scoreRate}) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final resolvedColor = color ?? Theme.of(context).colorScheme.onSurface;
         double fontSize = MediaQuery.of(context).size.width * 0.04;
+
+        final starsText =
+            scoreRate != null ? StringUtil.formatStars(scoreRate) : null;
+        final starsColor =
+            scoreRate != null ? ColorUtil.getStarsColor(starsText!) : null;
 
         return Row(
           mainAxisSize: MainAxisSize.min,
@@ -770,6 +611,25 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
             ),
             _buildDecimalText(value2, context,
                 decimalPlaces: decimalPlaces2, color: resolvedColor),
+            // DX 分达成率右侧添加星级（achievement / dxScore% / ✦x）
+            if (starsText != null) ...[
+              Text(
+                '/',
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.bold,
+                  color: resolvedColor,
+                ),
+              ),
+              Text(
+                starsText,
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.bold,
+                  color: starsColor,
+                ),
+              ),
+            ],
           ],
         );
       },
@@ -779,6 +639,12 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
   // 构建数据驱动的卡片网格
   Widget _buildDataCardGrid(
       List<Map<String, dynamic>> songs, double childAspectRatio) {
+    // 按当前列表里实际最大 ID 位数作为占位宽度：无 6 位则严格用 5 位，5 位 ID 与 chip 之间不留空
+    final int maxIdLength = songs.isEmpty
+        ? 5
+        : songs
+            .map((s) => s['song_id'].toString().length)
+            .reduce((a, b) => a > b ? a : b);
     return GridView.builder(
       shrinkWrap: true,
       physics: NeverScrollableScrollPhysics(),
@@ -791,13 +657,13 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
       ),
       itemCount: songs.length,
       itemBuilder: (context, index) {
-        return _buildDataGameCard(songs[index]);
+        return _buildDataGameCard(songs[index], maxIdLength: maxIdLength);
       },
     );
   }
 
   // 根据数据构建游戏卡片
-  Widget _buildDataGameCard(Map<String, dynamic> songData) {
+  Widget _buildDataGameCard(Map<String, dynamic> songData, {required int maxIdLength}) {
     // 解析数据
     double achievementRate = double.parse(songData['achievements'].toString());
     int score = songData['dxScore'];
@@ -816,69 +682,8 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
     String stars = StringUtil.formatStars(scoreRate);
     Color starsColor = ColorUtil.getStarsColor(stars);
 
-    // 映射FC属性
-    String fcText = '-';
-    if (fc.isNotEmpty) {
-      if (fc == 'fcp') {
-        fcText = 'FC+';
-      } else if (fc == 'fc') {
-        fcText = 'FC';
-      } else if (fc == 'ap') {
-        fcText = 'AP';
-      } else if (fc == 'app') {
-        fcText = 'AP+';
-      }
-    }
-
-    // 映射FS属性
-    String fsText = '-';
-    if (fs.isNotEmpty) {
-      if (fs == 'fsd') {
-        fsText = 'FDX';
-      } else if (fs == 'fsp') {
-        fsText = 'FS+';
-      } else if (fs == 'fs') {
-        fsText = 'FS';
-      } else if (fs == 'sync') {
-        fsText = 'SC';
-      } else if (fs == 'fsdp') {
-        fsText = 'FDX+';
-      }
-    }
-    // 映射Rate属性
-    String rateText = rate;
-    if (rateText == 'sssp') {
-      rateText = 'SSS+';
-    } else if (rateText == 'sss') {
-      rateText = 'SSS';
-    } else if (rateText == 'ssp') {
-      rateText = 'SS+';
-    } else if (rateText == 'ss') {
-      rateText = 'SS';
-    } else if (rateText == 'sp') {
-      rateText = 'S+';
-    } else if (rateText == 's') {
-      rateText = 'S';
-    } else if (rateText == 'aaa') {
-      rateText = 'AAA';
-    } else if (rateText == 'aa') {
-      rateText = 'AA';
-    } else if (rateText == 'a') {
-      rateText = 'A';
-    } else if (rateText == 'bbb') {
-      rateText = 'BBB';
-    } else if (rateText == 'bb') {
-      rateText = 'BB';
-    } else if (rateText == 'b') {
-      rateText = 'B';
-    } else if (rateText == 'c') {
-      rateText = 'C';
-    } else if (rateText == 'd') {
-      rateText = 'D';
-    }
-
-    // 构建完整grade
-    String grade = '$rateText | $fcText | $fsText';
+    // 计算该难度下的满分 (notes * 3)，通用卡片需要展示 分数/满分
+    int maxScore = _calculateMaxScore(songId, levelIndex);
 
     // 获取卡片颜色
       Color cardColor;
@@ -892,9 +697,6 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
     // 判断是否为DX模式或UT模式
       bool dxMode = type == 'DX';
       bool isUtage = songId.toString().length == 6; // 6位数ID为UTAGE
-    
-    // 判断是否使用了官方定数
-    bool useOfficialDiff = songData['use_official_diff'] ?? false;
 
     return GestureDetector(
       onTap: () {
@@ -917,12 +719,15 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
         dxMode: dxMode,
         isUtage: isUtage,
         score: score,
+        maxScore: maxScore,
         rating: rating,
         stars: stars,
-        grade: grade,
+        fc: fc,
+        fs: fs,
+        rate: rate,
         songId: songId,
         starsColor: starsColor,
-        useOfficialDiff: useOfficialDiff, // 传递使用官方定数的标记
+        maxIdLength: maxIdLength,
       ),
     );
   }
@@ -967,6 +772,24 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
 
     // 计算scoreRate
     return maxScore > 0 ? score / maxScore : 0.0;
+  }
+
+  // 计算指定歌曲/难度的满分（notes * 3），供通用卡片展示 分数/满分
+  int _calculateMaxScore(int songId, int levelIndex) {
+    if (_maimaiMusicData == null) return 0;
+    final songIndex = _maimaiMusicData!.indexWhere(
+      (item) => item['id'] == songId.toString(),
+    );
+    if (songIndex == -1) return 0;
+    final songData = _maimaiMusicData![songIndex];
+    if (songData['charts'] == null) return 0;
+    final List<dynamic> charts = songData['charts'];
+    if (levelIndex < 0 || levelIndex >= charts.length) return 0;
+    final chart = charts[levelIndex];
+    if (chart['notes'] == null) return 0;
+    final List<dynamic> notes = chart['notes'];
+    final notesSum = notes.fold<int>(0, (sum, note) => sum + (note as int));
+    return notesSum * 3;
   }
 
 

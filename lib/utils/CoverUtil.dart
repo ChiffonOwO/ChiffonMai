@@ -105,6 +105,24 @@ class CoverUtil {
     return buildCoverPath(songId);
   }
 
+  /// 从 songId 中提取曲绘 ID
+  ///
+  /// 规则：
+  /// - <5 位：直接返回 songId
+  /// - 5 位：剔除第一个 '1' 及后面连续的 '0'（如 11312→1312, 10125→125, 10025→25）
+  /// - 6 位（宴会场）：剔除前两位及后面连续的 '0'（如 121634→1634, 100018→18, 110234→234）
+  ///
+  /// 当返回 '0' 时表示无法映射到有效 cover id。
+  static String extractCoverId(String songId) {
+    if (songId.length == 5) {
+      return _stripLeadingOneAndZeros(songId);
+    }
+    if (songId.length == 6) {
+      return _stripFirstTwoAndLeadingZeros(songId);
+    }
+    return songId;
+  }
+
   // ===========================================================================
   // 网络曲绘 URL
   // ===========================================================================

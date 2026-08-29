@@ -74,7 +74,20 @@ class _SongPlayPageState extends State<SongPlayPage> {
       await _loadArtistInfo();
 
       final songPlayService = SongPlayService();
-      _luoXueSongId = await songPlayService.findLuoXueSongId(
+
+      // 宴会场歌曲（6 位数 songId）：曲绘实际用的是 cover id，
+      // 落雪那边的歌曲 ID 与曲绘 ID 一致，所以用 cover id 就能找到对应的落雪歌曲。
+      // 例如: songId=100018 -> coverId=18 -> 落雪歌曲 id=18
+      if (widget.songId.length == 6) {
+        final coverId = CoverUtil.extractCoverId(widget.songId);
+        if (coverId.isNotEmpty && coverId != '0') {
+          _luoXueSongId =
+              await songPlayService.findLuoXueSongIdByCoverId(coverId);
+        }
+      }
+
+      // 兜底：通过 title 和 type 查找（非宴会场歌曲，或宴会场 cover id 查不到时）
+      _luoXueSongId ??= await songPlayService.findLuoXueSongId(
         widget.songTitle,
         widget.songType,
       );

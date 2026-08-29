@@ -9,11 +9,12 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:media_scanner/media_scanner.dart';
-import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/TextStyleUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
+import 'package:my_first_flutter_app/widgets/B50GameCardWidget.dart';
+import 'package:my_first_flutter_app/widgets/MetaRowWidget.dart';
 
 class PersonalizedDiffBest50ConvertToImg {
   static GlobalKey _globalKey = GlobalKey();
@@ -39,7 +40,7 @@ class PersonalizedDiffBest50ConvertToImg {
         builder: (context) => Positioned(
           left: -9999,
           top: -9999,
-          width: 1200,
+          width: 1700, // 与 Best50ConvertToImgService 对齐：姓名框 1150 + gap 16 + metaRow 494 + 20*2 padding = 1700
           child: Material(
             type: MaterialType.transparency,
             child: imageWidget,
@@ -205,7 +206,7 @@ class PersonalizedDiffBest50ConvertToImg {
     });
     double averageScoreRate = diffSongs.isNotEmpty ? scoreRateSum / diffSongs.length : 0.0;
 
-    const double containerWidth = 1200.0;
+    const double containerWidth = 1700.0; // 与 Best50ConvertToImgService 对齐：容纳姓名框 + metaRow 横排布局
 
     return Container(
       width: containerWidth,
@@ -224,7 +225,22 @@ class PersonalizedDiffBest50ConvertToImg {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ExportUserInfoWidget.buildUserInfoSection(context),
+                // 用户信息区域 + metaRow 横排：严格参考 Best50ConvertToImgService。
+                // 姓名框 1150 + gap 16 + metaRow 494 = 1660 = 1700 容器 - 20*2 padding。
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ExportUserInfoWidget.buildUserInfoSection(context),
+                    const SizedBox(width: 16),
+                    SizedBox(
+                      height: 230,
+                      child: Align(
+                        alignment: Alignment.center,
+                        child: MetaRowWidget(width: 494, height: 230),
+                      ),
+                    ),
+                  ],
+                ),
                 SizedBox(height: 16.0),
 
                 _buildRatingSection(context, title, diffRatingSum, diffRatingAverage, averageAchievement, averageScoreRate),
@@ -233,7 +249,7 @@ class PersonalizedDiffBest50ConvertToImg {
                 _buildSectionTitle(context, title),
                 SizedBox(height: 16.0),
 
-                _buildDataCardGrid(context, diffSongs, 2.0, 5, maimaiMusicData),
+                _buildDataCardGrid(context, diffSongs, 1.85, 5, maimaiMusicData),
                 SizedBox(height: 20.0),
               ],
             ),
@@ -306,14 +322,15 @@ class PersonalizedDiffBest50ConvertToImg {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '平均达成率/DX分达成率',
+                      '平均达成率/DX分数达成率',
                       style: TextStyle(
                         fontSize: sectionTitleFontSize,
                         fontWeight: FontWeight.bold,
                         color: Colors.black,
                       ),
                     ),
-                    _buildDualDecimalText(context, averageAchievement, averageScoreRate * 100),
+                    _buildDualDecimalText(context, averageAchievement, averageScoreRate * 100,
+                  scoreRate: averageScoreRate),
                   ],
                 ),
               ),
@@ -349,7 +366,8 @@ class PersonalizedDiffBest50ConvertToImg {
     );
   }
 
-  // 构建游戏卡片
+  // 构建游戏卡片（导出版）：委托至通用 B50GameCardWidget，
+  // 与 Best50ConvertToImgService 一致采用 scale=1.0，导出图片单卡字号统一。
   static Widget _buildGameCard({
     required BuildContext context,
     required Color cardColor,
@@ -362,133 +380,31 @@ class PersonalizedDiffBest50ConvertToImg {
     int maxScore = 0,
     int rating = 0,
     String stars = '',
-    String grade = '',
+    String fc = '',
+    String fs = '',
+    String rate = '',
     int? songId,
     Color starsColor = Colors.white,
+    int maxIdLength = 5,
   }) {
-    const double containerWidth = 1200.0;
-
-    double songNameFontSize = containerWidth * 0.014;
-    double decimalMainFontSize = containerWidth * 0.021;
-    double decimalSmallFontSize = containerWidth * 0.016;
-    double otherFontSize = containerWidth * 0.009;
-    double gradeFontSize = containerWidth * 0.008;
-    double dxFontSize = containerWidth * 0.009;
-    double coverSize = containerWidth * 0.048;
-    double spacing = containerWidth * 0.006;
-    double smallSpacing = containerWidth * 0.003;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        border: Border.all(color: Colors.black, width: 2.0),
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      padding: EdgeInsets.all(spacing),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: coverSize,
-                height: coverSize,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.black, width: 1.0),
-                ),
-                child: songId != null
-                    ? CoverUtil.buildCoverWidgetWithContext(context, songId.toString(), coverSize)
-                    : Center(
-                        child: Text('曲绘', style: TextStyle(fontSize: coverSize * 0.24)),
-                      ),
-              ),
-              SizedBox(height: smallSpacing),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isUtage)
-                    Text('UT', style: TextStyle(fontSize: dxFontSize, fontWeight: FontWeight.bold, color: Colors.red)),
-                  if (dxMode && !isUtage)
-                    Text('DX', style: TextStyle(fontSize: dxFontSize, fontWeight: FontWeight.bold, color: Colors.orange)),
-                  if (!dxMode && !isUtage)
-                    Text('ST', style: TextStyle(fontSize: dxFontSize, fontWeight: FontWeight.bold, color: Colors.blue.shade300)),
-                  SizedBox(width: smallSpacing),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        difficulty.toStringAsFixed(2).split('.')[0],
-                        style: TextStyle(fontSize: decimalMainFontSize * 0.75, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
-                      Text(
-                        '.${difficulty.toStringAsFixed(2).split('.')[1]}',
-                        style: TextStyle(fontSize: decimalSmallFontSize * 0.75, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-          SizedBox(width: spacing),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  songName,
-                  style: TextStyle(fontSize: songNameFontSize, fontWeight: FontWeight.w900, color: Colors.white),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-                SizedBox(height: containerWidth * 0.002),
-
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      achievementRate.toStringAsFixed(4).split('.')[0],
-                      style: TextStyle(fontSize: decimalMainFontSize, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-                    Text(
-                      '.${achievementRate.toStringAsFixed(4).split('.')[1]}%',
-                      style: TextStyle(fontSize: decimalSmallFontSize, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-                  ],
-                ),
-
-                Row(
-                  children: [
-                    Text(
-                      'RA: $rating | $score / $maxScore | ',
-                      style: TextStyle(fontSize: otherFontSize, color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      stars,
-                      style: TextStyle(fontSize: otherFontSize, color: starsColor, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-
-                Text(
-                  grade,
-                  style: TextStyle(fontSize: gradeFontSize, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return B50GameCardWidget(
+      cardColor: cardColor,
+      songName: songName,
+      achievementRate: achievementRate,
+      difficulty: difficulty,
+      dxMode: dxMode,
+      isUtage: isUtage,
+      score: score,
+      maxScore: maxScore,
+      rating: rating,
+      stars: stars,
+      fc: fc,
+      fs: fs,
+      rate: rate,
+      songId: songId ?? 0,
+      starsColor: starsColor,
+      maxIdLength: maxIdLength,
+      scale: 1.0,
     );
   }
 
@@ -530,9 +446,14 @@ class PersonalizedDiffBest50ConvertToImg {
     int decimalPlaces1 = 4,
     int decimalPlaces2 = 2,
     Color color = Colors.black,
+    double? scoreRate,
   }) {
     const double containerWidth = 1200.0;
     double fontSize = containerWidth * 0.03;
+
+    final starsText = scoreRate != null ? StringUtil.formatStars(scoreRate) : null;
+    final starsColor =
+        scoreRate != null ? ColorUtil.getStarsColor(starsText!) : null;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -540,6 +461,11 @@ class PersonalizedDiffBest50ConvertToImg {
         _buildDecimalText(context, value1, decimalPlaces: decimalPlaces1, color: color),
         Text('/', style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold, color: color)),
         _buildDecimalText(context, value2, decimalPlaces: decimalPlaces2, color: color),
+        // DX 分达成率右侧添加星级（achievement / dxScore% / ✦x）
+        if (starsText != null) ...[
+          Text('/', style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold, color: color)),
+          Text(starsText, style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold, color: starsColor)),
+        ],
       ],
     );
   }
@@ -547,8 +473,17 @@ class PersonalizedDiffBest50ConvertToImg {
   // 构建数据驱动的卡片网格
   static Widget _buildDataCardGrid(
       BuildContext context, List<Map<String, dynamic>> songs, double childAspectRatio, int crossAxisCount, List<dynamic>? maimaiMusicData) {
+    // 计算谱面 ID 对齐宽度：若存在 6 位 ID 则按 6 位对齐，否则按 5 位
+    int maxIdLength = 5;
+    for (final song in songs) {
+      final id = (song['song_id'] ?? 0).toString();
+      if (id.length == 6) {
+        maxIdLength = 6;
+        break;
+      }
+    }
     return Container(
-      width: 1200,
+      width: 1700,
       child: GridView.builder(
         shrinkWrap: true,
         physics: NeverScrollableScrollPhysics(),
@@ -561,14 +496,14 @@ class PersonalizedDiffBest50ConvertToImg {
         ),
         itemCount: songs.length,
         itemBuilder: (context, index) {
-          return _buildDataGameCard(context, songs[index], maimaiMusicData);
+          return _buildDataGameCard(context, songs[index], maimaiMusicData, maxIdLength);
         },
       ),
     );
   }
 
   // 根据数据构建游戏卡片
-  static Widget _buildDataGameCard(BuildContext context, Map<String, dynamic> songData, List<dynamic>? maimaiMusicData) {
+  static Widget _buildDataGameCard(BuildContext context, Map<String, dynamic> songData, List<dynamic>? maimaiMusicData, int maxIdLength) {
     double achievementRate = double.tryParse(songData['achievements'].toString()) ?? 0.0;
     int score = songData['dxScore'] ?? 0;
     String fc = songData['fc'] ?? '';
@@ -586,12 +521,6 @@ class PersonalizedDiffBest50ConvertToImg {
     Color starsColor = ColorUtil.getStarsColor(stars);
 
     int maxScore = _calculateMaxScore(songId, levelIndex, maimaiMusicData);
-
-    String fcText = fc.isNotEmpty ? StringUtil.formatFC(fc) : '-';
-    String fsText = fs.isNotEmpty ? StringUtil.formatFS(fs) : '-';
-    String rateText = StringUtil.formatRate(rate);
-
-    String grade = '$rateText | $fcText | $fsText';
 
     Color cardColor;
     if (songId.toString().length == 6) {
@@ -615,9 +544,12 @@ class PersonalizedDiffBest50ConvertToImg {
       maxScore: maxScore,
       rating: rating,
       stars: stars,
-      grade: grade,
+      fc: fc,
+      fs: fs,
+      rate: rate,
       songId: songId,
       starsColor: starsColor,
+      maxIdLength: maxIdLength,
     );
   }
 

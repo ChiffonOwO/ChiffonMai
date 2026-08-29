@@ -9,7 +9,6 @@ import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import '../../service/Best50/PersonalizedDiffBest50Service.dart';
 import '../../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../SongInfoPage.dart';
-import '../../utils/CoverUtil.dart';
 import '../../service/Best50/PersonalizedDiffBest50ConvertToImgService.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
@@ -18,6 +17,7 @@ import 'package:my_first_flutter_app/entity/DXRating/MaiTagsModel.dart';
 import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 import 'package:my_first_flutter_app/utils/TextStyleUtil.dart';
+import '../../widgets/B50GameCardWidget.dart';
 
 class PersonalizedDiffBest50Page extends StatefulWidget {
   const PersonalizedDiffBest50Page({super.key});
@@ -691,14 +691,15 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '平均达成率/DX分达成率',
+                  '平均达成率/DX分数达成率',
                   style: TextStyle(
                     fontSize: screenWidth * 0.04,
                     fontWeight: FontWeight.bold,
                     color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
-                _buildDualDecimalText(averageAchievement, averageScoreRate * 100),
+                _buildDualDecimalText(averageAchievement, averageScoreRate * 100,
+                scoreRate: averageScoreRate),
                 SizedBox(height: 8.0),
                 Text(
                   '在拟合定数下计算单曲Rating\n取前50的谱面',
@@ -739,6 +740,12 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
 
   // 构建数据卡片网格
   Widget _buildDataCardGrid() {
+    // 按当前列表里实际最大 ID 位数作为占位宽度：无 6 位则严格用 5 位，5 位 ID 与 chip 之间不留空
+    final int maxIdLength = _diffSongs.isEmpty
+        ? 5
+        : _diffSongs
+            .map((s) => s['song_id'].toString().length)
+            .reduce((a, b) => a > b ? a : b);
     return GridView.builder(
       shrinkWrap: true,
       physics: NeverScrollableScrollPhysics(),
@@ -751,13 +758,13 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
       ),
       itemCount: _diffSongs.length,
       itemBuilder: (context, index) {
-        return _buildDataGameCard(_diffSongs[index]);
+        return _buildDataGameCard(_diffSongs[index], maxIdLength: maxIdLength);
       },
     );
   }
 
   // 根据数据构建游戏卡片
-  Widget _buildDataGameCard(Map<String, dynamic> songData) {
+  Widget _buildDataGameCard(Map<String, dynamic> songData, {required int maxIdLength}) {
     double achievementRate = double.tryParse(songData['achievements'].toString()) ?? 0.0;
     int score = songData['dxScore'] ?? 0;
     String fc = songData['fc'] ?? '';
@@ -775,34 +782,8 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
     String stars = StringUtil.formatStars(scoreRate);
     Color starsColor = ColorUtil.getStarsColor(stars);
 
-    // 映射FC属性
-    String fcText = '-';
-    if (fc.isNotEmpty) {
-      switch (fc) {
-        case 'fcp': fcText = 'FC+'; break;
-        case 'fc': fcText = 'FC'; break;
-        case 'ap': fcText = 'AP'; break;
-        case 'app': fcText = 'AP+'; break;
-      }
-    }
-
-    // 映射FS属性
-    String fsText = '-';
-    if (fs.isNotEmpty) {
-      switch (fs) {
-        case 'fsd': fsText = 'FDX'; break;
-        case 'fsp': fsText = 'FS+'; break;
-        case 'fs': fsText = 'FS'; break;
-        case 'sync': fsText = 'SC'; break;
-        case 'fsdp': fsText = 'FDX+'; break;
-      }
-    }
-
-    // 映射Rate属性
-    String rateText = StringUtil.formatRate(rate);
-
-    // 构建完整grade
-    String grade = '$rateText | $fcText | $fsText';
+    // 计算满分（notes * 3），通用卡片需要展示 分数/满分
+    int maxScore = _calculateMaxScore(songId, levelIndex);
 
     // 获取卡片颜色
     Color cardColor;
@@ -814,7 +795,6 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
 
     bool dxMode = type == 'DX';
     bool isUtage = songId.toString().length == 6;
-    bool useOfficialDiff = songData['use_official_diff'] ?? false;
 
     return GestureDetector(
       onTap: () {
@@ -837,17 +817,22 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
         dxMode: dxMode,
         isUtage: isUtage,
         score: score,
+        maxScore: maxScore,
         rating: rating,
         stars: stars,
-        grade: grade,
+        fc: fc,
+        fs: fs,
+        rate: rate,
         songId: songId,
         starsColor: starsColor,
-        useOfficialDiff: useOfficialDiff,
+        maxIdLength: maxIdLength,
       ),
     );
   }
 
-  // 构建游戏卡片
+  // 构建游戏卡片（委托至通用 widget B50GameCardWidget，
+  // 内部按 refCardWidth=335 缩放，scale 取当前屏幕上单卡实际可见宽度 / 335）。
+  // 注：原 useOfficialDiff（黄星标记）已废弃，统一不在卡片中显示。
   Widget _buildGameCard({
     required Color cardColor,
     String songName = '未知歌曲',
@@ -856,139 +841,40 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
     bool dxMode = false,
     bool isUtage = false,
     int score = 0,
+    int maxScore = 0,
     int rating = 0,
     String stars = '',
-    String grade = '',
+    String fc = '',
+    String fs = '',
+    String rate = '',
     int? songId,
     Color starsColor = Colors.white,
-    bool useOfficialDiff = false,
+    int maxIdLength = 5,
   }) {
-    final brightness = Theme.of(context).brightness;
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        border: Border.all(color: Colors.black, width: 2.0),
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      padding: EdgeInsets.all(cardPadding),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          double songNameFontSize = fontSizeBase;
-          double decimalMainFontSize = screenWidth * 0.04;
-          double decimalSmallFontSize = screenWidth * 0.03;
-          double otherFontSize = screenWidth * 0.025;
-          double gradeFontSize = screenWidth * 0.022;
-          double dxFontSize = screenWidth * 0.025;
-          double coverSize = screenWidth * 0.12;
+    final screenW = MediaQuery.of(context).size.width;
+    const double refCardWidth = 335.0;
+    final double cardW = (screenW - screenW * 0.02) / 2;
+    final double scale = cardW / refCardWidth;
+    final int id = songId ?? 0;
 
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 曲绘和难度
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: coverSize,
-                    height: coverSize,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      border: Border.all(color: Colors.black, width: 1.0),
-                    ),
-                    child: songId != null
-                        ? CoverUtil.buildCoverWidgetWithContext(context, songId.toString(), coverSize)
-                        : Center(
-                            child: Text('曲绘',
-                                style: TextStyle(fontSize: coverSize * 0.24)),
-                          ),
-                  ),
-                  SizedBox(height: screenWidth * 0.01),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (isUtage)
-                        Text('UT', style: TextStyle(fontSize: dxFontSize, fontWeight: FontWeight.bold, color: Colors.red)),
-                      if (dxMode && !isUtage)
-                        Text('DX', style: TextStyle(fontSize: dxFontSize, fontWeight: FontWeight.bold, color: AppColors.warningOrange(brightness))),
-                      if (!dxMode && !isUtage)
-                        Text('ST', style: TextStyle(fontSize: dxFontSize, fontWeight: FontWeight.bold, color: AppColors.linkBlue(brightness))),
-                      SizedBox(width: screenWidth * 0.01),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            difficulty.toStringAsFixed(2).split('.')[0],
-                            style: TextStyle(fontSize: decimalMainFontSize * 0.9, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                          Text(
-                            '.${difficulty.toStringAsFixed(2).split('.')[1]}',
-                            style: TextStyle(fontSize: decimalSmallFontSize * 0.9, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                          if (useOfficialDiff)
-                            Text('*', style: TextStyle(fontSize: decimalSmallFontSize * 0.7, fontWeight: FontWeight.bold, color: Colors.yellow)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              SizedBox(width: screenWidth * 0.02),
-
-              // 右侧信息
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      songName,
-                      style: TextStyle(fontSize: songNameFontSize, fontWeight: FontWeight.bold, color: Colors.white),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                    SizedBox(height: screenWidth * 0.007),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(
-                          achievementRate.toStringAsFixed(4).split('.')[0],
-                          style: TextStyle(fontSize: decimalMainFontSize, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                        Text(
-                          '.${achievementRate.toStringAsFixed(4).split('.')[1]}%',
-                          style: TextStyle(fontSize: decimalSmallFontSize, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          '$rating | $score | ',
-                          style: TextStyle(fontSize: otherFontSize, color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          stars,
-                          style: TextStyle(fontSize: otherFontSize, color: starsColor, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      grade,
-                      style: TextStyle(fontSize: gradeFontSize, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+    return B50GameCardWidget(
+      cardColor: cardColor,
+      songName: songName,
+      achievementRate: achievementRate,
+      difficulty: difficulty,
+      dxMode: dxMode,
+      isUtage: isUtage,
+      score: score,
+      maxScore: maxScore,
+      rating: rating,
+      stars: stars,
+      fc: fc,
+      fs: fs,
+      rate: rate,
+      songId: id,
+      starsColor: starsColor,
+      maxIdLength: maxIdLength,
+      scale: scale,
     );
   }
 
@@ -1020,8 +906,14 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
 
   // 构建双小数文本
   Widget _buildDualDecimalText(double value1, double value2,
-      {int decimalPlaces1 = 4, int decimalPlaces2 = 2, Color? color}) {
+      {int decimalPlaces1 = 4,
+      int decimalPlaces2 = 2,
+      Color? color,
+      double? scoreRate}) {
     final resolvedColor = color ?? Theme.of(context).colorScheme.onSurface;
+    final starsText = scoreRate != null ? StringUtil.formatStars(scoreRate) : null;
+    final starsColor =
+        scoreRate != null ? ColorUtil.getStarsColor(starsText!) : null;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -1029,6 +921,11 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
         _buildDecimalText(value1, context, decimalPlaces: decimalPlaces1, color: resolvedColor),
         Text('/', style: TextStyle(fontSize: screenWidth * 0.04, fontWeight: FontWeight.bold, color: resolvedColor)),
         _buildDecimalText(value2, context, decimalPlaces: decimalPlaces2, color: resolvedColor),
+        // DX 分达成率右侧添加星级（achievement / dxScore% / ✦x）
+        if (starsText != null) ...[
+          Text('/', style: TextStyle(fontSize: screenWidth * 0.04, fontWeight: FontWeight.bold, color: resolvedColor)),
+          Text(starsText, style: TextStyle(fontSize: screenWidth * 0.04, fontWeight: FontWeight.bold, color: starsColor)),
+        ],
       ],
     );
   }
@@ -1069,6 +966,24 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
     int maxScore = notesSum * 3;
 
     return maxScore > 0 ? score / maxScore : 0.0;
+  }
+
+  // 计算指定歌曲/难度的满分（notes * 3），供通用卡片展示 分数/满分
+  int _calculateMaxScore(int songId, int levelIndex) {
+    if (_maimaiMusicData == null) return 0;
+    final songIndex = _maimaiMusicData!.indexWhere(
+      (item) => item['id'] == songId.toString(),
+    );
+    if (songIndex == -1) return 0;
+    final songData = _maimaiMusicData![songIndex];
+    if (songData['charts'] == null) return 0;
+    final List<dynamic> charts = songData['charts'];
+    if (levelIndex < 0 || levelIndex >= charts.length) return 0;
+    final chart = charts[levelIndex];
+    if (chart['notes'] == null) return 0;
+    final List<dynamic> notes = chart['notes'];
+    final notesSum = notes.fold<int>(0, (sum, note) => sum + (note as int));
+    return notesSum * 3;
   }
 
   // 构建导出按钮

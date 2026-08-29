@@ -484,7 +484,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
     }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
           '定数历史',
@@ -818,7 +818,21 @@ class _SongInfoPageState extends State<SongInfoPage> {
       final songType = _songData!['type'] ?? '';
 
       final songPlayService = SongPlayService();
-      final luoXueSongId =
+      String? luoXueSongId;
+
+      // 宴会场歌曲（6 位数 songId）：曲绘实际用的是 cover id，
+      // 落雪那边的歌曲 ID 与曲绘 ID 一致，所以用 cover id 就能找到对应的落雪歌曲。
+      // 例如: songId=100018 -> coverId=18 -> 落雪歌曲 id=18
+      if (widget.songId.length == 6) {
+        final coverId = CoverUtil.extractCoverId(widget.songId);
+        if (coverId.isNotEmpty && coverId != '0') {
+          luoXueSongId =
+              await songPlayService.findLuoXueSongIdByCoverId(coverId);
+        }
+      }
+
+      // 兜底：通过 title 和 type 查找（非宴会场歌曲，或宴会场 cover id 查不到时）
+      luoXueSongId ??=
           await songPlayService.findLuoXueSongId(songTitle, songType);
 
       if (luoXueSongId == null) {
@@ -2760,10 +2774,23 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
                               const SizedBox(height: 16),
 
-                              // 定数历史（横向滑动表格）
-                              _buildDxHistoryTable(),
-
-                              const SizedBox(height: 20),
+                              // 定数历史（横向滑动表格）；当无历史数据时不占位（连同前后间距一起收缩）
+                              Builder(
+                                builder: (ctx) {
+                                  if (_buildDxHistory().isEmpty) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const SizedBox(height: 2),
+                                      _buildDxHistoryTable(),
+                                      const SizedBox(height: 20),
+                                    ],
+                                  );
+                                },
+                              ),
 
                               // 音符分布网格（优先使用Maidata解析的物量统计）
                               Row(

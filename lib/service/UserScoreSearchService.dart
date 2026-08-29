@@ -99,7 +99,7 @@ class UserScoreSearchService {
     await initSongCache();
   }
 
-  // 计算DX分达成率（私有方法）
+  // 计算DX分数达成率（私有方法）
   Future<double> _calculateDXScoreRate(dynamic record) async {
     if (record == null) return 0.0;
     
@@ -157,78 +157,55 @@ class UserScoreSearchService {
     } catch (e) {
       debugPrint('从缓存获取notes信息时出错: $e');
     }
-    // 计算DX分达成率
+    // 计算DX分数达成率
     double rate = maxScore > 0 ? dxScore / maxScore : 0.0;
     // 仅在调试模式下打印
-    // debugPrint('计算DX分达成率: songId=$songId, levelIndex=$levelIndex, dxScore=$dxScore, maxScore=$maxScore, rate=$rate');
+    // debugPrint('计算DX分数达成率: songId=$songId, levelIndex=$levelIndex, dxScore=$dxScore, maxScore=$maxScore, rate=$rate');
     return rate;
   }
   
-  // 计算DX分达成率（公共方法）
+  // 计算DX分数达成率（公共方法）
   Future<double> calculateDXScoreRate(dynamic record) async {
     return await _calculateDXScoreRate(record);
   }
 
-  // 计算DX分达成率（同步公共方法）
+  // 计算DX分数达成率（同步公共方法）
   double calculateDXScoreRateSync(dynamic record) {
-    if (record == null) return 0.0;
-    
-    // 获取DX分
+    final maxScore = calculateMaxScoreSync(record);
     int dxScore = int.tryParse(record['dxScore'].toString()) ?? 0;
+    return maxScore > 0 ? dxScore / maxScore : 0.0;
+  }
 
-    // 获取歌曲ID和难度索引
-    String songId = record['song_id'].toString();
-    int levelIndex = int.tryParse(record['level_index'].toString()) ?? 0;
-    
-    // 计算最大DX分 (根据notes总和 * 3)
-    int maxScore = 0;
+  // 计算最大DX分（同步公共方法）：根据 notes 总和 * 3 得到满分。
+  // 与 calculateDXScoreRateSync 共享同一份缓存逻辑，单独抽出来供 UI 卡片直接展示分数/满分。
+  int calculateMaxScoreSync(dynamic record) {
+    if (record == null) return 0;
+    final String songId = record['song_id'].toString();
+    final int levelIndex =
+        int.tryParse(record['level_index'].toString()) ?? 0;
 
-    // 尝试从缓存获取notes信息
     try {
-      // 仅使用已初始化的缓存
       if (_cachedSongs != null && _cachedSongs!.isNotEmpty) {
-        // 查找对应乐曲
-        var song = _cachedSongs!.where((s) => s.id == songId).firstOrNull;
-        // 如果找到歌曲
+        final song =
+            _cachedSongs!.where((s) => s.id == songId).firstOrNull;
         if (song != null) {
-          // 检查ds数组长度
           if (song.ds.length == 2) {
-            // 对于ds数组长度为2的特殊歌曲，计算两个难度谱面的最大分数之和
             if (song.charts.length >= 2) {
-              // 计算第一个难度谱面的最大分数
-              var chart1 = song.charts[0];
-              int notesSum1 = chart1.notes.fold(0, (sum, note) => sum + note);
-              int maxScore1 = notesSum1 * 3;
-              
-              // 计算第二个难度谱面的最大分数
-              var chart2 = song.charts[1];
-              int notesSum2 = chart2.notes.fold(0, (sum, note) => sum + note);
-              int maxScore2 = notesSum2 * 3;
-              
-              // 总最大分数为两个难度谱面的最大分数之和
-              maxScore = maxScore1 + maxScore2;
-                                    }
+              int maxScore1 = song.charts[0].notes.fold(0, (sum, n) => sum + n) * 3;
+              int maxScore2 = song.charts[1].notes.fold(0, (sum, n) => sum + n) * 3;
+              return maxScore1 + maxScore2;
+            }
           } else if (levelIndex >= 0 && levelIndex < song.charts.length) {
-            // 对于普通歌曲，使用当前难度的最大分数
-            // 获取对应难度的charts
-            var chart = song.charts[levelIndex];
-            // 计算notes总和
-            int notesSum = chart.notes.fold(0, (sum, note) => sum + note);
-            maxScore = notesSum * 3;
-                    }
-        } else {
-          debugPrint('未找到歌曲: $songId');
+            int notesSum =
+                song.charts[levelIndex].notes.fold(0, (sum, n) => sum + n);
+            return notesSum * 3;
+          }
         }
-      } else {
-        debugPrint('缓存未初始化或为空');
       }
     } catch (e) {
-      debugPrint('从缓存获取notes信息时出错: $e');
+      debugPrint('计算最大DX分时出错: $e');
     }
-    // 计算DX分达成率
-    double rate = maxScore > 0 ? dxScore / maxScore : 0.0;
-    //debugPrint('计算DX分达成率: songId=$songId, levelIndex=$levelIndex, dxScore=$dxScore, maxScore=$maxScore, rate=$rate');
-    return rate;
+    return 0;
   }
 
   // 分页获取歌曲数据

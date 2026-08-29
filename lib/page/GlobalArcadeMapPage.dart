@@ -33,8 +33,8 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
-  final Set<String> _selectedGames = {};
-  List<String> _allGameNames = [];
+  final Set<int> _selectedTitleIds = {};
+  List<_GameOption> _gameOptions = [];
   bool _showFilterPanel = false;
   bool _showSearchResults = false;
 
@@ -119,15 +119,37 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
   }
 
   void _applyShopData(List<Shop> shops) {
-    final gameNames = <String>{};
-    for (final shop in shops) {
-      for (final game in shop.games) {
-        if (game.name.isNotEmpty) gameNames.add(game.name);
-      }
-    }
     _shops.clear();
     _shops.addAll(shops);
-    _allGameNames = gameNames.toList()..sort();
+
+    // 按 titleId 分组，统计每个 titleId 下各 name 的出现次数，
+    // 每个 titleId 只保留出现次数最多的 name 作为筛选项（平局取字典序最小）。
+    final nameCountByTitle = <int, Map<String, int>>{};
+    for (final shop in shops) {
+      for (final game in shop.games) {
+        final name = game.name;
+        if (name.isEmpty) continue;
+        final m = nameCountByTitle.putIfAbsent(game.titleId, () => <String, int>{});
+        m[name] = (m[name] ?? 0) + 1;
+      }
+    }
+
+    final options = <_GameOption>[];
+    nameCountByTitle.forEach((tid, nameCounts) {
+      final sorted = nameCounts.entries.toList()
+        ..sort((a, b) {
+          final byCount = b.value.compareTo(a.value);
+          return byCount != 0 ? byCount : a.key.compareTo(b.key);
+        });
+      final top = sorted.first;
+      options.add(_GameOption(
+        titleId: tid,
+        canonicalName: top.key,
+        count: top.value,
+      ));
+    });
+    options.sort((a, b) => a.titleId.compareTo(b.titleId));
+    _gameOptions = options;
   }
 
   /// 手动刷新
@@ -190,9 +212,12 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
           return false;
         }
       }
-      if (_selectedGames.isNotEmpty) {
-        final shopGameNames = shop.games.map((g) => g.name).toSet();
-        if (!_selectedGames.any((g) => shopGameNames.contains(g))) return false;
+      if (_selectedTitleIds.isNotEmpty) {
+        // 按 titleId 匹配：用户点 "maimai DX" 时，所有 titleId=1 的店铺都命中，
+        // 无论他们在源数据中写的是 "maimai DX" / "舞萌DX" / "maimai でらっくす" 等。
+        final hit = shop.games.any(
+            (g) => _selectedTitleIds.contains(g.titleId));
+        if (!hit) return false;
       }
       return true;
     }).toList();
@@ -369,7 +394,7 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
           }).length
         : filtered.length;
     final shownCount = visibleInBounds.clamp(0, _maxVisibleMarkers);
-    final isFiltering = _searchQuery.isNotEmpty || _selectedGames.isNotEmpty;
+    final isFiltering = _searchQuery.isNotEmpty || _selectedTitleIds.isNotEmpty;
     final countLabel = isFiltering ? '${filtered.length}家' : '共${_shops.length}家';
 
     return Scaffold(
@@ -514,7 +539,7 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
                   ),
                 ),
                 // 搜索结果计数
-                if (_searchQuery.isNotEmpty || _selectedGames.isNotEmpty)
+                if (_searchQuery.isNotEmpty || _selectedTitleIds.isNotEmpty)
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     margin: EdgeInsets.only(right: 4),
@@ -540,7 +565,7 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
                   child: Container(
                     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                     child: Icon(Icons.filter_list, size: 16,
-                        color: _selectedGames.isNotEmpty ? Colors.red : Colors.grey),
+                        color: _selectedTitleIds.isNotEmpty ? Colors.red : Colors.grey),
                   ),
                 ),
                 SizedBox(width: 4),
@@ -604,7 +629,7 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
             ),
 
           // 筛选面板
-          if (_showFilterPanel && _allGameNames.isNotEmpty)
+          if (_showFilterPanel && _gameOptions.isNotEmpty)
             Container(
               margin: EdgeInsets.only(top: 4),
               padding: EdgeInsets.all(8),
@@ -622,9 +647,9 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
                     children: [
                       Text('机台筛选', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                       const Spacer(),
-                      if (_selectedGames.isNotEmpty)
+                      if (_selectedTitleIds.isNotEmpty)
                         GestureDetector(
-                          onTap: () => setState(() => _selectedGames.clear()),
+                          onTap: () => setState(() => _selectedTitleIds.clear()),
                           child: Text('清除', style: TextStyle(fontSize: 12, color: Colors.red)),
                         ),
                     ],
@@ -635,12 +660,14 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
                       child: Wrap(
                         spacing: 6,
                         runSpacing: 4,
-                        children: _allGameNames.map((name) {
-                          final selected = _selectedGames.contains(name);
+                        children: _gameOptions.map((opt) {
+                          final selected = _selectedTitleIds.contains(opt.titleId);
                           return GestureDetector(
                             onTap: () {
                               setState(() {
-                                selected ? _selectedGames.remove(name) : _selectedGames.add(name);
+                                selected
+                                    ? _selectedTitleIds.remove(opt.titleId)
+                                    : _selectedTitleIds.add(opt.titleId);
                               });
                             },
                             child: Container(
@@ -650,7 +677,7 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: selected ? Colors.red : Colors.grey.withOpacity(0.3)),
                               ),
-                              child: Text(name,
+                              child: Text('${opt.canonicalName} · ${opt.count}',
                                   style: TextStyle(fontSize: 11, color: selected ? Colors.red : Colors.grey.shade700)),
                             ),
                           );
@@ -746,4 +773,18 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
       ),
     );
   }
+}
+
+/// 机台筛选项：每个 titleId 只展示出现次数最多的 name，
+/// 避免一个游戏系列（如 titleId=1 = maimai DX）被拆成多种写法（maimai / 舞萌 / 舞萌DX 等）。
+class _GameOption {
+  final int titleId;
+  final String canonicalName;
+  final int count;
+
+  const _GameOption({
+    required this.titleId,
+    required this.canonicalName,
+    required this.count,
+  });
 }

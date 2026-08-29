@@ -130,6 +130,38 @@ class SongPlayService {
     }
   }
 
+  /// 通过曲绘 ID（coverId）查找落雪歌曲 ID。
+  ///
+  /// 用于宴会场歌曲：songId 是 6 位数（如 100018），曲绘实际用的是另一个 id（如 18），
+  /// 落雪那边的歌曲 ID 与曲绘 ID 是一致的，所以用 cover id 就能找到对应的落雪歌曲。
+  ///
+  /// 返回落雪歌曲 ID（字符串形式），找不到返回 null。
+  Future<String?> findLuoXueSongIdByCoverId(String coverId) async {
+    try {
+      final luoXueSongsManager = LuoXueSongsManager();
+      final luoXueSongEntity = await luoXueSongsManager.getLuoXueSongs();
+
+      if (luoXueSongEntity == null || luoXueSongEntity.songs.isEmpty) {
+        return null;
+      }
+
+      final coverIdInt = int.tryParse(coverId);
+      if (coverIdInt == null) {
+        return null;
+      }
+
+      for (final song in luoXueSongEntity.songs) {
+        if (song.id == coverIdInt) {
+          return song.id.toString();
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('通过曲绘 ID 查找落雪歌曲 ID 失败: $e');
+      return null;
+    }
+  }
+
   // 根据落雪歌曲ID获取歌曲信息
   Future<Map<String, dynamic>?> getSongInfoByLuoXueId(String luoXueId) async {
     try {

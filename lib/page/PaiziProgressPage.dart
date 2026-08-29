@@ -8,6 +8,7 @@ import 'package:my_first_flutter_app/service/PaiziProgressConvertToImgService.da
 import 'package:my_first_flutter_app/constant/LoadingTipsConstant.dart';
 import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
+import 'package:my_first_flutter_app/manager/LuoXue/CollectionsManager.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CollectionsImageUtil.dart';
@@ -110,6 +111,16 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
 
     try {
       _firstCharOptions = await _service.getFirstCharOptions();
+
+      // 如果首字选项为空，可能是首次启动还未拉取过收藏品数据，
+      // 或缓存损坏（API 调用失败时写入了空数据）。
+      // 主动从网络拉取四种收藏品并写入缓存，再重新读取首字选项。
+      if (_firstCharOptions.isEmpty) {
+        debugPrint('牌子进度：首字选项为空，主动拉取四种收藏品数据');
+        await CollectionsManager().refreshAllCollections();
+        _firstCharOptions = await _service.getFirstCharOptions();
+      }
+
       _titleTypeOptions = _service.getTitleTypeOptions(firstChar: _firstCharOptions.isNotEmpty ? _firstCharOptions[0] : null);
 
       // 获取保存的用户选项
