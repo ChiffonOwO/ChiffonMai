@@ -72,6 +72,8 @@ class SpecialRankingListService {
   
   // 远程缓存key前缀
   static const String remoteCacheKey = 'special:break_count_ranking_remote';
+  // 反向绝赞数排行榜缓存key（升序：绝赞数最少）
+  static const String reverseRemoteCacheKey = 'special:reverse_break_count_ranking_remote';
 
   // 定数差值排行榜相关缓存key
   static const String diffCacheKey = 'special:difficulty_diff_ranking_remote';
@@ -93,46 +95,61 @@ class SpecialRankingListService {
 
   // 样本总数排行榜相关缓存key
   static const String sampleCountCacheKey = 'special:sample_count_ranking_remote';
+  // 反向样本总数排行榜缓存key（升序：样本最少）
+  static const String reverseSampleCountCacheKey = 'special:reverse_sample_count_ranking_remote';
 
   // 物量排行榜相关缓存key
   static const String noteCountCacheKey = 'special:note_count_ranking_remote';
+  // 反向物量排行榜缓存key（升序：物量最少）
+  static const String reverseNoteCountCacheKey = 'special:reverse_note_count_ranking_remote';
 
   // 平均达成排行榜相关缓存key
   static const String avgAchievementCacheKey = 'special:avg_achievement_ranking_remote';
+  // 反向平均达成率排行榜缓存key（升序：达成率最低）
+  static const String reverseAvgAchievementCacheKey = 'special:reverse_avg_achievement_ranking_remote';
 
   // MASTER/Re:MASTER平均达成排行榜相关缓存key
   static const String masterAvgAchievementCacheKey = 'special:master_avg_achievement_ranking_remote';
+  // 反向MASTER/Re:MASTER平均达成率排行榜缓存key
+  static const String reverseMasterAvgAchievementCacheKey = 'special:reverse_master_avg_achievement_ranking_remote';
 
   // EXPERT平均达成排行榜相关缓存key
   static const String expertAvgAchievementCacheKey = 'special:expert_avg_achievement_ranking_remote';
+  // 反向EXPERT平均达成率排行榜缓存key
+  static const String reverseExpertAvgAchievementCacheKey = 'special:reverse_expert_avg_achievement_ranking_remote';
 
   /// 仅读取缓存，不触发重新计算。缓存不存在时返回空列表，页面可据此决定是否显示重新计算进度。
+  /// [ascending] false=降序（绝赞数最多→最少），true=升序（绝赞数最少→最多）
   Future<List<SpecialRankingEntry>> getBreakCountRanking({
     int limit = 100,
+    bool ascending = false,
   }) async {
     List<SpecialRankingEntry> result = [];
-    
+    final String cacheKey = ascending ? reverseRemoteCacheKey : remoteCacheKey;
+
     try {
       final conn = await RedisConnection().connect(redisHost, redisPort);
-      
+
       try {
         await conn.send_object(['AUTH', redisPassword]);
-        
+
         String key = 'special:song_break_count';
-        debugPrint('[SpecialRankingListService] Fetching song break count ranking from Redis: $key');
-        
+        debugPrint('[SpecialRankingListService] Fetching song break count ranking from Redis: $key (ascending=$ascending)');
+
         List<dynamic> redisResult = await conn.send_object(
-          ['ZREVRANGE', key, 0, limit - 1, 'WITHSCORES']
+          ascending
+              ? ['ZRANGE', key, 0, limit - 1, 'WITHSCORES']
+              : ['ZREVRANGE', key, 0, limit - 1, 'WITHSCORES']
         );
-        
+
         // 检查本地缓存是否为空
         bool localCacheEmpty = redisResult == null || redisResult.isEmpty;
-        
+
         if (localCacheEmpty) {
           debugPrint('[SpecialRankingListService] Local cache is empty, checking remote cache');
 
           // 检查远程缓存是否存在（由Redis自动根据TTL过期）
-          dynamic remoteData = await conn.send_object(['GET', remoteCacheKey]);
+          dynamic remoteData = await conn.send_object(['GET', cacheKey]);
           bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
 
           if (remoteCacheValid) {
@@ -141,9 +158,10 @@ class SpecialRankingListService {
             String rawRemoteData = remoteData;
             try {
               List<dynamic> remoteList = json.decode(rawRemoteData);
+              List<SpecialRankingEntry> allEntries = [];
               for (int i = 0; i < remoteList.length; i++) {
                 Map<String, dynamic> item = remoteList[i];
-                result.add(SpecialRankingEntry(
+                allEntries.add(SpecialRankingEntry(
                   rank: i + 1,
                   songId: item['songId'],
                   songTitle: item['songTitle'],
@@ -155,18 +173,38 @@ class SpecialRankingListService {
                   updateTime: item['updateTime'],
                 ));
               }
+              // 反向时：缓存按降序存储，从尾部取 limit 条
+              if (ascending) {
+                final start = (allEntries.length - limit).clamp(0, allEntries.length);
+                final reversed = allEntries.sublist(start).reversed.toList();
+                for (int i = 0; i < reversed.length; i++) {
+                  result.add(SpecialRankingEntry(
+                    rank: i + 1,
+                    songId: reversed[i].songId,
+                    songTitle: reversed[i].songTitle,
+                    songType: reversed[i].songType,
+                    difficultyIndex: reversed[i].difficultyIndex,
+                    difficultyLabel: reversed[i].difficultyLabel,
+                    ds: reversed[i].ds,
+                    breakCount: reversed[i].breakCount,
+                    updateTime: reversed[i].updateTime,
+                  ));
+                }
+              } else {
+                result = allEntries.take(limit).toList();
+              }
               debugPrint('[SpecialRankingListService] Loaded ${result.length} entries from remote cache');
             } catch (e) {
               debugPrint('[SpecialRankingListService] Failed to parse remote cache: $e');
             }
           }
-          
+
           // 缓存不存在也不触发重新计算，由调用方决定是否显示重新计算进度
           if (result.isEmpty) {
             debugPrint('[SpecialRankingListService] No cached data available, returning empty. Page should trigger background recalc.');
           }
         }
-        
+
         if (!localCacheEmpty && redisResult != null && redisResult.isNotEmpty) {
           // 预构建歌曲映射表，O(1)查找
           final songManager = MaimaiMusicDataManager();
@@ -177,37 +215,37 @@ class SpecialRankingListService {
               songMap[song.id] = song;
             }
           }
-          
+
           // 收集所有需要查询的key，准备批量获取更新时间
           List<String> updateTimeKeys = [];
           List<Map<String, dynamic>> parsedEntries = [];
-          
+
           for (int i = 0; i < redisResult.length; i += 2) {
             String songKey = redisResult[i] as String;
             dynamic scoreValue = redisResult[i + 1];
-            
+
             int breakCount = 0;
             if (scoreValue is num) {
               breakCount = scoreValue.toInt();
             } else if (scoreValue is String) {
               breakCount = int.tryParse(scoreValue) ?? 0;
             }
-            
+
             List<String> parts = songKey.split(':');
             if (parts.length >= 2) {
               String songId = parts[0];
               int difficultyIndex = int.tryParse(parts[1]) ?? 0;
-              
+
               // 从映射表获取歌曲信息，O(1)复杂度
               Song? song = songMap[songId];
               String songTitle = song?.title ?? '未知歌曲';
               String songType = song?.type ?? 'ST';
               String difficultyLabel = _getDifficultyLabel(songId, difficultyIndex);
               double ds = _getDifficultyDs(song, difficultyIndex);
-              
+
               // 收集更新时间查询key
               updateTimeKeys.add('special:song_break_count:updateTime:$songKey');
-              
+
               parsedEntries.add({
                 'rank': i ~/ 2 + 1,
                 'songId': songId,
@@ -221,7 +259,7 @@ class SpecialRankingListService {
               });
             }
           }
-          
+
           // 批量获取所有更新时间，一次Redis请求替代多次请求
           Map<String, int> updateTimeMap = {};
           if (updateTimeKeys.isNotEmpty) {
@@ -235,12 +273,12 @@ class SpecialRankingListService {
               updateTimeMap[updateTimeKeys[i]] = updateTime;
             }
           }
-          
+
           // 构建结果列表
           for (Map<String, dynamic> entry in parsedEntries) {
             String updateTimeKey = 'special:song_break_count:updateTime:${entry['songKey']}';
             int updateTime = updateTimeMap[updateTimeKey] ?? 0;
-            
+
             result.add(SpecialRankingEntry(
               rank: entry['rank'] as int,
               songId: entry['songId'] as String,
@@ -254,7 +292,7 @@ class SpecialRankingListService {
             ));
           }
         }
-        
+
         debugPrint('[SpecialRankingListService] Fetched ${result.length} entries');
       } finally {
         try {
@@ -264,8 +302,13 @@ class SpecialRankingListService {
     } catch (e) {
       debugPrint('[SpecialRankingListService] Redis error: $e');
     }
-    
+
     return result;
+  }
+
+  /// 反向绝赞数排行榜（绝赞数最少→最多）
+  Future<List<SpecialRankingEntry>> getReverseBreakCountRanking({int limit = 100}) async {
+    return getBreakCountRanking(limit: limit, ascending: true);
   }
 
   // 获取定数差值排行榜（拟合定数 - 官方定数）
@@ -2134,7 +2177,7 @@ class SpecialRankingListService {
         }
         
         debugPrint('[SpecialRankingListService] Calculated ${result.length} expert avg achievement entries');
-        
+
       } finally {
         try {
           await conn.send_object(['QUIT']);
@@ -2143,11 +2186,511 @@ class SpecialRankingListService {
     } catch (e) {
       debugPrint('[SpecialRankingListService] Redis error in getExpertAvgAchievementRanking: $e');
     }
-    
+
     return result;
   }
 
-  // 获取从maidata追加的歌曲列表
+  // ===================== 反向排行榜 =====================
+
+  /// 反向样本总数排行榜（升序：样本最少→最多）
+  Future<List<SpecialRankingEntry>> getReverseSampleCountRanking({
+    int limit = 100,
+    Function(int)? onProgress,
+  }) async {
+    List<SpecialRankingEntry> result = [];
+    try {
+      final conn = await RedisConnection().connect(redisHost, redisPort);
+      try {
+        await conn.send_object(['AUTH', redisPassword]);
+        dynamic remoteData = await conn.send_object(['GET', reverseSampleCountCacheKey]);
+        bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
+        if (remoteCacheValid) {
+          try {
+            List<dynamic> remoteList = json.decode(remoteData);
+            for (var item in remoteList) {
+              result.add(SpecialRankingEntry(
+                rank: item['rank'], songId: item['songId'], songTitle: item['songTitle'],
+                songType: item['songType'], difficultyIndex: item['difficultyIndex'],
+                difficultyLabel: item['difficultyLabel'], ds: item['ds'],
+                breakCount: item['breakCount'], updateTime: item['updateTime'],
+              ));
+            }
+          } catch (e) {
+            debugPrint('[SpecialRankingListService] Failed to parse remote reverse sample count ranking: $e');
+          }
+        }
+        if (result.isEmpty) {
+          final diffManager = DiffMusicDataManager();
+          DiffSong? diffSong = await diffManager.getCachedDiffData();
+          if (diffSong == null) {
+            await diffManager.fetchAndUpdateDiffData();
+            diffSong = await diffManager.getCachedDiffData();
+          }
+          final songManager = MaimaiMusicDataManager();
+          List<Song>? songs = await songManager.getCachedSongs();
+          if (songs == null || songs.isEmpty) return result;
+          if (diffSong == null) return result;
+          Set<String> excludedSongIds = await _getMaidataAddedSongIds();
+          List<Map<String, dynamic>> sampleList = [];
+          int totalSongs = songs.length;
+          int processedCount = 0;
+          for (Song song in songs) {
+            if (excludedSongIds.contains(song.id) || song.isExtra) {
+              processedCount++;
+              continue;
+            }
+            try {
+              List<DiffData>? songDiffDataList = diffSong.charts[song.id];
+              if (songDiffDataList == null || songDiffDataList.isEmpty) {
+                processedCount++;
+                if (onProgress != null) onProgress((processedCount * 100) ~/ totalSongs);
+                continue;
+              }
+              for (int i = 0; i < song.ds.length; i++) {
+                if (i < songDiffDataList.length) {
+                  DiffData diffData = songDiffDataList[i];
+                  num sampleSum = diffData.dist.fold(0, (sum, element) => sum + element);
+                  if (sampleSum > 0) {
+                    sampleList.add({
+                      'songId': song.id, 'songTitle': song.title, 'songType': song.type,
+                      'difficultyIndex': i, 'ds': song.ds[i], 'sampleSum': sampleSum,
+                    });
+                  }
+                }
+              }
+              processedCount++;
+              if (onProgress != null) onProgress((processedCount * 100) ~/ totalSongs);
+            } catch (e) {
+              debugPrint('[SpecialRankingListService] Error: $e');
+              processedCount++;
+            }
+          }
+          // 反向：升序
+          sampleList.sort((a, b) => (a['sampleSum'] as num).compareTo(b['sampleSum'] as num));
+          List<Map<String, dynamic>> topEntries = sampleList.take(limit).toList();
+          for (int i = 0; i < topEntries.length; i++) {
+            Map<String, dynamic> entry = topEntries[i];
+            result.add(SpecialRankingEntry(
+              rank: i + 1, songId: entry['songId'], songTitle: entry['songTitle'],
+              songType: entry['songType'], difficultyIndex: entry['difficultyIndex'],
+              difficultyLabel: _getDifficultyLabel(entry['songId'], entry['difficultyIndex']),
+              ds: entry['ds'], breakCount: (entry['sampleSum'] as num).toInt(),
+              updateTime: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+            ));
+          }
+          if (result.isNotEmpty) {
+            await conn.send_object(['SET', reverseSampleCountCacheKey, json.encode(result), 'EX', cacheExpireSeconds.toString()]);
+          }
+        }
+      } finally {
+        try { await conn.send_object(['QUIT']); } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('[SpecialRankingListService] Redis error: $e');
+    }
+    return result;
+  }
+
+  /// 反向物量排行榜（升序：物量最少→最多）
+  Future<List<SpecialRankingEntry>> getReverseNoteCountRanking({
+    int limit = 100,
+    Function(int)? onProgress,
+  }) async {
+    List<SpecialRankingEntry> result = [];
+    try {
+      final conn = await RedisConnection().connect(redisHost, redisPort);
+      try {
+        await conn.send_object(['AUTH', redisPassword]);
+        dynamic remoteData = await conn.send_object(['GET', reverseNoteCountCacheKey]);
+        bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
+        if (remoteCacheValid) {
+          try {
+            List<dynamic> remoteList = json.decode(remoteData);
+            for (int i = 0; i < remoteList.length && i < limit; i++) {
+              Map<String, dynamic> item = remoteList[i];
+              result.add(SpecialRankingEntry(
+                rank: item['rank'], songId: item['songId'], songTitle: item['songTitle'],
+                songType: item['songType'], difficultyIndex: item['difficultyIndex'],
+                difficultyLabel: item['difficultyLabel'], ds: item['ds'],
+                breakCount: item['breakCount'], updateTime: item['updateTime'],
+              ));
+            }
+          } catch (e) {
+            debugPrint('[SpecialRankingListService] Failed to parse remote reverse note count ranking: $e');
+          }
+        }
+        if (result.isEmpty) {
+          final songManager = MaimaiMusicDataManager();
+          List<Song>? songs = await songManager.getCachedSongs();
+          if (songs == null || songs.isEmpty) return result;
+          Set<String> excludedSongIds = await _getMaidataAddedSongIds();
+          List<Map<String, dynamic>> noteCountList = [];
+          int totalSongs = songs.length;
+          int processedCount = 0;
+          for (Song song in songs) {
+            if (excludedSongIds.contains(song.id) || song.isExtra) {
+              processedCount++;
+              continue;
+            }
+            try {
+              for (int i = 0; i < song.ds.length; i++) {
+                int totalNotes = 0;
+                if (i < song.charts.length) {
+                  List<int> notes = song.charts[i].notes;
+                  for (int j = 0; j < notes.length; j++) {
+                    totalNotes += notes[j];
+                  }
+                }
+                if (totalNotes > 0) {
+                  noteCountList.add({
+                    'songId': song.id, 'songTitle': song.title, 'songType': song.type,
+                    'difficultyIndex': i, 'ds': song.ds[i], 'totalNotes': totalNotes,
+                  });
+                }
+              }
+              processedCount++;
+              if (onProgress != null) onProgress((processedCount * 100) ~/ totalSongs);
+            } catch (e) {
+              debugPrint('[SpecialRankingListService] Error: $e');
+              processedCount++;
+            }
+          }
+          // 反向：升序
+          noteCountList.sort((a, b) => (a['totalNotes'] as int).compareTo(b['totalNotes'] as int));
+          List<Map<String, dynamic>> topEntries = noteCountList.take(limit).toList();
+          for (int i = 0; i < topEntries.length; i++) {
+            Map<String, dynamic> entry = topEntries[i];
+            result.add(SpecialRankingEntry(
+              rank: i + 1, songId: entry['songId'], songTitle: entry['songTitle'],
+              songType: entry['songType'], difficultyIndex: entry['difficultyIndex'],
+              difficultyLabel: _getDifficultyLabel(entry['songId'], entry['difficultyIndex']),
+              ds: entry['ds'], breakCount: entry['totalNotes'],
+              updateTime: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+            ));
+          }
+          if (result.isNotEmpty) {
+            await conn.send_object(['SET', reverseNoteCountCacheKey, json.encode(result), 'EX', cacheExpireSeconds.toString()]);
+          }
+        }
+      } finally {
+        try { await conn.send_object(['QUIT']); } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('[SpecialRankingListService] Redis error: $e');
+    }
+    return result;
+  }
+
+  /// 反向平均达成率排行榜（升序：达成率最低→最高）
+  Future<List<SpecialRankingEntry>> getReverseAvgAchievementRanking({
+    int limit = 100,
+    Function(int)? onProgress,
+  }) async {
+    List<SpecialRankingEntry> result = [];
+    try {
+      final conn = await RedisConnection().connect(redisHost, redisPort);
+      try {
+        await conn.send_object(['AUTH', redisPassword]);
+        dynamic remoteData = await conn.send_object(['GET', reverseAvgAchievementCacheKey]);
+        bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
+        if (remoteCacheValid) {
+          try {
+            List<dynamic> remoteList = json.decode(remoteData);
+            for (int i = 0; i < remoteList.length && i < limit; i++) {
+              Map<String, dynamic> item = remoteList[i];
+              result.add(SpecialRankingEntry(
+                rank: item['rank'], songId: item['songId'], songTitle: item['songTitle'],
+                songType: item['songType'], difficultyIndex: item['difficultyIndex'],
+                difficultyLabel: item['difficultyLabel'], ds: item['ds'],
+                breakCount: item['breakCount'], updateTime: item['updateTime'],
+              ));
+            }
+          } catch (e) {
+            debugPrint('[SpecialRankingListService] Failed to parse remote reverse avg achievement ranking: $e');
+          }
+        }
+        if (result.isEmpty) {
+          final diffManager = DiffMusicDataManager();
+          DiffSong? diffSong = await diffManager.getCachedDiffData();
+          if (diffSong == null) {
+            await diffManager.fetchAndUpdateDiffData();
+            diffSong = await diffManager.getCachedDiffData();
+          }
+          final songManager = MaimaiMusicDataManager();
+          List<Song>? songs = await songManager.getCachedSongs();
+          if (songs == null || songs.isEmpty) return result;
+          if (diffSong == null) return result;
+          Set<String> excludedSongIds = await _getMaidataAddedSongIds();
+          List<Map<String, dynamic>> avgAchievementList = [];
+          int totalSongs = songs.length;
+          int processedCount = 0;
+          for (Song song in songs) {
+            if (excludedSongIds.contains(song.id) || song.isExtra) {
+              processedCount++;
+              continue;
+            }
+            try {
+              List<DiffData>? songDiffDataList = diffSong.charts[song.id];
+              if (songDiffDataList == null || songDiffDataList.isEmpty) {
+                processedCount++;
+                if (onProgress != null) onProgress((processedCount * 100) ~/ totalSongs);
+                continue;
+              }
+              for (int i = 0; i < song.ds.length; i++) {
+                if (song.id.length == 6 && song.ds.length == 2 && i > 0) continue;
+                double avgAchievement = 0.0;
+                int dataIndex = i;
+                if (song.ds.length == 2 && songDiffDataList.length == 1) dataIndex = 0;
+                if (dataIndex < songDiffDataList.length) {
+                  DiffData diffData = songDiffDataList[dataIndex];
+                  avgAchievement = diffData.avg.toDouble();
+                }
+                if (avgAchievement > 0) {
+                  avgAchievementList.add({
+                    'songId': song.id, 'songTitle': song.title, 'songType': song.type,
+                    'difficultyIndex': i, 'ds': song.ds[i], 'avgAchievement': avgAchievement,
+                  });
+                }
+              }
+              processedCount++;
+              if (onProgress != null) onProgress((processedCount * 100) ~/ totalSongs);
+            } catch (e) {
+              debugPrint('[SpecialRankingListService] Error: $e');
+              processedCount++;
+            }
+          }
+          // 反向：升序
+          avgAchievementList.sort((a, b) => (a['avgAchievement'] as double).compareTo(b['avgAchievement'] as double));
+          List<Map<String, dynamic>> topEntries = avgAchievementList.take(limit).toList();
+          for (int i = 0; i < topEntries.length; i++) {
+            Map<String, dynamic> entry = topEntries[i];
+            result.add(SpecialRankingEntry(
+              rank: i + 1, songId: entry['songId'], songTitle: entry['songTitle'],
+              songType: entry['songType'], difficultyIndex: entry['difficultyIndex'],
+              difficultyLabel: _getDifficultyLabel(entry['songId'], entry['difficultyIndex']),
+              ds: entry['ds'], breakCount: (entry['avgAchievement'] * 100).toInt(),
+              updateTime: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+            ));
+          }
+          if (result.isNotEmpty) {
+            await conn.send_object(['SET', reverseAvgAchievementCacheKey, json.encode(result), 'EX', cacheExpireSeconds.toString()]);
+          }
+        }
+      } finally {
+        try { await conn.send_object(['QUIT']); } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('[SpecialRankingListService] Redis error: $e');
+    }
+    return result;
+  }
+
+  /// 反向MASTER/Re:MASTER平均达成率排行榜（升序）
+  Future<List<SpecialRankingEntry>> getReverseMasterAvgAchievementRanking({
+    int limit = 100,
+    Function(int)? onProgress,
+  }) async {
+    List<SpecialRankingEntry> result = [];
+    try {
+      final conn = await RedisConnection().connect(redisHost, redisPort);
+      try {
+        await conn.send_object(['AUTH', redisPassword]);
+        dynamic remoteData = await conn.send_object(['GET', reverseMasterAvgAchievementCacheKey]);
+        bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
+        if (remoteCacheValid) {
+          try {
+            List<dynamic> remoteList = json.decode(remoteData);
+            for (int i = 0; i < remoteList.length && i < limit; i++) {
+              Map<String, dynamic> item = remoteList[i];
+              result.add(SpecialRankingEntry(
+                rank: item['rank'], songId: item['songId'], songTitle: item['songTitle'],
+                songType: item['songType'], difficultyIndex: item['difficultyIndex'],
+                difficultyLabel: item['difficultyLabel'], ds: item['ds'],
+                breakCount: item['breakCount'], updateTime: item['updateTime'],
+              ));
+            }
+          } catch (e) {
+            debugPrint('[SpecialRankingListService] Failed to parse remote reverse master avg achievement ranking: $e');
+          }
+        }
+        if (result.isEmpty) {
+          final diffManager = DiffMusicDataManager();
+          DiffSong? diffSong = await diffManager.getCachedDiffData();
+          if (diffSong == null) {
+            await diffManager.fetchAndUpdateDiffData();
+            diffSong = await diffManager.getCachedDiffData();
+          }
+          final songManager = MaimaiMusicDataManager();
+          List<Song>? songs = await songManager.getCachedSongs();
+          if (songs == null || songs.isEmpty) return result;
+          if (diffSong == null) return result;
+          Set<String> excludedSongIds = await _getMaidataAddedSongIds();
+          List<Map<String, dynamic>> avgAchievementList = [];
+          int totalSongs = songs.length;
+          int processedCount = 0;
+          for (Song song in songs) {
+            if (excludedSongIds.contains(song.id) || song.isExtra) {
+              processedCount++;
+              continue;
+            }
+            try {
+              List<DiffData>? songDiffDataList = diffSong.charts[song.id];
+              if (songDiffDataList == null || songDiffDataList.isEmpty) {
+                processedCount++;
+                continue;
+              }
+              for (int i = 3; i <= 4 && i < song.ds.length; i++) {
+                double avgAchievement = 0.0;
+                int dataIndex = i;
+                if (song.ds.length == 2 && songDiffDataList.length == 1) dataIndex = 0;
+                if (dataIndex < songDiffDataList.length) {
+                  DiffData diffData = songDiffDataList[dataIndex];
+                  avgAchievement = diffData.avg.toDouble();
+                }
+                if (avgAchievement > 0) {
+                  avgAchievementList.add({
+                    'songId': song.id, 'songTitle': song.title, 'songType': song.type,
+                    'difficultyIndex': i, 'ds': song.ds[i], 'avgAchievement': avgAchievement,
+                  });
+                }
+              }
+              processedCount++;
+              if (onProgress != null) onProgress((processedCount * 100) ~/ totalSongs);
+            } catch (e) {
+              debugPrint('[SpecialRankingListService] Error: $e');
+              processedCount++;
+            }
+          }
+          // 反向：升序
+          avgAchievementList.sort((a, b) => (a['avgAchievement'] as double).compareTo(b['avgAchievement'] as double));
+          List<Map<String, dynamic>> topEntries = avgAchievementList.take(limit).toList();
+          for (int i = 0; i < topEntries.length; i++) {
+            Map<String, dynamic> entry = topEntries[i];
+            result.add(SpecialRankingEntry(
+              rank: i + 1, songId: entry['songId'], songTitle: entry['songTitle'],
+              songType: entry['songType'], difficultyIndex: entry['difficultyIndex'],
+              difficultyLabel: _getDifficultyLabel(entry['songId'], entry['difficultyIndex']),
+              ds: entry['ds'], breakCount: (entry['avgAchievement'] * 100).toInt(),
+              updateTime: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+            ));
+          }
+          if (result.isNotEmpty) {
+            await conn.send_object(['SET', reverseMasterAvgAchievementCacheKey, json.encode(result), 'EX', cacheExpireSeconds.toString()]);
+          }
+        }
+      } finally {
+        try { await conn.send_object(['QUIT']); } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('[SpecialRankingListService] Redis error: $e');
+    }
+    return result;
+  }
+
+  /// 反向EXPERT平均达成率排行榜（升序）
+  Future<List<SpecialRankingEntry>> getReverseExpertAvgAchievementRanking({
+    int limit = 100,
+    Function(int)? onProgress,
+  }) async {
+    List<SpecialRankingEntry> result = [];
+    try {
+      final conn = await RedisConnection().connect(redisHost, redisPort);
+      try {
+        await conn.send_object(['AUTH', redisPassword]);
+        dynamic remoteData = await conn.send_object(['GET', reverseExpertAvgAchievementCacheKey]);
+        bool remoteCacheValid = remoteData is String && remoteData.isNotEmpty;
+        if (remoteCacheValid) {
+          try {
+            List<dynamic> remoteList = json.decode(remoteData);
+            for (int i = 0; i < remoteList.length && i < limit; i++) {
+              Map<String, dynamic> item = remoteList[i];
+              result.add(SpecialRankingEntry(
+                rank: item['rank'], songId: item['songId'], songTitle: item['songTitle'],
+                songType: item['songType'], difficultyIndex: item['difficultyIndex'],
+                difficultyLabel: item['difficultyLabel'], ds: item['ds'],
+                breakCount: item['breakCount'], updateTime: item['updateTime'],
+              ));
+            }
+          } catch (e) {
+            debugPrint('[SpecialRankingListService] Failed to parse remote reverse expert avg achievement ranking: $e');
+          }
+        }
+        if (result.isEmpty) {
+          final diffManager = DiffMusicDataManager();
+          DiffSong? diffSong = await diffManager.getCachedDiffData();
+          if (diffSong == null) {
+            await diffManager.fetchAndUpdateDiffData();
+            diffSong = await diffManager.getCachedDiffData();
+          }
+          final songManager = MaimaiMusicDataManager();
+          List<Song>? songs = await songManager.getCachedSongs();
+          if (songs == null || songs.isEmpty) return result;
+          if (diffSong == null) return result;
+          Set<String> excludedSongIds = await _getMaidataAddedSongIds();
+          List<Map<String, dynamic>> avgAchievementList = [];
+          int totalSongs = songs.length;
+          int processedCount = 0;
+          for (Song song in songs) {
+            if (excludedSongIds.contains(song.id) || song.isExtra) {
+              processedCount++;
+              continue;
+            }
+            try {
+              List<DiffData>? songDiffDataList = diffSong.charts[song.id];
+              if (songDiffDataList == null || songDiffDataList.isEmpty) {
+                processedCount++;
+                continue;
+              }
+              int i = 2;
+              if (i < song.ds.length) {
+                double avgAchievement = 0.0;
+                int dataIndex = i;
+                if (song.ds.length == 2 && songDiffDataList.length == 1) dataIndex = 0;
+                if (dataIndex < songDiffDataList.length) {
+                  DiffData diffData = songDiffDataList[dataIndex];
+                  avgAchievement = diffData.avg.toDouble();
+                }
+                if (avgAchievement > 0) {
+                  avgAchievementList.add({
+                    'songId': song.id, 'songTitle': song.title, 'songType': song.type,
+                    'difficultyIndex': i, 'ds': song.ds[i], 'avgAchievement': avgAchievement,
+                  });
+                }
+              }
+              processedCount++;
+              if (onProgress != null) onProgress((processedCount * 100) ~/ totalSongs);
+            } catch (e) {
+              debugPrint('[SpecialRankingListService] Error: $e');
+              processedCount++;
+            }
+          }
+          // 反向：升序
+          avgAchievementList.sort((a, b) => (a['avgAchievement'] as double).compareTo(b['avgAchievement'] as double));
+          List<Map<String, dynamic>> topEntries = avgAchievementList.take(limit).toList();
+          for (int i = 0; i < topEntries.length; i++) {
+            Map<String, dynamic> entry = topEntries[i];
+            result.add(SpecialRankingEntry(
+              rank: i + 1, songId: entry['songId'], songTitle: entry['songTitle'],
+              songType: entry['songType'], difficultyIndex: entry['difficultyIndex'],
+              difficultyLabel: _getDifficultyLabel(entry['songId'], entry['difficultyIndex']),
+              ds: entry['ds'], breakCount: (entry['avgAchievement'] * 100).toInt(),
+              updateTime: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+            ));
+          }
+          if (result.isNotEmpty) {
+            await conn.send_object(['SET', reverseExpertAvgAchievementCacheKey, json.encode(result), 'EX', cacheExpireSeconds.toString()]);
+          }
+        }
+      } finally {
+        try { await conn.send_object(['QUIT']); } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('[SpecialRankingListService] Redis error: $e');
+    }
+    return result;
+  }
+
+  // 获取需要排除的maidata追加歌曲ID
   Future<Set<String>> _getMaidataAddedSongIds() async {
     try {
       final prefs = await SharedPreferences.getInstance();

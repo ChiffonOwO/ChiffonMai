@@ -5180,11 +5180,13 @@ class _CollectionPickerSheetState extends State<CollectionPickerSheet> {
                 : GridView.builder(
                     padding: const EdgeInsets.all(12),
                     gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3, // 3 列：姓名框更宽松（头像也用 3 列）
+                        SliverGridDelegateWithFixedCrossAxisCount(
+                      // 姓名框是长条形 banner 图片，使用 1 列 + 宽高比 6:1 避免被裁切/拉伸
+                      // 头像保持 3 列正方形网格
+                      crossAxisCount: _activeTab == 0 ? 3 : 1,
                       crossAxisSpacing: 8,
                       mainAxisSpacing: 8,
-                      childAspectRatio: 1,
+                      childAspectRatio: _activeTab == 0 ? 1 : 6,
                     ),
                     itemCount: filteredItems.length,
                     itemBuilder: (ctx, index) {
@@ -5220,7 +5222,7 @@ class _CollectionPickerSheetState extends State<CollectionPickerSheet> {
                                       strokeWidth: 2)),
                               errorWidget: (ctx, url, err) =>
                                   const Icon(Icons.error, size: 20),
-                              fit: BoxFit.cover,
+                              fit: BoxFit.contain,
                             ),
                           ),
                         ),

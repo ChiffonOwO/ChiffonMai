@@ -186,24 +186,29 @@ class _FriendLinkCard extends StatelessWidget {
         Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7);
     final BoxShadow shadow = AppColors.defaultShadow(brightness);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
+    return Container(
+      decoration: BoxDecoration(
+        // 外层用 Container 带 decoration（color + border + boxShadow），
+        // 自身的 borderRadius 自然裁出圆角，让四角都填满 color。
+        // 原本用 Material > InkWell > Ink + Ink 带 decoration 的写法，
+        // Ink 的圆角是 borderRadius=12 的内边界，外层 Material 默认 clipBehavior=Clip.none
+        // 用矩形 bounds，不会按 Ink 的圆角裁——会在圆角处漏出一圈父容器底色。
+        color: Theme.of(context)
+            .colorScheme
+            .surface
+            .withValues(alpha: brightness == Brightness.dark ? 0.7 : 1.0),
         borderRadius: BorderRadius.circular(12),
-        onTap: () => onOpen(link.url),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: Theme.of(context)
-                .colorScheme
-                .surface
-                .withValues(alpha: brightness == Brightness.dark ? 0.7 : 1.0),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: AppColors.tableBorder(brightness),
-              width: 1,
-            ),
-            boxShadow: [shadow],
-          ),
+        border: Border.all(
+          color: AppColors.tableBorder(brightness),
+          width: 1,
+        ),
+        boxShadow: [shadow],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => onOpen(link.url),
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: screenWidth * 0.03,

@@ -43,6 +43,7 @@ import 'package:my_first_flutter_app/entity/ChartNote.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/UnionUniManager.dart';
 import 'package:my_first_flutter_app/entity/DXRating/DXDataEntity.dart';
 import 'package:my_first_flutter_app/manager/DXDataManager.dart';
+import 'package:my_first_flutter_app/page/CalculatorPage.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 
 class SongInfoPage extends StatefulWidget {
@@ -683,46 +684,10 @@ class _SongInfoPageState extends State<SongInfoPage> {
           });
         }
       } else {
-        // 尝试使用shortId查询
-        debugPrint('[MaidataDecode] 主ID查询失败，尝试使用shortId查询');
-        if (_songData != null) {
-          dynamic shortId =
-              _songData!['basic_info']['short_id'] ?? _songData!['shortId'];
-          debugPrint('[MaidataDecode] shortId: $shortId');
-          if (shortId != null) {
-            String shortIdStr = shortId.toString();
-            String? maidataByShortId = MaidataManager().getMaidata(shortIdStr);
-            if (maidataByShortId != null && maidataByShortId.isNotEmpty) {
-              debugPrint(
-                  '[MaidataDecode] 通过shortId找到maidata，长度: ${maidataByShortId.length}');
-              MaidataData maidata = MaidataDecodeUtil.decode(maidataByShortId);
-              debugPrint(
-                  '[MaidataDecode] shortId解析出 ${maidata.charts.length} 个chart');
-              _applyMaidataParseResults(maidata);
-            }
-          }
-        }
-        // 尝试通过歌曲标题在index中查找shortId（仅当直接ID和shortId查询都未成功时）
-        if (!_maidataDecodedSuccessfully && _songData != null && _songData!['basic_info'] != null) {
-          final songTitle = _songData!['basic_info']['title'];
-          if (songTitle != null && songTitle is String && songTitle.isNotEmpty) {
-            debugPrint('[MaidataDecode] 主ID和shortId查询均失败，尝试通过标题"$songTitle"查找index...');
-            await MaidataManager().getIndex();
-            List<String> matchingShortIds = await MaidataManager().findShortIdsForTitleKana(songTitle);
-            if (matchingShortIds.isNotEmpty) {
-              debugPrint('[MaidataDecode] 标题匹配到 ${matchingShortIds.length} 个shortId: $matchingShortIds');
-              String? maidataByTitle = MaidataManager().getMaidataByShortIds(matchingShortIds);
-              if (maidataByTitle != null && maidataByTitle.isNotEmpty) {
-                debugPrint('[MaidataDecode] 通过标题索引找到maidata，长度: ${maidataByTitle.length}');
-                MaidataData maidata = MaidataDecodeUtil.decode(maidataByTitle);
-                debugPrint('[MaidataDecode] 标题索引解析出 ${maidata.charts.length} 个chart');
-                _applyMaidataParseResults(maidata);
-              }
-            } else {
-              debugPrint('[MaidataDecode] 标题"$songTitle"在index中未找到匹配');
-            }
-          }
-        }
+        // 严格按 widget.songId 命中失败就不再尝试其它 shortId / title 顶替，
+        // 让 SongInfoPage 的 songId 与 maidata.txt 的 &shortid= 严格一一对应。
+        debugPrint(
+            '[MaidataDecode] 严格查询失败, songId=${widget.songId}，不再使用 short_id 或 title 顶替');
       }
     } catch (e) {
       // 静默处理，继续使用默认数据
@@ -1866,73 +1831,83 @@ class _SongInfoPageState extends State<SongInfoPage> {
           .add({"completion": completion, "rating": rating, "score": score});
     }
 
-    // 对于定数大于等于12.0的谱面，添加额外的达成率点（比基准达成率高1分）
+    // 对于定数大于等于12.0的谱面，添加额外的达成率点（每个可达成的 score 都加边界）
     // 但6位数id的歌曲不添加额外达成率点
     if (difficulty >= 12.0 && !isSixDigitId) {
-      // 定义需要添加额外点的基准达成率
-      List<double> baseCompletions = [97.0, 98.0, 99.0, 99.5, 100.0];
-
-      for (double baseCompletion in baseCompletions) {
-        // 找到基准达成率对应的得分
-        var baseItem = scoreData.firstWhere(
-          (item) => item['completion'] == baseCompletion,
-        );
-
-        int baseScore = baseItem['score'];
-        int targetScore = baseScore + 1;
-
-        // 二分查找找到需要的达成率
-        double lowerBound = baseCompletion;
-        double upperBound = baseCompletion;
-
-        // 确定上界
-        switch (baseCompletion) {
-          case 97.0:
-            upperBound = 98.0;
-            break;
-          case 98.0:
-            upperBound = 98.9999;
-            break;
-          case 99.0:
-            upperBound = 99.5;
-            break;
-          case 99.5:
-            upperBound = 99.9999;
-            break;
-          case 100.0:
-            upperBound = 100.4999;
-            break;
-        }
-
-        // 二分查找
-        double mid = lowerBound;
-        int iterations = 0;
-        while (upperBound - lowerBound > 0.0001 && iterations < 100) {
-          mid = (lowerBound + upperBound) / 2;
+      // 在 [lo, hi] 内二分找最小 c 使 _calculateSingleRating(difficulty, c) >= targetScore
+      double binarySearchMinCompletion(double lo, double hi, int targetScore) {
+        double mid = lo;
+        int iters = 0;
+        while (hi - lo > 0.0001 && iters < 100) {
+          mid = (lo + hi) / 2;
           int currentScore = _calculateSingleRating(difficulty, mid);
-
           if (currentScore < targetScore) {
-            lowerBound = mid;
+            lo = mid;
           } else {
-            upperBound = mid;
+            hi = mid;
           }
-          iterations++;
+          iters++;
         }
+        return mid;
+      }
 
-        // 添加新的达成率点
-        if (_calculateSingleRating(difficulty, mid) >= targetScore) {
-          // 查找对应的评级
-          String rating = "";
-          for (var item in maimaiRatingMultiplier) {
-            if (mid >= item['completion']) {
-              rating = item['rating'];
-              break;
-            }
+      // 给定 c 找对应评级
+      String lookupRating(double c) {
+        for (var item in maimaiRatingMultiplier) {
+          if (c >= item['completion']) {
+            return item['rating'] as String;
           }
-
-          scoreData
-              .add({"completion": mid, "rating": rating, "score": targetScore});
         }
+        return '';
+      }
+
+      // 把每个区间内所有可达 score 的边界都加进 scoreData
+      void addBoundariesInRange(double baseCompletion, double upperCompletion) {
+        int baseScore =
+            _calculateSingleRating(difficulty, baseCompletion);
+        int upperScore =
+            _calculateSingleRating(difficulty, upperCompletion);
+        if (upperScore <= baseScore + 1) return; // 没有中间可达 score
+
+        double lowerBound = baseCompletion;
+        for (int target = baseScore + 1; target < upperScore; target++) {
+          final mid = binarySearchMinCompletion(
+              lowerBound, upperCompletion, target);
+          if (_calculateSingleRating(difficulty, mid) < target) {
+            // 该 score 在本区间不可达（安全兜底，正常不应发生）
+            break;
+          }
+          scoreData.add({
+            "completion": mid,
+            "rating": lookupRating(mid),
+            "score": target,
+          });
+          lowerBound = mid; // 下一个边界一定在 mid 之后
+        }
+      }
+
+      // 1. 高达成率大区间（5 段）：和原代码范围一致
+      const ranges = <List<double>>[
+        [97.0, 98.0],
+        [98.0, 98.9999],
+        [99.0, 99.5],
+        [99.5, 99.9999],
+        [100.0, 100.4999],
+      ];
+      for (final range in ranges) {
+        addBoundariesInRange(range[0], range[1]);
+      }
+
+      // 2. 跨倍率的 0.0001 窄段（原代码漏掉）
+      //    这些段里两个端点的倍率不同，中间可能有不可达的 score 跳变
+      const narrowRanges = <List<double>>[
+        [96.9999, 97.0], // AAA 0.176 → S 0.200
+        [98.9999, 99.0], // S+ 0.206 → SS 0.208
+        [99.9999, 100.0], // SS+ 0.214 → SSS 0.216
+        [100.4999, 100.5], // SSS 0.222 → SSS+ 0.224
+      ];
+      for (final range in narrowRanges) {
+        addBoundariesInRange(range[0], range[1]);
       }
 
       // 按达成率降序排序
@@ -2214,6 +2189,12 @@ class _SongInfoPageState extends State<SongInfoPage> {
                       icon: Icon(Icons.image_outlined, color: textPrimaryColor),
                       tooltip: '导出歌曲信息',
                       onPressed: _exportSongInfoToImage,
+                    ),
+                    // 计算工具按钮（打开独立的 CalculatorPage）
+                    IconButton(
+                      icon: Icon(Icons.calculate_outlined, color: textPrimaryColor),
+                      tooltip: '计算工具',
+                      onPressed: _openCalculator,
                     ),
                   ],
                 ),
@@ -2638,19 +2619,23 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                           mainAxisAlignment:
                                               MainAxisAlignment.center,
                                           children: [
-                                            Text(
-                                              _getDiffLabel(index),
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                fontSize: MediaQuery.of(context)
-                                                        .size
-                                                        .width *
-                                                    0.025,
-                                                fontWeight: FontWeight.bold,
-                                                color:
-                                                    _currentDiffIndex == index
-                                                        ? Colors.white
-                                                        : accentColor,
+                                            FittedBox(
+                                              fit: BoxFit.scaleDown,
+                                              child: Text(
+                                                _getDiffLabel(index),
+                                                textAlign: TextAlign.center,
+                                                maxLines: 1,
+                                                softWrap: false,
+                                                style: TextStyle(
+                                                  fontSize: MediaQuery.of(context)
+                                                          .size
+                                                          .width *
+                                                      0.025,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: _currentDiffIndex == index
+                                                      ? Colors.white
+                                                      : accentColor,
+                                                ),
                                               ),
                                             ),
                                             const SizedBox(height: 4),
@@ -6998,15 +6983,15 @@ class _SongInfoPageState extends State<SongInfoPage> {
     // 否则返回原来的标签
     switch (index) {
       case 0:
-        return 'Basic';
+        return 'BASIC';
       case 1:
-        return 'Advan';
+        return 'ADVANCED';
       case 2:
-        return 'Expert';
+        return 'EXPERT';
       case 3:
-        return 'Master';
+        return 'MASTER';
       case 4:
-        return 'Re:MAS';
+        return 'Re:MASTER';
       default:
         return '';
     }
@@ -8095,6 +8080,43 @@ class _SongInfoPageState extends State<SongInfoPage> {
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // 打开计算工具页面：预填当前曲谱的物量、定数、用户达成率等
+  void _openCalculator() {
+    if (_songData == null) return;
+    final currentChart = _songData!['charts'][_currentDiffIndex];
+    final record = _getUserBestRecord();
+
+    // 拟合定数兼容两种类型：DiffData 对象 / 普通 Map
+    double? fitDiffValue;
+    final diffEntry = _diffData != null ? _diffData![_currentDiffIndex] : null;
+    if (diffEntry is DiffData) {
+      fitDiffValue = diffEntry.fitDiff?.toDouble();
+    } else if (diffEntry is Map) {
+      final raw = diffEntry['fit_diff'];
+      fitDiffValue = raw is num ? raw.toDouble() : null;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CalculatorPage(
+          songId: widget.songId,
+          songTitle: _songData!['basic_info']['title'] ?? '',
+          songType: _songData!['type'] ?? 'DX',
+          difficultyIndex: _currentDiffIndex,
+          difficultyLabel: _getDiffLabel(_currentDiffIndex),
+          ds: (_songData!['ds'][_currentDiffIndex] as num).toDouble(),
+          fitDiff: fitDiffValue,
+          noteCounts: _getNoteCounts(currentChart),
+          userAchievement: (record?['achievements'] as num?)?.toDouble(),
+          userRating: (record?['ra'] is num)
+              ? (record!['ra'] as num).toInt()
+              : null,
         ),
       ),
     );

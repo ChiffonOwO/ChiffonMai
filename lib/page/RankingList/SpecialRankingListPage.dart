@@ -14,19 +14,15 @@ class SpecialRankingListPage extends StatefulWidget {
 
 enum RankingType {
   breakCount, // 绝赞数排行榜
-  difficultyDiff, // 定数差值排行榜
-  masterDiff, // MASTER/Re:MASTER定数差值排行榜
-  expertDiff, // EXPERT定数差值排行榜
-  reverseDiff, // 反向定数差值排行榜
-  reverseMasterDiff, // 反向MASTER/Re:MASTER定数差值排行榜
-  reverseExpertDiff, // 反向EXPERT定数差值排行榜
+  difficultyDiff, // 定数差值排行榜（可正反向切换）
+  masterDiff, // MASTER/Re:MASTER定数差值排行榜（可正反向切换）
+  expertDiff, // EXPERT定数差值排行榜（可正反向切换）
   sampleCount, // 样本总数排行榜
   noteCount, // 物量排行榜
   avgAchievement, // 平均达成排行榜
   masterAvgAchievement, // MASTER/Re:MASTER平均达成排行榜
   expertAvgAchievement, // EXPERT平均达成排行榜
-  bpmRanking, // BPM排行榜（最高）
-  reverseBpmRanking, // 反向BPM排行榜（最低）
+  bpmRanking, // BPM排行榜（可正反向切换）
 }
 
 class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
@@ -35,6 +31,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
   bool _isRecalculating = false;
   int _progress = 0;
   RankingType _currentRankingType = RankingType.breakCount;
+  bool _isReverse = false; // 当前排行榜是否为反向（仅对支持的排行榜生效）
   List<SpecialRankingEntry> _rankingList = [];
   String? _errorMessage;
 
@@ -103,34 +100,51 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
   Future<List<SpecialRankingEntry>> _fetchCachedRanking() async {
     switch (_currentRankingType) {
       case RankingType.breakCount:
-        return _service.getBreakCountRanking(limit: 100);
+        return _isReverse
+            ? _service.getReverseBreakCountRanking(limit: 100)
+            : _service.getBreakCountRanking(limit: 100);
       case RankingType.difficultyDiff:
-        return _service.getDifficultyDiffRanking(limit: 100);
+        return _isReverse
+            ? _service.getReverseDifficultyDiffRanking(limit: 100)
+            : _service.getDifficultyDiffRanking(limit: 100);
       case RankingType.masterDiff:
-        return _service.getMasterDifficultyDiffRanking(limit: 100);
+        return _isReverse
+            ? _service.getReverseMasterDifficultyDiffRanking(limit: 100)
+            : _service.getMasterDifficultyDiffRanking(limit: 100);
       case RankingType.expertDiff:
-        return _service.getExpertDifficultyDiffRanking(limit: 100);
-      case RankingType.reverseDiff:
-        return _service.getReverseDifficultyDiffRanking(limit: 100);
-      case RankingType.reverseMasterDiff:
-        return _service.getReverseMasterDifficultyDiffRanking(limit: 100);
-      case RankingType.reverseExpertDiff:
-        return _service.getReverseExpertDifficultyDiffRanking(limit: 100);
+        return _isReverse
+            ? _service.getReverseExpertDifficultyDiffRanking(limit: 100)
+            : _service.getExpertDifficultyDiffRanking(limit: 100);
       case RankingType.sampleCount:
-        return _service.getSampleCountRanking(limit: 100);
+        return _isReverse
+            ? _service.getReverseSampleCountRanking(limit: 100)
+            : _service.getSampleCountRanking(limit: 100);
       case RankingType.noteCount:
-        return _service.getNoteCountRanking(limit: 100);
+        return _isReverse
+            ? _service.getReverseNoteCountRanking(limit: 100)
+            : _service.getNoteCountRanking(limit: 100);
       case RankingType.avgAchievement:
-        return _service.getAvgAchievementRanking(limit: 100);
+        return _isReverse
+            ? _service.getReverseAvgAchievementRanking(limit: 100)
+            : _service.getAvgAchievementRanking(limit: 100);
       case RankingType.masterAvgAchievement:
-        return _service.getMasterAvgAchievementRanking(limit: 100);
+        return _isReverse
+            ? _service.getReverseMasterAvgAchievementRanking(limit: 100)
+            : _service.getMasterAvgAchievementRanking(limit: 100);
       case RankingType.expertAvgAchievement:
-        return _service.getExpertAvgAchievementRanking(limit: 100);
+        return _isReverse
+            ? _service.getReverseExpertAvgAchievementRanking(limit: 100)
+            : _service.getExpertAvgAchievementRanking(limit: 100);
       case RankingType.bpmRanking:
-        return _service.getBpmRanking(limit: 100);
-      case RankingType.reverseBpmRanking:
-        return _service.getReverseBpmRanking(limit: 100);
+        return _isReverse
+            ? _service.getReverseBpmRanking(limit: 100)
+            : _service.getBpmRanking(limit: 100);
     }
+  }
+
+  /// 当前排行榜是否支持正反向切换（所有排行榜都支持）
+  bool _rankingSupportsReverse(RankingType type) {
+    return true;
   }
 
   /// 后台触发重新计算（目前仅绝赞数排行榜支持独立重新计算）
@@ -164,12 +178,6 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
         return 'MASTER/Re:MASTER定数差值排行榜';
       case RankingType.expertDiff:
         return 'EXPERT定数差值排行榜';
-      case RankingType.reverseDiff:
-        return '反向定数差值排行榜';
-      case RankingType.reverseMasterDiff:
-        return '反向MASTER/Re:MASTER定数差值排行榜';
-      case RankingType.reverseExpertDiff:
-        return '反向EXPERT定数差值排行榜';
       case RankingType.sampleCount:
         return '样本总数排行榜';
       case RankingType.noteCount:
@@ -182,8 +190,6 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
         return 'EXPERT平均达成率排行榜';
       case RankingType.bpmRanking:
         return 'BPM排行榜';
-      case RankingType.reverseBpmRanking:
-        return '反向BPM排行榜';
     }
   }
 
@@ -194,9 +200,6 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
       case RankingType.difficultyDiff:
       case RankingType.masterDiff:
       case RankingType.expertDiff:
-      case RankingType.reverseDiff:
-      case RankingType.reverseMasterDiff:
-      case RankingType.reverseExpertDiff:
         return Colors.orange;
       case RankingType.sampleCount:
         return Colors.teal;
@@ -207,7 +210,6 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
       case RankingType.expertAvgAchievement:
         return Colors.purple;
       case RankingType.bpmRanking:
-      case RankingType.reverseBpmRanking:
         return Colors.red;
     }
   }
@@ -219,9 +221,6 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
       case RankingType.difficultyDiff:
       case RankingType.masterDiff:
       case RankingType.expertDiff:
-      case RankingType.reverseDiff:
-      case RankingType.reverseMasterDiff:
-      case RankingType.reverseExpertDiff:
         return (value / 100).toStringAsFixed(2);
       case RankingType.sampleCount:
         return value.toString();
@@ -232,7 +231,6 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
       case RankingType.expertAvgAchievement:
         return (value / 100).toStringAsFixed(2);
       case RankingType.bpmRanking:
-      case RankingType.reverseBpmRanking:
         return value.toString();
     }
   }
@@ -244,9 +242,6 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
       case RankingType.difficultyDiff:
       case RankingType.masterDiff:
       case RankingType.expertDiff:
-      case RankingType.reverseDiff:
-      case RankingType.reverseMasterDiff:
-      case RankingType.reverseExpertDiff:
         return '定数差值';
       case RankingType.sampleCount:
         return '样本总数';
@@ -257,7 +252,6 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
       case RankingType.expertAvgAchievement:
         return '平均达成率';
       case RankingType.bpmRanking:
-      case RankingType.reverseBpmRanking:
         return 'BPM';
     }
   }
@@ -278,86 +272,62 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                 _buildDialogTile(
                   brightness,
                   '绝赞数排行榜',
-                  '按谱面绝赞数量排名',
+                  '按谱面绝赞数量排名（可切换正反向）',
                   RankingType.breakCount,
                 ),
                 _buildDialogTile(
                   brightness,
                   '定数差值排行榜',
-                  '拟合定数与官方定数差值排名',
+                  '拟合定数与官方定数差值排名（可切换正反向）',
                   RankingType.difficultyDiff,
                 ),
                 _buildDialogTile(
                   brightness,
                   'MASTER/Re:MASTER定数差值排行榜',
-                  '只统计MASTER/Re:MASTER难度',
+                  '只统计MASTER/Re:MASTER难度（可切换正反向）',
                   RankingType.masterDiff,
                 ),
                 _buildDialogTile(
                   brightness,
                   'EXPERT定数差值排行榜',
-                  '只统计EXPERT难度',
+                  '只统计EXPERT难度（可切换正反向）',
                   RankingType.expertDiff,
                 ),
                 _buildDialogTile(
                   brightness,
-                  '反向定数差值排行榜',
-                  '拟合定数-官方定数最小的前100位',
-                  RankingType.reverseDiff,
-                ),
-                _buildDialogTile(
-                  brightness,
-                  '反向MASTER/Re:MASTER定数差值排行榜',
-                  '只统计MASTER/Re:MASTER难度',
-                  RankingType.reverseMasterDiff,
-                ),
-                _buildDialogTile(
-                  brightness,
-                  '反向EXPERT定数差值排行榜',
-                  '只统计EXPERT难度',
-                  RankingType.reverseExpertDiff,
-                ),
-                _buildDialogTile(
-                  brightness,
                   '样本总数排行榜',
-                  '玩家样本总量排名',
+                  '玩家样本总量排名（可切换正反向）',
                   RankingType.sampleCount,
                 ),
                 _buildDialogTile(
                   brightness,
                   '物量排行榜',
-                  '五种note总数排名',
+                  '五种note总数排名（可切换正反向）',
                   RankingType.noteCount,
                 ),
                 _buildDialogTile(
                   brightness,
                   '平均达成率排行榜',
-                  '按平均达成率排名',
+                  '按平均达成率排名（可切换正反向）',
                   RankingType.avgAchievement,
                 ),
                 _buildDialogTile(
                   brightness,
                   'MASTER/Re:MASTER平均达成率排行榜',
-                  '只统计MASTER/Re:MASTER难度',
+                  '只统计MASTER/Re:MASTER难度（可切换正反向）',
                   RankingType.masterAvgAchievement,
                 ),
                 _buildDialogTile(
                   brightness,
                   'EXPERT平均达成率排行榜',
-                  '只统计EXPERT难度',
+                  '只统计EXPERT难度（可切换正反向）',
                   RankingType.expertAvgAchievement,
                 ),
                 _buildDialogTile(
                   brightness,
                   'BPM排行榜',
-                  '按歌曲BPM从高到低排名',
+                  '按歌曲BPM排名（可切换正反向）',
                   RankingType.bpmRanking,
-                ),
-                _buildDialogTile(
-                  brightness,
-                  '反向BPM排行榜',
-                  '按歌曲BPM从低到高排名',
-                  RankingType.reverseBpmRanking,
                 ),
               ],
             ),
@@ -378,6 +348,10 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
         Navigator.pop(context);
         setState(() {
           _currentRankingType = type;
+          // 切换到不支持反向的排行榜时，重置为正向
+          if (!_rankingSupportsReverse(type)) {
+            _isReverse = false;
+          }
         });
         _loadRanking();
       },
@@ -676,6 +650,35 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                 ),
               ),
 
+              // 正反向切换（仅对支持的排行榜显示）
+              if (_rankingSupportsReverse(_currentRankingType))
+                Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment<bool>(
+                          value: false,
+                          label: Text('正向'),
+                          icon: Icon(Icons.arrow_upward, size: 16),
+                        ),
+                        ButtonSegment<bool>(
+                          value: true,
+                          label: Text('反向'),
+                          icon: Icon(Icons.arrow_downward, size: 16),
+                        ),
+                      ],
+                      selected: {_isReverse},
+                      showSelectedIcon: false,
+                      onSelectionChanged: (selection) {
+                        setState(() => _isReverse = selection.first);
+                        _loadRanking();
+                      },
+                    ),
+                  ),
+                ),
+
               // 排行榜列表
               Expanded(
                 child: Container(
@@ -887,8 +890,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                           ),
                                                           const SizedBox(
                                                               height: 4),
-                                                          if (_currentRankingType != RankingType.bpmRanking &&
-                                                              _currentRankingType != RankingType.reverseBpmRanking)
+                                                          if (_currentRankingType != RankingType.bpmRanking)
                                                             Row(
                                                               children: [
                                                                 _buildDifficultyTag(

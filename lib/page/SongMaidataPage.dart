@@ -209,15 +209,9 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
         Navigator.of(context).pop();
       }
 
-      // 显示成功提示
+      // 显示导出成功对话框（含路径与复制按钮）
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('导出成功: $safeName.zip\n保存路径: $filePath'),
-            duration: const Duration(seconds: 5),
-            backgroundColor: AppColors.successGreen(Theme.of(context).brightness),
-          ),
-        );
+        await _showExportSuccessDialog(filePath, '$safeName.zip');
       }
     } catch (e) {
       // 关闭加载对话框
@@ -242,6 +236,96 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
         });
       }
     }
+  }
+
+  /// 显示导出成功对话框：展示导出路径并提供复制按钮
+  Future<void> _showExportSuccessDialog(String filePath, String fileName) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        bool copied = false;
+        return StatefulBuilder(
+          builder: (ctx, setLocalState) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green.shade600, size: 22),
+                const SizedBox(width: 8),
+                const Text('导出成功'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '已导出 $fileName',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '文件已保存到：',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.maxFinite,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: Theme.of(ctx).dividerColor,
+                      width: 1,
+                    ),
+                  ),
+                  child: SelectableText(
+                    filePath,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: filePath));
+                  if (!ctx.mounted) return;
+                  setLocalState(() => copied = true);
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('路径已复制到剪贴板')),
+                  );
+                },
+                icon: Icon(
+                  copied ? Icons.check : Icons.copy,
+                  size: 16,
+                  color: copied ? Colors.green.shade600 : null,
+                ),
+                label: Text(
+                  copied ? '已复制' : '复制路径',
+                  style: copied
+                      ? TextStyle(color: Colors.green.shade600)
+                      : null,
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('关闭'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   /// 获取曲绘字节数据（优先本地资源，兜底网络下载）

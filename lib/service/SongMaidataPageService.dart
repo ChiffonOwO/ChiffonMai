@@ -234,78 +234,33 @@ class SongMaidataPageService {
   Future<String?> fetchMaidata({
     required void Function(List<String>) onInoteParsed,
   }) async {
-    // 首先检查全量缓存（用app的songId直接查询）
+    // 严格按 songId 命中：
+    // 谱面代码中的 shortId 必须与 SongInfoPage 传入的 songId 一致，
+    // 找不到就返回 null，不要用别的 ID 来顶替。
     await MaidataManager().initialize();
+
+    // 1) 全量缓存（key 本身就是从 maidata.txt 的 &shortid= 字段提取的）
     if (MaidataManager().isCacheReady) {
-      String? fullCacheContent = MaidataManager().getMaidata(songId);
+      final fullCacheContent = MaidataManager().getMaidata(songId);
       if (fullCacheContent != null) {
-        debugPrint('[DEBUG][Maidata] 使用全量缓存内容(songId直接命中)');
+        debugPrint('[DEBUG][Maidata] 使用全量缓存内容(songId严格命中)');
         List<String> inoteList = _parseInoteList(fullCacheContent);
         onInoteParsed(inoteList);
         return fullCacheContent;
       }
-
-      // 用songId直接查询失败，尝试通过歌曲标题在index中查找shortId
-      debugPrint('[DEBUG][Maidata] songId直接查询失败，尝试通过index匹配shortId...');
-      await MaidataManager().getIndex(); // 确保index已加载
-      List<String> matchingShortIds = MaidataManager().findShortIdsForTitle(songTitle);
-      if (matchingShortIds.isNotEmpty) {
-        debugPrint('[DEBUG][Maidata] index中找到 ${matchingShortIds.length} 个匹配: $matchingShortIds');
-        String? indexCacheContent = MaidataManager().getMaidataByShortIds(matchingShortIds);
-        if (indexCacheContent != null) {
-          debugPrint('[DEBUG][Maidata] 使用全量缓存内容(通过index+shortId命中)');
-          List<String> inoteList = _parseInoteList(indexCacheContent);
-          onInoteParsed(inoteList);
-          return indexCacheContent;
-        }
-      }
-      debugPrint('[DEBUG][Maidata] index匹配也失败，全量缓存中找不到此歌曲');
+      debugPrint('[DEBUG][Maidata] 全量缓存严格查询失败, songId=$songId');
     }
-    
-    // 其次检查独立缓存
-    String? cachedContent = await getCachedMaidata(onInoteParsed: onInoteParsed);
+
+    // 2) 单曲独立缓存（key 本身就用 songId）
+    final cachedContent = await getCachedMaidata(onInoteParsed: onInoteParsed);
     if (cachedContent != null) {
       debugPrint('[DEBUG][Maidata] 使用独立缓存内容');
       return cachedContent;
     }
-    
-    List<MatchResult> matches = await findAllMatches();
-    
-    if (matches.isEmpty) {
-      return null;
-    }
-    
-    debugPrint('[DEBUG][Maidata] 找到 ${matches.length} 个匹配结果');
-    
-    String? serverTitle;
-    for (int i = 0; i < matches.length; i++) {
-      MatchResult match = matches[i];
-      serverTitle = match.title;
-      
-      String url = _buildMaidataUrl(match.id, customTitle: match.customUrlTitle, serverTitle: serverTitle);
-      debugPrint('[DEBUG][Maidata] 尝试第 ${i + 1}/${matches.length} 个匹配: $url');
-      
-      final response = await ApiClient.get(Uri.parse(url));
-      
-      if (response.statusCode == 200) {
-        String content = _decodeResponse(response);
-        await cacheMaidata(content);
-        
-        List<String> inoteList = _parseInoteList(content);
-        onInoteParsed(inoteList);
-        
-        debugPrint('[DEBUG][Maidata] 请求成功！');
-        return content;
-      } else if (response.statusCode == 404) {
-        debugPrint('[DEBUG][Maidata] 404 - 尝试下一个匹配...');
-        continue;
-      } else {
-        return null;
-      }
-    }
-    
-    debugPrint('[DEBUG][Maidata] 所有匹配均失败，尝试后备机制...');
-    return await tryFallbackSearch(onInoteParsed: onInoteParsed);
+
+    // 没有 fallback：不做 title → index.json → shortId 替换，不做目录扫描。
+    debugPrint('[DEBUG][Maidata] 严格匹配未命中，返回 null');
+    return null;
   }
 
   Future<String?> getCachedMaidata({

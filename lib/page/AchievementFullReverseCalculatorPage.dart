@@ -560,7 +560,7 @@ class _AchievementFullReverseCalculatorState
     );
   }
 
-  // 构建普通音符表格
+  // 构建普通音符表格（保留 Table 结构，cell 显式 height 让背景填色撑满）
   Widget _buildNormalNoteTable(
       int totalCp, int totalP, int totalG, int totalGo, int totalM) {
     return Table(
@@ -572,7 +572,6 @@ class _AchievementFullReverseCalculatorState
         left: BorderSide(color: AppColors.tableBorder(Theme.of(context).brightness)),
         right: BorderSide(color: AppColors.tableBorder(Theme.of(context).brightness)),
       ),
-      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
       children: [
         // 表头
         TableRow(
@@ -588,7 +587,6 @@ class _AchievementFullReverseCalculatorState
         ),
         // TAP行
         TableRow(
-          decoration: const BoxDecoration(),
           children: [
             _buildTableCell('TAP',
                 color: Colors.lightBlue[100]!, fontSize: 11.2),
@@ -611,7 +609,6 @@ class _AchievementFullReverseCalculatorState
         ),
         // HOLD行
         TableRow(
-          decoration: const BoxDecoration(),
           children: [
             _buildTableCell('HOLD',
                 color: Colors.lightBlue[100]!, fontSize: 11.2),
@@ -634,7 +631,6 @@ class _AchievementFullReverseCalculatorState
         ),
         // SLIDE行
         TableRow(
-          decoration: const BoxDecoration(),
           children: [
             _buildTableCell('SLIDE',
                 color: Colors.lightBlue[100]!, fontSize: 11.2),
@@ -657,7 +653,6 @@ class _AchievementFullReverseCalculatorState
         ),
         // TOUCH行
         TableRow(
-          decoration: const BoxDecoration(),
           children: [
             _buildTableCell('TOUCH',
                 color: Colors.lightBlue[100]!, fontSize: 11.2),
@@ -680,7 +675,6 @@ class _AchievementFullReverseCalculatorState
         ),
         // BREAK行
         TableRow(
-          decoration: const BoxDecoration(),
           children: [
             _buildTableCell('BREAK',
                 color: Colors.lightBlue[100]!, fontSize: 11.2),
@@ -703,7 +697,6 @@ class _AchievementFullReverseCalculatorState
         ),
         // 总计行
         TableRow(
-          decoration: const BoxDecoration(),
           children: [
             _buildTableCell('总计',
                 color: Colors.lightBlue[100]!, fontSize: 11.2),
@@ -715,6 +708,83 @@ class _AchievementFullReverseCalculatorState
           ],
         ),
       ],
+    );
+  }
+
+  // 构建表格单元格：显式高度（screenHeight × 0.04）让背景填色撑满格子
+  // 不要用 SizedBox.expand，会让 Table.intrinsicRowHeight 测到 0 导致整行消失
+  Widget _buildTableCell(String text, {Color? color, double fontSize = 12.0}) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      height: screenHeight * 0.04,
+      decoration: BoxDecoration(color: color),
+      padding: EdgeInsets.symmetric(vertical: screenHeight * 0.005),
+      alignment: Alignment.center,
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: fontSize,
+          color: isDark ? Colors.black87 : null,
+        ),
+      ),
+    );
+  }
+
+  // 构建数字输入单元格：显式高度让背景填色撑满
+  Widget _buildNumberInputCell(
+      int value, Function(int) onChanged, TextEditingController controller,
+      {Color? color}) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      height: screenHeight * 0.04,
+      decoration: BoxDecoration(color: color),
+      alignment: Alignment.center,
+      padding: EdgeInsets.zero,
+      margin: EdgeInsets.zero,
+      child: TextField(
+        controller: controller,
+        decoration: InputDecoration(
+          filled: false,
+          border: InputBorder.none,
+          hintText: value == 0 ? '' : value.toString(),
+          contentPadding: EdgeInsets.symmetric(
+              horizontal: screenWidth * 0.01,
+              vertical: screenHeight * 0.005),
+          isDense: true,
+        ),
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: screenWidth * 0.025,
+          color: isDark ? Colors.black87 : null,
+        ),
+        onTap: () {
+          if (value == 0) {
+            controller.clear();
+          } else {
+            controller.selection = TextSelection.fromPosition(
+              TextPosition(offset: controller.text.length),
+            );
+          }
+        },
+        onChanged: (val) {
+          final parsedValue = int.tryParse(val) ?? 0;
+          onChanged(parsedValue);
+          if (val.isEmpty) {
+            controller.text = '0';
+            controller.selection = TextSelection.fromPosition(
+              TextPosition(offset: controller.text.length),
+            );
+          }
+        },
+      ),
     );
   }
 
@@ -751,83 +821,6 @@ class _AchievementFullReverseCalculatorState
         SizedBox(width: screenWidth * 0.01), // 间距为屏幕宽度的1%
         const Text('%'),
       ],
-    );
-  }
-
-  // 构建表格单元格
-  Widget _buildTableCell(String text, {Color? color, double fontSize = 12.0}) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    return Container(
-      color: color,
-      padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01), // 垂直 padding 为屏幕高度的1%
-      child: Text(
-        text,
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: screenWidth * 0.025, // 字体大小为屏幕宽度的2.5%
-          color: isDark ? Colors.black87 : null,
-        ),
-      ),
-    );
-  }
-
-  // 构建数字输入单元格
-  Widget _buildNumberInputCell(
-      int value, Function(int) onChanged, TextEditingController controller,
-      {Color? color}) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    return Container(
-      color: color, // 添加颜色参数
-      padding: EdgeInsets.zero, // 移除所有内边距，确保颜色完全填充
-      margin: EdgeInsets.zero, // 确保没有外边距
-      child: TextField(
-        controller: controller,
-        decoration: InputDecoration(
-          filled: false,
-          border: InputBorder.none,
-          hintText: value == 0 ? '' : value.toString(),
-          contentPadding: EdgeInsets.symmetric(
-              horizontal: screenWidth * 0.01,
-              vertical: screenHeight * 0.01), // 设置输入框内边距
-          isDense: true, // 紧凑模式，减少默认高度
-        ),
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: screenWidth * 0.025, // 字体大小为屏幕宽度的2.5%
-          color: isDark ? Colors.black87 : null,
-        ),
-        onTap: () {
-          if (value == 0) {
-            controller.clear();
-          } else {
-            // 将光标移动到文本末尾
-            controller.selection = TextSelection.fromPosition(
-              TextPosition(offset: controller.text.length),
-            );
-          }
-        },
-        onChanged: (val) {
-          final parsedValue = int.tryParse(val) ?? 0;
-          onChanged(parsedValue);
-          if (val.isEmpty) {
-            controller.text = '0';
-            controller.selection = TextSelection.fromPosition(
-              TextPosition(offset: controller.text.length),
-            );
-          }
-        },
-      ),
     );
   }
 }

@@ -785,41 +785,91 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
     List<MapEntry<String, int>> sortedCharters = _charterCounts!.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
+    final TextEditingController searchController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('选择谱师'),
-          content: SingleChildScrollView(
-            child: ListBody(
-              children: sortedCharters.map((entry) {
-                return ListTile(
-                  title: Text('${entry.key} (${entry.value}谱面)'),
-                  selected: _selectedCharter == entry.key,
-                  onTap: () async {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final String keyword = searchController.text.trim().toLowerCase();
+            final List<MapEntry<String, int>> filteredCharters = keyword.isEmpty
+                    ? sortedCharters
+                    : sortedCharters
+                        .where((e) => e.key.toLowerCase().contains(keyword))
+                        .toList();
+
+            return AlertDialog(
+              title: Text('选择谱师'),
+              content: SingleChildScrollView(
+                child: ListBody(
+                  children: [
+                    // 搜索输入框
+                    TextField(
+                      controller: searchController,
+                      decoration: InputDecoration(
+                        hintText: '搜索谱师',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        isDense: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        suffixIcon: keyword.isEmpty
+                            ? null
+                            : IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  searchController.clear();
+                                  setDialogState(() {});
+                                },
+                              ),
+                      ),
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    const SizedBox(height: 8),
+                    if (filteredCharters.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                            child: Text('没有匹配的谱师',
+                                style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant))),
+                      )
+                    else
+                      ...filteredCharters.map((entry) {
+                        return ListTile(
+                          title: Text('${entry.key} (${entry.value}谱面)'),
+                          selected: _selectedCharter == entry.key,
+                          onTap: () async {
+                            Navigator.of(context).pop();
+                            setState(() {
+                              _selectedCharter = entry.key;
+                              _cachedSongsWithStatus = null;
+                            });
+                            _saveOptions();
+                            await _loadSongsWithStatus();
+                          },
+                        );
+                      }),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: Text('取消'),
+                  onPressed: () {
                     Navigator.of(context).pop();
-                    setState(() {
-                      _selectedCharter = entry.key;
-                      _cachedSongsWithStatus = null;
-                    });
-                    _saveOptions();
-                    await _loadSongsWithStatus();
                   },
-                );
-              }).toList(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              child: Text('取消'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         );
       },
-    );
+    ).whenComplete(() {
+      searchController.dispose();
+    });
   }
 
   // 显示版本选择对话框
@@ -890,41 +940,91 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
     List<MapEntry<String, int>> sortedArtists = _artistCounts!.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
+    final TextEditingController searchController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('选择曲师'),
-          content: SingleChildScrollView(
-            child: ListBody(
-              children: sortedArtists.map((entry) {
-                return ListTile(
-                  title: Text('${entry.key} (${entry.value}首)'),
-                  selected: _selectedArtist == entry.key,
-                  onTap: () async {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final String keyword = searchController.text.trim().toLowerCase();
+            final List<MapEntry<String, int>> filteredArtists = keyword.isEmpty
+                    ? sortedArtists
+                    : sortedArtists
+                        .where((e) => e.key.toLowerCase().contains(keyword))
+                        .toList();
+
+            return AlertDialog(
+              title: Text('选择曲师'),
+              content: SingleChildScrollView(
+                child: ListBody(
+                  children: [
+                    // 搜索输入框
+                    TextField(
+                      controller: searchController,
+                      decoration: InputDecoration(
+                        hintText: '搜索曲师',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        isDense: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        suffixIcon: keyword.isEmpty
+                            ? null
+                            : IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  searchController.clear();
+                                  setDialogState(() {});
+                                },
+                              ),
+                      ),
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    const SizedBox(height: 8),
+                    if (filteredArtists.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                            child: Text('没有匹配的曲师',
+                                style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant))),
+                      )
+                    else
+                      ...filteredArtists.map((entry) {
+                        return ListTile(
+                          title: Text('${entry.key} (${entry.value}首)'),
+                          selected: _selectedArtist == entry.key,
+                          onTap: () async {
+                            Navigator.of(context).pop();
+                            setState(() {
+                              _selectedArtist = entry.key;
+                              _cachedSongsWithStatus = null;
+                            });
+                            _saveOptions();
+                            await _loadSongsWithStatus();
+                          },
+                        );
+                      }),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: Text('取消'),
+                  onPressed: () {
                     Navigator.of(context).pop();
-                    setState(() {
-                      _selectedArtist = entry.key;
-                      _cachedSongsWithStatus = null;
-                    });
-                    _saveOptions();
-                    await _loadSongsWithStatus();
                   },
-                );
-              }).toList(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              child: Text('取消'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         );
       },
-    );
+    ).whenComplete(() {
+      searchController.dispose();
+    });
   }
 
   // 显示流派选择对话框

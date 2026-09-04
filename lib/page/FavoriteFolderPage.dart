@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:my_first_flutter_app/entity/FavoriteFolder.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
@@ -1290,7 +1292,7 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
     }
   }
 
-  /// 导出收藏夹为文本列表
+  /// 导出收藏夹为文本文件
   Future<void> _exportFolder() async {
     try {
       final sortedCharts = _service.sortCharts(_charts, _sortOption);
@@ -1307,13 +1309,16 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
       buffer.writeln('---');
       buffer.writeln('由 ChiffonMai 导出');
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('已导出「${widget.folderName}」的谱面列表'),
-          ),
-        );
-      }
+      // 保存到应用文档目录（与 FavoriteExportService.saveImageBytes 保持一致）
+      final dir = await getApplicationDocumentsDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final safeName = widget.folderName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final fileName = 'favorites_${safeName}_$timestamp.txt';
+      final file = File('${dir.path}/$fileName');
+      await file.writeAsString(buffer.toString());
+
+      if (!mounted) return;
+      await _showExportSuccessDialog(file.path);
     } catch (e) {
       debugPrint('导出收藏夹失败: $e');
       if (mounted) {
@@ -1322,5 +1327,87 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
         );
       }
     }
+  }
+
+  /// 显示导出成功对话框：展示导出路径并提供复制按钮
+  Future<void> _showExportSuccessDialog(String filePath) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        bool copied = false;
+        return StatefulBuilder(
+          builder: (ctx, setLocalState) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green.shade600, size: 22),
+                const SizedBox(width: 8),
+                const Text('导出成功'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '文件已保存到：',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.maxFinite,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: Theme.of(ctx).dividerColor,
+                      width: 1,
+                    ),
+                  ),
+                  child: SelectableText(
+                    filePath,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: filePath));
+                  if (!ctx.mounted) return;
+                  setLocalState(() => copied = true);
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('路径已复制到剪贴板')),
+                  );
+                },
+                icon: Icon(
+                  copied ? Icons.check : Icons.copy,
+                  size: 16,
+                  color: copied ? Colors.green.shade600 : null,
+                ),
+                label: Text(
+                  copied ? '已复制' : '复制路径',
+                  style: copied
+                      ? TextStyle(color: Colors.green.shade600)
+                      : null,
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('关闭'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

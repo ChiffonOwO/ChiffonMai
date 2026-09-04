@@ -1490,6 +1490,7 @@ class _B50PageState extends State<B50Page> {
     int? songId,
     Color starsColor = Colors.white,
     int maxIdLength = 5,
+    bool isFitDiff = false,
   }) {
     // 容器宽度基准（以屏幕宽度为参照）
     final screenWidth = MediaQuery.of(context).size.width;
@@ -1517,6 +1518,7 @@ class _B50PageState extends State<B50Page> {
       starsColor: starsColor,
       maxIdLength: maxIdLength,
       scale: scale,
+      isFitDiff: isFitDiff,
     );
   }
 
@@ -1650,7 +1652,11 @@ class _B50PageState extends State<B50Page> {
     int score = songData['dxScore'];
     String fc = songData['fc'] ?? '';
     String fs = songData['fs'] ?? '';
-    double difficulty = double.parse(songData['ds'].toString());
+    // 通过 ds 字符串的小数位数判断是否为拟合定数（>1 位小数视为拟合）
+    String dsStr = songData['ds'].toString();
+    int dotIdx = dsStr.indexOf('.');
+    bool isFitDiff = dotIdx >= 0 && (dsStr.length - dotIdx - 1) > 1;
+    double difficulty = double.parse(dsStr);
     String rate = songData['rate'];
     int levelIndex = songData['level_index'];
     int rating = songData['ra'];
@@ -1703,6 +1709,7 @@ class _B50PageState extends State<B50Page> {
         songId: songId,
         starsColor: starsColor,
         maxIdLength: maxIdLength,
+        isFitDiff: isFitDiff,
       ),
     );
   }

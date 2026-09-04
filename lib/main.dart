@@ -4,7 +4,6 @@ import 'package:my_first_flutter_app/page/HomePage.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/ThemeManager.dart';
 import 'package:my_first_flutter_app/service/ConnectivityService.dart';
-import 'package:my_first_flutter_app/utils/SwipeBackDetector.dart';
 
 void main() {
   GoogleFonts.config.allowRuntimeFetching = true;
@@ -98,16 +97,13 @@ class _MyAppState extends State<MyApp> {
           ),
           themeMode: themeMode,
           builder: (context, child) {
-            return SwipeBackDetector(
-              navigatorKey: _navigatorKey,
-              child: MediaQuery(
-                data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
-                child: DefaultTextStyle(
-                  style: _fontsLoaded
-                      ? GoogleFonts.notoSansSc()
-                      : const TextStyle(),
-                  child: child!,
-                ),
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
+              child: DefaultTextStyle(
+                style: _fontsLoaded
+                    ? GoogleFonts.notoSansSc()
+                    : const TextStyle(),
+                child: child!,
               ),
             );
           },

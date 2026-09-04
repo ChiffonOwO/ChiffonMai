@@ -30,6 +30,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
   TextEditingController _searchController = TextEditingController();
   Timer? _searchTimer;
 
+  // 只按歌名搜索开关
+  bool _searchByTitleOnly = false;
+
   // 分页相关
   int _currentPage = 1;
   int _pageSize = 15;
@@ -39,7 +42,13 @@ class _SongSearchPageState extends State<SongSearchPage> {
   // 筛选相关
   TextEditingController _minLevelController = TextEditingController();
   TextEditingController _maxLevelController = TextEditingController();
+  TextEditingController _minNotesController = TextEditingController();
+  TextEditingController _maxNotesController = TextEditingController();
+  TextEditingController _minBpmController = TextEditingController();
+  TextEditingController _maxBpmController = TextEditingController();
   bool _showLevelFilter = false;
+  bool _showNotesFilter = false;
+  bool _showBpmFilter = false;
   bool _showVersionFilter = false;
   bool _showGenreFilter = false;
   bool _showTagFilter = false;
@@ -114,6 +123,10 @@ class _SongSearchPageState extends State<SongSearchPage> {
     _searchController.dispose();
     _minLevelController.dispose();
     _maxLevelController.dispose();
+    _minNotesController.dispose();
+    _maxNotesController.dispose();
+    _minBpmController.dispose();
+    _maxBpmController.dispose();
     _searchTimer?.cancel();
     super.dispose();
   }
@@ -145,6 +158,10 @@ class _SongSearchPageState extends State<SongSearchPage> {
     bool allFiltersEmpty = query.isEmpty &&
         _minLevelController.text.isEmpty &&
         _maxLevelController.text.isEmpty &&
+        _minNotesController.text.isEmpty &&
+        _maxNotesController.text.isEmpty &&
+        _minBpmController.text.isEmpty &&
+        _maxBpmController.text.isEmpty &&
         _selectedVersions.isEmpty &&
         _selectedGenres.isEmpty &&
         _selectedTagIds.isEmpty &&
@@ -177,7 +194,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
         results = await MaimaiMusicDataManager().getCachedSongs() ?? [];
       } else {
         // 当输入框不为空时，执行搜索
-        results = await SongSearchService.searchSongs(query);
+        results = await SongSearchService.searchSongs(query, titleOnly: _searchByTitleOnly);
       }
 
       // 应用筛选条件
@@ -209,6 +226,52 @@ class _SongSearchPageState extends State<SongSearchPage> {
             }
           }
           return false;
+        }).toList();
+      }
+
+      // 应用物量筛选（任意难度的总音符数落在区间内即匹配）
+      if (_minNotesController.text.isNotEmpty ||
+          _maxNotesController.text.isNotEmpty) {
+        int? minNotes = int.tryParse(_minNotesController.text);
+        int? maxNotes = int.tryParse(_maxNotesController.text);
+        if (minNotes == null && maxNotes != null) {
+          minNotes = 0;
+        }
+        if (minNotes != null && maxNotes == null) {
+          maxNotes = 99999;
+        }
+
+        filteredResults = filteredResults.where((song) {
+          for (final chart in song.charts) {
+            if (chart.notes.isEmpty) continue;
+            int total = chart.notes.fold(0, (sum, n) => sum + n);
+            bool meetsMin = minNotes == null || total >= minNotes;
+            bool meetsMax = maxNotes == null || total <= maxNotes;
+            if (meetsMin && meetsMax) {
+              return true;
+            }
+          }
+          return false;
+        }).toList();
+      }
+
+      // 应用 BPM 筛选
+      if (_minBpmController.text.isNotEmpty ||
+          _maxBpmController.text.isNotEmpty) {
+        int? minBpm = int.tryParse(_minBpmController.text);
+        int? maxBpm = int.tryParse(_maxBpmController.text);
+        if (minBpm == null && maxBpm != null) {
+          minBpm = 0;
+        }
+        if (minBpm != null && maxBpm == null) {
+          maxBpm = 99999;
+        }
+
+        filteredResults = filteredResults.where((song) {
+          final bpm = song.basicInfo.bpm;
+          bool meetsMin = minBpm == null || bpm >= minBpm;
+          bool meetsMax = maxBpm == null || bpm <= maxBpm;
+          return meetsMin && meetsMax;
         }).toList();
       }
 
@@ -506,6 +569,228 @@ class _SongSearchPageState extends State<SongSearchPage> {
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
                       hintText: '最大值',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(4.0),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                    ),
+                    onChanged: (value) {
+                      _debouncedFilter();
+                    },
+                  ),
+                ),
+                SizedBox(width: screenWidth * 0.02),
+                ElevatedButton(
+                  onPressed: _performFilteredSearch,
+                  child: Text('搜索'),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  // 构建物量筛选组件
+  Widget _buildNotesFilter(double screenWidth, double screenHeight) {
+    // 生成已选内容文本
+    String selectedNotesText = '';
+    if (_minNotesController.text.isNotEmpty ||
+        _maxNotesController.text.isNotEmpty) {
+      selectedNotesText =
+          '${_minNotesController.text.isEmpty ? '0' : _minNotesController.text} - ${_maxNotesController.text.isEmpty ? '不限' : _maxNotesController.text}';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: () {
+            setState(() {
+              _showNotesFilter = !_showNotesFilter;
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Row(
+                    children: [
+                      Text(
+                        '物量筛选',
+                        style: TextStyle(
+                          fontSize: screenWidth * 0.035,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                      if (selectedNotesText.isNotEmpty)
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(left: screenWidth * 0.02),
+                            child: Text(
+                              selectedNotesText,
+                              style: TextStyle(
+                                fontSize: screenWidth * 0.03,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  _showNotesFilter ? Icons.expand_less : Icons.expand_more,
+                  size: screenWidth * 0.04,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_showNotesFilter)
+          Container(
+            padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _minNotesController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: '最少物量',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(4.0),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                    ),
+                    onChanged: (value) {
+                      _debouncedFilter();
+                    },
+                  ),
+                ),
+                SizedBox(width: screenWidth * 0.02),
+                Expanded(
+                  child: TextField(
+                    controller: _maxNotesController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: '最多物量',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(4.0),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                    ),
+                    onChanged: (value) {
+                      _debouncedFilter();
+                    },
+                  ),
+                ),
+                SizedBox(width: screenWidth * 0.02),
+                ElevatedButton(
+                  onPressed: _performFilteredSearch,
+                  child: Text('搜索'),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  // 构建 BPM 筛选组件
+  Widget _buildBpmFilter(double screenWidth, double screenHeight) {
+    // 生成已选内容文本
+    String selectedBpmText = '';
+    if (_minBpmController.text.isNotEmpty ||
+        _maxBpmController.text.isNotEmpty) {
+      selectedBpmText =
+          '${_minBpmController.text.isEmpty ? '0' : _minBpmController.text} - ${_maxBpmController.text.isEmpty ? '不限' : _maxBpmController.text}';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: () {
+            setState(() {
+              _showBpmFilter = !_showBpmFilter;
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Row(
+                    children: [
+                      Text(
+                        'BPM筛选',
+                        style: TextStyle(
+                          fontSize: screenWidth * 0.035,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                      if (selectedBpmText.isNotEmpty)
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(left: screenWidth * 0.02),
+                            child: Text(
+                              selectedBpmText,
+                              style: TextStyle(
+                                fontSize: screenWidth * 0.03,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  _showBpmFilter ? Icons.expand_less : Icons.expand_more,
+                  size: screenWidth * 0.04,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_showBpmFilter)
+          Container(
+            padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _minBpmController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: '最小 BPM',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(4.0),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                    ),
+                    onChanged: (value) {
+                      _debouncedFilter();
+                    },
+                  ),
+                ),
+                SizedBox(width: screenWidth * 0.02),
+                Expanded(
+                  child: TextField(
+                    controller: _maxBpmController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: '最大 BPM',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(4.0),
                       ),
@@ -1166,7 +1451,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                 _debouncedSearch(value);
                               },
                               decoration: InputDecoration(
-                                hintText: '歌名/BPM/谱师/曲师/别名/歌曲ID/...',
+                                hintText: _searchByTitleOnly
+                                    ? '只按歌名搜索'
+                                    : '歌名/BPM/谱师/曲师/别名/歌曲ID/...',
                                 hintStyle: TextStyle(fontSize: smallFontSize),
                                 prefixIcon: const Icon(Icons.search),
                                 border: OutlineInputBorder(
@@ -1176,6 +1463,47 @@ class _SongSearchPageState extends State<SongSearchPage> {
                               style: TextStyle(fontSize: baseFontSize),
                             ),
                           ),
+
+                          // 只搜索歌名开关
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: padding),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.text_fields,
+                                  size: smallFontSize + 2,
+                                  color: _searchByTitleOnly
+                                      ? AppColors.linkBlue(brightness)
+                                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  '只搜索歌名',
+                                  style: TextStyle(
+                                    fontSize: smallFontSize,
+                                    color: _searchByTitleOnly
+                                        ? AppColors.linkBlue(brightness)
+                                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                                    fontWeight: _searchByTitleOnly
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                                Spacer(),
+                                Switch(
+                                  value: _searchByTitleOnly,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _searchByTitleOnly = value;
+                                    });
+                                    // 防抖触发一次搜索，立即响应
+                                    _debouncedSearch(_searchController.text);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: screenHeight * 0.005),
 
                           // 筛选条件、条目总数和搜索结果一起滚动
                           Expanded(
@@ -1190,6 +1518,14 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                       children: [
                                         // 定数筛选
                                         _buildLevelFilter(screenWidth, screenHeight),
+                                        SizedBox(height: screenHeight * 0.01),
+
+                                        // 物量筛选
+                                        _buildNotesFilter(screenWidth, screenHeight),
+                                        SizedBox(height: screenHeight * 0.01),
+
+                                        // BPM 筛选
+                                        _buildBpmFilter(screenWidth, screenHeight),
                                         SizedBox(height: screenHeight * 0.01),
 
                                         // 版本筛选
@@ -1222,7 +1558,11 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                       _selectedCharter != null ||
                                       _selectedArtist != null ||
                                       _minLevelController.text.isNotEmpty ||
-                                      _maxLevelController.text.isNotEmpty) &&
+                                      _maxLevelController.text.isNotEmpty ||
+                                      _minNotesController.text.isNotEmpty ||
+                                      _maxNotesController.text.isNotEmpty ||
+                                      _minBpmController.text.isNotEmpty ||
+                                      _maxBpmController.text.isNotEmpty) &&
                                   !_isSearching &&
                                   _errorMessage == null)
                                 Column(
@@ -1248,6 +1588,10 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                               _searchController.clear();
                                               _minLevelController.clear();
                                               _maxLevelController.clear();
+                                              _minNotesController.clear();
+                                              _maxNotesController.clear();
+                                              _minBpmController.clear();
+                                              _maxBpmController.clear();
                                               _selectedVersions.clear();
                                               _selectedGenres.clear();
                                               _selectedTagIds.clear();
@@ -1712,15 +2056,15 @@ class _SongSearchPageState extends State<SongSearchPage> {
   String _getDifficultyDisplayName(int index) {
     switch (index) {
       case 0:
-        return 'Basic';
+        return 'BASIC';
       case 1:
-        return 'Advanced';
+        return 'ADVANCED';
       case 2:
-        return 'Expert';
+        return 'EXPERT';
       case 3:
-        return 'Master';
+        return 'MASTER';
       case 4:
-        return 'Re:Master';
+        return 'Re:MASTER';
       default:
         return 'Unknown';
     }
@@ -1730,7 +2074,74 @@ class _SongSearchPageState extends State<SongSearchPage> {
   List<Map<String, String>> _getMatchInfo(dynamic song) {
     List<Map<String, String>> matchInfos = [];
     String query = _searchController.text.toLowerCase();
-    if (query.isEmpty) return matchInfos;
+    bool hasQuery = query.isNotEmpty;
+
+    // 物量区间筛选：显示通过的难度与物量
+    if (_minNotesController.text.isNotEmpty ||
+        _maxNotesController.text.isNotEmpty) {
+      int? minNotes = int.tryParse(_minNotesController.text);
+      int? maxNotes = int.tryParse(_maxNotesController.text);
+      if (minNotes == null && maxNotes != null) minNotes = 0;
+      if (minNotes != null && maxNotes == null) maxNotes = 99999;
+
+      for (int i = 0; i < song.charts.length; i++) {
+        if (i >= song.level.length) continue;
+        final chart = song.charts[i];
+        if (chart.notes.isEmpty) continue;
+        int total = chart.notes.fold(0, (sum, n) => sum + n);
+        bool meetsMin = minNotes == null || total >= minNotes;
+        bool meetsMax = maxNotes == null || total <= maxNotes;
+        if (meetsMin && meetsMax) {
+          matchInfos.add({
+            'type': '物量',
+            'value': '${_getDifficultyDisplayName(i)}：$total',
+          });
+        }
+      }
+    }
+
+    // BPM 筛选：显示歌曲的 BPM
+    if (_minBpmController.text.isNotEmpty ||
+        _maxBpmController.text.isNotEmpty) {
+      int? minBpm = int.tryParse(_minBpmController.text);
+      int? maxBpm = int.tryParse(_maxBpmController.text);
+      if (minBpm == null && maxBpm != null) minBpm = 0;
+      if (minBpm != null && maxBpm == null) maxBpm = 99999;
+
+      int bpm = song.basicInfo.bpm;
+      bool meetsMin = minBpm == null || bpm >= minBpm;
+      bool meetsMax = maxBpm == null || bpm <= maxBpm;
+      if (meetsMin && meetsMax) {
+        matchInfos.add({'type': 'BPM', 'value': bpm.toString()});
+      }
+    }
+
+    // 谱师筛选：列出歌曲中命中的谱师
+    if (_selectedCharter != null) {
+      final matchedCharters = <String>{};
+      for (final chart in song.charts) {
+        if (chart.charter == _selectedCharter) {
+          matchedCharters.add(chart.charter);
+        }
+      }
+      for (final name in matchedCharters) {
+        matchInfos.add({'type': '谱师', 'value': name});
+      }
+    }
+
+    // 流派筛选：列出歌曲命中的流派
+    if (_selectedGenres.isNotEmpty &&
+        _selectedGenres.contains(song.basicInfo.genre)) {
+      matchInfos.add({'type': '流派', 'value': song.basicInfo.genre});
+    }
+
+    // 曲师筛选：列出歌曲命中的曲师
+    if (_selectedArtist != null &&
+        song.basicInfo.artist == _selectedArtist) {
+      matchInfos.add({'type': '曲师', 'value': song.basicInfo.artist});
+    }
+
+    if (!hasQuery) return matchInfos;
 
     // 检查歌曲ID匹配
     if (song.id.toString() == _searchController.text) {
@@ -1770,6 +2181,20 @@ class _SongSearchPageState extends State<SongSearchPage> {
         aliases.where((alias) => alias.toLowerCase().contains(query)).toList();
     if (matchingAliases.isNotEmpty) {
       matchInfos.add({'type': '别名', 'value': matchingAliases.join('，')});
+    }
+    // 检查物量匹配（任意难度的总音符数包含 query）
+    for (int i = 0; i < song.charts.length; i++) {
+      if (i >= song.level.length) continue;
+      final chart = song.charts[i];
+      if (chart.notes.isEmpty) continue;
+      int total = chart.notes.fold(0, (sum, n) => sum + n);
+      if (total.toString().contains(query)) {
+        matchInfos.add({
+          'type': '物量',
+          'value': '${_getDifficultyDisplayName(i)}：$total',
+        });
+        break; // 只显示第一个匹配的难度
+      }
     }
     return matchInfos;
   }

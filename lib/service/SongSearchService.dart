@@ -29,13 +29,20 @@ class SongSearchService {
   }
 
   // 搜索函数
-  static Future<List<Song>> searchSongs(String query) async {
+  // [titleOnly] 为 true 时只按歌名匹配，其它字段（ID/艺术家/BPM/谱师/流派/版本/别名）忽略
+  static Future<List<Song>> searchSongs(String query, {bool titleOnly = false}) async {
     if (query.isEmpty) {
       return [];
     }
 
     final allSongs = await loadAllSongs();
     final lowerQuery = query.toLowerCase();
+
+    if (titleOnly) {
+      return allSongs!
+          .where((song) => song.basicInfo.title.toLowerCase().contains(lowerQuery))
+          .toList();
+    }
 
     return allSongs!.where((song) {
       // 检查歌曲ID（精确匹配）
