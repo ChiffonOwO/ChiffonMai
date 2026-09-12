@@ -29,6 +29,26 @@ class MaidataDecodeUtil {
     return match?.group(1);
   }
 
+  /// 只取歌名，不解析任何谱面数据。
+  ///
+  /// 与 [quickExtractShortId] 同一套路：&title 在 maidata 开头几行，
+  /// 取头部片段做正则即可。**不要为了拿歌名去调 [decode]**——
+  /// 那会把每个难度的 inote 都跑一遍 parseInote / extractValidSegments /
+  /// break 统计，对一个只需要一行字符串的调用来说是几十倍的浪费。
+  ///
+  /// 前 1000 字符里没有 &title 时（非标准排布，例如把整段 inote 写在前面），
+  /// 回退到 [decode] 精确取值。
+  static String? quickExtractTitle(String content) {
+    final head = content.length > 1000 ? content.substring(0, 1000) : content;
+    final match =
+        RegExp(r'&title=(.*)', caseSensitive: false).firstMatch(head);
+    final title = match?.group(1)?.trim();
+    if (title != null && title.isNotEmpty) return title;
+
+    final decoded = decode(content).title.trim();
+    return decoded.isEmpty ? null : decoded;
+  }
+
   /// 在后台 isolate 中批量解码 maidata 文本
   static List<Map<String, dynamic>> batchDecodeForIsolate(List<String> texts) {
     final results = <Map<String, dynamic>>[];

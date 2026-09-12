@@ -22,14 +22,41 @@ class ThemeManager {
   /// 通知 UI 纯黑模式变化
   final ValueNotifier<bool> pureBlackNotifier = ValueNotifier(false);
 
-  /// 背景覆层不透明度（0.0 ~ 1.0，浅色/深色模式共用）
-  /// 浅色模式：白色覆层，数值越高背景越淡，默认 0.55
+  /// 浅色模式：白色覆层，数值越高背景越淡
   /// 深色模式：暗色覆层，数值越高背景越暗
-  double _lightOverlayOpacity = 0.55;
+  double _lightOverlayOpacity = 0.72;
   double get lightOverlayOpacity => _lightOverlayOpacity;
 
   /// 通知 UI 覆层透明度变化
-  final ValueNotifier<double> lightOverlayNotifier = ValueNotifier(0.55);
+  final ValueNotifier<double> lightOverlayNotifier = ValueNotifier(1.0);
+
+  /// 自定义主题 seed 色（ColorScheme.fromSeed 派生整套配色）
+  /// null = 使用 AppTheme 内置默认 seed
+  Color? _seedColor;
+  Color? get seedColor => _seedColor;
+
+  /// 通知 UI 主题 seed 色变化
+  final ValueNotifier<Color?> seedColorNotifier = ValueNotifier<Color?>(null);
+
+  /// 自定义背景图绝对路径（存于应用文档目录下）
+  /// null/空 = 使用 assets/background.png
+  String? _customBackgroundPath;
+  String? get customBackgroundPath =>
+      (_customBackgroundPath != null && _customBackgroundPath!.isNotEmpty)
+          ? _customBackgroundPath
+          : null;
+
+  /// 通知 UI 自定义背景图变化
+  final ValueNotifier<String?> customBackgroundPathNotifier =
+      ValueNotifier<String?>(null);
+
+  /// chiffon2.png 装饰图透明度（0.0 ~ 1.0，默认完全隐藏）
+  /// 用户可在设置页调节；0 完全隐藏，1 完全不透明
+  double _chiffonOpacity = 0.0;
+  double get chiffonOpacity => _chiffonOpacity;
+
+  /// 通知 UI chiffon 透明度变化
+  final ValueNotifier<double> chiffonOpacityNotifier = ValueNotifier(0.0);
 
   bool _isLoaded = false;
   bool get isLoaded => _isLoaded;
@@ -42,11 +69,28 @@ class ThemeManager {
       _themeMode = _parseThemeMode(value);
       notifier.value = _themeMode;
 
-      _pureBlackEnabled = prefs.getBool(CacheKeyConstant.pureBlackEnabled) ?? false;
+      _pureBlackEnabled =
+          prefs.getBool(CacheKeyConstant.pureBlackEnabled) ?? false;
       pureBlackNotifier.value = _pureBlackEnabled;
 
-      _lightOverlayOpacity = prefs.getDouble(CacheKeyConstant.lightOverlayOpacity) ?? 0.55;
+      _lightOverlayOpacity =
+          prefs.getDouble(CacheKeyConstant.lightOverlayOpacity) ?? 0.72;
       lightOverlayNotifier.value = _lightOverlayOpacity;
+
+      // 自定义 seed 色：null 表示使用默认
+      final seedInt = prefs.getInt(CacheKeyConstant.themeSeedColor);
+      _seedColor = seedInt != null ? Color(seedInt) : null;
+      seedColorNotifier.value = _seedColor;
+
+      // 自定义背景图路径：null/空表示使用 asset 默认
+      final bgPath = prefs.getString(CacheKeyConstant.customBackgroundPath);
+      _customBackgroundPath =
+          (bgPath != null && bgPath.isNotEmpty) ? bgPath : null;
+      customBackgroundPathNotifier.value = _customBackgroundPath;
+
+      // chiffon 装饰图透明度
+      _chiffonOpacity = prefs.getDouble(CacheKeyConstant.chiffonOpacity) ?? 0.0;
+      chiffonOpacityNotifier.value = _chiffonOpacity;
 
       _isLoaded = true;
     } catch (e) {
@@ -55,8 +99,14 @@ class ThemeManager {
       notifier.value = ThemeMode.light;
       _pureBlackEnabled = false;
       pureBlackNotifier.value = false;
-      _lightOverlayOpacity = 0.55;
-      lightOverlayNotifier.value = 0.55;
+      _lightOverlayOpacity = 0.72;
+      lightOverlayNotifier.value = 0.72;
+      _seedColor = null;
+      seedColorNotifier.value = null;
+      _customBackgroundPath = null;
+      customBackgroundPathNotifier.value = null;
+      _chiffonOpacity = 0.0;
+      chiffonOpacityNotifier.value = 0.0;
       _isLoaded = true;
     }
   }
@@ -67,7 +117,8 @@ class ThemeManager {
     notifier.value = mode;
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(CacheKeyConstant.themeMode, _themeModeToString(mode));
+      await prefs.setString(
+          CacheKeyConstant.themeMode, _themeModeToString(mode));
     } catch (e) {
       debugPrint('保存主题偏好失败: $e');
     }
@@ -91,9 +142,55 @@ class ThemeManager {
     lightOverlayNotifier.value = _lightOverlayOpacity;
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble(CacheKeyConstant.lightOverlayOpacity, _lightOverlayOpacity);
+      await prefs.setDouble(
+          CacheKeyConstant.lightOverlayOpacity, _lightOverlayOpacity);
     } catch (e) {
       debugPrint('保存覆层透明度失败: $e');
+    }
+  }
+
+  /// 设置自定义主题 seed 色（null 表示恢复默认）
+  Future<void> setSeedColor(Color? color) async {
+    _seedColor = color;
+    seedColorNotifier.value = color;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (color == null) {
+        await prefs.remove(CacheKeyConstant.themeSeedColor);
+      } else {
+        await prefs.setInt(CacheKeyConstant.themeSeedColor, color.toARGB32());
+      }
+    } catch (e) {
+      debugPrint('保存主题 seed 色失败: $e');
+    }
+  }
+
+  /// 设置自定义背景图路径（null/空 表示恢复默认 asset）
+  Future<void> setCustomBackgroundPath(String? path) async {
+    _customBackgroundPath = (path != null && path.isNotEmpty) ? path : null;
+    customBackgroundPathNotifier.value = _customBackgroundPath;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_customBackgroundPath == null) {
+        await prefs.remove(CacheKeyConstant.customBackgroundPath);
+      } else {
+        await prefs.setString(
+            CacheKeyConstant.customBackgroundPath, _customBackgroundPath!);
+      }
+    } catch (e) {
+      debugPrint('保存自定义背景图路径失败: $e');
+    }
+  }
+
+  /// 设置 chiffon 装饰图透明度（0.0 ~ 1.0）
+  Future<void> setChiffonOpacity(double opacity) async {
+    _chiffonOpacity = opacity.clamp(0.0, 1.0);
+    chiffonOpacityNotifier.value = _chiffonOpacity;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(CacheKeyConstant.chiffonOpacity, _chiffonOpacity);
+    } catch (e) {
+      debugPrint('保存 chiffon 透明度失败: $e');
     }
   }
 

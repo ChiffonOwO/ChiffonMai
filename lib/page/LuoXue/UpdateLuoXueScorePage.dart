@@ -25,6 +25,7 @@ class UpdateLuoXueScorePage extends StatefulWidget {
   static Future<void> show(BuildContext context) {
     return showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (_) => const UpdateLuoXueScorePage(),
     );
   }
@@ -245,8 +246,12 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
               title: const Text('提示'),
               content: const Text('剪贴板内容不是有效的登入二维码，仍要填入吗？'),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-                TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('填入')),
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('取消')),
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('填入')),
               ],
             ),
           );
@@ -268,7 +273,8 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
       onPressed: () async {
         try {
           final picker = ImagePicker();
-          final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 100);
+          final pickedFile = await picker.pickImage(
+              source: ImageSource.gallery, imageQuality: 100);
           if (pickedFile == null) return;
 
           final controller = MobileScannerController();
@@ -322,11 +328,14 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
     if (stage == null) return const SizedBox.shrink();
     switch (stage) {
       case SyncStage.completed:
-        return Icon(Icons.check_circle, color: AppColors.successGreen(brightness), size: 36);
+        return Icon(Icons.check_circle,
+            color: AppColors.successGreen(brightness), size: 36);
       case SyncStage.failed:
-        return Icon(Icons.error, color: AppColors.errorRed(brightness), size: 36);
+        return Icon(Icons.error,
+            color: AppColors.errorRed(brightness), size: 36);
       case SyncStage.cancelled:
-        return Icon(Icons.cancel, color: AppColors.greyHint(brightness), size: 36);
+        return Icon(Icons.cancel,
+            color: AppColors.greyHint(brightness), size: 36);
       default:
         return const SizedBox.shrink();
     }
@@ -340,285 +349,332 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
 
-    return AlertDialog(
-      title: Row(
-        children: [
-          Icon(Icons.qr_code_scanner, color: Theme.of(context).colorScheme.onSurface, size: 22),
-          const SizedBox(width: 8),
-          const Text('同步成绩到落雪'),
-        ],
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+    return PopScope(
+      canPop: !_isSyncing,
+      child: AlertDialog(
+        title: Row(
           children: [
-            // ===== 阶段 1：输入 QR 码 =====
-            if (!_isSyncing && !_isDone) ...[
-              Text(
-                '在舞萌|中二公众号请求并打开二维码，扫描后将字符串粘贴到下方：',
-                style: TextStyle(fontSize: 13, color: AppColors.greyHint(brightness)),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _buildClipboardButton(),
-                  _buildGalleryQrButton(),
-                  _buildCameraScanButton(),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _qrController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: '舞萌DX | 中二节奏 登入二维码(SGWCMAID...)',
-                  hintStyle: TextStyle(fontSize: 13, color: AppColors.greyHint(brightness, shade: 400)),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.all(12),
+            Icon(Icons.qr_code_scanner,
+                color: Theme.of(context).colorScheme.onSurface, size: 22),
+            const SizedBox(width: 8),
+            const Text('同步成绩到落雪'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ===== 阶段 1：输入 QR 码 =====
+              if (!_isSyncing && !_isDone) ...[
+                Text(
+                  '在舞萌|中二公众号请求并打开二维码，扫描后将字符串粘贴到下方：',
+                  style: TextStyle(
+                      fontSize: 13, color: AppColors.greyHint(brightness)),
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildClipboardButton(),
+                    _buildGalleryQrButton(),
+                    _buildCameraScanButton(),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _qrController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: '舞萌DX | 中二节奏 登入二维码(SGWCMAID...)',
+                    hintStyle: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.greyHint(brightness, shade: 400)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                ),
+              ],
 
-            // ===== 落雪 API 密钥 =====
-            if (_tokenChecked && !_isSyncing && !_isDone) ...[
-              const SizedBox(height: 16),
-              // 获取 API 密钥的指引（未设置时显示）
-              if (!_hasLxnsToken)
+              // ===== 落雪 API 密钥 =====
+              if (_tokenChecked && !_isSyncing && !_isDone) ...[
+                const SizedBox(height: 16),
+                // 获取 API 密钥的指引（未设置时显示）
+                if (!_hasLxnsToken)
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.linkBlue(brightness)
+                          .withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: AppColors.linkBlue(brightness)
+                              .withValues(alpha: 0.15)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline,
+                                size: 16,
+                                color: AppColors.linkBlue(brightness)),
+                            const SizedBox(width: 6),
+                            Text('如何获取？',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.linkBlue(brightness))),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        GestureDetector(
+                          onTap: () async {
+                            final uri = Uri.parse(
+                                'https://maimai.lxns.net/user/profile?tab=thirdparty');
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri,
+                                  mode: LaunchMode.externalApplication);
+                            }
+                          },
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                const TextSpan(
+                                    text: '访问 ',
+                                    style: TextStyle(fontSize: 12)),
+                                TextSpan(
+                                  text:
+                                      'https://maimai.lxns.net/user/profile?tab=thirdparty',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.linkBlue(brightness),
+                                      decoration: TextDecoration.underline),
+                                ),
+                                const TextSpan(
+                                    text: '，滑到页面最底部即可找到个人 API 密钥。',
+                                    style: TextStyle(fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 Container(
-                  padding: const EdgeInsets.all(10),
-                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.linkBlue(brightness).withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.linkBlue(brightness).withValues(alpha: 0.15)),
+                    color: _hasLxnsToken
+                        ? AppColors.successGreen(brightness)
+                            .withValues(alpha: 0.08)
+                        : AppColors.warningOrange(brightness)
+                            .withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _hasLxnsToken
+                          ? AppColors.successGreen(brightness)
+                              .withValues(alpha: 0.2)
+                          : AppColors.warningOrange(brightness)
+                              .withValues(alpha: 0.2),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.info_outline, size: 16, color: AppColors.linkBlue(brightness)),
-                          const SizedBox(width: 6),
-                          Text('如何获取？',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-                              color: AppColors.linkBlue(brightness))),
+                          Icon(
+                            _hasLxnsToken ? Icons.check_circle : Icons.vpn_key,
+                            size: 18,
+                            color: _hasLxnsToken
+                                ? AppColors.successGreen(brightness)
+                                : AppColors.warningOrange(brightness),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _hasLxnsToken ? '落雪 API 密钥已设置' : '设置落雪个人 API 密钥',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      GestureDetector(
-                        onTap: () async {
-                          final uri = Uri.parse('https://maimai.lxns.net/user/profile?tab=thirdparty');
-                          if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri, mode: LaunchMode.externalApplication);
-                          }
-                        },
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              const TextSpan(text: '访问 ', style: TextStyle(fontSize: 12)),
-                              TextSpan(
-                                text: 'https://maimai.lxns.net/user/profile?tab=thirdparty',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500,
-                                  color: AppColors.linkBlue(brightness), decoration: TextDecoration.underline),
+                      if (!_hasLxnsToken) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _tokenController,
+                                obscureText: true,
+                                decoration: InputDecoration(
+                                  hintText: '在此粘贴落雪个人 API 密钥...',
+                                  border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8)),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 10),
+                                  isDense: true,
+                                ),
+                                style: const TextStyle(fontSize: 13),
                               ),
-                              const TextSpan(text: '，滑到页面最底部即可找到个人 API 密钥。',
-                                style: TextStyle(fontSize: 12)),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: _saveLxnsToken,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.linkBlue(brightness),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
+                              ),
+                              child: const Text('保存',
+                                  style: TextStyle(fontSize: 13)),
+                            ),
+                          ],
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: _hasLxnsToken
-                      ? AppColors.successGreen(brightness).withValues(alpha: 0.08)
-                      : AppColors.warningOrange(brightness).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _hasLxnsToken
-                        ? AppColors.successGreen(brightness).withValues(alpha: 0.2)
-                        : AppColors.warningOrange(brightness).withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              ],
+
+              // ===== 同步进度 =====
+              if (_isSyncing) ...[
+                // 同步中：警告 + 转圈
+                if (!_isDone) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.warningOrange(brightness)
+                          .withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: AppColors.warningOrange(brightness)
+                              .withValues(alpha: 0.25)),
+                    ),
+                    child: Row(
                       children: [
-                        Icon(
-                          _hasLxnsToken ? Icons.check_circle : Icons.vpn_key,
-                          size: 18,
-                          color: _hasLxnsToken
-                              ? AppColors.successGreen(brightness)
-                              : AppColors.warningOrange(brightness),
-                        ),
+                        Icon(Icons.info_outline,
+                            size: 16,
+                            color: AppColors.warningOrange(brightness)),
                         const SizedBox(width: 8),
-                        Text(
-                          _hasLxnsToken ? '落雪 API 密钥已设置' : '设置落雪个人 API 密钥',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Theme.of(context).colorScheme.onSurface,
+                        Expanded(
+                          child: Text(
+                            '同步进行中，请耐心等待，不要进行其他操作',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.warningOrange(brightness)),
                           ),
                         ),
                       ],
                     ),
-                    if (!_hasLxnsToken) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _tokenController,
-                              obscureText: true,
-                              decoration: InputDecoration(
-                                hintText: '在此粘贴落雪个人 API 密钥...',
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                isDense: true,
-                              ),
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          ElevatedButton(
-                            onPressed: _saveLxnsToken,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.linkBlue(brightness),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            ),
-                            child: const Text('保存', style: TextStyle(fontSize: 13)),
-                          ),
-                        ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: 12),
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
                       ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+                    ),
+                  ),
+                ],
 
-            // ===== 同步进度 =====
-            if (_isSyncing) ...[
-              // 同步中：警告 + 转圈
-              if (!_isDone) ...[
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.warningOrange(brightness).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.warningOrange(brightness).withValues(alpha: 0.25)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, size: 16, color: AppColors.warningOrange(brightness)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '同步进行中，请耐心等待，不要进行其他操作',
-                          style: TextStyle(fontSize: 12, color: AppColors.warningOrange(brightness)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.only(bottom: 12),
-                    child: SizedBox(
-                      width: 24, height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                // 完成/失败/取消：阶段图标
+                if (_isDone) ...[
+                  const SizedBox(height: 8),
+                  Center(child: _buildStageIcon(_currentStage, brightness)),
+                  const SizedBox(height: 8),
+                ],
+
+                Center(
+                  child: Text(
+                    _statusText,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: _currentStage == SyncStage.failed ||
+                              _currentStage == SyncStage.cancelled
+                          ? AppColors.errorRed(brightness)
+                          : _currentStage == SyncStage.completed
+                              ? AppColors.successGreen(brightness)
+                              : Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                 ),
-              ],
 
-              // 完成/失败/取消：阶段图标
-              if (_isDone) ...[
-                const SizedBox(height: 8),
-                Center(child: _buildStageIcon(_currentStage, brightness)),
-                const SizedBox(height: 8),
-              ],
-
-              Center(
-                child: Text(
-                  _statusText,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: _currentStage == SyncStage.failed || _currentStage == SyncStage.cancelled
-                        ? AppColors.errorRed(brightness)
-                        : _currentStage == SyncStage.completed
-                            ? AppColors.successGreen(brightness)
-                            : Theme.of(context).colorScheme.onSurface,
+                if (!_isDone) ...[
+                  const SizedBox(height: 10),
+                  if (_progress != null)
+                    LinearProgressIndicator(
+                        value: _progress, color: AppColors.linkBlue(brightness))
+                  else
+                    LinearProgressIndicator(
+                        color: AppColors.linkBlue(brightness)),
+                  const SizedBox(height: 12),
+                  Center(
+                    child: Text(
+                      _currentTip,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.greyHint(brightness, shade: 600)),
+                    ),
                   ),
-                ),
-              ),
+                ],
 
-              if (!_isDone) ...[
-                const SizedBox(height: 10),
-                if (_progress != null)
-                  LinearProgressIndicator(value: _progress, color: AppColors.linkBlue(brightness))
-                else
-                  LinearProgressIndicator(color: AppColors.linkBlue(brightness)),
-                const SizedBox(height: 12),
-                Center(
-                  child: Text(
-                    _currentTip,
-                    style: TextStyle(fontSize: 12, color: AppColors.greyHint(brightness, shade: 600)),
+                if (_isDone && _resultMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(
+                      '${_resultMessage!}\n${_countdown > 0 ? "${_countdown}s 后自动关闭" : ""}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 12, color: AppColors.greyHint(brightness)),
+                    ),
                   ),
-                ),
               ],
-
-              if (_isDone && _resultMessage != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Text(
-                    '${_resultMessage!}\n${_countdown > 0 ? "${_countdown}s 后自动关闭" : ""}',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: AppColors.greyHint(brightness)),
-                  ),
-                ),
             ],
-          ],
+          ),
         ),
-      ),
-      actions: [
-        // 初始状态：关闭 + 开始同步
-        if (!_isSyncing && !_isDone) ...[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('关闭'),
-          ),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.send, size: 18),
-            label: const Text('开始同步'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.linkBlue(brightness),
-              foregroundColor: Colors.white,
+        actions: [
+          // 初始状态：关闭 + 开始同步
+          if (!_isSyncing && !_isDone) ...[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('关闭'),
             ),
-            onPressed: _startSync,
-          ),
-        ],
+            ElevatedButton.icon(
+              icon: const Icon(Icons.send, size: 18),
+              label: const Text('开始同步'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.linkBlue(brightness),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: _startSync,
+            ),
+          ],
 
-        // 完成/失败/取消：确定按钮
-        if (_isDone)
-          TextButton(
-            onPressed: () {
-              _autoCloseTimer?.cancel();
-              Navigator.of(context).pop();
-            },
-            child: Text(_countdown > 0 ? '确定 ($_countdown)' : '确定'),
-          ),
-      ],
+          // 完成/失败/取消：确定按钮
+          if (_isDone)
+            TextButton(
+              onPressed: () {
+                _autoCloseTimer?.cancel();
+                Navigator.of(context).pop();
+              },
+              child: Text(_countdown > 0 ? '确定 ($_countdown)' : '确定'),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -651,7 +707,9 @@ class _QrScannerPageState extends State<_QrScannerPage> {
         onDetect: (BarcodeCapture capture) {
           if (_hasPopped) return;
           final barcode = capture.barcodes.firstOrNull;
-          if (barcode != null && barcode.rawValue != null && barcode.rawValue!.isNotEmpty) {
+          if (barcode != null &&
+              barcode.rawValue != null &&
+              barcode.rawValue!.isNotEmpty) {
             _hasPopped = true;
             Navigator.pop(context, barcode.rawValue);
           }

@@ -2,200 +2,249 @@ import 'package:flutter/material.dart';
 
 /// 集中式主题定义：提供浅色和暗色 ThemeData，以及主题感知的颜色访问器
 class AppTheme {
-  // ========== ColorScheme 定义 ==========
+  // ========== 默认 seed 色（用户未自定义时使用） ==========
+  static const Color defaultLightSeed = Color(0xFF546161);
+  static const Color defaultDarkSeed = Color(0xFFB0C4C4);
+  static const Color defaultPureBlackSeed = Color(0xFFE0E0E0);
 
-  static const ColorScheme lightColorScheme = ColorScheme.light(
-    primary: Color(0xFF546161),
-    onPrimary: Colors.white,
-    surface: Colors.white,
-    onSurface: Color(0xFF546161),
-    surfaceContainerHighest: Color.fromARGB(230, 255, 255, 255),
-    outline: Color.fromARGB(199, 192, 133, 100),
-    secondary: Color(0xFF6D7D7D),
-    onSurfaceVariant: Color(0xFF6D7D7D),
-    tertiary: Color.fromARGB(210, 227, 232, 125),
-  );
+  /// 派生浅色 ColorScheme（基于 seed 色）
+  static ColorScheme buildLightColorScheme({Color? seedColor}) =>
+      ColorScheme.fromSeed(
+        seedColor: seedColor ?? defaultLightSeed,
+        brightness: Brightness.light,
+      );
 
-  static const ColorScheme darkColorScheme = ColorScheme.dark(
-    primary: Color(0xFFB0C4C4),
-    onPrimary: Color(0xFF1E1E2E),
-    surface: Color(0xFF1E1E2E),
-    onSurface: Color(0xFFB0C4C4),
-    surfaceContainerHighest: Color.fromARGB(230, 30, 30, 46),
-    outline: Color.fromARGB(199, 150, 140, 120),
-    secondary: Color(0xFF9EADAD),
-    onSurfaceVariant: Color(0xFF9EADAD),
-    tertiary: Color.fromARGB(210, 100, 100, 80),
-  );
+  /// 派生暗色 ColorScheme（基于 seed 色）
+  static ColorScheme buildDarkColorScheme({Color? seedColor}) =>
+      ColorScheme.fromSeed(
+        seedColor: seedColor ?? defaultDarkSeed,
+        brightness: Brightness.dark,
+      );
 
-  static const ColorScheme pureBlackColorScheme = ColorScheme.dark(
-    primary: Color(0xFFE0E0E0),
-    onPrimary: Colors.black,
-    surface: Color(0xFF111111),
-    onSurface: Color(0xFFCCCCCC),
-    surfaceContainerHighest: Color(0xFF1A1A1A),
-    outline: Color(0xFF555555),
-    secondary: Color(0xFFBBBBBB),
-    onSurfaceVariant: Color(0xFFBBBBBB),
-    tertiary: Color(0xFF333333),
-  );
+  /// 派生纯黑 ColorScheme（基于 seed 色）
+  /// 纯黑模式覆层更深，surface 趋近黑色
+  static ColorScheme buildPureBlackColorScheme({Color? seedColor}) {
+    final base = ColorScheme.fromSeed(
+      seedColor: seedColor ?? defaultPureBlackSeed,
+      brightness: Brightness.dark,
+    );
+    return base.copyWith(
+      surface: const Color(0xFF111111),
+      surfaceContainerHighest: const Color(0xFF1A1A1A),
+      outline: const Color(0xFF555555),
+    );
+  }
 
   // ========== ThemeData 构建 ==========
 
-  static ThemeData lightTheme() {
+  static ThemeData lightTheme({Color? seedColor}) {
+    final scheme = buildLightColorScheme(seedColor: seedColor);
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      colorScheme: lightColorScheme,
+      colorScheme: scheme,
       scaffoldBackgroundColor: Colors.transparent,
       cardTheme: CardThemeData(
-        color: lightColorScheme.surface,
-        elevation: 2,
+        color: scheme.surfaceContainerLow,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        height: 72,
+        elevation: 0,
+        backgroundColor: scheme.surface,
+        indicatorColor: scheme.primaryContainer,
+        labelTextStyle: WidgetStatePropertyAll(TextStyle(fontWeight: FontWeight.w600)),
+      ),
+      listTileTheme: ListTileThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      ),
+      dividerTheme: DividerThemeData(color: scheme.outlineVariant, thickness: 1),
+      chipTheme: ChipThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
       appBarTheme: AppBarThemeData(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: IconThemeData(color: lightColorScheme.primary),
+        iconTheme: IconThemeData(color: scheme.primary),
         titleTextStyle: TextStyle(
-          color: lightColorScheme.primary,
+          color: scheme.primary,
           fontSize: 20,
           fontWeight: FontWeight.bold,
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: lightColorScheme.surface,
+        backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: lightColorScheme.primary,
+          backgroundColor: scheme.primary,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: lightColorScheme.primary,
+          foregroundColor: scheme.primary,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: lightColorScheme.surface,
+        fillColor: scheme.surface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: lightColorScheme.outline),
+          borderSide: BorderSide(color: scheme.outline),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: lightColorScheme.primary, width: 2),
+          borderSide: BorderSide(color: scheme.primary, width: 2),
         ),
       ),
     );
   }
 
-  static ThemeData darkTheme() {
+  static ThemeData darkTheme({Color? seedColor}) {
+    final scheme = buildDarkColorScheme(seedColor: seedColor);
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      colorScheme: darkColorScheme,
+      colorScheme: scheme,
       scaffoldBackgroundColor: const Color(0xFF121220),
       cardTheme: CardThemeData(
-        color: darkColorScheme.surface,
-        elevation: 2,
+        color: scheme.surfaceContainerLow,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        height: 72,
+        elevation: 0,
+        backgroundColor: scheme.surface,
+        indicatorColor: scheme.primaryContainer,
+        labelTextStyle: WidgetStatePropertyAll(TextStyle(fontWeight: FontWeight.w600)),
+      ),
+      listTileTheme: ListTileThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      ),
+      dividerTheme: DividerThemeData(color: scheme.outlineVariant, thickness: 1),
+      chipTheme: ChipThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
       appBarTheme: AppBarThemeData(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: IconThemeData(color: darkColorScheme.primary),
+        iconTheme: IconThemeData(color: scheme.primary),
         titleTextStyle: TextStyle(
-          color: darkColorScheme.primary,
+          color: scheme.primary,
           fontSize: 20,
           fontWeight: FontWeight.bold,
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: darkColorScheme.surface,
+        backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: darkColorScheme.primary,
+          backgroundColor: scheme.primary,
           foregroundColor: const Color(0xFF1E1E2E),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: darkColorScheme.primary,
+          foregroundColor: scheme.primary,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: darkColorScheme.surface,
+        fillColor: scheme.surface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: darkColorScheme.outline),
+          borderSide: BorderSide(color: scheme.outline),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: darkColorScheme.primary, width: 2),
+          borderSide: BorderSide(color: scheme.primary, width: 2),
         ),
       ),
     );
   }
 
-  static ThemeData pureBlackTheme() {
+  static ThemeData pureBlackTheme({Color? seedColor}) {
+    final scheme = buildPureBlackColorScheme(seedColor: seedColor);
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      colorScheme: pureBlackColorScheme,
+      colorScheme: scheme,
       scaffoldBackgroundColor: Colors.black,
       cardTheme: CardThemeData(
-        color: pureBlackColorScheme.surface,
-        elevation: 2,
+        color: scheme.surfaceContainerLow,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        height: 72,
+        elevation: 0,
+        backgroundColor: scheme.surface,
+        indicatorColor: scheme.primaryContainer,
+        labelTextStyle: WidgetStatePropertyAll(TextStyle(fontWeight: FontWeight.w600)),
+      ),
+      listTileTheme: ListTileThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      ),
+      dividerTheme: DividerThemeData(color: scheme.outlineVariant, thickness: 1),
+      chipTheme: ChipThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
       appBarTheme: AppBarThemeData(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: IconThemeData(color: pureBlackColorScheme.primary),
+        iconTheme: IconThemeData(color: scheme.primary),
         titleTextStyle: TextStyle(
-          color: pureBlackColorScheme.primary,
+          color: scheme.primary,
           fontSize: 20,
           fontWeight: FontWeight.bold,
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: pureBlackColorScheme.surface,
+        backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: pureBlackColorScheme.primary,
+          backgroundColor: scheme.primary,
           foregroundColor: Colors.black,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: pureBlackColorScheme.primary,
+          foregroundColor: scheme.primary,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: pureBlackColorScheme.surface,
+        fillColor: scheme.surface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: pureBlackColorScheme.outline),
+          borderSide: BorderSide(color: scheme.outline),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: pureBlackColorScheme.primary, width: 2),
+          borderSide: BorderSide(color: scheme.primary, width: 2),
         ),
       ),
     );
@@ -458,7 +507,11 @@ class AppColors {
     }
   }
 
-  /// 评级颜色
+  /// 评级颜色（**深色底专用**）
+  ///
+  /// ⚠️ SSS/SSS+ 返回的是 `Colors.yellow`——那是给 SongInfoPage 评级分布图
+  /// 那种深色背景用的。**放在浅色卡片上几乎看不见**。
+  /// 浅色底请改用 [ratingColorOnSurface]。
   static Color ratingColor(String grade) {
     switch (grade.toUpperCase().replaceAll('+', '').trim()) {
       case 'SSS':
@@ -480,6 +533,39 @@ class AppColors {
         return const Color(0xFFFF4444);
       default:
         return Colors.grey;
+    }
+  }
+
+  /// 评级颜色（**浅色/深色背景通用**）
+  ///
+  /// [ratingColor] 给 SSS 用的是纯黄，只适合深色底；这个版本按 [brightness]
+  /// 给两套色值——浅色底用深一档、深色底用亮一档，两边都能看清。
+  ///
+  /// 传 null 或未知评级时返回中性灰，不会抛异常。
+  static Color ratingColorOnSurface(String? grade, Brightness brightness) {
+    if (grade == null) {
+      return brightness == Brightness.dark
+          ? const Color(0xFFBDBDBD)
+          : const Color(0xFF757575);
+    }
+    final isDark = brightness == Brightness.dark;
+    switch (grade.toUpperCase().replaceAll('+', '').trim()) {
+      case 'SSS':
+        return isDark ? const Color(0xFFFFD54F) : const Color(0xFFF9A825);
+      case 'SS':
+        return isDark ? const Color(0xFFFFB74D) : const Color(0xFFEF6C00);
+      case 'S':
+        return isDark ? const Color(0xFFFF8A65) : const Color(0xFFE65100);
+      case 'AAA':
+      case 'AA':
+      case 'A':
+        return isDark ? const Color(0xFFEF9A9A) : const Color(0xFFD32F2F);
+      case 'BBB':
+      case 'BB':
+      case 'B':
+        return isDark ? const Color(0xFF90CAF9) : const Color(0xFF1976D2);
+      default:
+        return isDark ? const Color(0xFFBDBDBD) : const Color(0xFF757575);
     }
   }
 

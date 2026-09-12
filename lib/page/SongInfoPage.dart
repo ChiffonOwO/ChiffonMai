@@ -40,7 +40,7 @@ import 'package:my_first_flutter_app/service/SongInfo/SongScoreShareService.dart
 import 'package:my_first_flutter_app/service/SongInfo/SongInfoExportToImgService.dart';
 import 'package:my_first_flutter_app/service/ChartNoteService.dart';
 import 'package:my_first_flutter_app/entity/ChartNote.dart';
-import 'package:my_first_flutter_app/manager/DivingFish/UnionUniManager.dart';
+import 'package:my_first_flutter_app/manager/DivingFish/UnionManager.dart';
 import 'package:my_first_flutter_app/entity/DXRating/DXDataEntity.dart';
 import 'package:my_first_flutter_app/manager/DXDataManager.dart';
 import 'package:my_first_flutter_app/page/CalculatorPage.dart';
@@ -487,12 +487,16 @@ class _SongInfoPageState extends State<SongInfoPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          '定数历史',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: colorScheme.onSurfaceVariant,
+        SizedBox(
+          width: double.infinity,
+          child: Text(
+            '定数历史',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
         const SizedBox(height: 8),
@@ -885,7 +889,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
   // 格式化首次上线日期显示（"20190711" → "2019-07-11"）
   Future<void> _loadUniInfo() async {
     try {
-      final lookup = await UnionUniManager().getLookup();
+      final lookup = await UnionManager().getLookup();
       if (lookup.isEmpty) {
         debugPrint('[SongInfoPage] union uni 缓存为空');
         return;

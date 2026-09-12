@@ -91,7 +91,8 @@ class _DataBackupPageState extends State<DataBackupPage> {
                               SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  '数据备份功能可以将你的本地数据（收藏夹、谱面笔记、设置偏好等）导出为 JSON 文件，方便换手机或恢复数据时使用。',
+                                  '数据备份功能可以将你的本地数据（收藏夹、谱面笔记、账号凭据、设置偏好等）导出为 JSON 文件，方便换手机或恢复数据时使用。\n\n'
+                                  '可重新拉取的缓存（曲库、maidata、排行榜等）不会写进备份文件，恢复后首次进入相关页面会自动重新拉取。',
                                   style: TextStyle(
                                     color: Theme.of(context).colorScheme.onSurface,
                                     fontSize: 14,
@@ -158,7 +159,9 @@ class _DataBackupPageState extends State<DataBackupPage> {
                           isLoading: _isImporting,
                           onPressed: _handleImport,
                           color: AppColors.warningOrange(brightness),
-                          warningText: '⚠ 导入将覆盖现有数据，请谨慎操作',
+                          warningText:
+                              '⚠ 导入会先清空当前所有本地数据，再写入备份内容；\n'
+                              '　 备份里没有的项目（含各类缓存）会被一并抹掉。',
                         ),
                       ],
                     ),
@@ -354,6 +357,7 @@ class _DataBackupPageState extends State<DataBackupPage> {
       final exportedAt = backup['exportedAt'] ?? '未知';
       final keyCount = backup['keyCount'] ?? 0;
       final version = backup['version'] ?? '?';
+      final skippedCacheKeys = backup['skippedCacheKeys'];
 
       final confirm = await showDialog<bool>(
         context: context,
@@ -369,7 +373,8 @@ class _DataBackupPageState extends State<DataBackupPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('即将从备份文件恢复数据，这将覆盖当前所有本地数据。'),
+              Text('即将恢复数据。恢复前会先清空当前所有本地数据，然后写入备份内容——'
+                  '备份里没有的项目都会被抹掉。'),
               SizedBox(height: 12),
               Container(
                 padding: EdgeInsets.all(10),
@@ -386,10 +391,21 @@ class _DataBackupPageState extends State<DataBackupPage> {
                         style: TextStyle(fontSize: 13)),
                     Text('包含 $keyCount 个数据项',
                         style: TextStyle(fontSize: 13)),
+                    if (skippedCacheKeys != null)
+                      Text('已排除 $skippedCacheKeys 个缓存项',
+                          style: TextStyle(fontSize: 13)),
                   ],
                 ),
               ),
               SizedBox(height: 12),
+              Text(
+                '缓存（曲库、maidata、排行榜等）会被清空，恢复后首次进入相关页面会自动重新拉取，可能稍慢。',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              SizedBox(height: 8),
               Text(
                 '此操作不可撤销，确定要继续吗？',
                 style: TextStyle(
@@ -424,8 +440,7 @@ class _DataBackupPageState extends State<DataBackupPage> {
             toastLength: Toast.LENGTH_LONG,
           );
         }
-      }
-    } catch (e) {
+      }    } catch (e) {
       if (mounted) {
         setState(() => _isImporting = false);
         Fluttertoast.showToast(

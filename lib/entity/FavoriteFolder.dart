@@ -85,6 +85,39 @@ class FavoriteChart {
   int get hashCode => Object.hash(songId, levelIndex);
 }
 
+/// 收藏夹导入结果统计
+class FavoriteImportStats {
+  /// 新建的收藏夹数量
+  final int foldersCreated;
+
+  /// 合并进的已有收藏夹数量
+  final int foldersMerged;
+
+  /// 新增的谱面数量
+  final int chartsAdded;
+
+  /// 因为已存在而跳过的谱面数量
+  final int chartsSkipped;
+
+  const FavoriteImportStats({
+    this.foldersCreated = 0,
+    this.foldersMerged = 0,
+    this.chartsAdded = 0,
+    this.chartsSkipped = 0,
+  });
+
+  int get foldersTouched => foldersCreated + foldersMerged;
+
+  String describe() {
+    final parts = <String>[];
+    if (foldersCreated > 0) parts.add('新建 $foldersCreated 个收藏夹');
+    if (foldersMerged > 0) parts.add('合并到 $foldersMerged 个已有收藏夹');
+    parts.add('新增 $chartsAdded 个谱面');
+    if (chartsSkipped > 0) parts.add('跳过 $chartsSkipped 个重复谱面');
+    return parts.join('，');
+  }
+}
+
 /// 排序选项
 enum FavoriteSortOption {
   byDsDesc,    // 定数 高→低

@@ -517,7 +517,15 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
     spacing: sw * 0.03, runSpacing: sw * 0.02, alignment: WrapAlignment.center,
     children: [
       if (_photoPath == null) ...[
-        _btn(sw, c, Icons.add_a_photo, '选择图片', _showSourcePicker, true),
+        ElevatedButton.icon(
+          onPressed: _showSourcePicker,
+          icon: const Icon(Icons.add_a_photo),
+          label: const Text('选择图片'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+          ),
+        ),
       ] else if (_result == null) ...[
         _btn(sw, c, Icons.search, _isRecognizing ? '识别中...' : '开始识别', _isRecognizing ? null : _recognize, true),
         _btn(sw, c, Icons.crop, '重新裁剪', () async {

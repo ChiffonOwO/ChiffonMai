@@ -24,15 +24,15 @@ void _log(String msg) {
 
 /// 同步阶段
 enum SyncStage {
-  authenticating,       // 正在验证 QR 码
-  requesting,           // 正在创建抓取任务
+  authenticating, // 正在验证 QR 码
+  requesting, // 正在创建抓取任务
   sendingFriendRequest, // Bot 正在发送好友申请
-  waitingAcceptance,    // 等待好友申请通过
-  scraping,             // 正在抓取成绩数据
-  exporting,            // 正在同步到水鱼
-  completed,            // 同步完成
-  failed,               // 同步失败
-  cancelled,            // 用户取消
+  waitingAcceptance, // 等待好友申请通过
+  scraping, // 正在抓取成绩数据
+  exporting, // 正在同步到水鱼
+  completed, // 同步完成
+  failed, // 同步失败
+  cancelled, // 用户取消
 }
 
 /// 进度信息
@@ -50,8 +50,7 @@ class SyncProgress {
   });
 
   /// 0.0 ~ 1.0，无法确定时返回 null
-  double? get progress =>
-      totalDiffs > 0 ? completedDiffs / totalDiffs : null;
+  double? get progress => totalDiffs > 0 ? completedDiffs / totalDiffs : null;
 
   @override
   String toString() =>
@@ -73,21 +72,25 @@ class SyncResult {
   });
 
   factory SyncResult.success({String? friendCode, int exportedCount = 0}) =>
-      SyncResult._(isSuccess: true, friendCode: friendCode, exportedCount: exportedCount);
+      SyncResult._(
+          isSuccess: true,
+          friendCode: friendCode,
+          exportedCount: exportedCount);
 
   factory SyncResult.failure(String message, {String? friendCode}) =>
-      SyncResult._(isSuccess: false, errorMessage: message, friendCode: friendCode);
+      SyncResult._(
+          isSuccess: false, errorMessage: message, friendCode: friendCode);
 
   factory SyncResult.cancelled() =>
       SyncResult._(isSuccess: false, errorMessage: '用户取消同步');
 
   @override
   String toString() {
-    if (isSuccess) return 'SyncResult.success(friendCode: $friendCode, exported: $exportedCount)';
+    if (isSuccess)
+      return 'SyncResult.success(friendCode: $friendCode, exported: $exportedCount)';
     return 'SyncResult.failure("$errorMessage")';
   }
 }
-
 
 // =============================================================================
 // DivingFishProbeManager（单例）
@@ -110,7 +113,8 @@ class SyncResult {
 /// ```
 class DivingFishProbeManager {
   // ---- 单例 ----
-  static final DivingFishProbeManager _instance = DivingFishProbeManager._internal();
+  static final DivingFishProbeManager _instance =
+      DivingFishProbeManager._internal();
   factory DivingFishProbeManager() => _instance;
   DivingFishProbeManager._internal() {
     _log('DivingFishProbeManager 单例初始化');
@@ -124,6 +128,9 @@ class DivingFishProbeManager {
 
   // ---- 配置 ----
   static const _pollInterval = Duration(seconds: 3);
+  // 机台抓取 / 导出任务由服务器主动推进、进度变化快，用更短的轮询间隔能更及时地
+  // 捕捉到"已完成"，避免每个 3 秒间隔白白多等最多 3 秒。
+  static const _cabinetPollInterval = Duration(seconds: 1);
   static const _pollCountLogEvery = 10; // 每 N 次轮询输出一次日志
 
   // ---- Debug：用于统计轮询次数 ----
@@ -151,7 +158,8 @@ class DivingFishProbeManager {
   Future<int?> getLastSyncTimestamp() async {
     final prefs = await SharedPreferences.getInstance();
     final ts = prefs.getInt(CacheKeyConstant.probeLastSyncTime);
-    _log('getLastSyncTimestamp → ${ts != null ? DateTime.fromMillisecondsSinceEpoch(ts).toIso8601String() : "null"}');
+    _log(
+        'getLastSyncTimestamp → ${ts != null ? DateTime.fromMillisecondsSinceEpoch(ts).toIso8601String() : "null"}');
     return ts;
   }
 
@@ -182,6 +190,15 @@ class DivingFishProbeManager {
     return false;
   }
 
+  /// 取当前可用的 MaimaiHub 用户 token；未登录时返回 null。
+  ///
+  /// 供同样要走 `/me/*` 的功能复用（例如结算画面识别），
+  /// 避免各处重复实现「内存优先、其次读本地缓存」的恢复逻辑。
+  Future<String?> ensureAuthToken() async {
+    final ok = await _ensureAuthToken();
+    return ok ? _authToken : null;
+  }
+
   // ===========================================================================
   // 核心方法：一键同步
   // ===========================================================================
@@ -200,9 +217,11 @@ class DivingFishProbeManager {
     _log('══════════════════════════════════════════');
     _log('syncByQrCode 开始');
     _log('  QR长度: ${qrCode.length} 字符');
-    _log('  QR前20字符: ${qrCode.length > 20 ? '${qrCode.substring(0, 20)}...' : qrCode}');
+    _log(
+        '  QR前20字符: ${qrCode.length > 20 ? '${qrCode.substring(0, 20)}...' : qrCode}');
     _log('  超时设置: ${timeout.inMinutes} 分钟');
-    _log('  当前状态: isSyncing=$_isSyncing, hasToken=${_authToken != null}, friendCode=$_friendCode');
+    _log(
+        '  当前状态: isSyncing=$_isSyncing, hasToken=${_authToken != null}, friendCode=$_friendCode');
 
     // ---- 防并发 ----
     if (_isSyncing) {
@@ -216,14 +235,17 @@ class DivingFishProbeManager {
     try {
       // ===== Step 1: QR 码认证 =====
       _log('── Step 1: QR 码认证 ──');
-      _emit(onProgress, const SyncProgress(
-        stage: SyncStage.authenticating,
-        message: '正在验证二维码...',
-      ));
+      _emit(
+          onProgress,
+          const SyncProgress(
+            stage: SyncStage.authenticating,
+            message: '正在验证二维码...',
+          ));
 
       final loginBefore = DateTime.now();
       final loginData = await _loginByQr(qrCode);
-      _log('  _loginByQr 耗时: ${DateTime.now().difference(loginBefore).inMilliseconds}ms');
+      _log(
+          '  _loginByQr 耗时: ${DateTime.now().difference(loginBefore).inMilliseconds}ms');
 
       if (loginData == null) {
         _log('✗ Step 1 失败: loginData 为 null');
@@ -232,9 +254,11 @@ class DivingFishProbeManager {
       _log('  loginData 完整响应: $loginData');
 
       _authToken = loginData['token'] as String?;
-      _friendCode = (loginData['user'] as Map<String, dynamic>?)?.tryGet<String>('friendCode');
+      _friendCode = (loginData['user'] as Map<String, dynamic>?)
+          ?.tryGet<String>('friendCode');
 
-      _log('  解析 token: ${_authToken != null ? "${_authToken!.substring(0, _authToken!.length > 15 ? 15 : _authToken!.length)}..." : "null"}');
+      _log(
+          '  解析 token: ${_authToken != null ? "${_authToken!.substring(0, _authToken!.length > 15 ? 15 : _authToken!.length)}..." : "null"}');
       _log('  解析 friendCode: $_friendCode');
 
       if (_authToken == null || _friendCode == null) {
@@ -246,14 +270,17 @@ class DivingFishProbeManager {
 
       // ===== Step 2: 创建抓取任务 =====
       _log('── Step 2: 创建抓取任务 ──');
-      _emit(onProgress, const SyncProgress(
-        stage: SyncStage.requesting,
-        message: '正在创建抓取任务...',
-      ));
+      _emit(
+          onProgress,
+          const SyncProgress(
+            stage: SyncStage.requesting,
+            message: '正在创建抓取任务...',
+          ));
 
       final requestBefore = DateTime.now();
       var jobData = await _createDxnetJob(jobType: 'update_score');
-      _log('  _createDxnetJob(update_score) 耗时: ${DateTime.now().difference(requestBefore).inMilliseconds}ms');
+      _log(
+          '  _createDxnetJob(update_score) 耗时: ${DateTime.now().difference(requestBefore).inMilliseconds}ms');
 
       if (jobData == null) {
         _log('✗ Step 2 失败: jobData 为 null');
@@ -267,12 +294,15 @@ class DivingFishProbeManager {
         final friendRequestBefore = DateTime.now();
 
         // Step 2a: 创建好友请求 job
-        _emit(onProgress, const SyncProgress(
-          stage: SyncStage.sendingFriendRequest,
-          message: 'Bot 正在发送好友申请...',
-        ));
+        _emit(
+            onProgress,
+            const SyncProgress(
+              stage: SyncStage.sendingFriendRequest,
+              message: 'Bot 正在发送好友申请...',
+            ));
 
-        final friendResult = await _createDxnetJob(jobType: 'send_friend_request');
+        final friendResult =
+            await _createDxnetJob(jobType: 'send_friend_request');
         if (friendResult == null || friendResult['_needsFriendship'] == true) {
           _log('✗ Step 2a 失败: 创建好友请求 job 失败');
           return SyncResult.failure('创建好友请求失败，请稍后重试');
@@ -304,19 +334,23 @@ class DivingFishProbeManager {
         }
 
         final friendServerStatus = friendResult2.tryGet<String>('status') ?? '';
-        if (friendServerStatus == 'failed' || friendServerStatus == 'canceled') {
+        if (friendServerStatus == 'failed' ||
+            friendServerStatus == 'canceled') {
           final errMsg = friendResult2.tryGet<String>('message') ?? '好友请求失败';
           _log('✗ 好友请求终止: status=$friendServerStatus, msg=$errMsg');
           return SyncResult.failure(errMsg);
         }
 
-        _log('✓ 好友关系已建立，耗时 ${DateTime.now().difference(friendRequestBefore).inSeconds}s');
+        _log(
+            '✓ 好友关系已建立，耗时 ${DateTime.now().difference(friendRequestBefore).inSeconds}s');
 
         // Step 2c: 好友就绪后重试 update_score
-        _emit(onProgress, const SyncProgress(
-          stage: SyncStage.requesting,
-          message: '好友已添加，正在创建抓取任务...',
-        ));
+        _emit(
+            onProgress,
+            const SyncProgress(
+              stage: SyncStage.requesting,
+              message: '好友已添加，正在创建抓取任务...',
+            ));
 
         jobData = await _createDxnetJob(
           jobType: 'update_score',
@@ -378,16 +412,21 @@ class DivingFishProbeManager {
 
         // 解析分数进度
         final sp = status.tryGet<Map<String, dynamic>>('scoreProgress');
-        final completedDiffs = (sp?.tryGet<List>('completedDiffs')?.length) ?? 0;
+        final completedDiffs =
+            (sp?.tryGet<List>('completedDiffs')?.length) ?? 0;
         final totalDiffs = sp?.tryGet<int>('totalDiffs') ?? 0;
 
         // 只在状态变化 或 抓取进度变化 或 每 N 次 时输出详细日志
         final diffsChanged = completedDiffs != lastCompletedDiffs;
-        final stageChanged = stage != lastStage || serverStatus != lastServerStatus;
-        final shouldLog = stageChanged || diffsChanged || (_pollCount % _pollCountLogEvery == 1);
+        final stageChanged =
+            stage != lastStage || serverStatus != lastServerStatus;
+        final shouldLog = stageChanged ||
+            diffsChanged ||
+            (_pollCount % _pollCountLogEvery == 1);
 
         if (shouldLog) {
-          _log('  轮询 #$_pollCount (耗时${pollTime}ms): done=$done, status=$serverStatus, '
+          _log(
+              '  轮询 #$_pollCount (耗时${pollTime}ms): done=$done, status=$serverStatus, '
               'stage=$stage, diffs=$completedDiffs/$totalDiffs'
               '${statusMsg.isNotEmpty ? ', msg="$statusMsg"' : ''}');
         }
@@ -443,7 +482,8 @@ class DivingFishProbeManager {
       }
 
       if (_cancelled) {
-        _log('⊗ 用户取消: 已轮询 $_pollCount 次, 耗时 ${DateTime.now().difference(startTime).inSeconds}s');
+        _log(
+            '⊗ 用户取消: 已轮询 $_pollCount 次, 耗时 ${DateTime.now().difference(startTime).inSeconds}s');
         return SyncResult.cancelled();
       }
 
@@ -455,14 +495,17 @@ class DivingFishProbeManager {
       final bindResult = await _bindCachedImportTokenToHub();
       _log('  绑定结果: $bindResult');
 
-      _emit(onProgress, const SyncProgress(
-        stage: SyncStage.exporting,
-        message: '正在同步到水鱼...',
-      ));
+      _emit(
+          onProgress,
+          const SyncProgress(
+            stage: SyncStage.exporting,
+            message: '正在同步到水鱼...',
+          ));
 
       final exportBefore = DateTime.now();
       final exportData = await _exportToDivingFish();
-      _log('  _exportToDivingFish 耗时: ${DateTime.now().difference(exportBefore).inMilliseconds}ms');
+      _log(
+          '  _exportToDivingFish 耗时: ${DateTime.now().difference(exportBefore).inMilliseconds}ms');
 
       if (exportData == null) {
         _log('✗ Step 4 失败: exportData 为 null');
@@ -475,12 +518,14 @@ class DivingFishProbeManager {
 
       final exportJob = exportData.tryGet<Map<String, dynamic>>('job');
       final exportResult = exportJob?.tryGet<Map<String, dynamic>>('result');
-      final divingFish = exportResult?.tryGet<Map<String, dynamic>>('divingFish');
+      final divingFish =
+          exportResult?.tryGet<Map<String, dynamic>>('divingFish');
       final diveStatus = divingFish?.tryGet<String>('status') ?? '';
       final exported = divingFish?.tryGet<int>('exported') ?? 0;
       final scores = divingFish?.tryGet<int>('scores') ?? 0;
       final exportMsg = divingFish?.tryGet<String>('message') ?? '';
-      _log('  diveStatus=$diveStatus, exported=$exported, scores=$scores, msg="$exportMsg"');
+      _log(
+          '  diveStatus=$diveStatus, exported=$exported, scores=$scores, msg="$exportMsg"');
 
       if (diveStatus == 'success') {
         await _cacheSyncState();
@@ -492,12 +537,14 @@ class DivingFishProbeManager {
         _log('  导出成绩数: $exported');
         _log('══════════════════════════════════════════');
 
-        _emit(onProgress, SyncProgress(
-          stage: SyncStage.completed,
-          message: '同步完成！共同步 $exported 条成绩',
-          completedDiffs: 1,
-          totalDiffs: 1,
-        ));
+        _emit(
+            onProgress,
+            SyncProgress(
+              stage: SyncStage.completed,
+              message: '同步完成！共同步 $exported 条成绩',
+              completedDiffs: 1,
+              totalDiffs: 1,
+            ));
 
         return SyncResult.success(
           friendCode: _friendCode,
@@ -545,7 +592,8 @@ class DivingFishProbeManager {
     _log('══════════════════════════════════════════');
     _log('syncByCabinetQr 开始');
     _log('  QR长度: ${qrCode.length} 字符');
-    _log('  QR前30字符: ${qrCode.length > 30 ? '${qrCode.substring(0, 30)}...' : qrCode}');
+    _log(
+        '  QR前30字符: ${qrCode.length > 30 ? '${qrCode.substring(0, 30)}...' : qrCode}');
     _log('  超时设置: ${timeout.inMinutes} 分钟');
 
     if (_isSyncing) {
@@ -557,10 +605,12 @@ class DivingFishProbeManager {
     final hasToken = await _ensureAuthToken();
     if (!hasToken) {
       _log('── Step 0: Hub 认证 ──');
-      _emit(onProgress, const SyncProgress(
-        stage: SyncStage.authenticating,
-        message: '正在验证二维码...',
-      ));
+      _emit(
+          onProgress,
+          const SyncProgress(
+            stage: SyncStage.authenticating,
+            message: '正在验证二维码...',
+          ));
 
       final loginData = await _loginByQr(qrCode);
       if (loginData == null) {
@@ -569,7 +619,8 @@ class DivingFishProbeManager {
       }
 
       _authToken = loginData['token'] as String?;
-      _friendCode = (loginData['user'] as Map<String, dynamic>?)?.tryGet<String>('friendCode');
+      _friendCode = (loginData['user'] as Map<String, dynamic>?)
+          ?.tryGet<String>('friendCode');
 
       if (_authToken == null) {
         _log('✗ Hub 登录失败: token 为 null');
@@ -586,10 +637,12 @@ class DivingFishProbeManager {
     try {
       // ===== Step 1: 创建 Cabinet Score Job =====
       _log('── Step 1: 创建 Cabinet Score Job ──');
-      _emit(onProgress, const SyncProgress(
-        stage: SyncStage.requesting,
-        message: '正在提交二维码...',
-      ));
+      _emit(
+          onProgress,
+          const SyncProgress(
+            stage: SyncStage.requesting,
+            message: '正在提交二维码...',
+          ));
 
       final createResult = await _createCabinetScoreJob(qrCode);
       if (createResult == null) {
@@ -608,7 +661,8 @@ class DivingFishProbeManager {
       final initialJob = createResult.tryGet<Map<String, dynamic>>('job');
       final initialStatus = initialJob?.tryGet<String>('status') ?? '';
       if (initialStatus == 'completed') {
-        _log('✓ Cabinet Job 已完成（即时返回），scoreCount=${initialJob?.tryGet<int>('scoreCount')}');
+        _log(
+            '✓ Cabinet Job 已完成（即时返回），scoreCount=${initialJob?.tryGet<int>('scoreCount')}');
 
         // 导出到水鱼
         return await _doExportPhase(onProgress, methodStart);
@@ -650,7 +704,9 @@ class DivingFishProbeManager {
 
         final stageChanged = stage != lastStage || status != lastStatus;
         final progressChanged = detailsFetched != lastDetailsFetched;
-        final shouldLog = stageChanged || progressChanged || (_pollCount % _pollCountLogEvery == 1);
+        final shouldLog = stageChanged ||
+            progressChanged ||
+            (_pollCount % _pollCountLogEvery == 1);
 
         if (shouldLog) {
           _log('  Cabinet 轮询 #$_pollCount (耗时${pollTime}ms): status=$status, '
@@ -692,7 +748,7 @@ class DivingFishProbeManager {
           }
         }
 
-        await Future.delayed(_pollInterval);
+        await Future.delayed(_cabinetPollInterval);
       }
 
       if (_cancelled) {
@@ -702,7 +758,6 @@ class DivingFishProbeManager {
 
       // ===== Step 3: 导出到水鱼 =====
       return await _doExportPhase(onProgress, methodStart);
-
     } catch (e, stack) {
       _log('✗ Cabinet 同步异常');
       _log('  异常类型: ${e.runtimeType}');
@@ -718,21 +773,27 @@ class DivingFishProbeManager {
   /// 导出到水鱼 + 缓存（syncByQrCode 和 syncByCabinetQr 共用）
   Future<SyncResult> _doExportPhase(
     void Function(SyncProgress)? onProgress,
-    DateTime methodStart,
-  ) async {
+    DateTime methodStart, {
+    bool bindCachedImportToken = true,
+  }) async {
     _log('── 导出阶段: 同步到水鱼 ──');
 
-    final bindResult = await _bindCachedImportTokenToHub();
-    _log('  绑定 importToken 结果: $bindResult');
+    if (bindCachedImportToken) {
+      final bindResult = await _bindCachedImportTokenToHub();
+      _log('  绑定 importToken 结果: $bindResult');
+    }
 
-    _emit(onProgress, const SyncProgress(
-      stage: SyncStage.exporting,
-      message: '正在同步到水鱼...',
-    ));
+    _emit(
+        onProgress,
+        const SyncProgress(
+          stage: SyncStage.exporting,
+          message: '正在同步到水鱼...',
+        ));
 
     final exportBefore = DateTime.now();
     final exportData = await _exportToDivingFish();
-    _log('  _exportToDivingFish 耗时: ${DateTime.now().difference(exportBefore).inMilliseconds}ms');
+    _log(
+        '  _exportToDivingFish 耗时: ${DateTime.now().difference(exportBefore).inMilliseconds}ms');
 
     if (exportData == null) {
       _log('✗ 导出失败: exportData 为 null');
@@ -750,7 +811,8 @@ class DivingFishProbeManager {
     final exported = divingFish?.tryGet<int>('exported') ?? 0;
     final scores = divingFish?.tryGet<int>('scores') ?? 0;
     final exportMsg = divingFish?.tryGet<String>('message') ?? '';
-    _log('  diveStatus=$diveStatus, exported=$exported, scores=$scores, msg="$exportMsg"');
+    _log(
+        '  diveStatus=$diveStatus, exported=$exported, scores=$scores, msg="$exportMsg"');
 
     if (diveStatus == 'success') {
       await _cacheSyncState();
@@ -762,12 +824,14 @@ class DivingFishProbeManager {
       _log('  导出成绩数: $exported');
       _log('══════════════════════════════════════════');
 
-      _emit(onProgress, SyncProgress(
-        stage: SyncStage.completed,
-        message: '同步完成！共同步 $exported 条成绩',
-        completedDiffs: 1,
-        totalDiffs: 1,
-      ));
+      _emit(
+          onProgress,
+          SyncProgress(
+            stage: SyncStage.completed,
+            message: '同步完成！共同步 $exported 条成绩',
+            completedDiffs: 1,
+            totalDiffs: 1,
+          ));
 
       return SyncResult.success(
         friendCode: _friendCode,
@@ -815,6 +879,28 @@ class DivingFishProbeManager {
     return _exportToDivingFish();
   }
 
+  /// 导出最近一次抓取结果并转换为统一同步结果。
+  /// [bindCachedImportToken] 为 false 时，适用于刚完成账号绑定的重试。
+  Future<SyncResult> exportLatestToDivingFish({
+    void Function(SyncProgress progress)? onProgress,
+    bool bindCachedImportToken = true,
+  }) async {
+    final start = DateTime.now();
+    if (_isSyncing) {
+      return _doExportPhase(
+        onProgress,
+        start,
+        bindCachedImportToken: bindCachedImportToken,
+      );
+    }
+    _log('exportLatestToDivingFish 被调用 (hasToken: ${_authToken != null})');
+    return _doExportPhase(
+      onProgress,
+      start,
+      bindCachedImportToken: bindCachedImportToken,
+    );
+  }
+
   // ===========================================================================
   // 水鱼账号绑定
   // ===========================================================================
@@ -849,7 +935,8 @@ class DivingFishProbeManager {
         }),
       );
 
-      _log('  ← HTTP ${loginResponse.statusCode} (${loginResponse.body.length} 字节)');
+      _log(
+          '  ← HTTP ${loginResponse.statusCode} (${loginResponse.body.length} 字节)');
 
       if (loginResponse.statusCode != 200) {
         _log('  ✗ 登录失败: ${loginResponse.statusCode} ${loginResponse.body}');
@@ -866,7 +953,8 @@ class DivingFishProbeManager {
 
       // 从 Set-Cookie 提取 jwt_token
       final setCookie = loginResponse.headers['set-cookie'] ?? '';
-      _log('  Set-Cookie: ${setCookie.length > 200 ? '${setCookie.substring(0, 200)}...' : setCookie}');
+      _log(
+          '  Set-Cookie: ${setCookie.length > 200 ? '${setCookie.substring(0, 200)}...' : setCookie}');
       jwtToken = _extractJwtFromCookie(setCookie);
 
       if (jwtToken == null) {
@@ -893,18 +981,22 @@ class DivingFishProbeManager {
         },
       );
 
-      _log('  ← HTTP ${profileResponse.statusCode} (${profileResponse.body.length} 字节)');
+      _log(
+          '  ← HTTP ${profileResponse.statusCode} (${profileResponse.body.length} 字节)');
       _log('  Response: ${_truncateBody(profileResponse.body)}');
 
       if (profileResponse.statusCode == 200) {
-        final profile = json.decode(profileResponse.body) as Map<String, dynamic>;
+        final profile =
+            json.decode(profileResponse.body) as Map<String, dynamic>;
         final importToken = profile.tryGet<String>('import_token') ?? '';
         final nickname = profile.tryGet<String>('nickname') ?? '';
         final plate = profile.tryGet<String>('plate') ?? '';
         final additionalRating = profile.tryGet<int>('additional_rating') ?? 0;
 
-        _log('  importToken: ${importToken.isNotEmpty ? "*** (长度: ${importToken.length})" : "空!"}');
-        _log('  nickname=$nickname, plate=$plate, additionalRating=$additionalRating');
+        _log(
+            '  importToken: ${importToken.isNotEmpty ? "*** (长度: ${importToken.length})" : "空!"}');
+        _log(
+            '  nickname=$nickname, plate=$plate, additionalRating=$additionalRating');
 
         if (importToken.isEmpty) {
           _log('  ✗ 未找到 import_token');
@@ -914,7 +1006,8 @@ class DivingFishProbeManager {
         // 缓存到本地
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(CacheKeyConstant.probeDivingFishToken, jwtToken);
-        await prefs.setString(CacheKeyConstant.probeDivingFishImportToken, importToken);
+        await prefs.setString(
+            CacheKeyConstant.probeDivingFishImportToken, importToken);
         final bindQQ = profile.tryGet<String>('bind_qq') ?? '';
         if (bindQQ.isNotEmpty) {
           await prefs.setString(CacheKeyConstant.probeDivingFishBindQQ, bindQQ);
@@ -1170,7 +1263,8 @@ class DivingFishProbeManager {
       _log('  ← HTTP ${tokenResponse.statusCode}');
       if (tokenResponse.statusCode == 201) {
         final data = json.decode(tokenResponse.body) as Map<String, dynamic>;
-        _log('  ✓ importToken 获取成功: ${data['importToken'] != null ? "***" : "null"}');
+        _log(
+            '  ✓ importToken 获取成功: ${data['importToken'] != null ? "***" : "null"}');
       } else {
         _log('  ✗ 换取 token 失败: ${tokenResponse.body}');
         return false;
@@ -1202,7 +1296,8 @@ class DivingFishProbeManager {
     final body = json.encode({'qrCode': qrCode});
 
     _log('  POST $url');
-    _log('  Body: { "qrCode": "${qrCode.length > 30 ? '${qrCode.substring(0, 30)}...' : qrCode}" }');
+    _log(
+        '  Body: { "qrCode": "${qrCode.length > 30 ? '${qrCode.substring(0, 30)}...' : qrCode}" }');
 
     try {
       final response = await _postFollowRedirects(
@@ -1233,8 +1328,11 @@ class DivingFishProbeManager {
       }
 
       final user = data['user'];
-      final friendCode = user is Map<String, dynamic> ? user.tryGet<String>('friendCode') : null;
-      _log('  ✓ fast 登录，token=${data['token'] != null ? '***' : 'null'}, friendCode=${friendCode ?? 'null'}');
+      final friendCode = user is Map<String, dynamic>
+          ? user.tryGet<String>('friendCode')
+          : null;
+      _log(
+          '  ✓ fast 登录，token=${data['token'] != null ? '***' : 'null'}, friendCode=${friendCode ?? 'null'}');
       return data;
     } catch (e, stack) {
       _log('  ✗ 网络异常: $e');
@@ -1278,8 +1376,11 @@ class DivingFishProbeManager {
         if (status == 'matched') {
           final token = data.tryGet<String>('token');
           final user = data['user'];
-          final friendCode = user is Map<String, dynamic> ? user.tryGet<String>('friendCode') : null;
-          _log('  ✓ QR 登录 matched，token=${token != null ? '***' : 'null'}, friendCode=${friendCode ?? 'null'}');
+          final friendCode = user is Map<String, dynamic>
+              ? user.tryGet<String>('friendCode')
+              : null;
+          _log(
+              '  ✓ QR 登录 matched，token=${token != null ? '***' : 'null'}, friendCode=${friendCode ?? 'null'}');
           return {'token': token, 'user': user};
         }
 
@@ -1353,7 +1454,8 @@ class DivingFishProbeManager {
         if (code == 'needs_friendship') {
           return {
             '_needsFriendship': true,
-            'recommendedBotFriendCode': err.tryGet<String>('recommendedBotFriendCode'),
+            'recommendedBotFriendCode':
+                err.tryGet<String>('recommendedBotFriendCode'),
             'message': err.tryGet<String>('message') ?? '',
           };
         }
@@ -1387,7 +1489,8 @@ class DivingFishProbeManager {
       _pollCount++;
 
       if (DateTime.now().difference(startTime) > timeout) {
-        _log('  _pollUntilDone 超时: jobId=$jobId, 耗时 ${DateTime.now().difference(startTime).inSeconds}s');
+        _log(
+            '  _pollUntilDone 超时: jobId=$jobId, 耗时 ${DateTime.now().difference(startTime).inSeconds}s');
         return null;
       }
 
@@ -1407,8 +1510,10 @@ class DivingFishProbeManager {
         }
       }
 
-      if (serverStatus == 'failed' || serverStatus == 'canceled' ||
-          done || serverStatus == 'completed') {
+      if (serverStatus == 'failed' ||
+          serverStatus == 'canceled' ||
+          done ||
+          serverStatus == 'completed') {
         return status;
       }
 
@@ -1448,7 +1553,8 @@ class DivingFishProbeManager {
         };
       }
 
-      _log('  ✗ dxnet-jobs HTTP ${response.statusCode}: ${_truncateBody(response.body)}');
+      _log(
+          '  ✗ dxnet-jobs HTTP ${response.statusCode}: ${_truncateBody(response.body)}');
       return null;
     } catch (e, stack) {
       _log('  ✗ dxnet-jobs 网络异常: $e');
@@ -1512,7 +1618,9 @@ class DivingFishProbeManager {
     Uri uri, {
     Map<String, String> headers = const {},
     int maxRedirects = 5,
-  }) => _requestNoAutoRedirect('GET', uri, headers: headers, maxRedirects: maxRedirects);
+  }) =>
+      _requestNoAutoRedirect('GET', uri,
+          headers: headers, maxRedirects: maxRedirects);
 
   /// POST 请求，跟随 307/308 重定向且保留请求体和 Authorization 头
   Future<http.Response> _postFollowRedirects(
@@ -1520,7 +1628,9 @@ class DivingFishProbeManager {
     required Map<String, String> headers,
     required String body,
     int maxRedirects = 5,
-  }) => _requestNoAutoRedirect('POST', uri, headers: headers, body: body, maxRedirects: maxRedirects);
+  }) =>
+      _requestNoAutoRedirect('POST', uri,
+          headers: headers, body: body, maxRedirects: maxRedirects);
 
   /// PATCH 请求，跟随 307/308 重定向
   Future<http.Response> _patchFollowRedirects(
@@ -1528,7 +1638,9 @@ class DivingFishProbeManager {
     required Map<String, String> headers,
     required String body,
     int maxRedirects = 5,
-  }) => _requestNoAutoRedirect('PATCH', uri, headers: headers, body: body, maxRedirects: maxRedirects);
+  }) =>
+      _requestNoAutoRedirect('PATCH', uri,
+          headers: headers, body: body, maxRedirects: maxRedirects);
 
   /// POST /me/cabinet-score-jobs (authorized)
   ///
@@ -1548,7 +1660,8 @@ class DivingFishProbeManager {
     final body = json.encode({'qrCode': qrCode});
 
     _log('  POST $url');
-    _log('  Body: { "qrCode": "${qrCode.length > 20 ? '${qrCode.substring(0, 20)}...' : qrCode}" }');
+    _log(
+        '  Body: { "qrCode": "${qrCode.length > 20 ? '${qrCode.substring(0, 20)}...' : qrCode}" }');
 
     try {
       final response = await _postFollowRedirects(
@@ -1594,7 +1707,8 @@ class DivingFishProbeManager {
         return json.decode(response.body) as Map<String, dynamic>;
       }
 
-      _log('  ✗ cabinet-score-jobs HTTP ${response.statusCode}: ${_truncateBody(response.body)}');
+      _log(
+          '  ✗ cabinet-score-jobs HTTP ${response.statusCode}: ${_truncateBody(response.body)}');
       return null;
     } catch (e, stack) {
       _log('  ✗ cabinet-score-jobs 网络异常: $e');
@@ -1649,8 +1763,8 @@ class DivingFishProbeManager {
 
     try {
       // ── Step A: 创建导出任务 ──
-      final response = await _postFollowRedirects(
-        Uri.parse(url), headers: headers, body: '');
+      final response = await _postFollowRedirects(Uri.parse(url),
+          headers: headers, body: '');
 
       _log('  ← HTTP ${response.statusCode} (${response.body.length} 字节)');
 
@@ -1662,7 +1776,8 @@ class DivingFishProbeManager {
 
       final createData = json.decode(response.body) as Map<String, dynamic>;
       final exportJobId = createData['exportJobId'] as String?;
-      _log('  ✓ LXNS 导出任务已创建，exportJobId=$exportJobId, status=${createData['status']}');
+      _log(
+          '  ✓ LXNS 导出任务已创建，exportJobId=$exportJobId, status=${createData['status']}');
 
       if (exportJobId == null) {
         _log('  ✗ 创建响应缺少 exportJobId');
@@ -1673,8 +1788,9 @@ class DivingFishProbeManager {
       final pollUrl = '${ApiUrls.MaimaiHubSyncExportJobsUrl}/$exportJobId';
       final startTime = DateTime.now();
       const pollTimeout = Duration(minutes: 2);
-      const pollInterval = Duration(seconds: 2);
+      const pollInterval = Duration(seconds: 1);
       String? lastPollStatus;
+      bool firstPoll = true;
 
       while (!_cancelled) {
         if (DateTime.now().difference(startTime) > pollTimeout) {
@@ -1682,17 +1798,23 @@ class DivingFishProbeManager {
           return null;
         }
 
-        await Future.delayed(pollInterval);
+        if (!firstPoll) {
+          await Future.delayed(pollInterval);
+        }
+        firstPoll = false;
 
-        final pollResponse = await _getFollowRedirects(Uri.parse(pollUrl), headers: headers);
+        final pollResponse =
+            await _getFollowRedirects(Uri.parse(pollUrl), headers: headers);
 
         if (pollResponse.statusCode == 200) {
-          final exportJob = json.decode(pollResponse.body) as Map<String, dynamic>;
+          final exportJob =
+              json.decode(pollResponse.body) as Map<String, dynamic>;
           final expStatus = exportJob.tryGet<String>('status') ?? '';
 
           if (expStatus != lastPollStatus) {
             lastPollStatus = expStatus;
-            final lxns = exportJob.tryGet<Map<String, dynamic>>('result')
+            final lxns = exportJob
+                .tryGet<Map<String, dynamic>>('result')
                 ?.tryGet<Map<String, dynamic>>('lxns');
             _log('  LXNS 导出轮询: status=$expStatus, '
                 'lxns.status=${lxns?.tryGet<String>('status')}, '
@@ -1755,10 +1877,12 @@ class DivingFishProbeManager {
       final hasToken = await _ensureAuthToken();
       if (!hasToken) {
         _log('── Step 0: Hub 认证 ──');
-        _emit(onProgress, const SyncProgress(
-          stage: SyncStage.authenticating,
-          message: '正在验证二维码...',
-        ));
+        _emit(
+            onProgress,
+            const SyncProgress(
+              stage: SyncStage.authenticating,
+              message: '正在验证二维码...',
+            ));
 
         final loginData = await _loginByQr(qrCode);
         if (loginData == null) {
@@ -1767,7 +1891,8 @@ class DivingFishProbeManager {
         }
 
         _authToken = loginData['token'] as String?;
-        _friendCode = (loginData['user'] as Map<String, dynamic>?)?.tryGet<String>('friendCode');
+        _friendCode = (loginData['user'] as Map<String, dynamic>?)
+            ?.tryGet<String>('friendCode');
 
         if (_authToken == null) {
           _log('✗ Hub 登录失败: token 为 null');
@@ -1789,10 +1914,12 @@ class DivingFishProbeManager {
       }
 
       // ===== Step 1: 创建 Cabinet Score Job =====
-      _emit(onProgress, const SyncProgress(
-        stage: SyncStage.requesting,
-        message: '正在提交二维码...',
-      ));
+      _emit(
+          onProgress,
+          const SyncProgress(
+            stage: SyncStage.requesting,
+            message: '正在提交二维码...',
+          ));
 
       final createResult = await _createCabinetScoreJob(qrCode);
       if (createResult == null) {
@@ -1819,7 +1946,8 @@ class DivingFishProbeManager {
           _pollCount++;
           final elapsed = DateTime.now().difference(startTime);
           if (elapsed > timeout) {
-            return SyncResult.failure('同步超时——机台成绩抓取耗时超过 ${timeout.inMinutes} 分钟');
+            return SyncResult.failure(
+                '同步超时——机台成绩抓取耗时超过 ${timeout.inMinutes} 分钟');
           }
 
           final job = await _pollCabinetJobStatus(jobId);
@@ -1837,8 +1965,11 @@ class DivingFishProbeManager {
           final stageChanged = stage != lastStage || status != lastStatus;
           final progressChanged = detailsFetched != lastDetailsFetched;
 
-          if (stageChanged || progressChanged || (_pollCount % _pollCountLogEvery == 1)) {
-            _log('  Cabinet 轮询 #$_pollCount: status=$status, stage=$stage, detailsFetched=$detailsFetched');
+          if (stageChanged ||
+              progressChanged ||
+              (_pollCount % _pollCountLogEvery == 1)) {
+            _log(
+                '  Cabinet 轮询 #$_pollCount: status=$status, stage=$stage, detailsFetched=$detailsFetched');
           }
 
           lastStage = stage;
@@ -1863,7 +1994,7 @@ class DivingFishProbeManager {
             if (progress != null) _emit(onProgress, progress);
           }
 
-          await Future.delayed(_pollInterval);
+          await Future.delayed(_cabinetPollInterval);
         }
 
         if (_cancelled) return SyncResult.cancelled();
@@ -1871,17 +2002,26 @@ class DivingFishProbeManager {
 
       // ===== Step 3: 导出到落雪 =====
       _log('── 检查落雪 token ──');
-      final hasLxns = await hasLxnsImportToken();
+      // 若本次同步刚通过 setLxnsImportToken 设置成功，则无需再联网校验一次；
+      // 仅当本次没有传入 token 时才回退到查询 Hub 是否已绑定。
+      final bool? hasLxns;
+      if (lxnsImportToken != null && lxnsImportToken.isNotEmpty) {
+        hasLxns = true;
+      } else {
+        hasLxns = await hasLxnsImportToken();
+      }
       if (hasLxns != true) {
         _log('✗ 未设置落雪 importToken');
         return SyncResult.failure('尚未设置落雪个人 API 密钥，请在同步页面或账号管理中设置');
       }
 
       _log('── 导出到落雪 ──');
-      _emit(onProgress, const SyncProgress(
-        stage: SyncStage.exporting,
-        message: '正在同步到落雪...',
-      ));
+      _emit(
+          onProgress,
+          const SyncProgress(
+            stage: SyncStage.exporting,
+            message: '正在同步到落雪...',
+          ));
 
       final exportData = await _exportToLxns();
       if (exportData == null) {
@@ -1898,12 +2038,14 @@ class DivingFishProbeManager {
       if (lxnsStatus == 'success') {
         await _cacheSyncState();
         _log('✓ 落雪导出成功: exported=$exported');
-        _emit(onProgress, SyncProgress(
-          stage: SyncStage.completed,
-          message: '同步完成！共同步 $exported 条成绩到落雪',
-          completedDiffs: 1,
-          totalDiffs: 1,
-        ));
+        _emit(
+            onProgress,
+            SyncProgress(
+              stage: SyncStage.completed,
+              message: '同步完成！共同步 $exported 条成绩到落雪',
+              completedDiffs: 1,
+              totalDiffs: 1,
+            ));
         return SyncResult.success(exportedCount: exported);
       } else {
         return SyncResult.failure(
@@ -1965,8 +2107,9 @@ class DivingFishProbeManager {
       final pollUrl = '${ApiUrls.MaimaiHubSyncExportJobsUrl}/$exportJobId';
       final startTime = DateTime.now();
       const pollTimeout = Duration(minutes: 2);
-      const pollInterval = Duration(seconds: 2);
+      const pollInterval = Duration(seconds: 1);
       String? lastPollStatus;
+      bool firstPoll = true;
 
       while (!_cancelled) {
         if (DateTime.now().difference(startTime) > pollTimeout) {
@@ -1974,17 +2117,23 @@ class DivingFishProbeManager {
           return null;
         }
 
-        await Future.delayed(pollInterval);
+        if (!firstPoll) {
+          await Future.delayed(pollInterval);
+        }
+        firstPoll = false;
 
-        final pollResponse = await _getFollowRedirects(Uri.parse(pollUrl), headers: headers);
+        final pollResponse =
+            await _getFollowRedirects(Uri.parse(pollUrl), headers: headers);
 
         if (pollResponse.statusCode == 200) {
-          final exportJob = json.decode(pollResponse.body) as Map<String, dynamic>;
+          final exportJob =
+              json.decode(pollResponse.body) as Map<String, dynamic>;
           final expStatus = exportJob.tryGet<String>('status') ?? '';
 
           if (expStatus != lastPollStatus) {
             lastPollStatus = expStatus;
-            final df = exportJob.tryGet<Map<String, dynamic>>('result')
+            final df = exportJob
+                .tryGet<Map<String, dynamic>>('result')
                 ?.tryGet<Map<String, dynamic>>('divingFish');
             _log('  导出轮询: status=$expStatus, '
                 'divingFish.status=${df?.tryGet<String>('status')}, '
@@ -2033,7 +2182,8 @@ class DivingFishProbeManager {
     final detailsFetched = cp?.tryGet<int>('detailsFetched') ?? 0;
     final cabinetScoreCount = status.tryGet<int>('scoreCount') ?? 0;
 
-    _log('  _mapStage: stage=$stage, dxCompletedDiffs=$completedDiffs/$totalDiffs, '
+    _log(
+        '  _mapStage: stage=$stage, dxCompletedDiffs=$completedDiffs/$totalDiffs, '
         'detailsFetched=$detailsFetched, scoreCount=$cabinetScoreCount');
 
     switch (stage) {
@@ -2178,7 +2328,6 @@ class DivingFishProbeManager {
     return '${body.substring(0, 300)}... (共 ${body.length} 字符)';
   }
 }
-
 
 // =============================================================================
 // 扩展：让 Map 读取更安全

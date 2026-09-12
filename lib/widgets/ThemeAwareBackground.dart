@@ -1,20 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/ThemeManager.dart';
 
-/// 暗色遮罩颜色常量
-abstract class _DarkOverlay {
-  /// 暗色模式 chiffon 透明度
-  static const double chiffonOpacity = 0.28;
-}
-
-/// 浅色模式颜色常量
-abstract class _LightOverlay {
-  /// 浅色模式 chiffon 透明度
-  static const double chiffonOpacity = 0.40;
-}
-
-/// 主题感知的背景组件：浅色模式使用白色覆层将 PNG 背景图洗淡为柔和纹理，
-/// 暗色模式使用半透明深色遮罩，纯黑模式不显示背景图。
+/// 主题感知的背景组件：根据用户设置显示背景图和装饰图。
 ///
 /// 性能说明：
 /// 旧实现用 ColorFiltered + BlendMode.darken，该组合会强制每帧创建
@@ -24,8 +13,13 @@ abstract class _LightOverlay {
 /// Flutter 对纯色矩形的 alpha 合成走 fast path，不需要 saveLayer。
 class ThemeAwareBackground extends StatelessWidget {
   final Widget? child;
+  final bool showDecorativeImage;
 
-  const ThemeAwareBackground({super.key, this.child});
+  const ThemeAwareBackground({
+    super.key,
+    this.child,
+    this.showDecorativeImage = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +32,8 @@ class ThemeAwareBackground extends StatelessWidget {
         // 底层：背景图 + 主题覆层
         _BgImage(isDark: isDark, isPureBlack: isPureBlack),
         // 上层：chiffon 装饰图 + 主题覆层
-        _ChiffonImage(isDark: isDark, isPureBlack: isPureBlack),
+        if (showDecorativeImage)
+          _ChiffonImage(isDark: isDark, isPureBlack: isPureBlack),
         // 子组件
         if (child != null) Positioned.fill(child: child!),
       ],
@@ -94,17 +89,26 @@ class _BgImage extends StatelessWidget {
     }
 
     return ListenableBuilder(
-      listenable: ThemeManager().lightOverlayNotifier,
+      listenable: Listenable.merge([
+        ThemeManager().lightOverlayNotifier,
+        ThemeManager().chiffonOpacityNotifier,
+      ]),
       builder: (context, _) {
         final opacity = ThemeManager().lightOverlayOpacity;
         final overlayAlpha = (opacity * 255).round().clamp(0, 255);
         final lightOverlay = Color.fromARGB(overlayAlpha, 255, 255, 255);
 
+        final ImageProvider<Object> backgroundImage =
+            ThemeManager().customBackgroundPath == null
+                ? const AssetImage('assets/background.png') as ImageProvider<Object>
+                : FileImage(File(ThemeManager().customBackgroundPath!))
+                    as ImageProvider<Object>;
+
         return Stack(
           fit: StackFit.expand,
           children: [
-            Image.asset(
-              'assets/background.png',
+            Image(
+              image: backgroundImage,
               fit: BoxFit.cover,
               gaplessPlayback: true,
             ),
@@ -139,7 +143,10 @@ class _ChiffonImage extends StatelessWidget {
     }
 
     return ListenableBuilder(
-      listenable: ThemeManager().lightOverlayNotifier,
+      listenable: Listenable.merge([
+        ThemeManager().lightOverlayNotifier,
+        ThemeManager().chiffonOpacityNotifier,
+      ]),
       builder: (context, _) {
         final opacity = ThemeManager().lightOverlayOpacity;
         final overlayAlpha = (opacity * 255).round().clamp(0, 255);
@@ -156,7 +163,7 @@ class _ChiffonImage extends StatelessWidget {
                     fit: BoxFit.contain,
                     gaplessPlayback: true,
                     opacity: AlwaysStoppedAnimation(
-                      isDark ? _DarkOverlay.chiffonOpacity : _LightOverlay.chiffonOpacity,
+                      ThemeManager().chiffonOpacity,
                     ),
                   ),
                   if (isDark)

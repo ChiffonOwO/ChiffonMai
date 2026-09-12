@@ -266,6 +266,19 @@ class _RankDetailPageState extends State<RankDetailPage> {
     final brightness = Theme.of(context).brightness;
     final textPrimaryColor = Theme.of(context).colorScheme.onSurface;
     final subtitleColor = Theme.of(context).colorScheme.onSurfaceVariant;
+
+    // 分区容器（「预计结果」/「血量设置」）的边框统一走 M3 的 outlineVariant。
+    //
+    // 原来用的是 AppColors.tableBorder，它虽然按明暗分支，但两支都是**写死的中性灰**：
+    //   light → grey.shade300 #E0E0E0，压在浅色 surface 上只有约 1.26:1，基本看不见；
+    //   dark  → grey.shade700 #616161，压在深色 surface 上有约 3:1，非常显眼。
+    // 两边差了 2.4 倍，浅色下这条边框实际上等于没有，这就是「没做适配」的观感来源。
+    // 而且它也不跟随用户自定义主题色，纯黑模式专门覆盖的 outline 也吃不到。
+    //
+    // outlineVariant 由 ColorScheme 按明暗与种子色派生，深浅两侧对比度接近
+    // （约 1.63:1 / 1.98:1），且本项目的 cardTheme / dividerTheme 用的就是它，
+    // 放在这里正好和全局容器边框的观感保持一致。
+    final borderColor = Theme.of(context).colorScheme.outlineVariant;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -464,7 +477,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
               Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.tableBorder(brightness), width: 1.0),
+                  border: Border.all(color: borderColor, width: 1.0),
                   borderRadius: BorderRadius.circular(_borderRadiusSmall),
                 ),
                 padding: EdgeInsets.all(_paddingM),
@@ -537,7 +550,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            border: Border.all(color: AppColors.tableBorder(brightness), width: 1.0),
+            border: Border.all(color: borderColor, width: 1.0),
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
           ),
           padding: EdgeInsets.all(_paddingM),
@@ -570,7 +583,6 @@ class _RankDetailPageState extends State<RankDetailPage> {
   }
 
   Widget _buildStatCell(String label) {
-    final brightness = Theme.of(context).brightness;
     return Expanded(
       child: Text(
         label,

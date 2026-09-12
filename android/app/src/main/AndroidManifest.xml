@@ -26,11 +26,25 @@
         android:label="ChiffonMai"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!--
+          关于下面两个属性，改动原因说明（不要再改回 Flutter 模板的默认值）：
+
+          Flutter 模板默认给的是 launchMode="singleTop" + taskAffinity=""，
+          而 taskAffinity="" 表示「不属于任何任务」。文件管理器用
+          ACTION_VIEW + FLAG_ACTIVITY_NEW_TASK 打开 .cmf 时，系统拿着空 affinity
+          找不到已存在的任务，于是新建一个任务 → 新的 MainActivity 实例 →
+          新的 FlutterEngine → 表现为「又开了一个 App」，而不是把后台那个拉到前台。
+
+          所以：
+            - 去掉 taskAffinity=""，让它回到默认 affinity（与包名一致），
+              系统就能匹配到已有任务并复用（这是本次问题的根因）；
+            - launchMode 用 singleTask，从系统层面保证全局只有一个实例，
+              后续任何来源的启动都走 onNewIntent 投递（MainActivity 已处理）。
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop"
-            android:taskAffinity=""
+            android:launchMode="singleTask"
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
@@ -46,6 +60,36 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+
+            <!--
+              收藏夹文件「一键导入」入口 1：文件管理器里点开文件。
+              只对下列后缀生效，避免 App 出现在所有文件的选择列表里。
+              注意：部分文件管理器（走 SAF）给出的 content:// URI 不带后缀，
+              pathPattern 匹配不到，这类情况请用下面的「分享」入口。
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="content"/>
+                <data android:scheme="file"/>
+                <data android:mimeType="*/*"/>
+                <data android:pathPattern=".*\\.cmf"/>
+                <data android:pathPattern=".*\\.cmfavorite"/>
+                <data android:pathPattern=".*\\.chiffonmai"/>
+                <data android:pathPattern=".*\\.cmaifav"/>
+            </intent-filter>
+
+            <!--
+              收藏夹文件「一键导入」入口 2：分享 → ChiffonMai。
+              自定义后缀无法在编译期写进 pathPattern，所以这里放开成 */*，
+              任何后缀的文件都能通过分享导回，由 Dart 侧按内容校验。
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="*/*"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

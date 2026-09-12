@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
@@ -264,14 +266,18 @@ class CommonWidgetUtil {
 /// - 浅色模式：白色半透明覆层使背景图变成若隐若现的纹理（不透明度用户可调）
 /// - 深色模式：深色半透明覆层压暗背景图
 /// - 纯黑模式：隐藏背景图，显示纯黑底色
+/// - 用户自定义背景图：ThemeManager.customBackgroundPath 非空时优先使用本地文件
 class _ThemeAwareBgWidget extends StatelessWidget {
   const _ThemeAwareBgWidget();
 
   @override
   Widget build(BuildContext context) {
-    // 用 ListenableBuilder 包裹，仅在覆层透明度变化时局部重建
+    // 用 ListenableBuilder 包裹两个信号：覆层透明度 + 自定义背景图路径
     return ListenableBuilder(
-      listenable: ThemeManager().lightOverlayNotifier,
+      listenable: Listenable.merge([
+        ThemeManager().lightOverlayNotifier,
+        ThemeManager().customBackgroundPathNotifier,
+      ]),
       builder: (context, _) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final isPureBlack = isDark && ThemeManager().pureBlackEnabled;
@@ -280,6 +286,28 @@ class _ThemeAwareBgWidget extends StatelessWidget {
         final lightOverlay = Color.fromARGB(overlayAlpha, 255, 255, 255);
         final darkOverlay = Color.fromARGB(overlayAlpha, 15, 15, 28);
 
+        // 解析背景图层：自定义路径 -> Image.file，否则 -> Image.asset
+        final customPath = ThemeManager().customBackgroundPath;
+        Widget bgImage;
+        if (customPath != null) {
+          bgImage = Image.file(
+            File(customPath),
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (_, __, ___) => Image.asset(
+              'assets/background.png',
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+            ),
+          );
+        } else {
+          bgImage = Image.asset(
+            'assets/background.png',
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+          );
+        }
+
         return Stack(
           fit: StackFit.expand,
           children: [
@@ -287,11 +315,7 @@ class _ThemeAwareBgWidget extends StatelessWidget {
             if (isPureBlack)
               const Positioned.fill(child: ColoredBox(color: Colors.black))
             else ...[
-              Image.asset(
-                'assets/background.png',
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
-              ),
+              Positioned.fill(child: bgImage),
               // 浅色/深色均添加覆层：浅色用白色洗淡，深色用暗色压暗
               if (isDark)
                 Positioned.fill(child: ColoredBox(color: darkOverlay))
@@ -307,20 +331,19 @@ class _ThemeAwareBgWidget extends StatelessWidget {
 
 /// 主题感知的 chiffon 装饰组件（StatelessWidget）
 /// 性能：用 Stack + 半透明覆层代替 ColorFiltered + BlendMode.darken，避免 saveLayer
-/// - 浅色模式：降低透明度，让装饰层更含蓄
-/// - 深色模式：大幅降低透明度并叠加暗色覆层
+/// - 浅色/深色模式：使用 ThemeManager.chiffonOpacity 控制装饰图透明度
 /// - 纯黑模式：完全隐藏装饰层
 class _ThemeAwareChiffonWidget extends StatelessWidget {
   const _ThemeAwareChiffonWidget({super.key});
 
-  static const double _darkOpacity = 0.35;
-  static const double _lightOpacity = 0.40;
-
   @override
   Widget build(BuildContext context) {
-    // 用 ListenableBuilder 包裹，仅在覆层透明度变化时局部重建
+    // 用 ListenableBuilder 包裹两个信号：覆层透明度 + chiffon 透明度
     return ListenableBuilder(
-      listenable: ThemeManager().lightOverlayNotifier,
+      listenable: Listenable.merge([
+        ThemeManager().lightOverlayNotifier,
+        ThemeManager().chiffonOpacityNotifier,
+      ]),
       builder: (context, _) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final isPureBlack = isDark && ThemeManager().pureBlackEnabled;
@@ -346,7 +369,7 @@ class _ThemeAwareChiffonWidget extends StatelessWidget {
                     fit: BoxFit.cover,
                     gaplessPlayback: true,
                     opacity: AlwaysStoppedAnimation(
-                      isDark ? _darkOpacity : _lightOpacity,
+                      ThemeManager().chiffonOpacity,
                     ),
                   ),
                   if (isDark)

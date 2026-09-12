@@ -39,6 +39,13 @@ class _FriendLinksPageState extends State<FriendLinksPage> {
       iconType: FriendLinkIconType.game,
       iconBg: Color(0xFF26A69A),
     ),
+    _FriendLink(
+      name: '溯光的个人主页',
+      desc: '此人正开发原创音游中...',
+      url: 'https://su-guang.rth1.xyz/',
+      iconType: FriendLinkIconType.music,
+      iconBg: Color(0xFF5C6BC0),
+    ),
   ];
 
   Future<void> _open(String url) async {

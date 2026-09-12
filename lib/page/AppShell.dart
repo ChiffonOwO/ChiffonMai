@@ -1,0 +1,196 @@
+import 'package:flutter/material.dart';
+import '../utils/AppDesignTokens.dart';
+import '../widgets/ThemeAwareBackground.dart';
+import 'HomePage.dart';
+import 'Best50HubPage.dart';
+import 'LibraryHubPage.dart';
+import 'GuessHubPage.dart';
+import 'ToolsHubPage.dart';
+import 'SystemHubPage.dart';
+
+class AppShell extends StatefulWidget {
+  final VoidCallback? onFirstFrameRendered;
+
+  const AppShell({super.key, this.onFirstFrameRendered});
+
+  @override
+  State<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<AppShell> {
+  int _index = 0;
+  late final List<Widget> _pages;
+  final GlobalKey<HomePageState> _homePageKey = GlobalKey<HomePageState>();
+  bool _firstFrameNotified = false;
+
+  // ===== 6 个主分类标签（首页 + FeatureRegistry 的 5 大功能分类） =====
+  static const List<_NavTab> _tabs = [
+    _NavTab(
+      label: '首页',
+      icon: Icons.home_outlined,
+      activeIcon: Icons.home_rounded,
+    ),
+    _NavTab(
+      label: '曲库与数据',
+      icon: Icons.library_music_outlined,
+      activeIcon: Icons.library_music_rounded,
+    ),
+    _NavTab(
+      label: 'Best50',
+      icon: Icons.emoji_events_outlined,
+      activeIcon: Icons.emoji_events_rounded,
+    ),
+    _NavTab(
+      label: '猜歌游戏',
+      icon: Icons.casino_outlined,
+      activeIcon: Icons.casino_rounded,
+    ),
+    _NavTab(
+      label: '实用工具',
+      icon: Icons.handyman_outlined,
+      activeIcon: Icons.handyman_rounded,
+    ),
+    _NavTab(
+      label: '系统',
+      icon: Icons.settings_outlined,
+      activeIcon: Icons.settings_rounded,
+    ),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = [
+      HomePage(
+        key: _homePageKey,
+        onEntertainmentTap: () => setState(() => _index = 3),
+      ),
+      const LibraryHubPage(),
+      const Best50HubPage(),
+      const GuessHubPage(),
+      const ToolsHubPage(),
+      SystemHubPage(
+        onAccountManageTap: () =>
+            _homePageKey.currentState?.showAccountManageDialog(),
+      ),
+    ];
+    // 仅在首帧渲染完成后触发一次回调，避免每次 build 都重新调度
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _firstFrameNotified) return;
+      _firstFrameNotified = true;
+      widget.onFirstFrameRendered?.call();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: ThemeAwareBackground(
+        showDecorativeImage: _index == 0,
+        child: Center(
+          child: ConstrainedBox(
+            constraints:
+                const BoxConstraints(maxWidth: AppDesignTokens.maxContentWidth),
+            child: IndexedStack(index: _index, children: _pages),
+          ),
+        ),
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: scheme.surface.withValues(alpha: 0.92),
+          border: Border(
+            top: BorderSide(
+              color: scheme.outlineVariant.withValues(alpha: 0.6),
+              width: 0.5,
+            ),
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 70,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                const double pillW = 48;
+                const double pillH = 28;
+                final double tabW = constraints.maxWidth / _tabs.length;
+                return Stack(
+                  children: [
+                    // 滑动的药丸 indicator（核心改动：AnimatedPositioned）
+                    AnimatedPositioned(
+                      duration: const Duration(milliseconds: 360),
+                      curve: Curves.easeOutCubic,
+                      left: _index * tabW + (tabW - pillW) / 2,
+                      top: 8,
+                      width: pillW,
+                      height: pillH,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: scheme.primary.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(pillH / 2),
+                        ),
+                      ),
+                    ),
+                    // Tab row：icon + label，点击切换 _index
+                    Row(
+                      children: [
+                        for (int i = 0; i < _tabs.length; i++)
+                          Expanded(
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => setState(() => _index = i),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    i == _index
+                                        ? _tabs[i].activeIcon
+                                        : _tabs[i].icon,
+                                    size: 24,
+                                    color: i == _index
+                                        ? scheme.primary
+                                        : scheme.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _tabs[i].label,
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: i == _index
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      letterSpacing: 0.4,
+                                      color: i == _index
+                                          ? scheme.primary
+                                          : scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavTab {
+  final String label;
+  final IconData icon;
+  final IconData activeIcon;
+
+  const _NavTab({
+    required this.label,
+    required this.icon,
+    required this.activeIcon,
+  });
+}

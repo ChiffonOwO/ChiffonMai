@@ -1,11 +1,10 @@
-import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:path_provider/path_provider.dart';
 import '../entity/FavoriteFolder.dart';
 import '../entity/DivingFish/Song.dart';
 import '../utils/CoverUtil.dart';
+import '../utils/ExportPathUtil.dart';
 import '../utils/StringUtil.dart';
 
 /// 收藏夹导出为图片的服务
@@ -16,16 +15,22 @@ class FavoriteExportService {
 
   /// 导出需要配合 UI 层完成——在页面中使用 GlobalKey + RepaintBoundary 捕获，
   /// 然后调用 [saveImageBytes] 保存到本地文件
+  ///
+  /// 落盘位置与其它导出保持一致：`Download/ChiffonMai/收藏夹/`，
+  /// 文件管理器可以直接找到（公开目录不可写时自动退化为应用文档目录）。
   Future<String?> saveImageBytes({
     required List<int> pngBytes,
     required String folderName,
   }) async {
     try {
-      final dir = await getApplicationDocumentsDirectory();
+      final safeName =
+          ExportPathUtil.sanitizeFileName(folderName, fallback: 'favorites');
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final fileName = 'favorites_${folderName}_$timestamp.png';
-      final file = File('${dir.path}/$fileName');
-      await file.writeAsBytes(pngBytes);
+      final file = await ExportPathUtil.writeExportFile(
+        fileName: 'favorites_${safeName}_$timestamp.png',
+        bytes: pngBytes,
+        subDir: '收藏夹',
+      );
       debugPrint('收藏夹图片已保存到: ${file.path}');
       return file.path;
     } catch (e) {

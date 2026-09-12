@@ -71,8 +71,10 @@ class SongRankingService {
     int limit = 100,
   }) async {
     try {
-      final typeStr = type == RankingType.achievementRate ? 'achievement_rate' : 'dx_score';
-      final url = Uri.parse('${ApiUrls.SongRankingsBaseUrl}/$songId/$difficultyIndex/$typeStr')
+      final typeStr =
+          type == RankingType.achievementRate ? 'achievement_rate' : 'dx_score';
+      final url = Uri.parse(
+              '${ApiUrls.SongRankingsBaseUrl}/$songId/$difficultyIndex/$typeStr')
           .replace(queryParameters: {'limit': limit.toString()});
 
       final response = await ApiClient.get(url);
@@ -83,7 +85,8 @@ class SongRankingService {
           return data.map((e) => RankingEntry.fromJson(e)).toList();
         }
       }
-      debugPrint('[SongRankingService] HTTP ${response.statusCode}: ${response.body}');
+      debugPrint(
+          '[SongRankingService] HTTP ${response.statusCode}: ${response.body}');
     } catch (e) {
       debugPrint('[SongRankingService] Error fetching ranking: $e');
     }
@@ -98,7 +101,8 @@ class SongRankingService {
     String playerId,
   ) async {
     try {
-      final typeStr = type == RankingType.achievementRate ? 'achievement_rate' : 'dx_score';
+      final typeStr =
+          type == RankingType.achievementRate ? 'achievement_rate' : 'dx_score';
       final url = Uri.parse(
         '${ApiUrls.SongRankingsBaseUrl}/$songId/$difficultyIndex/$typeStr/user/$playerId',
       );
@@ -136,7 +140,8 @@ class SongRankingService {
     return '';
   }
 
-  Future<bool> _validateRecord(String songId, int difficultyIndex, double achievementRate, int dxScore) async {
+  Future<bool> _validateRecord(String songId, int difficultyIndex,
+      double achievementRate, int dxScore) async {
     try {
       final songs = await MaimaiMusicDataManager().getCachedSongs();
       if (songs == null) return true;
@@ -146,37 +151,39 @@ class SongRankingService {
 
       final song = songs[songIndex];
 
-      // 校验规则1：达成率满分判断
       double maxAchievementRate = 101.0;
-      // 判断是否为6位ID且只有2个难度的歌曲
       if (songId.length == 6 && song.charts.length == 2) {
         maxAchievementRate = 202.0;
       }
 
       if (achievementRate > maxAchievementRate || achievementRate < 0) {
-        debugPrint('[SongRankingService] Invalid achievement rate: $achievementRate for song $songId');
+        debugPrint(
+            '[SongRankingService] Invalid achievement rate: $achievementRate for song $songId');
         return false;
       }
 
-      // 校验规则2：DX分数不得超过满分
       if (difficultyIndex >= 0 && difficultyIndex < song.charts.length) {
         int maxDxScore = 0;
 
-        // 对于6位ID且只有2个难度的歌曲，将两个难度的满分DX分相加作为满分
         if (songId.length == 6 && song.charts.length == 2) {
-          for (int i = 0; i < song.charts.length; i++) {
-            List<int> notesList = song.charts[i].notes;
-            int totalNotes = notesList.reduce((a, b) => a + b);
-            maxDxScore += totalNotes * 3;
+          for (final chart in song.charts) {
+            var noteTotal = 0;
+            for (final note in chart.notes) {
+              noteTotal += note;
+            }
+            maxDxScore += noteTotal * 3;
           }
         } else {
-          List<int> notesList = song.charts[difficultyIndex].notes;
-          int totalNotes = notesList.reduce((a, b) => a + b);
-          maxDxScore = totalNotes * 3;
+          var noteTotal = 0;
+          for (final note in song.charts[difficultyIndex].notes) {
+            noteTotal += note;
+          }
+          maxDxScore = noteTotal * 3;
         }
 
         if (dxScore > maxDxScore || dxScore < 0) {
-          debugPrint('[SongRankingService] Invalid DX score: $dxScore (max: $maxDxScore) for song $songId');
+          debugPrint(
+              '[SongRankingService] Invalid DX score: $dxScore for song $songId');
           return false;
         }
       }
@@ -188,38 +195,40 @@ class SongRankingService {
     }
   }
 
-  Future<bool> validateUserRecord(String songId, int difficultyIndex, double achievementRate, int dxScore) async {
-    return await _validateRecord(songId, difficultyIndex, achievementRate, dxScore);
+  Future<bool> validateUserRecord(String songId, int difficultyIndex,
+      double achievementRate, int dxScore) async {
+    return await _validateRecord(
+        songId, difficultyIndex, achievementRate, dxScore);
   }
 
-  Future<void> updateSongRankings(
+  Future<bool> updateSongRankings(
     String playerId,
     String playerName,
     List<Map<String, dynamic>> records, {
+    List<dynamic>? songs,
     void Function(int sentBatches, int totalBatches)? onBatchProgress,
   }) async {
     try {
-      // 预加载所有歌曲数据用于校验
-      final songs = await MaimaiMusicDataManager().getCachedSongs();
+      // 歌曲按 id 建索引，避免逐记录 indexWhere 全表扫描（O(记录数×歌曲数)），
+      // 直接把校验从平方级降到线性。
+      final resolvedSongs =
+          songs ?? await MaimaiMusicDataManager().getCachedSongs();
+      final songById = <String, dynamic>{};
+      for (final song in resolvedSongs ?? const <dynamic>[]) {
+        songById[song.id] = song;
+      }
 
-      // 过滤有效记录
-      List<Map<String, dynamic>> validRecords = [];
-      for (var record in records) {
+      final validRecords = <Map<String, dynamic>>[];
+      for (final record in records) {
         try {
-          String songId = record['song_id'].toString();
-          int difficultyIndex = int.tryParse(record['level_index'].toString()) ?? 0;
-
-          dynamic achievementsValue = record['achievements'];
-          double achievementRate = 0.0;
-          if (achievementsValue is num) {
-            achievementRate = achievementsValue.toDouble();
-          } else if (achievementsValue is String) {
-            achievementRate = double.tryParse(achievementsValue) ?? 0.0;
-          }
-
-          int dxScore = int.tryParse(record['dxScore'].toString()) ?? 0;
-
-          if (_validateRecordSync(songs, songId, difficultyIndex, achievementRate, dxScore)) {
+          final songId = record['song_id'].toString();
+          final difficultyIndex =
+              int.tryParse(record['level_index'].toString()) ?? 0;
+          final achievementRate =
+              (record['achievements'] as num?)?.toDouble() ?? 0.0;
+          final dxScore = int.tryParse(record['dxScore'].toString()) ?? 0;
+          if (_validateRecordSync(songById, songId, difficultyIndex,
+              achievementRate, dxScore)) {
             validRecords.add(record);
           }
         } catch (e) {
@@ -227,153 +236,160 @@ class SongRankingService {
         }
       }
 
-      if (validRecords.isEmpty) {
-        debugPrint('[SongRankingService] No valid records to update for player $playerId');
-        return;
-      }
+      // 每张谱面只取其最佳：成就率最高、DX 分最高（可能来自不同一局）。
+      final clientBest = _groupClientBest(validRecords);
 
-      // 构建请求 payload
-      List<Map<String, dynamic>> payloadRecords = [];
-      for (var record in validRecords) {
-        String songId = record['song_id'].toString();
-        int difficultyIndex = int.tryParse(record['level_index'].toString()) ?? 0;
+      // 拉取服务器已存的该玩家成绩，做增量：只发送「服务器没有的新谱面」和
+      // 「比服务器更高分」的记录，避免整包重传。拉取失败时返回空表 —— 此时
+      // 所有记录都被当作新记录，退化为全量上传（幂等、安全）。
+      final serverScores = await fetchPlayerStoredScores(playerId);
+      debugPrint(
+          '[SongRankingService] Fetched ${serverScores.length} stored score(s) from server for player $playerId');
 
-        dynamic achievementsValue = record['achievements'];
-        double achievementRate = 0.0;
-        if (achievementsValue is num) {
-          achievementRate = achievementsValue.toDouble();
-        } else if (achievementsValue is String) {
-          achievementRate = double.tryParse(achievementsValue) ?? 0.0;
+      final payloadRecords = <Map<String, dynamic>>[];
+      for (final best in clientBest.values) {
+        final key = '${best.songId}|${best.difficultyIndex}';
+        final server = serverScores[key];
+        // 该谱面的 DX 满分（note 总数 × 3，UTAGE 双谱面求和）。
+        // 若服务器尚未存过 max_dx_score（旧数据），即使成绩未提升也要重传，
+        // 以便把缺失的 max_dx_score 回填回去 —— 否则平均DX得分达成率恒为 0。
+        final computedMaxDx =
+            _maxDxScoreOf(songById, best.songId, best.difficultyIndex);
+        if (server == null) {
+          // 服务器没有该谱面：新增。
+          payloadRecords.add({
+            'songId': best.songId,
+            'difficultyIndex': best.difficultyIndex,
+            'achievementRate': best.achievementRate,
+            'dxScore': best.dxScore,
+            'fc': best.fc,
+            'maxDxScore': computedMaxDx,
+          });
+          continue;
         }
 
-        int dxScore = int.tryParse(record['dxScore'].toString()) ?? 0;
-        String fc = record['fc']?.toString() ?? '';
+        // 把「客户端最佳」与「服务器已存」合并成双方较高的水位线，
+        // 任一项（达成率/DX/连击）提升都更新，且绝不回退。
+        final bestAch = best.achievementRate > server.achievementRate
+            ? best.achievementRate
+            : server.achievementRate;
+        final bestDx = best.dxScore > server.dxScore
+            ? best.dxScore
+            : server.dxScore;
+        final bestFc = _gradePriorityOf(best.fc) > _gradePriorityOf(server.fc)
+            ? best.fc
+            : server.fc;
+
+        final missingMaxDx = server.maxDxScore <= 0 && computedMaxDx > 0;
+        final improved = bestAch > server.achievementRate ||
+            bestDx > server.dxScore ||
+            bestFc != server.fc ||
+            missingMaxDx;
+        if (!improved) continue;
 
         payloadRecords.add({
-          'songId': songId,
-          'difficultyIndex': difficultyIndex,
-          'achievementRate': achievementRate,
-          'dxScore': dxScore,
-          'fc': fc,
+          'songId': best.songId,
+          'difficultyIndex': best.difficultyIndex,
+          'achievementRate': bestAch,
+          'dxScore': bestDx,
+          'fc': bestFc,
+          'maxDxScore': computedMaxDx,
         });
       }
 
-      debugPrint('[SongRankingService] Sending ${payloadRecords.length} records to server for player $playerId');
-
-      // 单包超 100KB 会被 express 默认 body-parser 拦截（413 PayloadTooLarge），
-      // 这里按记录数分批上传，每批 500 条 ≈ 60-75KB，留足余量。
-      const int batchSize = 500;
-      final totalBatches = (payloadRecords.length / batchSize).ceil();
-      int totalUpdated = 0;
-      int totalSkipped = 0;
-      int failedBatches = 0;
-
-      debugPrint(
-          '[SongRankingService] Splitting into $totalBatches batches (≤$batchSize records each)');
-
-      for (int i = 0; i < payloadRecords.length; i += batchSize) {
-        final end = (i + batchSize > payloadRecords.length)
-            ? payloadRecords.length
-            : i + batchSize;
-        final batch = payloadRecords.sublist(i, end);
-        final batchIndex = (i ~/ batchSize) + 1;
-
+      if (payloadRecords.isEmpty) {
         debugPrint(
-            '[SongRankingService] → batch $batchIndex/$totalBatches (${batch.length} records)');
-
-        onBatchProgress?.call(batchIndex, totalBatches);
-
-        try {
-          final response = await ApiClient.post(
-            Uri.parse('${ApiUrls.SongRankingsBaseUrl}/update'),
-            headers: {'Content-Type': 'application/json'},
-            body: json.encode({
-              'playerId': playerId,
-              'playerName': playerName,
-              'records': batch,
-            }),
-          );
-
-          if (response.statusCode == 200) {
-            final body = json.decode(response.body);
-            if (body['success'] == true) {
-              totalUpdated += (body['updatedCount'] as int?) ?? 0;
-              totalSkipped += (body['skippedCount'] as int?) ?? 0;
-              debugPrint(
-                  '[SongRankingService] ✓ batch $batchIndex: updated=${body['updatedCount']}, skipped=${body['skippedCount']}');
-            } else {
-              failedBatches++;
-              debugPrint(
-                  '[SongRankingService] ✗ batch $batchIndex rejected: ${body['error'] ?? 'unknown'}');
-            }
-          } else {
-            failedBatches++;
-            debugPrint(
-                '[SongRankingService] ✗ batch $batchIndex HTTP ${response.statusCode}: ${response.body}');
-          }
-        } catch (e) {
-          failedBatches++;
-          debugPrint('[SongRankingService] ✗ batch $batchIndex error: $e');
-        }
+            '[SongRankingService] No new/increased records to update for player $playerId');
+        onBatchProgress?.call(1, 1);
+        return true;
       }
 
+      // 单个 bulk-update 请求会受服务器请求体大小限制（HTTP 413），
+      // 因此把记录拆成多个批次顺序上传，并逐批回调进度。
+      const batchSize = 300;
+      final totalBatches = (payloadRecords.length + batchSize - 1) ~/ batchSize;
       debugPrint(
-          '[SongRankingService] All batches done for $playerId: $totalUpdated updated, $totalSkipped skipped, $failedBatches failed');
+          '[SongRankingService] Sending ${payloadRecords.length} records in $totalBatches batch(es) for $playerId');
+      for (var i = 0; i < totalBatches; i++) {
+        final start = i * batchSize;
+        final end = (start + batchSize) < payloadRecords.length
+            ? start + batchSize
+            : payloadRecords.length;
+        final batch = payloadRecords.sublist(start, end);
+        final response = await ApiClient.postGzip(
+          Uri.parse(ApiUrls.SongRankingsBulkUpdateUrl),
+          body: {
+            'playerId': playerId,
+            'playerName': playerName,
+            'records': batch,
+          },
+          // 服务端每个批次要写入约 300 条记录，15s 默认超时容易触发
+          // TimeoutException，这里给足写入时间。
+          timeout: const Duration(seconds: 60),
+        );
+        if (response.statusCode != 200) {
+          debugPrint(
+              '[SongRankingService] bulk update HTTP ${response.statusCode}: ${response.body}');
+          return false;
+        }
+        final body = json.decode(response.body);
+        if (body['success'] != true) {
+          debugPrint(
+              '[SongRankingService] bulk update failed: ${body['error'] ?? 'unknown'}');
+          return false;
+        }
+        debugPrint(
+            '[SongRankingService] bulk update batch ${i + 1}/$totalBatches done: updated=${body['updatedCount']}, skipped=${body['skippedCount']}');
+        onBatchProgress?.call(i + 1, totalBatches);
+      }
+      debugPrint(
+          '[SongRankingService] bulk update done: ${payloadRecords.length} records across $totalBatches batch(es) for $playerId');
+      return true;
     } catch (e) {
       debugPrint('[SongRankingService] Error updating rankings: $e');
+      return false;
     }
   }
 
-  // 同步版本的校验方法，使用预加载的数据
   bool _validateRecordSync(
-    List<dynamic>? songs,
+    Map<String, dynamic>? songById,
     String songId,
     int difficultyIndex,
     double achievementRate,
     int dxScore,
   ) {
     try {
-      if (songs == null || songs.isEmpty) return true;
+      if (songById == null || songById.isEmpty) return true;
 
-      // 查找歌曲
-      final songIndex = songs.indexWhere((s) => s.id == songId);
-      if (songIndex == -1) return true;
-
-      final song = songs[songIndex];
-
-      // 校验规则1：达成率满分判断
+      final song = songById[songId];
+      if (song == null) return true;
       double maxAchievementRate = 101.0;
       if (songId.length == 6 && song.charts.length == 2) {
         maxAchievementRate = 202.0;
       }
-
       if (achievementRate > maxAchievementRate || achievementRate < 0) {
-        debugPrint('[SongRankingService] Invalid achievement rate: $achievementRate for song $songId');
         return false;
       }
 
-      // 校验规则2：DX分数不得超过满分
       if (difficultyIndex >= 0 && difficultyIndex < song.charts.length) {
         int maxDxScore = 0;
-
         if (songId.length == 6 && song.charts.length == 2) {
-          for (int i = 0; i < song.charts.length; i++) {
-            List<int> notesList = song.charts[i].notes;
-            int totalNotes = notesList.reduce((a, b) => a + b);
-            maxDxScore += totalNotes * 3;
+          for (final chart in song.charts) {
+            var noteTotal = 0;
+            for (final note in chart.notes) {
+              noteTotal += (note as num).toInt();
+            }
+            maxDxScore += noteTotal * 3;
           }
         } else {
-          List<int> notesList = song.charts[difficultyIndex].notes;
-          int totalNotes = notesList.reduce((a, b) => a + b);
-          maxDxScore = totalNotes * 3;
+          var noteTotal = 0;
+          for (final note in song.charts[difficultyIndex].notes) {
+            noteTotal += (note as num).toInt();
+          }
+          maxDxScore = noteTotal * 3;
         }
-
-        if (dxScore > maxDxScore || dxScore < 0) {
-          debugPrint('[SongRankingService] Invalid DX score: $dxScore (max: $maxDxScore) for song $songId');
-          return false;
-        }
+        if (dxScore > maxDxScore || dxScore < 0) return false;
       }
-
       return true;
     } catch (e) {
       debugPrint('[SongRankingService] Error validating record: $e');
@@ -381,17 +397,191 @@ class SongRankingService {
     }
   }
 
-  Future<void> deleteSongRankings(String playerId) async {
+  // 计算某张谱面的 DX 满分（note 总数 × 3）。UTAGE 双谱面时为两张谱面之和。
+  // 用于换算「DX 得分达成率 = dxScore / maxDxScore」，返回 0 表示无法计算。
+  int _maxDxScoreOf(
+    Map<String, dynamic>? songById,
+    String songId,
+    int difficultyIndex,
+  ) {
+    try {
+      final song = songById?[songId];
+      if (song == null) return 0;
+      int maxDxScore = 0;
+      if (songId.length == 6 && song.charts.length == 2) {
+        for (final chart in song.charts) {
+          var noteTotal = 0;
+          for (final note in chart.notes) {
+            noteTotal += (note as num).toInt();
+          }
+          maxDxScore += noteTotal * 3;
+        }
+      } else {
+        if (difficultyIndex < 0 || difficultyIndex >= song.charts.length) {
+          return 0;
+        }
+        var noteTotal = 0;
+        for (final note in song.charts[difficultyIndex].notes) {
+          noteTotal += (note as num).toInt();
+        }
+        maxDxScore = noteTotal * 3;
+      }
+      return maxDxScore;
+    } catch (e) {
+      debugPrint('[SongRankingService] Error computing max DX score: $e');
+      return 0;
+    }
+  }
+
+  // 拉取服务器已存的该玩家全部单曲成绩。返回按 (songId|difficultyIndex) 索引的
+  // { achievementRate, dxScore, fc, maxDxScore }。兼容 { success, data } 包装与裸
+  // data 数组，同时兼容 camelCase（songId/difficultyIndex/achievementRate/maxDxScore）
+  // 与 snake_case（song_id/level_index/achievements/max_dx_score）字段。拉取失败返回空表，
+  // 便于上层退化为全量上传。
+  Future<Map<String,
+          ({double achievementRate, int dxScore, String fc, int maxDxScore})>>
+      fetchPlayerStoredScores(String playerId) async {
+    final url = Uri.parse('${ApiUrls.SongRankingsPlayerUrl}/$playerId');
+    try {
+      final response = await ApiClient.get(url);
+      if (response.statusCode == 200) {
+        final body = json.decode(response.body);
+        dynamic data = body;
+        if (body is Map<String, dynamic>) {
+          data = body['data'] ?? data;
+        }
+        final list = data is List ? data : <dynamic>[];
+        final map = <String,
+            ({
+              double achievementRate,
+              int dxScore,
+              String fc,
+              int maxDxScore,
+            })>{};
+        for (final item in list) {
+          if (item is! Map<String, dynamic>) continue;
+          final songId = (item['songId'] ?? item['song_id'] ?? '').toString();
+          final difficultyIndex =
+              int.tryParse((item['difficultyIndex'] ?? item['level_index'] ?? 0)
+                      .toString()) ??
+                  0;
+          final achRaw = item['achievementRate'] ?? item['achievements'] ?? 0;
+          final achievementRate =
+              achRaw is num ? achRaw.toDouble() : 0.0;
+          final dxScore = int.tryParse((item['dxScore'] ?? 0).toString()) ?? 0;
+          final fc = (item['fc'] ?? '').toString();
+          final maxDxScore =
+              int.tryParse((item['maxDxScore'] ?? item['max_dx_score'] ?? 0)
+                      .toString()) ??
+                  0;
+          if (songId.isNotEmpty) {
+            map['$songId|$difficultyIndex'] = (
+              achievementRate: achievementRate,
+              dxScore: dxScore,
+              fc: fc,
+              maxDxScore: maxDxScore,
+            );
+          }
+        }
+        return map;
+      }
+      debugPrint(
+          '[SongRankingService] fetch stored scores HTTP ${response.statusCode}: ${response.body}');
+    } catch (e) {
+      debugPrint('[SongRankingService] Error fetching stored scores: $e');
+    }
+    return {};
+  }
+
+  // 按 (song_id, level_index) 分组，每张谱面独立保留最优指标：
+  // 成就率最高、DX 分最高、连击（fc）等级最高。
+  Map<String,
+      ({
+        String songId,
+        int difficultyIndex,
+        double achievementRate,
+        int dxScore,
+        String fc,
+      })> _groupClientBest(List<Map<String, dynamic>> records) {
+    final map = <String,
+        ({
+          String songId,
+          int difficultyIndex,
+          double achievementRate,
+          int dxScore,
+          String fc,
+        })>{};
+    for (final record in records) {
+      final songId = record['song_id'].toString();
+      final difficultyIndex =
+          int.tryParse(record['level_index'].toString()) ?? 0;
+      final key = '$songId|$difficultyIndex';
+
+      final achievementValue = record['achievements'];
+      final achievementRate = achievementValue is num
+          ? achievementValue.toDouble()
+          : double.tryParse(achievementValue?.toString() ?? '') ?? 0.0;
+      final dxScore = int.tryParse(record['dxScore'].toString()) ?? 0;
+      final fc = record['fc']?.toString() ?? '';
+
+      final cur = map[key];
+      if (cur == null) {
+        map[key] = (
+          songId: songId,
+          difficultyIndex: difficultyIndex,
+          achievementRate: achievementRate,
+          dxScore: dxScore,
+          fc: fc,
+        );
+      } else {
+        map[key] = (
+          songId: songId,
+          difficultyIndex: difficultyIndex,
+          achievementRate: achievementRate > cur.achievementRate
+              ? achievementRate
+              : cur.achievementRate,
+          dxScore: dxScore > cur.dxScore ? dxScore : cur.dxScore,
+          fc: _gradePriorityOf(fc) > _gradePriorityOf(cur.fc) ? fc : cur.fc,
+        );
+      }
+    }
+    return map;
+  }
+
+  // 连击（fc）相对等级，沿用 App 内的既有层级：fc < fcp < ap < app。
+  int _gradePriorityOf(String value) {
+    switch (value.toLowerCase()) {
+      case 'app':
+        return 4;
+      case 'ap':
+        return 3;
+      case 'fcp':
+        return 2;
+      case 'fc':
+      case 'sync':
+        return 1;
+      default:
+        return 0;
+    }
+  }
+
+  Future<bool> deleteSongRankings(String playerId) async {
     try {
       final response = await ApiClient.delete(
         Uri.parse('${ApiUrls.SongRankingsBaseUrl}/player/$playerId'),
       );
 
       if (response.statusCode == 200) {
-        debugPrint('[SongRankingService] Deleted rankings for player $playerId');
+        debugPrint(
+            '[SongRankingService] Deleted rankings for player $playerId');
+        return true;
       }
+      debugPrint(
+          '[SongRankingService] Delete failed HTTP ${response.statusCode}');
+      return false;
     } catch (e) {
       debugPrint('[SongRankingService] Error deleting rankings: $e');
+      return false;
     }
   }
 }

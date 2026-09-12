@@ -85,6 +85,9 @@ dependencies:
   geocoding: ^5.0.0
   charset: ^2.0.1
   font_awesome_flutter: ^10.7.0  # 友链页 GitHub 图标
+  flutter_colorpicker: ^1.1.0  # 设置页自定义主题色
+  http_parser: ^4.0.2  # multipart/form-data 媒体类型（ApiClient + OcrService）
+  path: ^1.9.0  # 文件路径处理（SettingsPage 后台图片）
 
 dev_dependencies:
   flutter_test:
@@ -121,6 +124,7 @@ flutter:
     - assets/userinfobg.png
     - assets/userinfobg2.png
     - assets/chiffon2.png
+    - assets/icon.png   # 关于页展示的 App 图标（原来是只给 flutter_launcher_icons 用的构建期素材，未打包）
     - assets/cover_manifest.json
     - assets/res/
     - assets/grade/

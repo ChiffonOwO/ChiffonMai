@@ -2,45 +2,34 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:my_first_flutter_app/page/RankingList/AvgScoreRankingListPage.dart';
+import 'package:my_first_flutter_app/page/RankingList/FittedRatingRankingListPage.dart';
 import 'package:my_first_flutter_app/page/RankingList/RatingRankListPage.dart';
 import 'package:my_first_flutter_app/page/RankingList/SpecialRankingListPage.dart';
+import 'package:my_first_flutter_app/service/RankingList/AvgRankingListService.dart';
 import 'dart:convert';
-import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api/ApiUrls.dart';
 import '../constant/CacheKeyConstant.dart';
 import '../constant/LoadingTipsConstant.dart';
 import '../service/HomeService.dart';
-import '../service/PaiziProgressService.dart';
-import '../service/PersonalizedScoreService.dart';
-import '../service/RecommendByTagsService.dart';
-import '../utils/CommonWidgetUtil.dart';
 import '../manager/LZYCheckUpdateManager.dart';
 import '../utils/ThemeManager.dart';
 import '../utils/AppTheme.dart';
 import '../utils/AppConstants.dart';
-import '../service/ConnectivityService.dart';
-import '../widgets/QuickSearchBar.dart';
 import 'DifficultyDistributionPage.dart';
-import '../manager/DivingFish/UserPlayDataManager.dart';
+import 'SettingsPage.dart';
 import '../manager/DivingFish/MaimaiMusicDataManager.dart';
-import '../manager/DivingFish/UnionUniManager.dart';
 import '../manager/MaidataManager.dart';
-import '../manager/DivingFish/DiffMusicDataManager.dart';
 import '../manager/SongAliasManager.dart';
-import '../manager/DivingFish/UserBest50Manager.dart';
-import '../manager/LuoXue/LuoXueUserPlayDataManager.dart';
-import '../entity/DivingFish/RecordItem.dart';
-import '../service/RankingList/SongRankingService.dart';
-import '../entity/DivingFish/Song.dart';
 import '../entity/FeatureModels.dart';
-import '../widgets/FeatureButton.dart';
+import 'HubComponents.dart';
 import 'FeatureCategoryPage.dart';
-import 'FavoriteFeaturesPage.dart';
 import '../utils/FeatureRegistry.dart';
 import 'AchievementFullReverseCalculatorPage.dart';
 import 'AchievementRateCalculatorPage.dart';
+import '../widgets/SyncScoreDialogs.dart';
 import 'VersionViewPage.dart' hide AppConstants;
 import 'Best50/Best50Page.dart';
 import 'Best50/DiffBest50Page.dart';
@@ -74,49 +63,32 @@ import 'AboutAppPage.dart';
 import 'SupportDeveloperPage.dart';
 import 'FriendLinksPage.dart';
 import 'CoverRecognitionPage.dart';
+import 'ScoreOcrPage.dart';
 import 'DataBackupPage.dart';
 import 'DailyRecommendPage.dart';
+import '../widgets/RefreshDataDialog.dart'
+    show
+        showRefreshDataDialog,
+        executeRefreshData,
+        CurrentDataSourceNotifier,
+        RefreshDataSource,
+        refreshBest50DataWithProgress,
+        launchUrlFallback;
 import 'FriendComparePage.dart';
 import 'RecentCommentsPage.dart';
 import 'RecentRatingsPage.dart';
 import 'LuoXue/UpdateLuoXueScorePage.dart';
-import '../manager/LuoXue/CollectionsManager.dart';
 import '../manager/DivingFishProbeManager.dart';
 import '../manager/DivingFish/DivingFishOAuthManager.dart';
-import '../manager/DivingFish/ProberException.dart';
-import '../entity/LuoXue/Collection.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:my_first_flutter_app/utils/FavoriteFeaturesNotifier.dart';
+import 'package:my_first_flutter_app/utils/LoginStateNotifier.dart';
+import 'package:my_first_flutter_app/utils/UserProfileNotifier.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
-// Rating上限数据类
-class RatingLimits {
-  final int best35Limit;
-  final int best15Limit;
-  final int best50Limit;
-
-  RatingLimits({
-    required this.best35Limit,
-    required this.best15Limit,
-    required this.best50Limit,
-  });
-}
-
-// ds值与歌曲对应关系数据类
-class DsSong {
-  final double ds;
-  final String songId;
-  final String songTitle;
-  final String level;
-
-  DsSong({
-    required this.ds,
-    required this.songId,
-    required this.songTitle,
-    required this.level,
-  });
-}
+// ds值与歌曲对应关系数据类已随 _calculateRatingLimits 一起抽离到
+// lib/widgets/RefreshDataDialog.dart，不再需要此处的定义。
 
 // 首页初始化时间间隔常量
 class _InitInterval {
@@ -130,67 +102,55 @@ class _InitInterval {
 /// 首页组件：有状态组件，包含所有页面元素和业务数据
 class HomePage extends StatefulWidget {
   final VoidCallback? onFirstFrameRendered;
+  final VoidCallback? onEntertainmentTap;
 
-  const HomePage({super.key, this.onFirstFrameRendered});
+  const HomePage(
+      {super.key, this.onFirstFrameRendered, this.onEntertainmentTap});
 
   @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-/// 数据源枚举
-enum DataSource {
-  shuiyu, // 水鱼
-  luoxue, // 落雪
+  State<HomePage> createState() => HomePageState();
 }
 
 /// 首页状态类：处理页面状态、存储数据、实现布局构建
-class _HomePageState extends State<HomePage> {
-  // 个人信息展示风格
-  bool _useCardStyle = true; // true=卡片式，false=经典式
+class HomePageState extends State<HomePage> {
+  void showAccountManageDialog() {
+    if (!mounted) return;
+    _showAccountManageDialog(context);
+  }
 
-  // 功能搜索过滤
-  String _featureSearchQuery = '';
-
-  // 收藏的功能
-  Set<String> _favoriteTitles = {};
+  // 收藏的功能（实际数据来自 FavoriteFeaturesNotifier，字段保留便于本地访问）
+  Set<String> _favoriteTitles = <String>{};
 
   // 后台初始化状态
   bool _isBackgroundInitializing = false;
   bool _isInitializationCompleted = false;
   String _initializationProgress = '';
 
-  // 用户数据
-  String _userNickname = "U+5E78";
-  int _best50TotalRA = 15049;
-  int _best35TotalRA = 10670;
-  int _best15TotalRA = 4379;
+  // 用户数据（昵称 / Rating）：实际数据来自 UserProfileNotifier，字段保留便于本地访问
+  String _userNickname = "";
+  // 0 表示尚未从水鱼/落雪拉取真实数据；UI 层用 _displayBest* 回落为 "-"
+  int _best50TotalRA = 0;
+  int _best35TotalRA = 0;
+  int _best15TotalRA = 0;
 
-  // 缓存的QQ号
+  // 缓存的QQ号（实际数据来自 UserProfileNotifier，字段保留便于本地访问）
   String _cachedQQ = "";
-
-  // 当前数据源
-  DataSource _currentDataSource = DataSource.shuiyu;
-
-  // 头像选择器
-  int _selectedAvatarId = 1;
-  List<Collection> _avatarIcons = [];
-
-  // 姓名框选择器
-  int? _selectedPlateId;
-  List<Collection> _avatarPlates = [];
 
   // 初始化方法，用于从本地存储加载数据
   @override
   void initState() {
     super.initState();
-    _loadProfileCardStyle();
+    // 监听用户档案共享状态（昵称 / Rating / QQ 跨页面同步）
+    UserProfileNotifier.instance.addListener(_onUserProfileChanged);
+    _onUserProfileChanged();
+    // 加载当前数据源（首页摘要"数据源"显示用）
+    CurrentDataSourceNotifier.load();
     _loadUserData();
-    _loadCachedAvatarId();
-    _fetchAvatarIcons();
-    _loadCachedPlateId();
-    _fetchAvatarPlates();
     _autoCheckUpdate();
     _checkDivingFishLoginStatus();
+    // 注意：收藏列表的实时同步不再走 addListener，
+    // 而是直接在 build 顶层用 ValueListenableBuilder<FavoritesPayload>
+    // 包整个 Scaffold，确保 IndexedStack 内任意子页面点星标时首页都能立即重建。
     _loadFavoriteCount();
     // 无论冷却状态如何，都先加载别名缓存到内存
     // 防止冷却期间别名丢失（详见：冷却逻辑在_initializeDataInBackground内）
@@ -220,41 +180,15 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // 加载个人信息展示风格偏好
-  Future<void> _loadProfileCardStyle() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (mounted) {
-        setState(() {
-          _useCardStyle =
-              prefs.getBool(CacheKeyConstant.profileCardStyle) ?? true;
-        });
-      }
-    } catch (e) {
-      debugPrint('加载个人信息展示风格失败: $e');
-    }
-  }
-
-  // 切换并保存个人信息展示风格
-  Future<void> _toggleProfileCardStyle() async {
-    final newStyle = !_useCardStyle;
-    setState(() => _useCardStyle = newStyle);
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(CacheKeyConstant.profileCardStyle, newStyle);
-    } catch (e) {
-      debugPrint('保存个人信息展示风格失败: $e');
-    }
-  }
-
   // 从本地存储加载用户数据
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _userNickname = prefs.getString('userNickname') ?? "U+5E78";
-      _best50TotalRA = prefs.getInt('best50TotalRA') ?? 15049;
-      _best35TotalRA = prefs.getInt('best35TotalRA') ?? 10670;
-      _best15TotalRA = prefs.getInt('best15TotalRA') ?? 4379;
+      _userNickname = prefs.getString('userNickname') ?? '';
+      // 0 表示尚未拉到真实数据，UI 显示为 "-"
+      _best50TotalRA = prefs.getInt('best50TotalRA') ?? 0;
+      _best35TotalRA = prefs.getInt('best35TotalRA') ?? 0;
+      _best15TotalRA = prefs.getInt('best15TotalRA') ?? 0;
       _cachedQQ = prefs.getString('cachedQQ') ?? "";
     });
   }
@@ -333,24 +267,24 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // 保存用户数据到本地存储
-  Future<void> _saveUserData() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('userNickname', _userNickname);
-    await prefs.setInt('best50TotalRA', _best50TotalRA);
-    await prefs.setInt('best35TotalRA', _best35TotalRA);
-    await prefs.setInt('best15TotalRA', _best15TotalRA);
-  }
-
   // 保存QQ号到本地存储
   Future<void> _saveQQ(String qq) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('cachedQQ', qq);
+    await prefs.setString(CacheKeyConstant.probeDivingFishBindQQ, qq);
     if (mounted) {
       setState(() {
         _cachedQQ = qq;
       });
     }
+    // 同步共享 notifier，让我的页头像区也能即时更新 QQ 字段
+    UserProfileNotifier.replace(UserProfile(
+      nickname: _userNickname,
+      best50TotalRA: _best50TotalRA,
+      best35TotalRA: _best35TotalRA,
+      best15TotalRA: _best15TotalRA,
+      cachedQQ: qq,
+    ));
   }
 
   // 使用 ValueNotifier 以便 FeatureCategoryPage 等子页面也能响应登录状态变化
@@ -359,17 +293,38 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    UserProfileNotifier.instance.removeListener(_onUserProfileChanged);
     _loginStateNotifier.dispose();
     super.dispose();
+  }
+
+  /// 渲染用的 Rating：值为 0 时回落为 "-"，避免暴露 15049/10670/4379 这类硬编码占位。
+  String _displayBest50RA() => _best50TotalRA == 0 ? '-' : '$_best50TotalRA';
+  String _displayBest35RA() => _best35TotalRA == 0 ? '-' : '$_best35TotalRA';
+  String _displayBest15RA() => _best15TotalRA == 0 ? '-' : '$_best15TotalRA';
+
+  /// 共享用户档案变更回调：把 notifier 中的值同步到本地字段，
+  /// 触发 setState 后首页"欢迎回来，xxx" / 仪表盘 Rating 等区域立刻更新。
+  void _onUserProfileChanged() {
+    if (!mounted) return;
+    final p = UserProfileNotifier.instance.value;
+    setState(() {
+      _userNickname = p.nickname;
+      _best50TotalRA = p.best50TotalRA;
+      _best35TotalRA = p.best35TotalRA;
+      _best15TotalRA = p.best15TotalRA;
+      _cachedQQ = p.cachedQQ;
+    });
   }
 
   Future<void> _checkDivingFishLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final jwt = prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '';
-    if (mounted) {
-      _loginStateNotifier.value = jwt.isNotEmpty;
-      setState(() {});
-    }
+    // 只更新 ValueNotifier；登录态变化本身就是触发重建的信号，不需要再 setState
+    final loggedIn = jwt.isNotEmpty;
+    _loginStateNotifier.value = loggedIn;
+    // 同步共享 LoginStateNotifier，让"我的"页等监听者也能感知登录态变化
+    LoginStateNotifier.setLoggedIn(loggedIn);
   }
 
   Future<void> _loadFavoriteCount() async {
@@ -383,34 +338,40 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _toggleFavorite(String title) async {
-    setState(() {
-      if (_favoriteTitles.contains(title)) {
-        _favoriteTitles.remove(title);
-      } else {
-        _favoriteTitles.add(title);
-      }
-    });
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(
-        CacheKeyConstant.favoriteFeatures, _favoriteTitles.toList());
+    // 通过共享 notifier 切换；顶层 ValueListenableBuilder 会随之重建首页 UI。
+    await FavoriteFeaturesNotifier.toggle(title);
   }
 
   Future<void> _logoutDivingFish() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(CacheKeyConstant.probeDivingFishToken);
-    await prefs.remove(CacheKeyConstant.probeDivingFishImportToken);
-    await prefs.remove(CacheKeyConstant.probeDivingFishBindQQ);
-    // 清除缓存的用户标识符，防止排行榜等页面使用旧账号数据
-    await prefs.remove('cachedQQ');
-    await prefs.remove(CacheKeyConstant.shuiyuUserId);
-    await prefs.remove(CacheKeyConstant.luoxueUserId);
-    await prefs.remove(CacheKeyConstant.lastDataSource);
-    if (mounted) {
-      _loginStateNotifier.value = false;
-      setState(() {
-        _cachedQQ = '';
-      });
+    // 集中清理：清掉水鱼账号相关的所有成绩 / 缓存（保留歌曲 / 收藏品等静态数据）
+    if (!mounted) return;
+    // 立即给出视觉反馈：清缓存是逐键移除，可能耗时较久，先弹一个加载框
+    // 避免出现"点了半天没反应"的空白等待。
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('正在登出水鱼账号…'),
+          ],
+        ),
+      ),
+    );
+    try {
+      await UserProfileNotifier.clearShuiyuAccountCache();
+      // 同时把内存中的 CurrentDataSourceNotifier 重置为水鱼（load 会读 prefs，已被清空，回退默认）
+      await CurrentDataSourceNotifier.load();
+    } catch (e) {
+      debugPrint('登出水鱼账号失败：$e');
     }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop();
+    LoginStateNotifier.setLoggedIn(false);
+    _loginStateNotifier.value = false;
     Fluttertoast.showToast(msg: '已登出水鱼账号');
   }
 
@@ -418,713 +379,311 @@ class _HomePageState extends State<HomePage> {
       FeatureRegistry.allCategories(_isDivingFishLoggedIn);
 
   /// 不参与首页搜索和收藏的分类名集合
-  static const Set<String> _excludedFromSearch = {'友情链接'};
+  static const Set<String> _excludedFromSearch = <String>{};
 
   /// 参与首页搜索和收藏的分类（已过滤掉 _excludedFromSearch 中的项）
   List<ButtonCategory> get _searchableCategories => _buttonCategories
       .where((c) => !_excludedFromSearch.contains(c.name))
       .toList();
 
-  /// 已收藏的功能项（扁平化所有分类中的已收藏项）
-  List<ButtonItem> get _favoritedItems => _searchableCategories
-      .expand((c) => c.items)
-      .where((item) => _favoriteTitles.contains(item.title))
-      .toList();
-
   @override
   Widget build(BuildContext context) {
-    // 获取屏幕尺寸
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
+    // 顶层直接监听共享收藏列表：
+    //   IndexedStack 子页面点星标 / 收藏管理页删除收藏 / 其他 Hub 页切换收藏时，
+    //   整页 Scaffold 必定重建，"收藏的功能"区域即时刷新。
+    //   不依赖 addListener 隐式 setState（IndexedStack 中非可见子页在某些情况下
+    //   不会触发自身的 markNeedsBuild 链路）。
+    return ValueListenableBuilder<FavoritesPayload>(
+      valueListenable: FavoriteFeaturesNotifier.instance,
+      builder: (context, payload, _) {
+        // 直接用 notifier 的最新 titles 渲染；本地 _favoriteTitles 字段仍保留，
+        // 仅给 _loadFavoriteCount 初始化时使用
+        return _buildScaffold(context, payload.titles);
+      },
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context, Set<String> favoriteTitles) {
+    final scheme = Theme.of(context).colorScheme;
     final brightness = Theme.of(context).brightness;
 
-    // 页面根布局：Scaffold + Stack 实现多层级叠加布局
-    // Stack子组件按书写顺序从上到下叠加，越靠后层级越高
     return Scaffold(
-      backgroundColor: Colors.transparent, // 透明背景，显示底层图片
-      resizeToAvoidBottomInset: false, // 防止输入法弹出时重新布局导致卡顿
-      body: Stack(
-        children: [
-          // 层级1：基础背景图 - 使用通用背景Widget
-          CommonWidgetUtil.buildCommonBgWidget(),
-
-          // 层级2：第一张虚化装饰图 - 使用通用装饰背景Widget
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // ChiffonMai 标题
-          if (_useCardStyle)
-            Positioned(
-              top: screenHeight * 0.08,
-              left: 0,
-              right: 0,
-              child: Text(
-                "ChiffonMai",
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: screenWidth * 0.07,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 3,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-
-          // 层级3：个人信息区域
-          if (_useCardStyle)
-            Positioned(
-              top: screenHeight * 0.14,
-              left: screenWidth * 0.03,
-              right: screenWidth * 0.03,
-              child: _buildProfileCard(context),
-            )
-          else
-            ..._buildClassicProfile(context),
-
-          // 层级5：核心功能区 - 分分类的可滚动按钮区域
-          Positioned(
-            left: screenWidth * 0.02,
-            right: screenWidth * 0.02,
-            top: _useCardStyle ? screenHeight * 0.335 : screenHeight * 0.34,
-            bottom: 10 + safeBottom,
-            child: Builder(
-              builder: (context) {
-                final brightness = Theme.of(context).brightness;
-                return Container(
-                  decoration: BoxDecoration(
-                    color:
-                        Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius:
-                        BorderRadius.circular(AppConstants.borderRadiusSmall),
-                    boxShadow: [AppConstants.defaultShadow(brightness)],
-                  ),
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.symmetric(
-                        horizontal: screenWidth * 0.03,
-                        vertical: screenHeight * 0.015),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // 功能搜索栏
-                        QuickSearchBar(
-                          onChanged: (query) {
-                            setState(() =>
-                                _featureSearchQuery = query.toLowerCase());
-                          },
-                        ),
-                        // 分类按钮区域（支持搜索过滤）
-                        if (_featureSearchQuery.isEmpty) ...[
-                          // 搜索为空：收藏的功能区域（置顶，直接显示入口）
-                          _buildFavoriteFeaturesSection(context),
-                          if (_favoritedItems.isNotEmpty) ...[
-                            SizedBox(height: screenHeight * 0.012),
-                            const Divider(height: 1, thickness: 1),
-                            SizedBox(height: screenHeight * 0.012),
-                          ],
-                          // 大类导航卡片
-                          ..._buttonCategories.map((category) {
-                            // 友情链接：点击直接进入友链页面，跳过 FeatureCategoryPage 中间层
-                            if (category.name == '友情链接') {
-                              return _buildCategoryCard(
-                                category,
-                                context,
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (ctx) =>
-                                          const FriendLinksPage(),
-                                    ),
-                                  );
-                                },
-                              );
-                            }
-                            return _buildCategoryCard(category, context);
-                          }),
-                        ],
-                        if (_featureSearchQuery.isNotEmpty)
-                          // 搜索有内容：显示匹配的功能按钮（保持原有分类分组行为）
-                          // 注：友情链接等被排除的分类（_excludedFromSearch）不会出现在搜索结果中
-                          ..._searchableCategories.where((category) {
-                            return category.items.any((item) =>
-                                item.title
-                                    .toLowerCase()
-                                    .contains(_featureSearchQuery) ||
-                                item.subtitle
-                                    .toLowerCase()
-                                    .contains(_featureSearchQuery));
-                          }).map((category) {
-                            final filteredItems = category.items
-                                .where((item) =>
-                                    item.title
-                                        .toLowerCase()
-                                        .contains(_featureSearchQuery) ||
-                                    item.subtitle
-                                        .toLowerCase()
-                                        .contains(_featureSearchQuery))
-                                .toList();
-                            return _buildCategorySection(
-                              ButtonCategory(
-                                  name: category.name, items: filteredItems),
-                              context,
-                            );
-                          }),
-                      ],
-                    ),
-                  ),
-                ); // Container end
-              }, // Builder callback
-            ), // Builder end
-          ),
-
-          // 后台初始化状态提示
-          if (_isBackgroundInitializing || _isInitializationCompleted)
-            Positioned(
-              bottom: screenHeight * 0.06 + safeBottom,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Container(
-                  constraints: BoxConstraints(maxWidth: screenWidth * 0.8),
-                  padding: EdgeInsets.symmetric(
-                      horizontal: screenWidth * 0.05,
-                      vertical: screenHeight * 0.015),
-                  decoration: BoxDecoration(
-                    color: _isInitializationCompleted
-                        ? AppColors.successGreen(brightness)
-                            .withValues(alpha: 0.85)
-                        : Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest
-                            .withValues(alpha: 0.95),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      if (!_isInitializationCompleted)
-                        SizedBox(
-                          width: screenWidth * 0.04,
-                          height: screenWidth * 0.04,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                      if (!_isInitializationCompleted)
-                        SizedBox(width: screenWidth * 0.02),
-                      Flexible(
-                        child: Text(
-                          _initializationProgress,
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.03,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // 从本地存储加载缓存的头像ID
-  Future<void> _loadCachedAvatarId() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final cachedId = prefs.getInt('selectedAvatarId');
-      if (cachedId != null && mounted) {
-        setState(() => _selectedAvatarId = cachedId);
-      }
-    } catch (e) {
-      debugPrint('加载缓存头像ID失败: $e');
-    }
-  }
-
-  // 保存头像ID到本地存储
-  Future<void> _saveAvatarId(int id) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('selectedAvatarId', id);
-    } catch (e) {
-      debugPrint('保存头像ID失败: $e');
-    }
-  }
-
-  // 获取头像列表
-  Future<void> _fetchAvatarIcons() async {
-    try {
-      final collectionData = await CollectionsManager().fetchIconsCollections();
-      if (collectionData?.icons != null && mounted) {
-        setState(() => _avatarIcons = collectionData!.icons!);
-      }
-    } catch (e) {
-      debugPrint('获取头像列表失败: $e');
-    }
-  }
-
-  // 从本地加载姓名框 ID
-  Future<void> _loadCachedPlateId() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final cached = prefs.getInt(CacheKeyConstant.selectedPlateIdCache);
-      if (mounted) setState(() => _selectedPlateId = cached);
-    } catch (e) {
-      debugPrint('加载姓名框ID失败: $e');
-    }
-  }
-
-  // 保存姓名框 ID（传 null 表示清除）
-  Future<void> _savePlateId(int? id) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (id == null) {
-        await prefs.remove(CacheKeyConstant.selectedPlateIdCache);
-      } else {
-        await prefs.setInt(CacheKeyConstant.selectedPlateIdCache, id);
-      }
-    } catch (e) {
-      debugPrint('保存姓名框ID失败: $e');
-    }
-  }
-
-  // 获取姓名框列表
-  Future<void> _fetchAvatarPlates() async {
-    try {
-      final collectionData = await CollectionsManager().fetchPlatesCollections();
-      if (collectionData?.plates != null && mounted) {
-        setState(() => _avatarPlates = collectionData!.plates!);
-      }
-    } catch (e) {
-      debugPrint('获取姓名框列表失败: $e');
-    }
-  }
-
-  // 构建经典式个人信息区域（userinfobg2 风格）
-  List<Widget> _buildClassicProfile(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    return [
-      // userinfobg2 装饰图
-      Center(
-        child: Transform.translate(
-          offset: const Offset(0, -30),
-          child: Image.asset(
-            'assets/userinfobg2.png',
-            fit: BoxFit.cover,
-            opacity: const AlwaysStoppedAnimation(1),
-          ),
-        ),
-      ),
-      // 标题
-      Positioned(
-        top: screenHeight * 0.08,
-        left: 0,
-        right: 0,
-        child: Column(
-          children: [
-            Text(
-              "ChiffonMai",
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: screenWidth * 0.06,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 2,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: screenHeight * 0.01),
-            Text(
-              "基本信息",
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: screenWidth * 0.045,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-      // 主题切换 + 风格切换
-      Positioned(
-        top: screenHeight * 0.07,
-        right: screenWidth * 0.02,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            GestureDetector(
-              onTap: _toggleProfileCardStyle,
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surface
-                      .withValues(alpha: 0.7),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Icon(Icons.swap_horiz,
-                    size: 20, color: Theme.of(context).colorScheme.onSurface),
-              ),
-            ),
-            const SizedBox(width: 6),
-            _buildThemeToggleButton(context),
-          ],
-        ),
-      ),
-      // 头像
-      Positioned(
-        left: screenWidth * 0.1,
-        top: screenHeight * 0.19,
-        child: _buildClassicAvatar(context),
-      ),
-      // 用户信息
-      Positioned(
-        left: screenWidth * 0.5,
-        top: screenHeight * 0.21,
-        child: _buildClassicUserInfo(context),
-      ),
-    ];
-  }
-
-  // 经典式头像
-  Widget _buildClassicAvatar(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final avatarSize = screenWidth * 0.3;
-    final brightness = Theme.of(context).brightness;
-
-    return GestureDetector(
-      onTap: _showCollectionPicker,
-      child: Container(
-        width: avatarSize,
-        height: avatarSize,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
-          border: Border.all(
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.4),
-              width: 1.5),
-          boxShadow: [AppConstants.defaultShadow(brightness)],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: CachedNetworkImage(
-            imageUrl:
-                'https://assets2.lxns.net/maimai/icon/$_selectedAvatarId.png',
-            placeholder: (ctx, url) => Icon(Icons.person,
-                size: 30, color: AppColors.greyHint(brightness)),
-            errorWidget: (ctx, url, err) => Icon(Icons.person,
-                size: 30, color: AppColors.greyHint(brightness)),
-            fit: BoxFit.cover,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 经典式用户信息
-  Widget _buildClassicUserInfo(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final hasNoCachedData = _userNickname == "U+5E78";
-
-    return GestureDetector(
-      onTap: () => _showRefreshDataDialog(context),
-      child: hasNoCachedData
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text("请点击",
-                    style: TextStyle(
-                        color: const Color(0xFF546161),
-                        fontSize: screenWidth * 0.05,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1,
-                        height: 1.2)),
-                Text("刷新数据",
-                    style: TextStyle(
-                        color: const Color(0xFF546161),
-                        fontSize: screenWidth * 0.05,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1,
-                        height: 1.2)),
-                Text("刷新成绩",
-                    style: TextStyle(
-                        color: const Color(0xFF546161),
-                        fontSize: screenWidth * 0.05,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1,
-                        height: 1.2)),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(_userNickname,
-                    style: TextStyle(
-                        color: const Color(0xFF546161),
-                        fontSize: screenWidth * 0.07,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1,
-                        height: 0.6),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1),
-                SizedBox(height: screenHeight * 0.005),
-                Text("Rating",
-                    style: TextStyle(
-                        color: const Color(0xFF546161),
-                        fontSize: screenWidth * 0.045)),
-                Text("$_best50TotalRA",
-                    style: TextStyle(
-                        color: const Color(0xFF546161),
-                        fontSize: screenWidth * 0.07,
-                        fontWeight: FontWeight.w600,
-                        height: 0.8)),
-                Text("$_best35TotalRA+$_best15TotalRA",
-                    style: TextStyle(
-                        color: const Color(0xFF6D7D7D),
-                        fontSize: screenWidth * 0.04,
-                        fontWeight: FontWeight.w300)),
-              ],
-            ),
-    );
-  }
-
-  // 构建个人信息卡片（头像 + 昵称 + Rating + 主题切换）
-  Widget _buildProfileCard(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final brightness = Theme.of(context).brightness;
-    final avatarSize = screenWidth * 0.20;
-    final hasNoCachedData = _userNickname == "U+5E78";
-
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: screenWidth * 0.04,
-        vertical: screenHeight * 0.018,
-      ),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-        boxShadow: [AppConstants.defaultShadow(brightness)],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 第一行：标题 + 主题切换按钮
-          Row(
-            children: [
-              Text(
-                "基础信息",
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: screenWidth * 0.055,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                ),
-              ),
-              const Spacer(),
-              // 风格切换按钮
-              GestureDetector(
-                onTap: _toggleProfileCardStyle,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surface
-                        .withValues(alpha: 0.7),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Icon(Icons.swap_horiz,
-                      size: 20, color: Theme.of(context).colorScheme.onSurface),
-                ),
-              ),
-              const SizedBox(width: 6),
-              _buildThemeToggleButton(context),
-            ],
-          ),
-          SizedBox(height: screenHeight * 0.015),
-          // 第二行：头像 + 用户信息
-          GestureDetector(
-            onTap: () => _showRefreshDataDialog(context),
-            child: Row(
-              children: [
-                // 头像
-                GestureDetector(
-                  onTap: _showCollectionPicker,
-                  child: Container(
-                    width: avatarSize,
-                    height: avatarSize,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.3),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: CachedNetworkImage(
-                        imageUrl:
-                            'https://assets2.lxns.net/maimai/icon/$_selectedAvatarId.png',
-                        placeholder: (ctx, url) => Icon(Icons.person,
-                            size: avatarSize * 0.4,
-                            color: AppColors.greyHint(brightness)),
-                        errorWidget: (ctx, url, err) => Icon(Icons.person,
-                            size: avatarSize * 0.4,
-                            color: AppColors.greyHint(brightness)),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: screenWidth * 0.04),
-                // 用户信息
-                Expanded(
-                  child: hasNoCachedData
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text("请点击刷新数据",
-                                style: TextStyle(
-                                  color:
-                                      Theme.of(context).colorScheme.onSurface,
-                                  fontSize: screenWidth * 0.042,
-                                  fontWeight: FontWeight.w600,
-                                )),
-                            SizedBox(height: 4),
-                            Text("获取你的舞萌成绩",
-                                style: TextStyle(
-                                  color: AppColors.greyHint(brightness),
-                                  fontSize: screenWidth * 0.032,
-                                )),
-                          ],
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _userNickname,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontSize: screenWidth * 0.06,
-                                fontWeight: FontWeight.w700,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              "Rating $_best50TotalRA",
-                              style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurface
-                                    .withValues(alpha: 0.8),
-                                fontSize: screenWidth * 0.04,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Text(
-                              "$_best35TotalRA + $_best15TotalRA",
-                              style: TextStyle(
-                                color: AppColors.greyHint(brightness),
-                                fontSize: screenWidth * 0.032,
-                              ),
-                            ),
-                          ],
-                        ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 显示头像选择对话框
-  // 显示头像 / 姓名框 选择抽屉（顶部带 tab）
-  void _showCollectionPicker() {
-    if (_avatarIcons.isEmpty && _avatarPlates.isEmpty) {
-      Fluttertoast.showToast(msg: '收藏品数据尚未加载，请先刷新数据');
-      return;
-    }
-
-    // 关键：activeTab 和 searchController 都放进独立的 StatefulWidget (CollectionPickerSheet)
-    // 不能直接放在 showModalBottomSheet.builder 的局部作用域里。
-    // ModalBottomSheetRoute.buildPage 在某些场景（例如父级 setState、键盘弹起触发
-    // MediaQuery 变化、输入法焦点切换等）会被多次调用，每次调用会重新执行 builder，
-    // 导致局部变量 `int activeTab = 0` 反复重新声明 → tab 状态被重置回 0（头像）。
-    // 症状：用户在「姓名框」tab 下输入文字时，tab 莫名跳回「头像」。
-    // 修复：把状态搬到 StatefulWidget 的 State 里，生命周期跟 sheet 实例绑定。
-    final TextEditingController searchController = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => CollectionPickerSheet(
-        searchController: searchController,
-        avatarIcons: _avatarIcons,
-        avatarPlates: _avatarPlates,
-        selectedAvatarId: _selectedAvatarId,
-        selectedPlateId: _selectedPlateId,
-        onAvatarPicked: (id) async {
-          await _saveAvatarId(id);
-          if (mounted) setState(() => _selectedAvatarId = id);
-          if (ctx.mounted) Navigator.of(ctx).pop();
-        },
-        onPlatePicked: (id) async {
-          await _savePlateId(id);
-          if (mounted) setState(() => _selectedPlateId = id);
-          if (ctx.mounted) Navigator.of(ctx).pop();
-        },
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ChiffonMai',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: scheme.primary,
+                              letterSpacing: 2,
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        _userNickname.isEmpty
+                            ? '请登录水鱼账号'
+                            : '欢迎回来，$_userNickname',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: '切换主题',
+                  onPressed: _showThemeDialog,
+                  icon: const Icon(Icons.brightness_6_outlined),
+                ),
+              ],
+            ),
+            const SizedBox(height: 22),
+            _buildDashboardSummary(context, brightness),
+            const SizedBox(height: 28),
+            _buildHomeSectionTitle(context, '快捷入口', '现在就去做点什么'),
+            const SizedBox(height: 12),
+            _buildQuickActions(context),
+            const SizedBox(height: 28),
+            _buildHomeSectionTitle(context, '收藏的功能', '常用功能快速直达'),
+            const SizedBox(height: 12),
+            // 顶层 ValueListenableBuilder 已保证整页重建，直接用 notifier 传入的 titles 渲染。
+            _buildFavoriteFeaturesSection(context, favoriteTitles),
+            if (_isBackgroundInitializing || _isInitializationCompleted) ...[
+              const SizedBox(height: 16),
+              _buildInitializationStatus(context),
+            ],
+          ],
+        ),
       ),
-    ).then((_) {
-      // 弹窗完全关闭后再 dispose：close 按钮 / item 点击 / barrier 点击 / back 键
-      // 任何方式关闭都会触发这里，确保 controller 生命周期严格包住弹窗生命周期。
-      searchController.dispose();
-    });
+    );
+  }
+
+  Widget _buildDashboardSummary(BuildContext context, Brightness brightness) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            scheme.primary,
+            Color.alphaBlend(
+                scheme.secondary.withValues(alpha: .38), scheme.primary)
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(
+              child: Text('PLAYER OVERVIEW',
+                  style: TextStyle(
+                      color: scheme.onPrimary.withValues(alpha: .72),
+                      letterSpacing: 1.5,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800))),
+          Icon(Icons.music_note,
+              color: scheme.onPrimary.withValues(alpha: .3), size: 28),
+        ]),
+        const SizedBox(height: 8),
+        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(_displayBest50RA(),
+              style: TextStyle(
+                  color: scheme.onPrimary,
+                  fontSize: 36,
+                  height: 1,
+                  fontWeight: FontWeight.w900)),
+          const SizedBox(width: 10),
+          Padding(
+              padding: const EdgeInsets.only(bottom: 3),
+              child: Text('TOTAL RATING',
+                  style: TextStyle(
+                      color: scheme.onPrimary.withValues(alpha: .76),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700))),
+        ]),
+        const SizedBox(height: 20),
+        ValueListenableBuilder<RefreshDataSource>(
+          valueListenable: CurrentDataSourceNotifier.instance,
+          builder: (context, source, _) => Row(children: [
+            _summaryMetric(context, 'Best35', _displayBest35RA()),
+            _summaryMetric(context, 'Best15', _displayBest15RA()),
+            _summaryMetric(context, '数据源',
+                source == RefreshDataSource.shuiyu ? '水鱼' : '落雪'),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  // 顶部头像 / 姓名框入口已迁移到 MeHubPage；选择结果仍存于 SharedPreferences，
+  // 供 Best50 / 拟合等图片导出时由 ExportUserInfoWidget 读取。
+
+  Widget _summaryMetric(BuildContext context, String label, String value) {
+    final onPrimary = Theme.of(context).colorScheme.onPrimary;
+    return Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label,
+          style:
+              TextStyle(color: onPrimary.withValues(alpha: .68), fontSize: 12)),
+      const SizedBox(height: 3),
+      Text(value,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+              color: onPrimary, fontWeight: FontWeight.w700, fontSize: 15)),
+    ]));
+  }
+
+  Widget _buildHomeSectionTitle(
+      BuildContext context, String title, String subtitle) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(children: [
+      Expanded(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title,
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 3),
+        Text(subtitle,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: scheme.onSurfaceVariant)),
+      ])),
+    ]);
+  }
+
+  Widget _buildQuickActions(BuildContext context) {
+    return Row(children: [
+      Expanded(
+          child:
+              _homeAction(context, Icons.score_outlined, '查成绩', '游玩记录', '查成绩')),
+      const SizedBox(width: 12),
+      Expanded(
+          child: _homeAction(context, Icons.leaderboard_outlined, 'Best50',
+              'Rating 构成', 'Best50')),
+      const SizedBox(width: 12),
+      Expanded(child: _homeAction(context, Icons.search, '查歌曲', '曲库搜索', '查歌曲')),
+      const SizedBox(width: 12),
+      Expanded(
+          child: _homeAction(
+              context, Icons.today_outlined, '每日推荐', '今日选曲', '每日推荐')),
+    ]);
+  }
+
+  Widget _buildAllFeaturesList(BuildContext context) {
+    final categories = _searchableCategories;
+    return Column(
+      children: [
+        for (final category in categories)
+          _buildCategoryCard(category, context),
+      ],
+    );
+  }
+
+  Widget _homeAction(BuildContext context, IconData icon, String title,
+      String subtitle, String featureTitle) {
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: () => _tapFeatureTitle(featureTitle),
+      borderRadius: BorderRadius.circular(16),
+      child: Ink(
+        padding: const EdgeInsets.fromLTRB(10, 15, 10, 13),
+        decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: scheme.outlineVariant)),
+        child: Column(children: [
+          Icon(icon, color: scheme.primary, size: 25),
+          const SizedBox(height: 9),
+          Text(title,
+              textAlign: TextAlign.center,
+              style:
+                  const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+          const SizedBox(height: 3),
+          Text(subtitle,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10)),
+        ]),
+      ),
+    );
+  }
+
+  void _tapFeatureTitle(String title) {
+    switch (title) {
+      case '查成绩':
+        Navigator.push(
+            context, MaterialPageRoute(builder: (_) => UserScoreSearchPage()));
+        return;
+      case 'Best50':
+        Navigator.push(context, MaterialPageRoute(builder: (_) => B50Page()));
+        return;
+      case '查歌曲':
+        Navigator.push(
+            context, MaterialPageRoute(builder: (_) => SongSearchPage()));
+        return;
+      case '每日推荐':
+        Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const DailyRecommendPage()));
+        return;
+      case '我的收藏夹':
+        Navigator.push(
+            context, MaterialPageRoute(builder: (_) => FavoriteFolderPage()));
+        return;
+    }
+    final item = _buttonCategories
+        .expand((category) => category.items)
+        .where((item) => item.title == title)
+        .firstOrNull;
+    if (item != null) _handleFeatureTap(item);
+  }
+
+  Widget _buildInitializationStatus(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final completed = _isInitializationCompleted;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+          color: completed
+              ? scheme.secondaryContainer
+              : scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(14)),
+      child: Row(children: [
+        if (!completed)
+          const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2))
+        else
+          Icon(Icons.check_circle_outline, color: scheme.onSecondaryContainer),
+        const SizedBox(width: 10),
+        Expanded(
+            child: Text(_initializationProgress,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: completed
+                        ? scheme.onSecondaryContainer
+                        : scheme.onSurfaceVariant,
+                    fontSize: 12))),
+      ]),
+    );
   }
 
   // 收藏品选择 tab 按钮已迁移到独立的 CollectionPickerSheet StatefulWidget
@@ -1140,1180 +699,100 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // 显示刷新数据对话框
-  Future<void> _showRefreshDataDialog(BuildContext context) async {
-    final brightness = Theme.of(context).brightness;
-
-    // 水鱼：读取登录状态和绑定的QQ号
-    final prefsForBind = await SharedPreferences.getInstance();
-    final jwt =
-        prefsForBind.getString(CacheKeyConstant.probeDivingFishToken) ?? '';
-    final bindQQ =
-        prefsForBind.getString(CacheKeyConstant.probeDivingFishBindQQ) ?? '';
-    final bool isDivingFishLoggedIn = jwt.isNotEmpty && bindQQ.isNotEmpty;
-
-    final TextEditingController qqController =
-        TextEditingController(text: bindQQ.isNotEmpty ? bindQQ : _cachedQQ);
-    final TextEditingController authCodeController = TextEditingController();
-    bool isRefreshing = false;
-    int progress = 0;
-    String progressText = '';
-    String currentLoadingTip = LoadingTipsConstant.getRandomLoadingTip();
-    bool isFirstBuild = true;
-
-    bool? isAuthorized;
-    bool isCheckingAuth = isDivingFishLoggedIn;
-
-    // 排行榜相关选项
-    bool participateRankings = false;
-    bool showNickname = false;
-
-    // 从缓存读取排行榜设置
-    Future<void> loadRankingSettings() async {
-      final prefs = await SharedPreferences.getInstance();
-      participateRankings =
-          prefs.getBool(CacheKeyConstant.participateRankings) ?? false;
-      showNickname = prefs.getBool(CacheKeyConstant.showNickname) ?? false;
-      // 使用StatefulBuilder的setState更新UI
-      setState(() {});
-    }
-
-    // 保存排行榜设置到缓存
-    Future<void> saveRankingSettings() async {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(
-          CacheKeyConstant.participateRankings, participateRankings);
-      await prefs.setBool(CacheKeyConstant.showNickname, showNickname);
-    }
-
-    // 初始化时加载设置
-    loadRankingSettings();
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            // 只在第一次构建时初始化
-            if (isFirstBuild) {
-              isFirstBuild = false;
-              if (isDivingFishLoggedIn) {
-                DivingFishOAuthManager()
-                    .checkAuthorization(bindQQ)
-                    .then((result) {
-                  setState(() {
-                    isAuthorized = result;
-                    isCheckingAuth = false;
-                  });
-                });
-              }
-              // 启动定时切换
-              LoadingTipsConstant.startAutoSwitch(3);
-              // 监听加载提示切换
-              LoadingTipsConstant.tipStream.listen((tip) {
-                if (isRefreshing) {
-                  // 使用StatefulBuilder的context来检查mounted状态
-                  try {
-                    setState(() {
-                      currentLoadingTip = tip;
-                    });
-                  } catch (_) {
-                    // 忽略已销毁状态的错误
-                  }
-                }
-              });
-            }
-
-            return PopScope(
-                canPop: !isRefreshing,
-                child: AlertDialog(
-                  title: Text('刷新数据'),
-                  content: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // 数据源切换
-                        if (!isRefreshing)
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text('当前数据源：'),
-                              SizedBox(width: 8),
-                              ToggleButtons(
-                                constraints:
-                                    BoxConstraints(minHeight: 28, minWidth: 50),
-                                isSelected: [
-                                  _currentDataSource == DataSource.shuiyu,
-                                  _currentDataSource == DataSource.luoxue,
-                                ],
-                                onPressed: (index) {
-                                  setState(() {
-                                    _currentDataSource = index == 0
-                                        ? DataSource.shuiyu
-                                        : DataSource.luoxue;
-                                    authCodeController.clear();
-                                  });
-                                },
-                                children: [
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 2),
-                                    child: Text('水鱼'),
-                                  ),
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 2),
-                                    child: Text('落雪'),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        if (!isRefreshing) SizedBox(height: 12),
-
-                        // 水鱼数据源：QQ号输入（需登录后自动填充）
-                        if (!isRefreshing &&
-                            _currentDataSource == DataSource.shuiyu)
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              TextField(
-                                controller: qqController,
-                                keyboardType: TextInputType.number,
-                                enabled: false,
-                                decoration: InputDecoration(
-                                  labelText: isDivingFishLoggedIn
-                                      ? '已绑定QQ号'
-                                      : '请先登录水鱼账号',
-                                  hintText:
-                                      isDivingFishLoggedIn ? bindQQ : '登录后自动填充',
-                                  suffixIcon: isDivingFishLoggedIn
-                                      ? Icon(Icons.check_circle,
-                                          color: Colors.green)
-                                      : Icon(Icons.warning_amber,
-                                          color: Colors.orange),
-                                ),
-                              ),
-                              if (!isDivingFishLoggedIn)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: Text(
-                                    '请先在「水鱼数据同步」中登录水鱼账号，再进行数据刷新',
-                                    style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppColors.warningOrange(
-                                            brightness)),
-                                  ),
-                                ),
-                              if (isDivingFishLoggedIn)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: () {
-                                    if (isCheckingAuth) {
-                                      return Row(
-                                        children: [
-                                          SizedBox(
-                                            width: 14,
-                                            height: 14,
-                                            child: CircularProgressIndicator(
-                                                strokeWidth: 2),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '正在检查授权状态...',
-                                            style: TextStyle(
-                                                fontSize: 12,
-                                                color: AppColors.greyHint(
-                                                    brightness)),
-                                          ),
-                                        ],
-                                      );
-                                    }
-                                    if (isAuthorized == true) {
-                                      return Row(
-                                        children: [
-                                          Icon(Icons.check_circle,
-                                              size: 16,
-                                              color: AppColors.successGreen(
-                                                  brightness)),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            '已授权',
-                                            style: TextStyle(
-                                                fontSize: 13,
-                                                color: AppColors.successGreen(
-                                                    brightness)),
-                                          ),
-                                        ],
-                                      );
-                                    }
-                                    return Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            '读取成绩需先授权本应用，未授权时刷新会失败',
-                                            style: TextStyle(
-                                                fontSize: 12,
-                                                color: AppColors.greyHint(
-                                                    brightness)),
-                                          ),
-                                        ),
-                                        TextButton(
-                                          onPressed: () async {
-                                            final qq =
-                                                qqController.text.trim();
-                                            if (qq.isEmpty) {
-                                              Fluttertoast.showToast(
-                                                  msg: '未找到 QQ 号');
-                                              return;
-                                            }
-                                            final ok =
-                                                await DivingFishOAuthManager()
-                                                    .openBindingLink(qq);
-                                            if (!mounted) return;
-                                            Fluttertoast.showToast(
-                                                msg: ok
-                                                    ? '已打开授权链接，请在浏览器中完成授权后重新刷新'
-                                                    : '发起授权失败，请稍后重试');
-                                            if (ok) {
-                                              final authResult =
-                                                  await DivingFishOAuthManager()
-                                                      .checkAuthorization(qq);
-                                              isAuthorized = authResult;
-                                              setState(() {});
-                                            }
-                                          },
-                                          child: const Text('去授权'),
-                                        ),
-                                      ],
-                                    );
-                                  }(),
-                                ),
-                            ],
-                          ),
-
-                        // 落雪数据源：授权相关
-                        if (!isRefreshing &&
-                            _currentDataSource == DataSource.luoxue)
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ElevatedButton(
-                                onPressed: () async {
-                                  final url = LuoXueUserPlayDataManager()
-                                      .getAuthorizationUrl();
-                                  try {
-                                    if (await canLaunchUrl(Uri.parse(url))) {
-                                      await launchUrl(Uri.parse(url),
-                                          mode: LaunchMode.externalApplication);
-                                    } else {
-                                      _launchUrlFallback(url);
-                                    }
-                                  } catch (e) {
-                                    debugPrint('打开落雪授权链接失败: $e');
-                                    _launchUrlFallback(url);
-                                  }
-                                },
-                                child: Text('点击授权'),
-                              ),
-                              const SizedBox(height: 8),
-                              // 降级方案：复制授权链接手动打开浏览器
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: AppColors.warningOrange(brightness)
-                                      .withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: AppColors.warningOrange(brightness)
-                                        .withValues(alpha: 0.3),
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(Icons.info_outline,
-                                            size: 16,
-                                            color: AppColors.warningOrange(
-                                                brightness)),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          '点击授权没反应？',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.warningOrange(
-                                                brightness),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      '请复制链接后在浏览器中手动打开完成授权：',
-                                      style: TextStyle(
-                                          fontSize: 12,
-                                          color:
-                                              AppColors.greyHint(brightness)),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    OutlinedButton.icon(
-                                      icon: const Icon(Icons.copy, size: 16),
-                                      label: const Text('复制授权链接',
-                                          style: TextStyle(fontSize: 13)),
-                                      style: OutlinedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 8),
-                                      ),
-                                      onPressed: () {
-                                        final url = LuoXueUserPlayDataManager()
-                                            .getAuthorizationUrl();
-                                        Clipboard.setData(
-                                            ClipboardData(text: url));
-                                        Fluttertoast.showToast(
-                                            msg: '授权链接已复制，请在浏览器中粘贴打开');
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                '授权后复制页面上显示的授权码，粘贴到下方输入框',
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.greyHint(brightness)),
-                              ),
-                              SizedBox(height: 8),
-                              TextField(
-                                controller: authCodeController,
-                                decoration: InputDecoration(
-                                  labelText: '请输入授权码',
-                                  hintText: '粘贴授权码',
-                                ),
-                              ),
-                            ],
-                          ),
-
-                        // 参与排行榜选项
-                        if (!isRefreshing)
-                          Column(
-                            children: [
-                              SizedBox(height: 16),
-                              CheckboxListTile(
-                                title: Text('参与排行榜'),
-                                value: participateRankings,
-                                onChanged: (value) {
-                                  setState(() {
-                                    participateRankings = value ?? false;
-                                    if (!participateRankings) {
-                                      showNickname = false;
-                                    }
-                                  });
-                                  saveRankingSettings();
-                                },
-                                controlAffinity:
-                                    ListTileControlAffinity.leading,
-                              ),
-                              // 展示昵称选项（只有勾选参与排行榜时才显示）
-                              if (participateRankings)
-                                CheckboxListTile(
-                                  title: Text('展示昵称（不勾选则显示为匿名用户）'),
-                                  value: showNickname,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      showNickname = value ?? false;
-                                    });
-                                    saveRankingSettings();
-                                  },
-                                  controlAffinity:
-                                      ListTileControlAffinity.leading,
-                                ),
-                            ],
-                          ),
-
-                        // 刷新进度显示
-                        if (isRefreshing)
-                          Column(
-                            children: [
-                              SizedBox(height: 16),
-                              CircularProgressIndicator(
-                                  color: AppColors.linkBlue(brightness)),
-                              SizedBox(height: 12),
-                              LinearProgressIndicator(
-                                value: progress / 100,
-                                minHeight: 8,
-                                color: AppColors.linkBlue(brightness),
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                progressText,
-                                style: TextStyle(fontSize: 14),
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                '$progress%',
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.greyHint(brightness)),
-                                textAlign: TextAlign.center,
-                              ),
-                              SizedBox(height: 16),
-                              // 随机加载提示
-                              Text(
-                                currentLoadingTip,
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.greyHint(brightness,
-                                        shade: 600)),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ),
-                  actions: [
-                    if (!isRefreshing)
-                      TextButton(
-                        onPressed: () {
-                          LoadingTipsConstant.stopAutoSwitch();
-                          Navigator.of(context).pop();
-                        },
-                        child: Text('取消'),
-                      ),
-                    if (!isRefreshing)
-                      TextButton(
-                        onPressed: () async {
-                          // 水鱼数据源：检查是否已登录
-                          if (_currentDataSource == DataSource.shuiyu &&
-                              !isDivingFishLoggedIn) {
-                            Fluttertoast.showToast(msg: '请先登录水鱼账号后再刷新数据');
-                            return;
-                          }
-
-                          final isOnline =
-                              await ConnectivityService().hasConnection();
-                          if (!isOnline) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('当前无网络连接，无法刷新数据。请联网后重试。'),
-                                    duration: Duration(seconds: 3)),
-                              );
-                            }
-                            return;
-                          }
-                          setState(() {
-                            isRefreshing = true;
-                            progress = 0;
-                            progressText = '开始刷新数据...';
-                          });
-
-                          try {
-                            if (_currentDataSource == DataSource.shuiyu) {
-                              // 水鱼数据源
-                              if (qqController.text.isNotEmpty) {
-                                await _saveQQ(qqController.text);
-                                await _refreshBest50DataWithProgress(
-                                  qqController.text,
-                                  (p, t) {
-                                    setState(() {
-                                      progress = p;
-                                      progressText = t;
-                                    });
-                                  },
-                                  participateRankings,
-                                  showNickname,
-                                );
-                              }
-                            } else {
-                              // 落雪数据源
-                              if (authCodeController.text.isNotEmpty) {
-                                await _handleLuoXueAuthWithProgress(
-                                  authCodeController.text,
-                                  (p, t) {
-                                    setState(() {
-                                      progress = p;
-                                      progressText = t;
-                                    });
-                                  },
-                                  participateRankings,
-                                  showNickname,
-                                );
-                              }
-                            }
-
-                            // 刷新成功，停止定时器并关闭对话框
-                            LoadingTipsConstant.stopAutoSwitch();
-                            if (mounted) {
-                              Navigator.of(context).pop();
-                              Fluttertoast.showToast(msg: '数据刷新成功!');
-                            }
-                          } on ProberException catch (e) {
-                            // 未授权/配额等 OAuth 代理错误
-                            LoadingTipsConstant.stopAutoSwitch();
-                            if (mounted) Navigator.of(context).pop();
-                            if (e.code == 'CONSENT_REQUIRED') {
-                              final qq = qqController.text.trim();
-                              if (qq.isNotEmpty) {
-                                final ok = await DivingFishOAuthManager()
-                                    .openBindingLink(qq);
-                                if (mounted) {
-                                  Fluttertoast.showToast(
-                                      msg: ok
-                                          ? '已打开授权链接，请在浏览器中完成授权后重新刷新'
-                                          : '该 QQ 尚未授权本应用，请稍后在「账号管理」中完成授权');
-                                }
-                              } else if (mounted) {
-                                Fluttertoast.showToast(msg: e.message);
-                              }
-                            } else if (mounted) {
-                              Fluttertoast.showToast(
-                                  msg: '刷新数据失败：${e.message}');
-                            }
-                          } catch (e) {
-                            // 刷新失败，停止定时器并关闭对话框
-                            LoadingTipsConstant.stopAutoSwitch();
-                            if (mounted) {
-                              Navigator.of(context).pop();
-                              Fluttertoast.showToast(msg: '刷新数据失败：$e');
-                            }
-                          }
-                        },
-                        child: Text('确认'),
-                      ),
-                  ],
-                ));
-          },
-        );
-      },
-    );
-  }
-
-  // 处理落雪授权（带进度回调）
-  Future<void> _handleLuoXueAuthWithProgress(
-      String authCode, Function(int, String) onProgress,
-      [bool participateRankings = false, bool showNickname = false]) async {
-    try {
-      onProgress(5, '正在清除缓存...');
-
-      // 清除推荐结果缓存
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove(CacheKeyConstant.recommendationResults);
-        debugPrint('推荐结果缓存已清除');
-      } catch (e) {
-        debugPrint('清除推荐结果缓存失败: $e');
-      }
-
-      onProgress(10, '正在换取访问令牌...');
-
-      // 使用授权码换取令牌（必须串行，需要authCode）
-      final success =
-          await LuoXueUserPlayDataManager().exchangeCodeForToken(authCode);
-
-      if (success) {
-        onProgress(15, '授权成功，正在并行刷新数据...');
-
-        // 第二阶段：令牌获取成功后，并行执行所有独立的数据刷新请求
-        int completedCount = 0;
-        const totalParallelTasks = 7; // alias 改为后台执行，不计入并行任务数
-        void updateParallelProgress(String message) {
-          completedCount++;
-          final progress =
-              15 + ((completedCount / totalParallelTasks) * 60).round();
-          onProgress(progress, message);
-        }
-
-        final saveDataSourceFuture = _saveLastDataSource('luoxue');
-        final musicFuture =
-            MaimaiMusicDataManager().refreshDataWithSmartMaidata();
-        final diffFuture = DiffMusicDataManager().fetchAndUpdateDiffData();
-        final tagsFuture = RecommendByTagsService.initializeTags();
-        final playerInfoFuture = LuoXueUserPlayDataManager().getPlayerInfo();
-        final playerRecordsFuture =
-            LuoXueUserPlayDataManager().getPlayerRecordsAsRecordItems();
-        // 收藏品（称号 / 头像 / 姓名框 / 背景）刷新：牌子进度等页面依赖此缓存
-        final collectionsFuture = CollectionsManager().refreshAllCollections();
-
-        saveDataSourceFuture.then((_) => updateParallelProgress('数据源已保存'));
-        musicFuture.then((_) => updateParallelProgress('歌曲数据已刷新'));
-        diffFuture.then((_) => updateParallelProgress('难度数据已刷新'));
-        tagsFuture.then((_) => updateParallelProgress('标签数据已刷新'));
-        playerInfoFuture.then((_) => updateParallelProgress('玩家信息已获取'));
-        playerRecordsFuture.then((_) => updateParallelProgress('玩家成绩已获取'));
-        collectionsFuture.then((_) => updateParallelProgress('收藏品数据已刷新'));
-
-        await Future.wait([
-          saveDataSourceFuture,
-          musicFuture,
-          diffFuture,
-          tagsFuture,
-          playerInfoFuture,
-          playerRecordsFuture,
-          collectionsFuture,
-        ]);
-        SongAliasManager.instance.refresh();
-        UnionUniManager().fetchAndCache();
-
-        // 处理玩家信息结果
-        final playerInfo = await playerInfoFuture;
-        if (playerInfo != null) {
-          setState(() {
-            // 将全角字符转换为半角字符
-            final halfWidthName = StringUtil.toHalfWidth(playerInfo.name);
-            _userNickname = halfWidthName.isNotEmpty ? halfWidthName : '未知玩家';
-          });
-          await _saveUserData();
-
-          // 保存落雪用户ID（格式：luoxue:friendCode）
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString(
-              'luoxue_user_id', 'luoxue:${playerInfo.friendCode}');
-        }
-
-        // 处理玩家成绩结果
-        final playerRecords = await playerRecordsFuture;
-        debugPrint('玩家成绩数量: ${playerRecords?.length ?? 0}');
-
-        onProgress(85, '正在计算 Best50 数据...');
-
-        // 从落雪数据计算并更新首页的 Best50 数据
-        var luoxueRecords = playerRecords != null && playerRecords.isNotEmpty
-            ? await _calculateBest50FromLuoXueRecords(playerRecords)
-            : null;
-
-        onProgress(95, '正在保存数据...');
-
-        // 更新排行榜数据
-        String? rankingError;
-        if (playerInfo != null) {
-          final userId = 'luoxue:${playerInfo.friendCode}';
-
-          if (participateRankings) {
-            final displayNickname = showNickname ? _userNickname : '匿名用户';
-            rankingError = await _updateRankings(
-              dataSource: 'luoxue',
-              originalId: playerInfo.friendCode.toString(),
-              nickname: displayNickname,
-              totalRating: _best50TotalRA,
-              best35Rating: _best35TotalRA,
-              best15Rating: _best15TotalRA,
-              best35Records: luoxueRecords?.best35,
-              best15Records: luoxueRecords?.best15,
-            );
-
-            // 同步歌曲记录到Redis排行榜
-            if (playerRecords != null && playerRecords.isNotEmpty) {
-              final recordsMap =
-                  playerRecords.map((record) => record.toJson()).toList();
-              await SongRankingService().updateSongRankings(
-                userId,
-                displayNickname,
-                recordsMap,
-                onBatchProgress: (sent, total) {
-                  // 排行榜总进度落在 95-99% 区间
-                  final percent = 95 + ((sent * 4) ~/ total).clamp(0, 4);
-                  onProgress(percent, '上传单曲排行榜 $sent/$total...');
-                },
-              );
-            }
-          } else {
-            // 如果不参与排行榜且有记录，删除记录
-            await _deleteRankings(userId);
-            await SongRankingService().deleteSongRankings(userId);
-          }
-        }
-
-        // 清除有状态服务的记录缓存，确保下次打开时使用最新数据
-        PersonalizedScoreService().clearRecordsCache();
-        PaiziProgressService().clearRecordsCache();
-
-        onProgress(100, '完成');
-
-        // 如果有排行榜数据异常，显示警告
-        if (rankingError != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: Text('警告'),
-                content: Text(rankingError!),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text('确定'),
-                  ),
-                ],
-              ),
-            );
-          });
-        }
-      } else {
-        throw Exception('授权失败，请检查授权码是否正确');
-      }
-    } catch (e) {
-      throw e;
-    }
-  }
-
-  // 更新排行榜数据，返回异常信息（如果数据异常）
-  Future<String?> _updateRankings({
-    required String dataSource,
-    required String originalId,
-    required String nickname,
-    required int totalRating,
-    required int best35Rating,
-    required int best15Rating,
-    List<RecordItem>? best35Records,
-    List<RecordItem>? best15Records,
-  }) async {
-    try {
-      // 计算合法值上限
-      final ratingLimits = await _calculateRatingLimits();
-
-      // 验证数据合法性，收集异常信息
-      List<String> errors = [];
-      if (totalRating > ratingLimits.best50Limit) {
-        errors.add('Best50 数据异常');
-      }
-      if (best35Rating > ratingLimits.best35Limit) {
-        errors.add('Best35 数据异常');
-      }
-      if (best15Rating > ratingLimits.best15Limit) {
-        errors.add('Best15 数据异常');
-      }
-
-      // 如果有异常，返回错误信息，不更新排行榜
-      if (errors.isNotEmpty) {
-        final errorMsg = errors.join('、');
-        debugPrint('警告: $errorMsg，跳过排行榜更新');
-        debugPrint(
-            '  用户数据: Best50=$totalRating, Best35=$best35Rating, Best15=$best15Rating');
-        debugPrint(
-            '  理论上限: Best50=${ratingLimits.best50Limit}, Best35=${ratingLimits.best35Limit}, Best15=${ratingLimits.best15Limit}');
-
-        // 打印用户 Best35 记录
-        if (best35Records != null && best35Records.isNotEmpty) {
-          final sorted = List<RecordItem>.from(best35Records)
-            ..sort((a, b) => b.ra.compareTo(a.ra));
-          debugPrint('  --- 用户 Best35 记录 (按RA降序) ---');
-          for (int i = 0; i < sorted.length; i++) {
-            final r = sorted[i];
-            debugPrint(
-                '  ${i + 1}. RA=${r.ra} 定数=${r.ds} songId=${r.songId} title=${r.title} level=${r.level}');
-          }
-        }
-
-        // 打印用户 Best15 记录
-        if (best15Records != null && best15Records.isNotEmpty) {
-          final sorted = List<RecordItem>.from(best15Records)
-            ..sort((a, b) => b.ra.compareTo(a.ra));
-          debugPrint('  --- 用户 Best15 记录 (按RA降序) ---');
-          for (int i = 0; i < sorted.length; i++) {
-            final r = sorted[i];
-            debugPrint(
-                '  ${i + 1}. RA=${r.ra} 定数=${r.ds} songId=${r.songId} title=${r.title} level=${r.level}');
-          }
-        }
-
-        return '$errorMsg，可能存在非法数据，请检查';
-      }
-
-      final response = await ApiClient.post(
-        Uri.parse(ApiUrls.RankingsUpdateUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'dataSource': dataSource,
-          'originalId': originalId,
-          'nickname': nickname,
-          'totalRating': totalRating,
-          'best35Rating': best35Rating,
-          'best15Rating': best15Rating,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final result = json.decode(response.body);
-        if (result['success'] == true) {
-          debugPrint('排行榜数据更新成功: ${result['message']}');
-        } else {
-          debugPrint('排行榜数据更新失败: ${result['error']}');
-        }
-      } else {
-        debugPrint('排行榜数据更新失败，状态码: ${response.statusCode}');
-      }
-      return null;
-    } catch (e) {
-      debugPrint('更新排行榜数据时发生异常: $e');
-      return null;
-    }
-  }
-
-  // 删除排行榜记录
-  Future<void> _deleteRankings(String userId) async {
-    try {
-      final response = await ApiClient.delete(
-        Uri.parse('${ApiUrls.RankingsBaseUrl}/user/$userId'),
-      );
-
-      if (response.statusCode == 200) {
-        final result = json.decode(response.body);
-        if (result['success'] == true) {
-          debugPrint('排行榜记录删除成功: ${result['message']}');
-        } else {
-          debugPrint('排行榜记录删除失败: ${result['error']}');
-        }
-      } else {
-        debugPrint('排行榜记录删除失败，状态码: ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('删除排行榜记录时发生异常: $e');
-    }
-  }
-
-  // 计算Rating合法值上限
-  Future<RatingLimits> _calculateRatingLimits() async {
-    final musicManager = MaimaiMusicDataManager();
-    final songs = await musicManager.getCachedSongs();
-
-    if (songs == null || songs.isEmpty) {
-      debugPrint('警告: 歌曲缓存为空，使用默认Rating上限');
-      return RatingLimits(
-          best35Limit: 12000, best15Limit: 5000, best50Limit: 17000);
-    }
-
-    // 获取从maidata追加的歌曲ID列表
-    final rawAddedIds = await musicManager.getAddedSongIds() ?? [];
-
-    // 防御：addedSongIds 缓存历史上曾出现污染（包含水鱼主库 ID）。
-    // 若条目数与主库歌曲数接近则视为不可信，直接跳过该过滤以避免 Best 上限被误算为 0。
-    final addedSongIds =
-        rawAddedIds.length > songs.length * 0.5 ? <String>[] : rawAddedIds;
-    if (rawAddedIds.length != addedSongIds.length) {
-      debugPrint(
-          '警告: addedSongIds 缓存异常（${rawAddedIds.length} 条，占主库 ${(rawAddedIds.length / songs.length * 100).toStringAsFixed(1)}%），已自动跳过该过滤');
-    }
-
-    // 各维度筛除数量（用于诊断「过滤后为空」的根因）
-    final droppedByAdded = <String>{};
-    int droppedByExtra = 0;
-    int droppedBySixDigitId = 0;
-
-    // 过滤掉ID为6位数的歌曲和从maidata追加的歌曲
-    final filteredSongs = songs.where((song) {
-      // 过滤掉从maidata追加的歌曲
-      if (addedSongIds.contains(song.id)) {
-        droppedByAdded.add(song.id);
-        return false;
-      }
-      // 过滤掉union API独有的歌曲
-      if (song.isExtra) {
-        droppedByExtra++;
-        return false;
-      }
-      // 过滤掉ID为6位数的歌曲（宴会场）
-      final id = song.id;
-      if (id.length == 6 && RegExp(r'^\d+$').hasMatch(id)) {
-        droppedBySixDigitId++;
-        return false;
-      }
-      return true;
-    }).toList();
-
-    debugPrint('=== Rating 上限过滤统计 ===');
-    debugPrint('原始歌曲数: ${songs.length}');
-    debugPrint('  - 被 addedSongIds 剔除: ${droppedByAdded.length}');
-    debugPrint('  - 被 isExtra 剔除: $droppedByExtra');
-    debugPrint('  - 被 6 位 ID 剔除: $droppedBySixDigitId');
-    debugPrint('过滤后剩余: ${filteredSongs.length}');
-
-    // 兜底：若过滤后为空（一般是 addedSongIds 缓存污染或歌曲ID格式异常），
-    // 退回默认上限，避免误报"数据异常"
-    if (filteredSongs.isEmpty) {
-      debugPrint('警告: 过滤后歌曲为空，使用默认Rating上限避免误报');
-      return RatingLimits(
-          best35Limit: 12000, best15Limit: 5000, best50Limit: 17000);
-    }
-
-    // 根据is_new分类
-    final best35Candidates =
-        filteredSongs.where((song) => song.basicInfo.isNew == false).toList();
-    final best15Candidates =
-        filteredSongs.where((song) => song.basicInfo.isNew == true).toList();
-
-    // 提取所有ds值及对应的歌曲信息并排序
-    List<DsSong> best35DsSongs = [];
-    for (var song in best35Candidates) {
-      for (int i = 0; i < song.ds.length; i++) {
-        final ds = song.ds[i];
-        if (ds != null) {
-          final level = i < song.level.length ? song.level[i] : '';
-          best35DsSongs.add(DsSong(
-            ds: ds,
-            songId: song.id,
-            songTitle: song.title,
-            level: level,
-          ));
-        }
-      }
-    }
-    best35DsSongs.sort((a, b) => b.ds.compareTo(a.ds));
-
-    List<DsSong> best15DsSongs = [];
-    for (var song in best15Candidates) {
-      for (int i = 0; i < song.ds.length; i++) {
-        final ds = song.ds[i];
-        if (ds != null) {
-          final level = i < song.level.length ? song.level[i] : '';
-          best15DsSongs.add(DsSong(
-            ds: ds,
-            songId: song.id,
-            songTitle: song.title,
-            level: level,
-          ));
-        }
-      }
-    }
-    best15DsSongs.sort((a, b) => b.ds.compareTo(a.ds));
-
-    // 取前35和前15个最高值计算
-    final top35DsSongs = best35DsSongs.take(35).toList();
-    final top15DsSongs = best15DsSongs.take(15).toList();
-
-    // 计算公式: ds * 0.224 * 100.5 并向下取整
-    int calculateRating(List<DsSong> dsSongs) {
-      return dsSongs.fold(
-          0, (sum, dsSong) => sum + (dsSong.ds * 0.224 * 100.5).floor());
-    }
-
-    final best35Limit = calculateRating(top35DsSongs);
-    final best15Limit = calculateRating(top15DsSongs);
-    final best50Limit = best35Limit + best15Limit;
-
-    // 输出到控制台
-    debugPrint('=== Rating 合法值上限计算结果 ===');
-    debugPrint('Best35 歌曲数量: ${best35Candidates.length}');
-    debugPrint('Best15 歌曲数量: ${best15Candidates.length}');
-
-    // 输出Best35最高35个ds值及对应歌曲
-    debugPrint('--- Best35 最高35个ds值及对应歌曲 ---');
-    for (int i = 0; i < top35DsSongs.length; i++) {
-      final dsSong = top35DsSongs[i];
-      final ra = (dsSong.ds * 0.224 * 100.5).floor();
-      debugPrint(
-          '${i + 1}. ds=${dsSong.ds}, ra=$ra, level=${dsSong.level}, title=${dsSong.songTitle}, id=${dsSong.songId}');
-    }
-
-    // 输出Best15最高15个ds值及对应歌曲
-    debugPrint('--- Best15 最高15个ds值及对应歌曲 ---');
-    for (int i = 0; i < top15DsSongs.length; i++) {
-      final dsSong = top15DsSongs[i];
-      final ra = (dsSong.ds * 0.224 * 100.5).floor();
-      debugPrint(
-          '${i + 1}. ds=${dsSong.ds}, ra=$ra, level=${dsSong.level}, title=${dsSong.songTitle}, id=${dsSong.songId}');
-    }
-
-    debugPrint('=== Rating 上限值 ===');
-    debugPrint('Best35 总Rating上限: $best35Limit');
-    debugPrint('Best15 总Rating上限: $best15Limit');
-    debugPrint('Best50 总Rating上限: $best50Limit');
-    debugPrint('==================================');
-
-    return RatingLimits(
-      best35Limit: best35Limit,
-      best15Limit: best15Limit,
-      best50Limit: best50Limit,
-    );
-  }
-
-  // 刷新Best50数据（带进度回调）
-  Future<void> _refreshBest50DataWithProgress(
-      String qq, Function(int, String) onProgress,
-      [bool participateRankings = false, bool showNickname = false]) async {
-    try {
-      onProgress(5, '正在清除缓存...');
-
-      // 清除推荐结果缓存
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove(CacheKeyConstant.recommendationResults);
-        debugPrint('推荐结果缓存已清除');
-      } catch (e) {
-        debugPrint('清除推荐结果缓存失败: $e');
-      }
-
-      // 保存当前数据源
-      await _saveLastDataSource('shuiyu');
-
-      // 第二阶段：并行执行所有独立的数据刷新请求
-      onProgress(10, '正在并行刷新数据...');
-
-      int completedCount = 0;
-      const totalParallelTasks = 6; // alias 改为后台执行，不计入并行任务数
-      void updateParallelProgress(String message) {
-        completedCount++;
-        final progress =
-            10 + ((completedCount / totalParallelTasks) * 65).round();
-        onProgress(progress, message);
-      }
-
-      final musicFuture =
-          MaimaiMusicDataManager().refreshDataWithSmartMaidata();
-      final diffFuture = DiffMusicDataManager().fetchAndUpdateDiffData();
-      final tagsFuture = RecommendByTagsService.initializeTags();
-      final userPlayDataFuture = UserPlayDataManager().fetchUserPlayData(qq);
-      // 收藏品（称号 / 头像 / 姓名框 / 背景）刷新：牌子进度等页面依赖此缓存
-      final collectionsFuture = CollectionsManager().refreshAllCollections();
-
-      musicFuture.then((_) => updateParallelProgress('歌曲数据已刷新'));
-      diffFuture.then((_) => updateParallelProgress('难度数据已刷新'));
-      tagsFuture.then((_) => updateParallelProgress('标签数据已刷新'));
-      userPlayDataFuture.then((_) => updateParallelProgress('用户数据已获取'));
-      collectionsFuture.then((_) => updateParallelProgress('收藏品数据已刷新'));
-
-      await Future.wait([
-        musicFuture,
-        diffFuture,
-        tagsFuture,
-        userPlayDataFuture,
-        collectionsFuture,
-      ]);
-      SongAliasManager.instance.refresh();
-      UnionUniManager().fetchAndCache();
-
-      final userPlayData = await userPlayDataFuture;
-      final best50Data = await UserBest50Manager().getUserBest50(
-        qq,
-        playData: userPlayData,
-      );
-      updateParallelProgress('Best50数据已获取');
-      debugPrint(best50Data.toString());
-
-      // 更新用户昵称
-      if (userPlayData != null && userPlayData.containsKey('nickname')) {
-        if (mounted) {
-          setState(() {
-            _userNickname = userPlayData['nickname'];
-          });
-        }
-      }
-
-      onProgress(85, '正在计算Rating...');
-
-      // 计算Best50、Best35、Best15总RA
-      int totalRA = 0;
-      int best35RA = 0;
-      int best15RA = 0;
-
-      // 计算Best35总RA (sd charts)
-      for (var record in best50Data.charts.sd) {
-        best35RA += record.ra;
-      }
-
-      // 计算Best15总RA (dx charts)
-      for (var record in best50Data.charts.dx) {
-        best15RA += record.ra;
-      }
-
-      // 计算Best50总RA (sd + dx)
-      totalRA = best35RA + best15RA;
-
-      // 更新状态
-      if (mounted) {
-        setState(() {
-          _best50TotalRA = totalRA;
-          _best35TotalRA = best35RA;
-          _best15TotalRA = best15RA;
-        });
-      }
-
-      onProgress(95, '正在保存数据...');
-
-      // 保存数据到本地存储
-      await _saveUserData();
-
-      // 清除有状态服务的记录缓存，确保下次打开时使用最新数据
-      PersonalizedScoreService().clearRecordsCache();
-      PaiziProgressService().clearRecordsCache();
-
-      // 更新排行榜数据
-      String? rankingError;
-      final userId = 'shuiyu:$qq';
-
-      // 保存水鱼用户ID到本地存储
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('shuiyu_user_id', userId);
-
-      if (participateRankings) {
-        final displayNickname = showNickname ? _userNickname : '匿名用户';
-        rankingError = await _updateRankings(
-          dataSource: 'shuiyu',
-          originalId: qq,
-          nickname: displayNickname,
-          totalRating: _best50TotalRA,
-          best35Rating: _best35TotalRA,
-          best15Rating: _best15TotalRA,
-          best35Records: best50Data.charts.sd,
-          best15Records: best50Data.charts.dx,
-        );
-
-        // 同步歌曲记录到Redis排行榜
-        if (userPlayData != null && userPlayData['records'] is List) {
-          final records = userPlayData['records'] as List;
-          if (records.isNotEmpty) {
-            await SongRankingService().updateSongRankings(
-              userId,
-              displayNickname,
-              records.cast<Map<String, dynamic>>(),
-              onBatchProgress: (sent, total) {
-                // 排行榜总进度落在 95-99% 区间
-                final percent = 95 + ((sent * 4) ~/ total).clamp(0, 4);
-                onProgress(percent, '上传单曲排行榜 $sent/$total...');
-              },
-            );
-          }
-        }
-      } else {
-        // 如果不参与排行榜且有记录，删除记录
-        await _deleteRankings(userId);
-        await SongRankingService().deleteSongRankings(userId);
-      }
-
-      // 清除有状态服务的记录缓存，确保下次打开时使用最新数据
-      PersonalizedScoreService().clearRecordsCache();
-      PaiziProgressService().clearRecordsCache();
-
-      onProgress(100, '完成');
-
-      // 如果有排行榜数据异常，显示警告
-      if (rankingError != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Text('警告'),
-              content: Text(rankingError!),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text('确定'),
-                ),
-              ],
-            ),
+  SyncCallbacks get _syncCallbacks => SyncCallbacks(
+        cachedQQ: _cachedQQ,
+        onSaveQQ: _saveQQ,
+        onSaveLastDataSource: _saveLastDataSource,
+        onRefreshAfterSync: ({
+          required String qq,
+          required void Function(double progress, String text) onProgress,
+          required bool participateRankings,
+          required bool showNickname,
+        }) async {
+          await refreshBest50DataWithProgress(
+            qq,
+            (p, t) {
+              debugPrint('[HomePage] 后台刷新 $p%: $t');
+              onProgress(0.70 + (p / 100) * 0.30, t);
+            },
+            participateRankings: participateRankings,
+            showNickname: showNickname,
           );
-        });
+        },
+        onLoginStateChanged: () async {
+          await _loadUserData();
+          await _checkDivingFishLoginStatus();
+        },
+      );
+
+  Future<void> _syncToDivingFish() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasJwt =
+        (prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '')
+            .isNotEmpty;
+
+    if (!hasJwt) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('提示'),
+          content: const Text('请先登录你的水鱼账号，再使用同步功能。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('去登录'),
+            ),
+          ],
+        ),
+      );
+      if (ok == true && mounted) {
+        await SyncScoreDialogs.showDivingFishLoginDialog(
+            context, _syncCallbacks);
+        final prefs2 = await SharedPreferences.getInstance();
+        final hasJwt2 =
+            (prefs2.getString(CacheKeyConstant.probeDivingFishToken) ?? '')
+                .isNotEmpty;
+        if (hasJwt2 && mounted) {
+          await SyncScoreDialogs.showDivingFishSyncDialog(
+              context, _syncCallbacks);
+        }
       }
-    } catch (e) {
-      throw e;
+      return;
     }
+
+    final bindQQ =
+        prefs.getString(CacheKeyConstant.probeDivingFishBindQQ) ?? '';
+    final cachedQQ = _cachedQQ.isNotEmpty ? _cachedQQ : null;
+    if (bindQQ.isNotEmpty && cachedQQ != null && bindQQ != cachedQQ) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('账号不匹配'),
+          content: Text(
+            '当前登录水鱼账号绑定的 QQ（$bindQQ）与本机缓存的 QQ（$cachedQQ）不一致。\n\n请先登出当前水鱼账号，登录正确的账号后再同步。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('确定'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    await SyncScoreDialogs.showDivingFishSyncDialog(context, _syncCallbacks);
   }
 
-  // 同步成功后自动刷新首页数据（成绩 + Best50 + 排行榜）
-  // 调用前需确保 _cachedQQ / bind_qq 已保存
+  // 显示刷新数据对话框（旧版实现已抽离到 lib/widgets/RefreshDataDialog.dart，
+  // 这里仅保留给其它可能的本地调用入口；首页/系统 Tab 现统一调用 showRefreshDataDialog）
   Future<void> _autoRefreshAfterSync({
     Future<void> Function(double progress, String text)? onProgress,
   }) async {
@@ -2326,14 +805,14 @@ class _HomePageState extends State<HomePage> {
 
     debugPrint('[HomePage] _autoRefreshAfterSync: 使用 QQ=$qq 自动刷新');
 
-    await _refreshBest50DataWithProgress(
+    await refreshBest50DataWithProgress(
       qq,
       (p, t) async {
         debugPrint('[HomePage] 后台刷新 $p%: $t');
         await onProgress?.call(0.70 + (p / 100) * 0.30, t);
       },
-      await _getParticipateRankings(),
-      await _getShowNickname(),
+      participateRankings: await _getParticipateRankings(),
+      showNickname: await _getShowNickname(),
     );
     debugPrint('[HomePage] _autoRefreshAfterSync: 完成');
   }
@@ -3151,35 +1630,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // 右上角主题快捷切换按钮
-  Widget _buildThemeToggleButton(BuildContext context) {
-    final currentMode = ThemeManager().themeMode;
-    final isDark = currentMode == ThemeMode.dark;
-    return GestureDetector(
-      onTap: () => _showThemeDialog(),
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Icon(
-          isDark ? Icons.dark_mode : Icons.light_mode,
-          size: 20,
-          color: Theme.of(context).colorScheme.onSurface,
-        ),
-      ),
-    );
-  }
-
   // 显示主题切换对话框
   void _showThemeDialog() {
     showDialog(
@@ -3280,6 +1730,17 @@ class _HomePageState extends State<HomePage> {
             ),
             actions: [
               TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsPage()),
+                  );
+                },
+                child: Text('更多设置',
+                    style: TextStyle(color: AppColors.linkBlue(brightness))),
+              ),
+              TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
                 child: Text('完成',
                     style: TextStyle(color: AppColors.linkBlue(brightness))),
@@ -3362,7 +1823,8 @@ class _HomePageState extends State<HomePage> {
                             ] else
                               // 未登录水鱼：友好提示用户去登录水鱼（落雪 token 仍可操作）
                               Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
                                 child: Text(
                                   '未登录水鱼账号，仅显示落雪相关设置',
                                   style: TextStyle(
@@ -3591,11 +2053,11 @@ class _HomePageState extends State<HomePage> {
                         await launchUrl(uri,
                             mode: LaunchMode.externalApplication);
                       } else {
-                        _launchUrlFallback(uri.toString());
+                        launchUrlFallback(uri.toString(), context);
                       }
                     } catch (e) {
                       debugPrint('打开落雪第三方绑定链接失败: $e');
-                      _launchUrlFallback(uri.toString());
+                      launchUrlFallback(uri.toString(), context);
                     }
                   },
                   child: Text.rich(
@@ -3942,13 +2404,13 @@ class _HomePageState extends State<HomePage> {
             builder: (context) => AchievementFullReverseCalculator()),
       );
     }
-    if (item.title == 'Best50查询') {
+    if (item.title == 'Best50') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => B50Page()),
       );
     }
-    if (item.title == '单曲Rating计算') {
+    if (item.title == '单曲 Rating 计算') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => SingleRatingCalculator()),
@@ -3960,7 +2422,7 @@ class _HomePageState extends State<HomePage> {
         MaterialPageRoute(builder: (context) => RecommendByTags()),
       );
     }
-    if (item.title == '基于目标Rating推荐') {
+    if (item.title == '基于目标 Rating 推荐') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => RatingRecommendPage()),
@@ -3979,15 +2441,38 @@ class _HomePageState extends State<HomePage> {
       );
     }
     if (item.title == '刷新数据') {
-      final isOnline = await ConnectivityService().hasConnection();
-      if (!mounted) return;
-      if (!isOnline) {
-        Fluttertoast.showToast(msg: '当前无网络连接，请联网后重试');
-        return;
+      // 对话框只负责收集输入；确认后关闭对话框。
+      // 首页这里没有可承载进度的按钮，所以用一条常驻 SnackBar 显示进度文本。
+      // （系统 Tab 的同类入口走同一套 executeRefreshData，进度显示在按钮上。）
+      final request = await showRefreshDataDialog(context);
+      if (request == null || !mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      // SnackBar 同一时刻只保留一条，所以每次进度更新前先清空旧的，
+      // 否则高频 onProgress 会把 SnackBar 排成长队。
+      void showProgress(String text) {
+        messenger.clearSnackBars();
+        messenger.showSnackBar(SnackBar(
+          content: Text(text),
+          duration: const Duration(minutes: 10),
+        ));
       }
-      _showRefreshDataDialog(context);
+
+      showProgress('正在刷新数据...');
+      var failed = false;
+      try {
+        await executeRefreshData(request, onProgress: (p, t) {
+          if (!mounted) return;
+          showProgress('$t ($p%)');
+        });
+      } catch (e) {
+        failed = true;
+        if (mounted) Fluttertoast.showToast(msg: '刷新数据失败：$e');
+      } finally {
+        messenger.clearSnackBars();
+      }
+      if (!failed && mounted) Fluttertoast.showToast(msg: '数据刷新成功!');
     }
-    if (item.title == '刷新maidata') {
+    if (item.title == '刷新 maidata') {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -4059,7 +2544,7 @@ class _HomePageState extends State<HomePage> {
         MaterialPageRoute(builder: (context) => UserScoreSearchPage()),
       );
     }
-    if (item.title == '拟合Best50查询') {
+    if (item.title == '拟合 Best50') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => DiffBest50Page()),
@@ -4125,13 +2610,13 @@ class _HomePageState extends State<HomePage> {
         MaterialPageRoute(builder: (context) => MaimaiServerStatusPage()),
       );
     }
-    if (item.title == '个性化Best50查询') {
+    if (item.title == '个性化 Best50') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => PersonalizedBest50Page()),
       );
     }
-    if (item.title == '个性化拟合Best50查询') {
+    if (item.title == '个性化拟合 Best50') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => PersonalizedDiffBest50Page()),
@@ -4155,6 +2640,12 @@ class _HomePageState extends State<HomePage> {
         MaterialPageRoute(builder: (context) => const CoverRecognitionPage()),
       );
     }
+    if (item.title == '结算画面识别') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ScoreOcrPage()),
+      );
+    }
     if (item.title == '牌子进度') {
       Navigator.push(
         context,
@@ -4174,7 +2665,7 @@ class _HomePageState extends State<HomePage> {
             builder: (context) => PersonalizedChartPlayConfigure()),
       );
     }
-    if (item.title == '关于本APP') {
+    if (item.title == '关于 APP') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const AboutAppPage()),
@@ -4192,81 +2683,23 @@ class _HomePageState extends State<HomePage> {
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         } else {
-          _launchUrlFallback(uri.toString());
+          launchUrlFallback(uri.toString(), context);
         }
       } catch (e) {
         debugPrint('打开问卷调查链接失败: $e');
-        _launchUrlFallback(uri.toString());
+        launchUrlFallback(uri.toString(), context);
       }
     }
     if (item.title == '同步成绩到水鱼') {
-      // 检测是否已登录水鱼
-      final prefs = await SharedPreferences.getInstance();
-      final hasJwt =
-          (prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '')
-              .isNotEmpty;
-      if (!hasJwt) {
-        if (context.mounted) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('提示'),
-              content: const Text('请先在「登录水鱼」中登录你的水鱼账号，再使用同步功能。'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('取消'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(ctx).pop();
-                    _showDivingFishLoginDialog(context);
-                  },
-                  child: const Text('去登录'),
-                ),
-              ],
-            ),
-          );
-        }
-        return;
-      }
-
-      // 检测缓存 QQ 与当前水鱼 bind_qq 是否一致
-      final cachedQQ = _cachedQQ.isNotEmpty ? _cachedQQ : null;
-      if (cachedQQ != null) {
-        final bindQQ = await DivingFishProbeManager().fetchBindQQ();
-        if (bindQQ != null && bindQQ.isNotEmpty && bindQQ != cachedQQ) {
-          if (context.mounted) {
-            showDialog(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('账号不匹配'),
-                content: Text(
-                  '当前登录的水鱼账号绑定的 QQ（$bindQQ）与本机缓存的 QQ（$cachedQQ）不一致。\n\n'
-                  '请先登出当前水鱼账号，登录正确的账号后再同步。',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    child: const Text('确定'),
-                  ),
-                ],
-              ),
-            );
-          }
-          return;
-        }
-      }
-
-      await _showSyncScoreDialog(context);
+      await _syncToDivingFish();
     }
     if (item.title == '账号管理') {
       _showAccountManageDialog(context);
     }
     if (item.title == '登录水鱼') {
-      _showDivingFishLoginDialog(context);
+      await SyncScoreDialogs.showDivingFishLoginDialog(context, _syncCallbacks);
     }
-    if (item.title == '登出账号') {
+    if (item.title == '登出水鱼账号') {
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -4297,16 +2730,42 @@ class _HomePageState extends State<HomePage> {
         MaterialPageRoute(builder: (context) => RankListPage()),
       );
     }
-    if (item.title == '排行榜(仅供参考)') {
+    if (item.title == 'Rating 排行榜') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => RatingRankListPage()),
+      );
+    }
+    if (item.title == '拟合总Rating排行榜') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const FittedRatingRankingListPage(),
+        ),
       );
     }
     if (item.title == '特殊排行榜') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => SpecialRankingListPage()),
+      );
+    }
+    if (item.title == '平均达成率排行榜') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              const AvgScoreRankingListPage(initialMetric: AvgMetric.achievement),
+        ),
+      );
+    }
+    if (item.title == '平均DX分数达成率排行榜') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              const AvgScoreRankingListPage(initialMetric: AvgMetric.dx),
+        ),
       );
     }
     if (item.title == '检查更新') {
@@ -4377,7 +2836,7 @@ class _HomePageState extends State<HomePage> {
             builder: (context) => const DifficultyDistributionPage()),
       );
     }
-    if (item.title == '浅色/深色模式') {
+    if (item.title == '主题与背景') {
       _showThemeDialog();
     }
     if (item.title == '收藏夹') {
@@ -4407,11 +2866,11 @@ class _HomePageState extends State<HomePage> {
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         } else {
-          _launchUrlFallback(uri.toString());
+          launchUrlFallback(uri.toString(), context);
         }
       } catch (e) {
         debugPrint('打开全国音游地图失败: $e');
-        _launchUrlFallback(uri.toString());
+        launchUrlFallback(uri.toString(), context);
       }
     }
     if (item.title == '全球音游街机地图') {
@@ -4438,187 +2897,52 @@ class _HomePageState extends State<HomePage> {
         MaterialPageRoute(builder: (context) => const DataBackupPage()),
       );
     }
-  }
-
-  /// 打开外部链接失败时的降级处理：复制链接到剪贴板并提示用户
-  void _launchUrlFallback(String url) {
-    Clipboard.setData(ClipboardData(text: url));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('无法打开浏览器，链接已复制到剪贴板，请手动粘贴到浏览器打开'),
-          duration: const Duration(seconds: 3),
-          action: SnackBarAction(
-            label: '知道了',
-            onPressed: () {},
-          ),
-        ),
+    if (item.title == '查看友情链接') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const FriendLinksPage()),
       );
     }
   }
 
   // 构建收藏的功能区域（首页直接显示已收藏功能的入口按钮）
-  Widget _buildFavoriteFeaturesSection(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final brightness = Theme.of(context).brightness;
-    final items = _favoritedItems;
+  // [titles] 来自 FavoriteFeaturesNotifier 的实时值，
+  // 这样其他页面切换星标后，本区域无需依赖本地缓存即可立即刷新。
+  Widget _buildFavoriteFeaturesSection(
+      BuildContext context, Set<String> titles) {
+    final items = _searchableCategories
+        .expand((c) => c.items)
+        .where((item) => titles.contains(item.title))
+        .toList();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return HubSection(
+      title: '收藏的功能',
+      icon: Icons.star,
+      subtitle: '常用功能快速直达',
       children: [
-        // 标题行：星标图标 + "收藏的功能" + 管理链接
-        Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: screenWidth * 0.01,
-            vertical: screenHeight * 0.006,
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.star, size: screenWidth * 0.045, color: Colors.amber),
-              SizedBox(width: screenWidth * 0.02),
-              Text(
-                '收藏的功能',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: screenWidth * 0.038,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (ctx) => FavoriteFeaturesPage(
-                        allCategories: _buttonCategories,
-                        onFeatureTap: _handleFeatureTap,
-                      ),
-                    ),
-                  ).then((_) => _loadFavoriteCount());
-                },
-                icon: Icon(Icons.tune,
-                    size: screenWidth * 0.035,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.6)),
-                label: Text(
-                  '管理',
-                  style: TextStyle(
-                    fontSize: screenWidth * 0.03,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.6),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        // 内容区：有收藏则显示功能按钮网格，无收藏则显示引导提示
-        if (items.isNotEmpty)
-          GridView.builder(
-            padding: EdgeInsets.zero,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: AppConstants.crossAxisCount,
-              crossAxisSpacing: screenWidth * 0.02,
-              mainAxisSpacing: screenHeight * 0.01,
-              childAspectRatio: screenWidth > 600 ? 1.3 : 1.2,
-            ),
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return FeatureButton(
-                item: item,
-                onTap: () => _handleFeatureTap(item),
-                isFavorited: true,
-                onToggleFavorite: () => _toggleFavorite(item.title),
-              );
-            },
-          )
-        else
+        if (items.isEmpty)
           Padding(
-            padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
             child: Center(
               child: Text(
                 '点击分类中的 ⭐ 星标即可收藏功能，收藏后直接显示在此处',
                 style: TextStyle(
-                  fontSize: screenWidth * 0.03,
-                  color: AppColors.greyHint(brightness),
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ),
-          ),
-        SizedBox(height: screenHeight * 0.004),
-      ],
-    );
-  }
-
-  // 构建分类区域（分类标题 + 分隔条 + 按钮网格）
-  Widget _buildCategorySection(ButtonCategory category, BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 分隔条
-        const Divider(height: 1, thickness: 1),
-        SizedBox(height: screenHeight * 0.008),
-        // 分类标题（居中 + 底色突出）
-        Center(
-          child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: screenWidth * 0.04,
-              vertical: screenHeight * 0.004,
-            ),
-            decoration: BoxDecoration(
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.12),
-              borderRadius:
-                  BorderRadius.circular(AppConstants.borderRadiusSmall),
-            ),
-            child: Text(
-              category.name,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: screenWidth * 0.035,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-        SizedBox(height: screenHeight * 0.006),
-        // 按钮网格
-        GridView.builder(
-          padding: EdgeInsets.zero,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: AppConstants.crossAxisCount,
-            crossAxisSpacing: screenWidth * 0.02,
-            mainAxisSpacing: screenHeight * 0.01,
-            childAspectRatio: screenWidth > 600 ? 1.3 : 1.2,
-          ),
-          itemCount: category.items.length,
-          itemBuilder: (context, index) {
-            final item = category.items[index];
-            return FeatureButton(
-              item: item,
-              onTap: () => _handleFeatureTap(item),
-              isFavorited: _favoriteTitles.contains(item.title),
+          )
+        else
+          for (final item in items)
+            HubActionTile(
+              title: item.title,
+              subtitle: item.subtitle,
+              icon: item.icon,
+              isFavorited: true,
               onToggleFavorite: () => _toggleFavorite(item.title),
-            );
-          },
-        ),
-        SizedBox(height: screenHeight * 0.006),
+              onTap: () => _handleFeatureTap(item),
+            ),
       ],
     );
   }
@@ -4632,7 +2956,7 @@ class _HomePageState extends State<HomePage> {
   }) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    final brightness = Theme.of(context).brightness;
+    final scheme = Theme.of(context).colorScheme;
 
     return Padding(
       padding: EdgeInsets.only(bottom: screenHeight * 0.012),
@@ -4640,10 +2964,9 @@ class _HomePageState extends State<HomePage> {
         height: screenHeight * 0.09,
         child: TextButton(
           style: TextButton.styleFrom(
-            backgroundColor:
-                Theme.of(context).colorScheme.surface.withValues(alpha: 0.85),
+            backgroundColor: scheme.surface.withValues(alpha: 0.85),
             side: BorderSide(
-              color: AppColors.buttonBorder(brightness),
+              color: scheme.outlineVariant,
               width: AppConstants.borderWidth,
             ),
             padding: EdgeInsets.symmetric(
@@ -4674,12 +2997,12 @@ class _HomePageState extends State<HomePage> {
               },
           child: Row(
             children: [
-              // 左侧：分类图标（圆形背景）
+              // 左侧：分类图标（主题色圆形背景）
               Container(
                 width: screenWidth * 0.11,
                 height: screenWidth * 0.11,
                 decoration: BoxDecoration(
-                  color: AppColors.buttonBackground(brightness),
+                  color: scheme.primary.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -4687,7 +3010,7 @@ class _HomePageState extends State<HomePage> {
                       (category.items.isNotEmpty
                           ? category.items.first.icon
                           : Icons.folder),
-                  color: Theme.of(context).colorScheme.onSurface,
+                  color: scheme.primary,
                   size: screenWidth * 0.06,
                 ),
               ),
@@ -4701,7 +3024,7 @@ class _HomePageState extends State<HomePage> {
                     Text(
                       category.name,
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
+                        color: scheme.onSurface,
                         fontSize: screenWidth * 0.042,
                         fontWeight: FontWeight.bold,
                       ),
@@ -4710,10 +3033,7 @@ class _HomePageState extends State<HomePage> {
                     Text(
                       '${overrideCount ?? category.items.length} 个功能',
                       style: TextStyle(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.6),
+                        color: scheme.onSurface.withValues(alpha: 0.6),
                         fontSize: screenWidth * 0.03,
                       ),
                     ),
@@ -4723,10 +3043,7 @@ class _HomePageState extends State<HomePage> {
               // 右侧：箭头
               Icon(
                 Icons.chevron_right,
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withValues(alpha: 0.5),
+                color: scheme.onSurface.withValues(alpha: 0.5),
                 size: screenWidth * 0.06,
               ),
             ],
@@ -4734,81 +3051,6 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
-  }
-
-  /// 从落雪玩家记录计算并更新首页的 Best50 数据
-  Future<({List<RecordItem> best35, List<RecordItem> best15})?>
-      _calculateBest50FromLuoXueRecords(List<RecordItem> playerRecords) async {
-    try {
-      // 使用缓存的歌曲数据
-      final musicDataManager = MaimaiMusicDataManager();
-      final cachedSongs = await musicDataManager.getCachedSongs();
-
-      if (cachedSongs == null || cachedSongs.isEmpty) {
-        debugPrint('❌ 无法获取缓存的歌曲数据');
-        return null;
-      }
-
-      // 根据歌曲的 is_new 字段分组
-      List<RecordItem> oldSongs = []; // is_new = false
-      List<RecordItem> newSongs = []; // is_new = true
-
-      for (var record in playerRecords) {
-        bool isNew = _isSongNewFromCache(record.songId, cachedSongs);
-        if (isNew) {
-          newSongs.add(record);
-        } else {
-          oldSongs.add(record);
-        }
-      }
-
-      // 按 ra 降序排序并取前 N 个
-      oldSongs.sort((a, b) => b.ra.compareTo(a.ra));
-      newSongs.sort((a, b) => b.ra.compareTo(a.ra));
-
-      // Best35: is_new=false 的前35首
-      List<RecordItem> best35 = oldSongs.take(35).toList();
-      // Best15: is_new=true 的前15首
-      List<RecordItem> best15 = newSongs.take(15).toList();
-
-      // 计算总 Rating
-      int best35RA = best35.fold(0, (sum, item) => sum + item.ra);
-      int best15RA = best15.fold(0, (sum, item) => sum + item.ra);
-      int totalRA = best35RA + best15RA;
-
-      // 更新首页状态
-      if (mounted) {
-        setState(() {
-          _best50TotalRA = totalRA;
-          _best35TotalRA = best35RA;
-          _best15TotalRA = best15RA;
-        });
-        await _saveUserData(); // 保存到缓存
-      }
-
-      debugPrint(
-          '✅ 从落雪数据计算Best50完成: Best35=${best35RA}, Best15=${best15RA}, 总Rating=$totalRA');
-      return (best35: best35, best15: best15);
-    } catch (e) {
-      debugPrint('Error calculating Best50 from LuoXue records: $e');
-      return null;
-    }
-  }
-
-  /// 根据歌曲ID从缓存判断是否为新曲（is_new=true）
-  bool _isSongNewFromCache(int songId, List<Song> cachedSongs) {
-    try {
-      Song song = cachedSongs.firstWhere(
-        (song) => song.id == songId.toString(),
-      );
-
-      return song.basicInfo.isNew;
-    } catch (e) {
-      // 歌曲未找到时返回 false
-      debugPrint('Song $songId not found in cached songs');
-    }
-
-    return false;
   }
 
   // ===== 水鱼导入辅助方法 =====
@@ -4921,7 +3163,7 @@ class _HomePageState extends State<HomePage> {
         try {
           final result = await Navigator.of(dialogContext).push<String>(
             MaterialPageRoute(
-              builder: (_) => _QrScannerPage(),
+              builder: (_) => const QrScannerPage(),
             ),
           );
           if (result != null && result.isNotEmpty) {
@@ -4935,357 +3177,6 @@ class _HomePageState extends State<HomePage> {
           Fluttertoast.showToast(msg: '扫码失败: $e');
         }
       },
-    );
-  }
-}
-
-// 收藏品选择抽屉（头像 / 姓名框 tab + 搜索 + 网格）
-//
-// 关键设计：必须是独立的 StatefulWidget，不能用 showModalBottomSheet.builder
-// 内联的 StatefulBuilder + 局部 `int activeTab = 0`。
-// 原因：ModalBottomSheetRoute.buildPage 在某些场景（父级 setState、键盘弹起、
-// MediaQuery 变化、输入法焦点切换）会被多次调用，每次调用都会重新执行 builder，
-// 导致局部 `int activeTab = 0` 反复重新声明 → tab 状态被重置回 0（头像）。
-// 症状：用户在「姓名框」tab 下输入文字时，tab 莫名跳回「头像」。
-//
-// 修复：把状态搬到 State 字段里，生命周期跟 sheet 实例绑定，builder 被多次调用也安全。
-class CollectionPickerSheet extends StatefulWidget {
-  final TextEditingController searchController;
-  final List<Collection> avatarIcons;
-  final List<Collection> avatarPlates;
-  final int? selectedAvatarId;
-  final int? selectedPlateId;
-  final ValueChanged<int> onAvatarPicked;
-  final ValueChanged<int> onPlatePicked;
-
-  const CollectionPickerSheet({
-    super.key,
-    required this.searchController,
-    required this.avatarIcons,
-    required this.avatarPlates,
-    required this.selectedAvatarId,
-    required this.selectedPlateId,
-    required this.onAvatarPicked,
-    required this.onPlatePicked,
-  });
-
-  @override
-  State<CollectionPickerSheet> createState() => _CollectionPickerSheetState();
-}
-
-class _CollectionPickerSheetState extends State<CollectionPickerSheet> {
-  // 状态放到 State 字段里，跟 sheet 实例生命周期绑定
-  int _activeTab = 0; // 0=头像, 1=姓名框
-
-  void _switchTab(int tab) {
-    setState(() {
-      _activeTab = tab;
-      widget.searchController.clear();
-    });
-  }
-
-  Widget _buildTabButton({
-    required BuildContext ctx,
-    required String label,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
-    final brightness = Theme.of(ctx).brightness;
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: isActive
-                ? AppColors.warningOrange(brightness).withValues(alpha: 0.15)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isActive
-                  ? AppColors.warningOrange(brightness)
-                  : AppColors.tableBorder(brightness),
-              width: isActive ? 2 : 1,
-            ),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-              color: isActive
-                  ? AppColors.warningOrange(brightness)
-                  : AppColors.primaryText(brightness),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    final screenSize = MediaQuery.of(context).size;
-
-    final List<Collection> currentList =
-        _activeTab == 0 ? widget.avatarIcons : widget.avatarPlates;
-    final int? currentSelectedId = _activeTab == 0
-        ? widget.selectedAvatarId
-        : widget.selectedPlateId;
-    final String searchHint = _activeTab == 0
-        ? '输入头像名称或描述搜索...'
-        : '输入姓名框名称或描述搜索...';
-    final String emptyText =
-        _activeTab == 0 ? '未找到匹配的头像' : '未找到匹配的姓名框';
-
-    // 根据关键词过滤
-    final keyword = widget.searchController.text.trim().toLowerCase();
-    final filteredItems = keyword.isEmpty
-        ? List<Collection>.from(currentList)
-        : currentList.where((c) {
-            final matchName = c.name.toLowerCase().contains(keyword);
-            final matchDesc =
-                c.description?.toLowerCase().contains(keyword) ?? false;
-            return matchName || matchDesc;
-          }).toList();
-    // 将当前选中项移到最前面
-    final selectedIndex =
-        filteredItems.indexWhere((c) => c.id == currentSelectedId);
-    if (selectedIndex > 0) {
-      final selected = filteredItems.removeAt(selectedIndex);
-      filteredItems.insert(0, selected);
-    }
-
-    return Container(
-      height: screenSize.height * 0.65,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      child: Column(
-        children: [
-          // 标题栏 + 关闭按钮
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Row(
-              children: [
-                Text('选择收藏品',
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primaryText(brightness))),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-          ),
-          // tab 切换
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                _buildTabButton(
-                  ctx: context,
-                  label: '头像',
-                  isActive: _activeTab == 0,
-                  onTap: () => _switchTab(0),
-                ),
-                const SizedBox(width: 8),
-                _buildTabButton(
-                  ctx: context,
-                  label: '姓名框',
-                  isActive: _activeTab == 1,
-                  onTap: () => _switchTab(1),
-                ),
-              ],
-            ),
-          ),
-          // 搜索栏
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: TextField(
-              controller: widget.searchController,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                hintText: searchHint,
-                prefixIcon: const Icon(Icons.search, size: 20),
-                suffixIcon: widget.searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
-                        onPressed: () {
-                          widget.searchController.clear();
-                          setState(() {});
-                        },
-                      )
-                    : null,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                    vertical: 10, horizontal: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                      color: AppColors.tableBorder(brightness)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                      color: AppColors.tableBorder(brightness)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.onSurface),
-                ),
-              ),
-            ),
-          ),
-          // 搜索结果数量
-          if (keyword.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '找到 ${filteredItems.length} 个${_activeTab == 0 ? "头像" : "姓名框"}',
-                  style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.greyHint(brightness, shade: 600)),
-                ),
-              ),
-            ),
-          const Divider(height: 1),
-          // 网格
-          Expanded(
-            child: filteredItems.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.search_off,
-                            size: 48,
-                            color: AppColors.greyHint(brightness, shade: 400)),
-                        const SizedBox(height: 8),
-                        Text(emptyText,
-                            style: TextStyle(
-                                color: AppColors.greyHint(brightness,
-                                    shade: 500))),
-                      ],
-                    ),
-                  )
-                : GridView.builder(
-                    padding: const EdgeInsets.all(12),
-                    gridDelegate:
-                        SliverGridDelegateWithFixedCrossAxisCount(
-                      // 姓名框是长条形 banner 图片，使用 1 列 + 宽高比 6:1 避免被裁切/拉伸
-                      // 头像保持 3 列正方形网格
-                      crossAxisCount: _activeTab == 0 ? 3 : 1,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                      childAspectRatio: _activeTab == 0 ? 1 : 6,
-                    ),
-                    itemCount: filteredItems.length,
-                    itemBuilder: (ctx, index) {
-                      final item = filteredItems[index];
-                      final isSelected = item.id == currentSelectedId;
-                      final imageUrl = _activeTab == 0
-                          ? 'https://assets2.lxns.net/maimai/icon/${item.id}.png'
-                          : 'https://assets2.lxns.net/maimai/plate/${item.id}.png';
-                      return GestureDetector(
-                        onTap: () {
-                          if (_activeTab == 0) {
-                            widget.onAvatarPicked(item.id);
-                          } else {
-                            widget.onPlatePicked(item.id);
-                          }
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: isSelected
-                                  ? AppColors.warningOrange(brightness)
-                                  : AppColors.tableBorder(brightness),
-                              width: isSelected ? 3 : 1,
-                            ),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
-                            child: CachedNetworkImage(
-                              imageUrl: imageUrl,
-                              placeholder: (ctx, url) => const Center(
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2)),
-                              errorWidget: (ctx, url, err) =>
-                                  const Icon(Icons.error, size: 20),
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 摄像头扫二维码页面
-class _QrScannerPage extends StatefulWidget {
-  const _QrScannerPage();
-
-  @override
-  State<_QrScannerPage> createState() => _QrScannerPageState();
-}
-
-class _QrScannerPageState extends State<_QrScannerPage> {
-  bool _hasPopped = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('扫描二维码'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: MobileScanner(
-        onDetect: (BarcodeCapture capture) {
-          if (_hasPopped) return;
-          final barcode = capture.barcodes.firstOrNull;
-          if (barcode != null &&
-              barcode.rawValue != null &&
-              barcode.rawValue!.isNotEmpty) {
-            _hasPopped = true;
-            Navigator.pop(context, barcode.rawValue);
-          }
-        },
-        errorBuilder: (context, error) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                const SizedBox(height: 16),
-                Text('摄像头错误: $error'),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('返回'),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
     );
   }
 }

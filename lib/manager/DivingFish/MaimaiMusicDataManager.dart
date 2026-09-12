@@ -24,6 +24,42 @@ class MaimaiMusicDataManager {
   final MultiplayerCloudBaseService _cloudService =
       MultiplayerCloudBaseService();
   Future<void>? _maidataRefreshFuture;
+  List<Song>? _cachedSongs;
+  Map<String, Song>? _cachedSongIndex;
+  Future<List<Song>>? _songLoadFuture;
+
+  void _setCachedSongs(List<Song> songs) {
+    _cachedSongs = List<Song>.unmodifiable(songs);
+    _cachedSongIndex = {
+      for (final song in _cachedSongs!) song.id: song,
+    };
+  }
+
+  Song? findSongByTitleAndType(String title, String type) {
+    for (final song in _cachedSongs ?? const <Song>[]) {
+      if (song.basicInfo.title == title && song.type == type) return song;
+    }
+    return null;
+  }
+
+  List<Song> get cachedSongs => _cachedSongs ?? const <Song>[];
+
+  Future<bool> hasValidMusicCache(
+      {Duration maxAge = const Duration(days: 1)}) async {
+    if (_cachedSongs == null || _cachedSongs!.isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      final songsJson = prefs.getString(CacheKeyConstant.cachedSongs);
+      final timestamp = prefs.getInt(CacheKeyConstant.cachedSongsTimestamp);
+      if (songsJson == null || songsJson.isEmpty || timestamp == null) {
+        return false;
+      }
+      if (DateTime.now().millisecondsSinceEpoch - timestamp >
+          maxAge.inMilliseconds) {
+        return false;
+      }
+    }
+    return _cachedSongs?.isNotEmpty ?? true;
+  }
 
   // 使用 compute 进行后台 JSON 解析
   Future<List<Song>> _parseSongsInBackground(String responseBody) async {
@@ -72,7 +108,15 @@ class MaimaiMusicDataManager {
     return json.encode(songs.map((song) => song.toJson()).toList());
   }
 
-  Future<bool> fetchAndUpdateMusicData({List<String>? maidataTexts}) async {
+  Future<bool> fetchAndUpdateMusicData({
+    List<String>? maidataTexts,
+    bool forceNetwork = false,
+  }) async {
+    if (!forceNetwork && await hasValidMusicCache()) {
+      debugPrint('曲库缓存有效，跳过网络刷新');
+      return true;
+    }
+
     try {
       // 离线检查
       final isOnline = await ConnectivityService().hasConnection();
@@ -262,6 +306,11 @@ class MaimaiMusicDataManager {
       final songsJson = await _encodeSongsInBackground(songs);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(CacheKeyConstant.cachedSongs, songsJson);
+      await prefs.setInt(
+        CacheKeyConstant.cachedSongsTimestamp,
+        DateTime.now().millisecondsSinceEpoch,
+      );
+      _setCachedSongs(songs);
 
       debugPrint('成功更新音乐数据缓存，共 ${songs.length} 首歌曲');
       return true;
@@ -272,9 +321,17 @@ class MaimaiMusicDataManager {
   }
 
   Future<bool> refreshDataWithSmartMaidata({
+    bool forceNetwork = false,
     bool forceMaidataRefresh = false,
   }) async {
     final maidataManager = MaidataManager();
+    if (!forceNetwork && await hasValidMusicCache()) {
+      debugPrint('曲库缓存有效，跳过网络刷新');
+      if (!await maidataManager.isFullCacheValid()) {
+        _scheduleMaidataRefresh(maidataManager);
+      }
+      return true;
+    }
 
     if (forceMaidataRefresh) {
       final activeRefresh = _maidataRefreshFuture;
@@ -284,12 +341,15 @@ class MaimaiMusicDataManager {
       await maidataManager.fetchAndCacheFullMaidata();
       return fetchAndUpdateMusicData(
         maidataTexts: maidataManager.getAllMaidataTexts(),
+        forceNetwork: forceNetwork,
       );
     }
 
-    // 普通“刷新数据”只等待水鱼/union 曲库。maidata 是体积很大的辅助数据，
+    // 普通”刷新数据”只等待水鱼/union 曲库。maidata 是体积很大的辅助数据，
     // 有效期内无需扫描；过期后在主刷新完成后转入后台维护。
-    final result = await fetchAndUpdateMusicData();
+    final result = await fetchAndUpdateMusicData(
+      forceNetwork: forceNetwork,
+    );
     if (!await maidataManager.isFullCacheValid()) {
       _scheduleMaidataRefresh(maidataManager);
     }
@@ -319,27 +379,47 @@ class MaimaiMusicDataManager {
     return songsJson != null && songsJson.isNotEmpty;
   }
 
-  Future<List<Song>?> getCachedSongs() async {
+  Future<List<Song>> _loadCachedSongsFromPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final songsJson = prefs.getString(CacheKeyConstant.cachedSongs);
-
-      if (songsJson != null && songsJson.isNotEmpty) {
-        // 使用 compute 在后台解析
-        return await compute((String jsonStr) {
-          final List<dynamic> jsonList = json.decode(jsonStr);
-          return jsonList.map((item) => Song.fromJson(item)).toList();
-        }, songsJson);
+      if (songsJson == null || songsJson.isEmpty) {
+        return const <Song>[];
       }
+      return await compute((String jsonStr) {
+        final List<dynamic> jsonList = json.decode(jsonStr);
+        return jsonList.map((item) => Song.fromJson(item)).toList();
+      }, songsJson);
     } catch (e) {
       debugPrint('读取本地缓存时出错: $e');
+      return const <Song>[];
     }
+  }
 
-    return null;
+  Future<List<Song>?> getCachedSongs() async {
+    if (_cachedSongs != null) return _cachedSongs!;
+    final activeLoad = _songLoadFuture;
+    if (activeLoad != null) return activeLoad;
+
+    final loadFuture = _loadCachedSongsFromPreferences();
+    _songLoadFuture = loadFuture;
+    try {
+      final songs = await loadFuture;
+      if (songs.isEmpty) {
+        _cachedSongs = const <Song>[];
+        _cachedSongIndex = const <String, Song>{};
+        return null;
+      }
+      _setCachedSongs(songs);
+      return _cachedSongs!;
+    } finally {
+      _songLoadFuture = null;
+    }
   }
 
   Future<Song?> getCachedSongById(String songId) async {
     try {
+      if (_cachedSongIndex != null) return _cachedSongIndex![songId];
       final songs = await getCachedSongs();
       if (songs != null) {
         return songs.firstWhere((song) => song.id == songId);
@@ -418,7 +498,7 @@ class MaimaiMusicDataManager {
         return 0;
       }
 
-      existingSongs.add(newSong);
+      _setCachedSongs([...existingSongs, newSong]);
 
       final songsJson = await _encodeSongsInBackground(existingSongs);
 

@@ -421,95 +421,101 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
                 ),
               ),
 
-              // 内容区域
+              // 内容区域 - 卡片占满可用高度，空状态内容居中显示
               Expanded(
-                child: Stack(
-                  children: [
-                    // 加载中状态
-                    if (_isLoading && _selectedTagId != null)
-                      Container(
-                        color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              CircularProgressIndicator(color: Theme.of(context).colorScheme.onSurface),
-                              SizedBox(height: 16),
-                              Text(
-                                '正在计算个性化拟合Best50...',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
+                child: Container(
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(borderRadiusSmall),
+                    boxShadow: [AppColors.defaultShadow(brightness)],
+                  ),
+                  padding: EdgeInsets.all(screenWidth * 0.03),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // 标签选择按钮（始终在顶部）
+                      ElevatedButton(
+                        onPressed: _showTagSelectionDialog,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.linkBlue(brightness),
+                          padding: EdgeInsets.symmetric(vertical: 12.0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                        ),
+                        child: Text(
+                          _selectedTagName != null
+                              ? '选择标签: $_selectedTagName'
+                              : '选择标签',
+                          style: TextStyle(
+                            fontSize: screenWidth * 0.04,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
+                      SizedBox(height: 12.0),
 
-                    // 内容
-                    Container(
-                      margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(borderRadiusSmall),
-                        boxShadow: [AppColors.defaultShadow(brightness)],
-                      ),
-                      child: SingleChildScrollView(
-                        padding: EdgeInsets.all(screenWidth * 0.03),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // 标签选择按钮
-                            ElevatedButton(
-                              onPressed: _showTagSelectionDialog,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.linkBlue(brightness),
-                                padding: EdgeInsets.symmetric(vertical: 12.0),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8.0),
-                                ),
-                              ),
-                              child: Text(
-                                _selectedTagName != null
-                                    ? '选择标签: $_selectedTagName'
-                                    : '选择标签',
-                                style: TextStyle(
-                                  fontSize: screenWidth * 0.04,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                      // 状态分支：未选标签 / 已选标签无数据 / 已选标签有数据
+                      // 空状态用 Expanded + Center 让内容垂直居中，避免下方留白
+                      if (!_isLoading && _selectedTagId == null)
+                        Expanded(child: Center(child: _buildEmptyHint())),
+
+                      if (!_isLoading && _selectedTagId != null && _diffSongs.isEmpty)
+                        Expanded(child: Center(child: _buildNoDataHint())),
+
+                      // 有数据时滚动展示
+                      if (!_isLoading && _selectedTagId != null && _diffSongs.isNotEmpty)
+                        Expanded(
+                          child: SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _buildRatingSection(),
+                                SizedBox(height: 12.0),
+                                _buildExportButton(),
+                                SizedBox(height: 12.0),
+                                _buildSectionTitle('基于拟合难度的个性化Best50', context),
+                                SizedBox(height: screenWidth * 0.02),
+                                _buildDataCardGrid(),
+                              ],
                             ),
-                            SizedBox(height: 12.0),
-
-                            // 未选择标签时的提示
-                            if (_selectedTagId == null)
-                              _buildEmptyHint(),
-
-                            // 已选择标签且有数据时显示
-                            if (_selectedTagId != null && _diffBest50Data != null && _diffSongs.isNotEmpty) ...[
-                              _buildRatingSection(),
-                              SizedBox(height: 12.0),
-                              _buildExportButton(),
-                              SizedBox(height: 12.0),
-                              _buildSectionTitle('基于拟合难度的个性化Best50', context),
-                              SizedBox(height: screenWidth * 0.02),
-                              _buildDataCardGrid(),
-                            ],
-
-                            // 已选择标签但无数据时显示
-                            if (_selectedTagId != null && _diffBest50Data != null && _diffSongs.isEmpty && !_isLoading)
-                              _buildNoDataHint(),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
+
+          // 加载中遮罩（覆盖在卡片之上）
+          if (_isLoading && _selectedTagId != null)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Container(
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(
+                            color: Theme.of(context).colorScheme.onSurface),
+                        SizedBox(height: 16),
+                        Text(
+                          '正在计算个性化拟合Best50...',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -518,30 +524,31 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
   // 未选择标签时的提示
   Widget _buildEmptyHint() {
     return Container(
-      padding: EdgeInsets.all(24.0),
+      padding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(
             Icons.label_outline,
-            size: 64,
+            size: 48,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
-          SizedBox(height: 16),
+          SizedBox(height: 12),
           Text(
             '请先选择一个标签',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: 8),
+          SizedBox(height: 6),
           Text(
             '选择标签后，将显示包含该标签且有游玩记录\n在拟合定数下RA前50的谱面',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
@@ -554,33 +561,43 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
   // 无数据提示
   Widget _buildNoDataHint() {
     return Container(
-      padding: EdgeInsets.all(24.0),
+      padding: EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(
             Icons.refresh,
-            size: 64,
+            size: 48,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
-          SizedBox(height: 16),
+          SizedBox(height: 12),
           Text(
             '暂无标签"$_selectedTagName"的拟合Best50数据',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 6),
+          Text(
+            '该标签可能没有对应的游玩记录\n可尝试更换其他标签',
+            style: TextStyle(
+              fontSize: 13,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
           ),
           SizedBox(height: 8),
-          Text(
-            '该标签可能没有对应的游玩记录',
-            style: TextStyle(
-              fontSize: 14,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+          TextButton.icon(
+            onPressed: _showTagSelectionDialog,
+            icon: const Icon(Icons.swap_horiz, size: 16),
+            label: const Text('更换标签'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.linkBlue(Theme.of(context).brightness),
             ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),

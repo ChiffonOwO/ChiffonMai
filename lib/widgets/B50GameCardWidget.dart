@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../utils/CoverUtil.dart';
-import '../utils/AppTheme.dart';
 
 /// Best50 系列卡片通用 widget。
 /// 采用两段式布局：上方 70% 卡色背景（曲绘 + 歌名 + 达成率 + 定数→RA | 分数/满分），
@@ -65,7 +64,6 @@ class B50GameCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
     final double songNameFontSize = _kSongName * scale;
     final double decimalMainFontSize = _kDecimalMain * scale;
     final double decimalSmallFontSize = _kDecimalSmall * scale;
@@ -84,9 +82,14 @@ class B50GameCardWidget extends StatelessWidget {
     final String diffMain = diffParts[0];
     final String diffDecimal = '.${diffParts[1]}';
 
+    // 卡片下方 30% 区域固定使用白色背景 + 深色文字，
+    // 避免深色 / 浅色模式影响屏幕显示与导出图片效果，保证导出一致性。
+    const Color cardBottomBg = Colors.white;
+    const Color cardBottomText = Colors.black;
+
     return Container(
       decoration: BoxDecoration(
-        // 外层填色：上半 cardColor / 下半主题色，70% 处硬切换。
+        // 外层填色：上半 cardColor / 下半白色，70% 处硬切换。
         // 同时充当 border 缝隙（ClipRRect 因 border 内缩 2px 留出的几像素环）
         // 的兜底，让圆角四周都能被正确颜色覆盖。
         gradient: LinearGradient(
@@ -95,8 +98,8 @@ class B50GameCardWidget extends StatelessWidget {
           colors: [
             cardColor,
             cardColor,
-            AppColors.cardBackground(brightness),
-            AppColors.cardBackground(brightness),
+            cardBottomBg,
+            cardBottomBg,
           ],
           stops: const [0.0, 0.7, 0.7, 1.0],
         ),
@@ -137,8 +140,7 @@ class B50GameCardWidget extends StatelessWidget {
                               context, songId.toString(), coverSize)
                           : Center(
                               child: Text('曲绘',
-                                  style:
-                                      TextStyle(fontSize: coverSize * 0.24)),
+                                  style: TextStyle(fontSize: coverSize * 0.24)),
                             ),
                     ),
                     SizedBox(width: spacing),
@@ -218,12 +220,12 @@ class B50GameCardWidget extends StatelessWidget {
                 ),
               ),
             ),
-            // ★ 下方 30%：ID + 类型 chip + 评级 + FC + FS + 星数
+            // ★ 下方 30%：固定白色背景 + 深色文字，导出图片与屏幕显示一致
             Expanded(
               flex: 3,
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppColors.cardBackground(brightness),
+                  color: cardBottomBg,
                   borderRadius: const BorderRadius.only(
                     bottomLeft: Radius.circular(8.0),
                     bottomRight: Radius.circular(8.0),
@@ -254,7 +256,7 @@ class B50GameCardWidget extends StatelessWidget {
                           songId != 0 ? '#${songId.toString()}' : '',
                           style: TextStyle(
                             fontSize: otherFontSize * 1.5,
-                            color: AppColors.secondaryText(brightness),
+                            color: cardBottomText,
                             fontWeight: FontWeight.bold,
                             height: 1.0,
                           ),
@@ -334,8 +336,7 @@ class B50GameCardWidget extends StatelessWidget {
   }
 
   /// 类型标签（带颜色文字，无背景）
-  static Widget buildTypeChip(
-      bool isUtage, bool dxMode, double fontSize) {
+  static Widget buildTypeChip(bool isUtage, bool dxMode, double fontSize) {
     Color textColor;
     String text;
     if (isUtage) {
@@ -385,7 +386,7 @@ class B50GameCardWidget extends StatelessWidget {
               child: Text(
                 stars,
                 style: TextStyle(
-                  fontSize: fontSize * 1.5,
+                  fontSize: fontSize,
                   color: starsColor,
                   fontWeight: FontWeight.bold,
                 ),
@@ -395,17 +396,47 @@ class B50GameCardWidget extends StatelessWidget {
         );
       }
     }
-    // ✦0 / ✦5.5 / ✦6 等情况：用占位 SizedBox 保持与有星卡片对齐
+    // ✦0 / ✦5.5 / ✦6 等情况：用占位 SizedBox 保持与有星卡片对齐；
+    // Text 用 FittedBox + 大字号自动缩放到与图片星等高，加粗加深可读性。
+    // 5.5 / 6 字号比图片星略小一点（1.5x vs 2.0x），避免视觉过重。
+    // 5.5 / 6 走细描边（4 方向 Shadow 偏移 1.0）让数字更"立"起来。
+    // ✦ 与数字拆成 Row 用 baseline 对齐，避免 ✦ 与数字上下错位。
+    final bool needsStroke = stars == '✦6' || stars == '✦5.5';
+    final String digits =
+        stars.startsWith('✦') ? stars.substring(1) : stars;
+    final TextStyle starStyle = TextStyle(
+      fontSize: fontSize * 1.5,
+      color: starsColor,
+      fontWeight: FontWeight.w900,
+      height: 1.0,
+      shadows: needsStroke
+          ? const [
+              Shadow(color: Colors.black87, offset: Offset(-1.0, 0), blurRadius: 0),
+              Shadow(color: Colors.black87, offset: Offset(1.0, 0), blurRadius: 0),
+              Shadow(color: Colors.black87, offset: Offset(0, -1.0), blurRadius: 0),
+              Shadow(color: Colors.black87, offset: Offset(0, 1.0), blurRadius: 0),
+            ]
+          : null,
+    );
     return SizedBox(
       width: fontSize * heightMultiplier * starsAspect,
       height: fontSize * heightMultiplier,
       child: Center(
-        child: Text(
-          stars,
-          style: TextStyle(
-            fontSize: fontSize * 1.5,
-            color: starsColor,
-            fontWeight: FontWeight.bold,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              // ✦ 在很多字体里视觉重心偏低，整体上移 1.5 让它和数字看起来一样高
+              Transform.translate(
+                offset: const Offset(0, -1.5),
+                child: Text('✦', style: starStyle),
+              ),
+              const SizedBox(width: 1.5),
+              Text(digits, style: starStyle),
+            ],
           ),
         ),
       ),

@@ -6,23 +6,98 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:media_scanner/media_scanner.dart';
 
+import '../constant/CacheKeyConstant.dart';
+
 /// 数据备份服务
 /// 导出/导入所有 SharedPreferences 数据为 JSON 文件
+///
+/// **可重新拉取的缓存不参与备份**（见 [_cacheExactKeys] / [_cacheKeyPrefixes]）：
+/// 它们体积大（cachedSongs / maidata 动辄数 MB），却只是服务端数据的副本；
+/// 更麻烦的是恢复后会写回**旧的缓存时间戳**，App 会以为缓存还新鲜，
+/// 从而继续用过期数据。排除掉之后备份文件只剩真正的用户数据，
+/// 恢复后由各 Manager 按需重新拉取。
 class DataBackupService {
   static final DataBackupService _instance = DataBackupService._internal();
   factory DataBackupService() => _instance;
   DataBackupService._internal();
 
+  /// 精确匹配的缓存键（可随时重新拉取，不属于用户数据）
+  static const Set<String> _cacheExactKeys = {
+    CacheKeyConstant.cachedSongs,
+    CacheKeyConstant.cachedSongsTimestamp,
+    CacheKeyConstant.maidataFullCache,
+    CacheKeyConstant.maidataFullCacheTimestamp,
+    CacheKeyConstant.maidataAddedSongs,
+    CacheKeyConstant.maidataAddedSongsTimestamp,
+    CacheKeyConstant.maidataIndexCache,
+    CacheKeyConstant.maidataIndexCacheTimestamp,
+    CacheKeyConstant.unionExtraSongIds,
+    CacheKeyConstant.unionCache,
+    CacheKeyConstant.unionCacheTimestamp,
+    CacheKeyConstant.knowledgeData,
+    CacheKeyConstant.knowledgeTimestamp,
+    CacheKeyConstant.luoxueSongsCache,
+    CacheKeyConstant.trophiesCollectionsCacheData,
+    CacheKeyConstant.iconsCollectionsCacheData,
+    CacheKeyConstant.platesCollectionsCacheData,
+    CacheKeyConstant.framesCollectionsCacheData,
+    CacheKeyConstant.maiTagsCache,
+    CacheKeyConstant.maiTagsCacheTimestamp,
+    CacheKeyConstant.userPlayData,
+    CacheKeyConstant.diffMusicData,
+    CacheKeyConstant.diffMusicDataTimestamp,
+    CacheKeyConstant.recommendationResults,
+    CacheKeyConstant.totalRankingsCache,
+    CacheKeyConstant.totalRankingsCacheTimestamp,
+    CacheKeyConstant.shuiyuRankingsCache,
+    CacheKeyConstant.shuiyuRankingsCacheTimestamp,
+    CacheKeyConstant.luoxueRankingsCache,
+    CacheKeyConstant.luoxueRankingsCacheTimestamp,
+    CacheKeyConstant.avgRankingsCache,
+    CacheKeyConstant.avgRankingsCacheTimestamp,
+    CacheKeyConstant.coverHashCache,
+    CacheKeyConstant.coverHashCacheTimestamp,
+  };
+
+  /// 前缀匹配的缓存键（这些键按歌曲 / 模式 / 难度拼接，数量不固定）
+  static const List<String> _cacheKeyPrefixes = [
+    CacheKeyConstant.maidataCachePrefix, // maidata_cache_<shortId>
+    CacheKeyConstant.fittedRankingsCachePrefix, // fitted_rankings_cache_<mode>
+    CacheKeyConstant.fittedRankingsCacheTimestampPrefix,
+    CacheKeyConstant.songCommentsCachePrefix, // song_comments_cache_<songId>
+    CacheKeyConstant.songCommentsCacheTimestampPrefix,
+  ];
+
+  /// 是否是「可重新拉取的缓存」——这类键不写进备份
+  static bool isCacheKey(String key) {
+    if (_cacheExactKeys.contains(key)) return true;
+    for (final p in _cacheKeyPrefixes) {
+      if (key.startsWith(p)) return true;
+    }
+    // 兜底：`xxx_timestamp` 若其主体被判定为缓存，则该时间戳也是缓存
+    const suffix = '_timestamp';
+    if (key.endsWith(suffix)) {
+      final base = key.substring(0, key.length - suffix.length);
+      if (_cacheExactKeys.contains(base)) return true;
+    }
+    return false;
+  }
+
   /// 导出所有数据到 JSON 文件
   /// 返回保存的文件路径，null 表示用户取消或失败
   Future<String?> exportToFile() async {
     try {
-      // 1. 读取所有 SharedPreferences 数据
+      // 1. 读取所有 SharedPreferences 数据（跳过可重新拉取的缓存）
       final prefs = await SharedPreferences.getInstance();
       final keys = prefs.getKeys();
       final data = <String, dynamic>{};
+      var skipped = 0;
 
       for (final key in keys) {
+        if (isCacheKey(key)) {
+          skipped++;
+          continue;
+        }
         final value = prefs.get(key);
         if (value is String) {
           data[key] = {'type': 'String', 'value': value};
@@ -37,13 +112,17 @@ class DataBackupService {
         }
       }
 
+      debugPrint(
+          'DataBackup: 导出 ${data.length} 个用户数据键，跳过 $skipped 个缓存键');
+
       // 2. 构建备份元数据
       final backup = {
-        'version': 1,
+        'version': 2,
         'appName': 'ChiffonMai',
         'exportedAt': DateTime.now().toIso8601String(),
         'exportedAtTimestamp': DateTime.now().millisecondsSinceEpoch,
-        'keyCount': keys.length,
+        'keyCount': data.length,
+        'skippedCacheKeys': skipped,
         'data': data,
       };
 
@@ -52,8 +131,14 @@ class DataBackupService {
       final bytes = utf8.encode(jsonStr);
 
       // 4. 让用户选择保存路径
-      final dateStr =
-          '${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}';
+      //    文件名带时分秒：同一天导出多次不再互相覆盖（旧实现只到日期）
+      final now = DateTime.now();
+      final dateStr = '${now.year}'
+          '${now.month.toString().padLeft(2, '0')}'
+          '${now.day.toString().padLeft(2, '0')}_'
+          '${now.hour.toString().padLeft(2, '0')}'
+          '${now.minute.toString().padLeft(2, '0')}'
+          '${now.second.toString().padLeft(2, '0')}';
       final suggestedName = 'ChiffonMai_backup_$dateStr.json';
 
       // 优先保存到公共目录（用户可访问）
@@ -165,13 +250,34 @@ class DataBackupService {
     }
   }
 
-  /// 将备份数据恢复到 SharedPreferences
-  /// 返回成功恢复的键数量
-  Future<int> restoreData(Map<String, dynamic> backupData) async {
+  /// 将备份数据恢复到 SharedPreferences。
+  ///
+  /// **先清空再写入**（[clearFirst] 默认 true）：备份里没有的键会被一并抹掉，
+  /// 这才是「覆盖恢复」应有的语义——否则用户从旧备份恢复后，
+  /// 比备份更新的那些键还留着，新旧数据混在一起。
+  ///
+  /// 注意随之而来的两个后果（都属于预期行为，不是 bug）：
+  /// 1. 缓存键（cachedSongs / maidata / 各排行榜缓存等）会被清掉，
+  ///    恢复后首次进相关页面会重新拉取，会慢一点。
+  /// 2. 若备份里不含登录凭据，恢复后需要重新登录对应账号。
+  ///    本项目的凭据键（probeDivingFishToken / probeLxnsImportToken /
+  ///    luoxue_* 等）都**不在** [_cacheExactKeys] 里，会被正常备份与还原。
+  ///
+  /// 返回成功恢复的键数量。
+  Future<int> restoreData(
+    Map<String, dynamic> backupData, {
+    bool clearFirst = true,
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final data = backupData;
       int restoredCount = 0;
+
+      if (clearFirst) {
+        final before = prefs.getKeys().length;
+        await prefs.clear();
+        debugPrint('DataBackup: 已清空原有 $before 个键');
+      }
 
       for (final entry in data.entries) {
         final key = entry.key;

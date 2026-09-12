@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/UserBest50Entity.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/RecordItem.dart';
+import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'UserPlayDataManager.dart';
 import 'MaimaiMusicDataManager.dart';
 
@@ -14,6 +15,7 @@ class UserBest50Manager {
   Future<UserBest50Entity> getUserBest50(
     String qq, {
     Map<String, dynamic>? playData,
+    List<Song>? songs,
   }) async {
     try {
       // OAuth 用户由 access token 决定，不能再调用按 QQ 查询的旧接口。
@@ -22,12 +24,13 @@ class UserBest50Manager {
       if (resolvedPlayData == null || resolvedPlayData['records'] is! List) {
         throw Exception('水鱼成绩接口未返回 records');
       }
-      final songs = await MaimaiMusicDataManager().getCachedSongs();
-      if (songs == null || songs.isEmpty) {
+      final resolvedSongs =
+          songs ?? await MaimaiMusicDataManager().getCachedSongs();
+      if (resolvedSongs == null || resolvedSongs.isEmpty) {
         throw Exception('缺少歌曲数据，无法区分当前版本歌曲');
       }
       final isNewById = <String, bool>{
-        for (final song in songs) song.id: song.basicInfo.isNew,
+        for (final song in resolvedSongs) song.id: song.basicInfo.isNew,
       };
       final records = (resolvedPlayData['records'] as List)
           .whereType<Map<String, dynamic>>()

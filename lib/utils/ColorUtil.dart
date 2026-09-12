@@ -9,9 +9,11 @@ class ColorUtil {
   static Color getStarsColor(String stars) {
     switch (stars) {
       case '✦6':
+        return const Color(0xFFFFD700); // 金色（满分档）
       case '✦5.5':
+        return const Color(0xFFFFA726); // 琥珀橙（5.5 与 5 区分）
       case '✦5':
-        return Colors.yellow;
+        return Colors.yellow; // 黄色（图片档）
       case '✦4':
       case '✦3':
         return Colors.orange;

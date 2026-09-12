@@ -29,8 +29,20 @@ class UserPlayDataManager {
       final response = await ApiClient.get(url);
 
       if (response.statusCode == 200) {
-        // 解析 JSON 数据
-        final Map<String, dynamic> data = json.decode(response.body);
+        // 水鱼 /player/records 的返回结构不固定：可能是直接数组，也可能是
+        // 代理包装的 { records, additional_rating } 或 { success, data: ... }。
+        // 统一归一化为 { records: [...], additional_rating }，避免下游读到空 records。
+        final dynamic decoded = json.decode(response.body);
+        final data = _normalizeRecords(decoded);
+        if (data == null) {
+          if (decoded is Map<String, dynamic>) {
+            debugPrint(
+                '水鱼成绩接口返回未知结构: ${decoded['message'] ?? decoded['error'] ?? decoded['code'] ?? decoded}');
+          } else {
+            debugPrint('水鱼成绩接口返回未知结构: ${decoded.runtimeType}');
+          }
+          return null;
+        }
 
         // 保存到缓存
         await _saveToCache(data);
@@ -48,6 +60,48 @@ class UserPlayDataManager {
       debugPrint('获取用户游玩数据时出错: $e');
       return null;
     }
+  }
+
+  // 归一化水鱼 /player/records 返回结构，统一为 { records: [...], additional_rating }。
+  // 支持的直接形态：
+  //   List                          -> { records: list }
+  //   { records: [...] }            -> 原样返回
+  //   { additional_rating, records }-> 原样返回
+  // 后端 chiffonmai.cloud 代理包装形态：
+  //   { success, data: [...] }                     -> 解包 data 为 records
+  //   { success, data: { records: [...], ... } }   -> 解包 data.records
+  Map<String, dynamic>? _normalizeRecords(dynamic decoded) {
+    if (decoded is List) {
+      return {'records': decoded, 'additional_rating': 0};
+    }
+    if (decoded is Map<String, dynamic>) {
+      // 已是 { records } 形态
+      final records = decoded['records'];
+      if (records is List) {
+        final normalized = Map<String, dynamic>.from(decoded);
+        normalized['records'] = records;
+        return normalized;
+      }
+      // 代理包装 { success, data: ... }
+      final data = decoded['data'];
+      if (data is List) {
+        return {
+          'records': data,
+          'additional_rating': decoded['additional_rating'] ?? 0,
+        };
+      }
+      if (data is Map<String, dynamic>) {
+        final innerRecords = data['records'];
+        if (innerRecords is List) {
+          final normalized = Map<String, dynamic>.from(data);
+          if (decoded['additional_rating'] != null) {
+            normalized['additional_rating'] = decoded['additional_rating'];
+          }
+          return normalized;
+        }
+      }
+    }
+    return null;
   }
 
   // 将后端 OAuth 代理的错误码转为可区分的异常

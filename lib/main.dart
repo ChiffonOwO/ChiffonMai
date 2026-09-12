@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:my_first_flutter_app/page/HomePage.dart';
+import 'package:my_first_flutter_app/page/AppShell.dart';
+import 'package:my_first_flutter_app/page/SplashPage.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/ExportSettings.dart';
+import 'package:my_first_flutter_app/utils/FavoriteFeaturesNotifier.dart';
+import 'package:my_first_flutter_app/utils/FavoriteImportFlow.dart';
+import 'package:my_first_flutter_app/utils/LoginStateNotifier.dart';
 import 'package:my_first_flutter_app/utils/ThemeManager.dart';
+import 'package:my_first_flutter_app/utils/UserProfileNotifier.dart';
 import 'package:my_first_flutter_app/service/ConnectivityService.dart';
 
 void main() {
@@ -23,11 +30,90 @@ class _MyAppState extends State<MyApp> {
   bool _fontsLoaded = false;
   bool _themeLoaded = false;
 
+  /// 收藏夹「一键导入」通道，与 MainActivity.kt 中的 IMPORT_CHANNEL 对应
+  static const MethodChannel _openFileChannel =
+      MethodChannel('com.example.app/open_file');
+
+  /// 正在处理导入（避免冷启动时 pending + 实时推送把同一个文件导两次）
+  bool _handlingIncoming = false;
+  String? _lastHandledPath;
+
   @override
   void initState() {
     super.initState();
     _initTheme();
     ConnectivityService().start();
+    // 应用启动时一次性加载跨页面共享状态，
+    // 保证首页 / 4 个 Hub 页 / 收藏管理页能立刻读到收藏列表、登录态与个人信息。
+    FavoriteFeaturesNotifier.load();
+    LoginStateNotifier.load();
+    UserProfileNotifier.load();
+    // 导出相关偏好（收藏夹自定义后缀）
+    ExportSettings.load();
+    _initFileOpenHandling();
+  }
+
+  /// 注册「文件管理器点开收藏夹文件」的处理。
+  ///
+  /// 两条来源都会汇到 [_handleIncomingFile]：
+  ///   1. 冷启动：App 没在跑，MainActivity 把路径暂存，这里主动取走；
+  ///   2. 热启动：App 已在后台，MainActivity 通过 onFileOpened 直接推过来。
+  Future<void> _initFileOpenHandling() async {
+    _openFileChannel.setMethodCallHandler((call) async {
+      if (call.method == 'onFileOpened') {
+        final path = call.arguments as String?;
+        if (path != null && path.isNotEmpty) {
+          await _handleIncomingFile(path);
+        }
+      }
+      return null;
+    });
+
+    try {
+      final initial =
+          await _openFileChannel.invokeMethod<String>('getInitialImportPath');
+      if (initial != null && initial.isNotEmpty) {
+        await _handleIncomingFile(initial);
+      }
+    } on MissingPluginException {
+      // 非 Android 平台没有这个通道，正常忽略
+    } catch (e) {
+      debugPrint('[open_file] 读取启动导入文件失败: $e');
+    }
+  }
+
+  /// 等到 Navigator 的 Overlay 就绪，并返回它的 context。
+  ///
+  /// 这里刻意不用 `navigatorKey.currentContext`：那是 Navigator 自己的 context，
+  /// 而 `Navigator.of` / `showDialog` 都是从**祖先**里找 NavigatorState，
+  /// 拿它当 context 会找不到 Navigator。Overlay 的 context 位于 Navigator 之下，
+  /// 是弹窗和导航都能正常工作的安全选择。
+  Future<BuildContext?> _awaitNavigatorContext() async {
+    for (var i = 0; i < 30; i++) {
+      final ctx = _navigatorKey.currentState?.overlay?.context;
+      if (ctx != null && ctx.mounted) return ctx;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    return null;
+  }
+
+  Future<void> _handleIncomingFile(String path) async {
+    if (_handlingIncoming || path == _lastHandledPath) return;
+    _handlingIncoming = true;
+    _lastHandledPath = path;
+
+    try {
+      final ctx = await _awaitNavigatorContext();
+      if (ctx == null || !ctx.mounted) {
+        debugPrint('[open_file] 界面还没准备好，忽略导入: $path');
+        return;
+      }
+      await runFavoriteImportFlow(ctx, presetPath: path);
+    } catch (e) {
+      debugPrint('[open_file] 处理导入文件失败: $e');
+    } finally {
+      _handlingIncoming = false;
+    }
   }
 
   Future<void> _initTheme() async {
@@ -53,56 +139,58 @@ class _MyAppState extends State<MyApp> {
 
   void _loadFonts() {
     if (!_fontsLoaded) {
-      setState(() {
-        _fontsLoaded = true;
-      });
-      debugPrint('📦 开始加载网络字体...');
+      setState(() => _fontsLoaded = true);
     }
   }
 
-  /// 构建包含字体配置的 ThemeData
   ThemeData _buildThemeWithFonts(ThemeData base) {
     if (!_fontsLoaded) return base;
     return base.copyWith(
-      textTheme: GoogleFonts.notoSansScTextTheme(
-        base.textTheme,
-      ),
-      primaryTextTheme: GoogleFonts.notoSansScTextTheme(
-        base.primaryTextTheme,
-      ),
+      textTheme: GoogleFonts.notoSansScTextTheme(base.textTheme),
+      primaryTextTheme: GoogleFonts.notoSansScTextTheme(base.primaryTextTheme),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     if (!_themeLoaded) {
-      return const MaterialApp(
+      return MaterialApp(
         debugShowCheckedModeBanner: false,
-        home: Scaffold(body: Center(child: CircularProgressIndicator())),
+        theme: AppTheme.lightTheme(),
+        darkTheme: AppTheme.darkTheme(),
+        home: const SplashPage(),
       );
     }
 
     return ListenableBuilder(
-      listenable: Listenable.merge([ThemeManager().notifier, ThemeManager().pureBlackNotifier]),
+      listenable: Listenable.merge([
+        ThemeManager().notifier,
+        ThemeManager().pureBlackNotifier,
+        ThemeManager().seedColorNotifier,
+        ThemeManager().customBackgroundPathNotifier,
+      ]),
       builder: (context, _) {
         final themeMode = ThemeManager().themeMode;
         final pureBlack = ThemeManager().pureBlackEnabled;
+        final seedColor = ThemeManager().seedColor;
         return MaterialApp(
           debugShowCheckedModeBanner: false,
           navigatorKey: _navigatorKey,
-          home: HomePage(onFirstFrameRendered: _loadFonts),
-          theme: _buildThemeWithFonts(AppTheme.lightTheme()),
+          home: AppShell(onFirstFrameRendered: _loadFonts),
+          theme:
+              _buildThemeWithFonts(AppTheme.lightTheme(seedColor: seedColor)),
           darkTheme: _buildThemeWithFonts(
-            pureBlack ? AppTheme.pureBlackTheme() : AppTheme.darkTheme(),
+            pureBlack
+                ? AppTheme.pureBlackTheme(seedColor: seedColor)
+                : AppTheme.darkTheme(seedColor: seedColor),
           ),
           themeMode: themeMode,
           builder: (context, child) {
             return MediaQuery(
               data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
               child: DefaultTextStyle(
-                style: _fontsLoaded
-                    ? GoogleFonts.notoSansSc()
-                    : const TextStyle(),
+                style:
+                    _fontsLoaded ? GoogleFonts.notoSansSc() : const TextStyle(),
                 child: child!,
               ),
             );

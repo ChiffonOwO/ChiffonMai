@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>OCR 识别流程</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    width: 1180px; background:#F7F8FA; padding:28px 32px 36px;
+    font-family:"Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    color:#1A1C1C;
+  }
+  h1 { font-size:23px; font-weight:700; letter-spacing:-.3px; margin-bottom:4px; }
+  .sub { font-size:12.5px; color:#6B7275; margin-bottom:20px; }
+
+  .row { display:flex; align-items:stretch; gap:0; margin-bottom:10px; }
+  .step {
+    flex:1; background:#fff; border-radius:11px; padding:12px 14px;
+    box-shadow:0 1px 3px rgba(0,0,0,.07); border:1px solid #E6E9EA;
+    position:relative; min-width:0;
+  }
+  .step .n {
+    position:absolute; top:-8px; left:12px; background:#00696B; color:#fff;
+    width:19px; height:19px; border-radius:50%; font-size:11px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .step h3 { font-size:13.5px; font-weight:700; margin:5px 0 4px; }
+  .step p  { font-size:11.5px; color:#5A6265; line-height:1.5; }
+  .step code {
+    font-size:10.5px; background:#F0F3F4; padding:1px 4px; border-radius:3px;
+    color:#2E5152; font-family:Consolas,monospace;
+  }
+  .arrow {
+    width:26px; display:flex; align-items:center; justify-content:center;
+    color:#B4BEC1; font-size:15px; flex:0 0 26px;
+  }
+  .band {
+    background:#fff; border-radius:11px; border:1px solid #E6E9EA;
+    padding:14px 16px; margin:14px 0; box-shadow:0 1px 3px rgba(0,0,0,.05);
+  }
+  .band h2 { font-size:14px; font-weight:700; margin-bottom:10px; display:flex; align-items:center; gap:7px; }
+  .tag {
+    font-size:10px; font-weight:600; padding:2px 7px; border-radius:20px;
+  }
+  .tag-ok   { background:#E3F5E8; color:#1E7B3C; }
+  .tag-half { background:#FFF4DE; color:#8A5A00; }
+  .tag-no   { background:#FDE8E8; color:#A32B2B; }
+
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  ul { font-size:11.5px; color:#4E5659; line-height:1.75; padding-left:16px; }
+  li b { color:#1A1C1C; }
+  .kw { color:#00696B; font-weight:600; }
+
+  .fork { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px; }
+  .fork .col { background:#fff; border-radius:11px; border:1px solid #E6E9EA; padding:12px 14px; }
+  .fork h4 { font-size:12.5px; font-weight:700; margin-bottom:6px; }
+  .diving { border-left:3px solid #2F7FD1; }
+  .lxns   { border-left:3px solid #D14F8A; }
+  table { width:100%; border-collapse:collapse; font-size:11px; }
+  th,td { text-align:left; padding:5px 7px; border-bottom:1px solid #EDF0F1; }
+  th { color:#6B7275; font-weight:600; }
+  td code { font-size:10px; background:#F0F3F4; padding:1px 4px; border-radius:3px; }
+</style>
+</head>
+<body>
+  <h1>结算画面识别 · 完整流程</h1>
+  <div class="sub">入口：实用工具 → 结算画面识别　｜　代码：<code>lib/page/ScoreOcrPage.dart</code></div>
+
+  <div class="row">
+    <div class="step"><span class="n">1</span>
+      <h3>选图</h3>
+      <p>底部菜单选「拍照」或「从相册选择」。拍照先申请相机权限，拒绝则跳系统设置。</p>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step"><span class="n">2</span>
+      <h3>手动裁剪</h3>
+      <p>进入内嵌裁剪页 <code>_OcrImageCropPage</code>，拖框选定结算区域。取消则回退用原图。</p>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step"><span class="n">3</span>
+      <h3>上传识别</h3>
+      <p><code>POST {Hub}/me/ocr/recognize</code><br>multipart，字段名 <code>images</code>，Bearer 用户 token。护栏：≤20 张、单张 ≤8&nbsp;MiB、超时 90s。</p>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step"><span class="n">4</span>
+      <h3>服务端返回结构化成绩</h3>
+      <p>专用模型（曲绘 ArcFace + 标题分类双路）。直接回曲名候选 / 达成率 / DX 分 / 难度 / FC / FS，<b>不是</b>原始文本块。</p>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="arrow" style="visibility:hidden">→</div>
+    <div class="step"><span class="n">5</span>
+      <h3>本地曲库补全</h3>
+      <p>拿曲名查 <code>MaimaiMusicDataManager</code>，补曲绘 / 版本 / 流派 / 等级 / 定数。<b>查不到就整体不显示</b>，不硬塞错曲绘。曲绘走网络时提前预热。</p>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step"><span class="n">6</span>
+      <h3>卡片展示 + 玩家修正</h3>
+      <p>六项可改：歌曲（搜库）/ 难度（<b>内联展开</b>，只列该曲真实存在的难度）/ 达成率 / DX 分数（实时上限校验）/ FC / FS。</p>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step"><span class="n">7</span>
+      <h3>上传成绩</h3>
+      <p>两个按钮，各自独立 loading。<b>可直接点，也可以先改再传。</b></p>
+    </div>
+  </div>
+
+  <div class="fork">
+    <div class="col diving">
+      <h4>同步到水鱼</h4>
+      <table>
+        <tr><th>端点</th><td><code>/player/update_records</code>（批量）</td></tr>
+        <tr><th>认证</th><td><code>Import-Token</code> 头（已有缓存）</td></tr>
+        <tr><th>歌曲定位</th><td>曲名 <code>title</code> + 类型，服务端反查</td></tr>
+        <tr><th>类型值</th><td><code>DX</code> / <code>SD</code></td></tr>
+        <tr><th>DX 分</th><td><code>dxScore</code></td></tr>
+      </table>
+    </div>
+    <div class="col lxns">
+      <h4>同步到落雪</h4>
+      <table>
+        <tr><th>端点</th><td><code>/api/v0/user/maimai/player/scores</code></td></tr>
+        <tr><th>认证</th><td><code>Authorization: Bearer</code>（落雪 OAuth）</td></tr>
+        <tr><th>歌曲定位</th><td><b>数字 <code>id</code></b>，需从水鱼 id 取余转换</td></tr>
+        <tr><th>类型值</th><td><code>dx</code> / <code>standard</code> / <code>utage</code></td></tr>
+        <tr><th>DX 分</th><td><code>dx_score</code></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="band" style="margin-top:16px">
+    <h2>两条路的差异（写错会静默记到别的曲目上）</h2>
+    <ul>
+      <li><b>歌曲标识方式不同</b>：水鱼传<span class="kw">曲名</span>让服务端反查；落雪传<span class="kw">数字 id</span>，且两边 id 体系不一致（水鱼 <code>11466</code> → 落雪 <code>1466</code>，<b>取余 10000</b>）。</li>
+      <li><b>宴会场（id ≥ 100000）是个陷阱</b>：落雪这边<b>不能取余</b>（会指向无关曲目），而且它不走 0–4 难度索引 —— 所以落雪那条路<b>直接拒绝同步宴会场谱面</b>并给出明确原因。</li>
+      <li><b>静默失败要自己挡</b>：水鱼服务端对「曲名匹配不到」和「难度索引越界」都是 <code>continue</code> 跳过，<b>照样返回 200 成功</b>。所以客户端检查 <code>creates + updates == 0</code> 并报错，否则用户会以为同步成功了。</li>
+    </ul>
+  </div>
+
+  <div class="band">
+    <h2>验证状态 <span class="tag tag-no">这是当前最要紧的事</span></h2>
+    <ul>
+      <li><span class="tag tag-ok">已验证</span> 识别链路（1–5 步）：整条走通。<code>flutter analyze</code> 零 error。</li>
+      <li><span class="tag tag-ok">已验证</span> 落雪 id 转换：拿两边公开曲目表逐首比对 1332 首，取余后曲名一致 <b>1331</b> 首；6 个单元测试全过。已知例外 1 例（<code>Link(CoF)</code>）。</li>
+      <li><span class="tag tag-no">未验证</span> <b>两个上传按钮（第 7 步）一次都没真调过</b>，也<b>没构建过 APK</b>。落雪认证到底该用 OAuth 还是个人密钥，只有真调一次才知道。</li>
+    </ul>
+  </div>
+</body>
+</html>

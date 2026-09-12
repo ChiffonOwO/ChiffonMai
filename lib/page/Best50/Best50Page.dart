@@ -487,113 +487,78 @@ class _B50PageState extends State<B50Page> {
     }
 
     if (_b50Data == null || (_dxSongs.isEmpty && _sdSongs.isEmpty)) {
+      // 空状态：与 DiffBest50Page 风格完全一致
+      // （common bg widget + 同样的顶部栏 + 同样的居中提示）
+      final emptyStateTextColor = Theme.of(context).colorScheme.onSurface;
+      final emptyStateWidth = MediaQuery.of(context).size.width;
       return Scaffold(
         backgroundColor: Colors.transparent,
+        resizeToAvoidBottomInset: false,
         body: Stack(
           children: [
-            Container(
-              width: double.infinity,
-              height: double.infinity,
-              decoration: const BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage('assets/background.png'),
-                  fit: BoxFit.cover,
-                  opacity: 1.0,
-                ),
-              ),
-            ),
-            Center(
-              child: Transform.translate(
-                offset: const Offset(0, -20),
-                child: Transform.scale(
-                  scale: 1,
-                  child: Image.asset(
-                    'assets/chiffon2.png',
-                    fit: BoxFit.cover,
-                    opacity: const AlwaysStoppedAnimation(1),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: MediaQuery.of(context).size.height * 0.12,
-              left: MediaQuery.of(context).size.width * 0.02,
-              right: MediaQuery.of(context).size.width * 0.02,
-              bottom: MediaQuery.of(context).size.height * 0.03,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(12.0),
-                  boxShadow: [
-                    BoxShadow(
-                      color: brightness == Brightness.dark ? Colors.black.withValues(alpha: 0.3) : Colors.black12,
-                      blurRadius: 8.0,
-                      offset: Offset(2.0, 2.0),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+            CommonWidgetUtil.buildCommonBgWidget(),
+            CommonWidgetUtil.buildCommonChiffonBgWidget(context),
+            Column(
+              children: [
+                // 顶部栏：与 DiffBest50Page 同款（左侧返回按钮 + 居中标题）
+                Container(
+                  padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
+                  child: Row(
                     children: [
-                      Icon(
-                        Icons.refresh,
-                        size: 64,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      IconButton(
+                        icon: Icon(Icons.arrow_back,
+                            color: emptyStateTextColor),
+                        onPressed: () => Navigator.of(context).pop(),
                       ),
-                      SizedBox(height: 16),
-                      Text(
-                        '暂无Best50数据',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            'Best50 查询',
+                            style: TextStyle(
+                              color: emptyStateTextColor,
+                              fontSize: emptyStateWidth * 0.06,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
-                      SizedBox(height: 8),
-                      Text(
-                        '请返回首页点击"刷新数据"按钮获取',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
+                      // 右侧占位，保持标题居中（与 DiffBest50Page 右侧模式按钮位置对齐）
+                      const SizedBox(width: 48),
                     ],
                   ),
                 ),
-              ),
-            ),
-            Positioned(
-              top: 60,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  "Best50查询",
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
+                Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.refresh,
+                          size: 64,
+                          color: AppColors.greyHint(brightness),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '暂无Best50数据',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '请返回首页点击"刷新数据"按钮获取',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ),
-            Positioned(
-              top: 40,
-              left: 10,
-              child: GestureDetector(
-                onTap: () {
-                  debugPrint('返回按钮被点击');
-                  Navigator.pop(context);
-                },
-                child: Container(
-                  padding: EdgeInsets.all(16),
-                  color: Colors.transparent,
-                  child: Icon(Icons.arrow_back,
-                      color: Theme.of(context).colorScheme.onSurface, size: 28),
-                ),
-              ),
+              ],
             ),
           ],
         ),

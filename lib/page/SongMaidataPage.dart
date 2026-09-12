@@ -1,12 +1,13 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:archive/archive.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:http/http.dart' as http;
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/CoverUtil.dart';
 import '../utils/AppTheme.dart';
+import '../utils/ExportPathUtil.dart';
 import '../service/SongMaidataPageService.dart';
 import '../service/SongPlayService.dart';
 import '../manager/MaidataManager.dart';
@@ -42,6 +43,8 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
   List<String> _inoteList = [];
   String? _selectedInote;
   String? _displayedInote; // 当前显示的难度
+  /// 公开目录不可写时，记录实际落盘的私有路径，用于在成功弹窗里提示用户
+  String? _fallbackPath;
   final ScrollController _scrollController = ScrollController();
 
   late SongMaidataPageService _service;
@@ -129,14 +132,141 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
     );
   }
 
-  Future<void> _exportToZip() async {
+  /// 谱面导出：先让用户选目标格式
+  Future<void> _showExportOptions() async {
     if (_maidataContent.isEmpty || _isExporting) return;
 
-    setState(() {
-      _isExporting = true;
-    });
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(ctx).dividerColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: const Icon(Icons.folder_zip_outlined),
+              title: const Text('导出压缩包 (.zip)'),
+              subtitle: const Text('maidata.txt + 曲绘 + 音源，通用谱面包'),
+              onTap: () => Navigator.of(ctx).pop('zip'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.sports_esports_outlined),
+              title: const Text('导出 AstroDX 谱面 (.adx)'),
+              subtitle: const Text('用 AstroDX 打开即可自动安装谱面'),
+              onTap: () => Navigator.of(ctx).pop('adx'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
 
-    // 显示加载对话框
+    if (!mounted || choice == null) return;
+    if (choice == 'zip') {
+      await _exportToZip();
+    } else if (choice == 'adx') {
+      await _exportAstroDx();
+    }
+  }
+
+  /// 收集谱面三件套：maidata 文本、曲绘、音源
+  Future<_ChartExportAssets> _collectExportAssets() async {
+    // 必须用 utf8.encode，不能用 codeUnits。
+    // codeUnits 返回的是 UTF-16 码元，日文/中文标题会被写成乱码字节，
+    // 导出的 maidata.txt 到别的工具里就是一堆问号。
+    final maidataBytes = Uint8List.fromList(utf8.encode(_maidataContent));
+    final coverBytes = await _getCoverBytes();
+    final audioBytes = await _getAudioBytes();
+    return _ChartExportAssets(
+      maidataBytes: maidataBytes,
+      coverBytes: coverBytes,
+      audioBytes: audioBytes,
+    );
+  }
+
+  /// 导出通用 zip 压缩包（三件套平铺在压缩包根目录）
+  Future<void> _exportToZip() async {
+    if (_maidataContent.isEmpty || _isExporting) return;
+    await _runExport(() async {
+      final assets = await _collectExportAssets();
+
+      final archive = Archive();
+      archive.add(ArchiveFile.bytes('maidata.txt', assets.maidataBytes));
+      if (assets.coverBytes != null) {
+        archive.add(ArchiveFile.bytes('bg.png', assets.coverBytes!));
+      }
+      if (assets.audioBytes != null) {
+        archive.add(ArchiveFile.bytes('track.mp3', assets.audioBytes!));
+      }
+
+      final zipData = ZipEncoder().encode(archive);
+      final safeName =
+          ExportPathUtil.sanitizeFileName(widget.songTitle, fallback: 'chart');
+      final file = await ExportPathUtil.writeExportFile(
+        fileName: '$safeName.zip',
+        bytes: zipData,
+        subDir: '谱面',
+        onFallback: (p) => _fallbackPath = p,
+      );
+      return (file.path, '$safeName.zip', assets.missingHint);
+    });
+  }
+
+  /// 导出 AstroDX 谱面包（.adx）
+  ///
+  /// `.adx` 本质就是「改了后缀的 zip」：AstroDX 会扫描压缩包内容，
+  /// 找到包含 maidata.txt 的谱面文件夹后自动安装。
+  /// 因此三件套必须套在一层以曲名命名的文件夹里，
+  /// 而不能像通用 zip 那样平铺在压缩包根目录。
+  Future<void> _exportAstroDx() async {
+    if (_maidataContent.isEmpty || _isExporting) return;
+    await _runExport(() async {
+      final assets = await _collectExportAssets();
+      final safeName =
+          ExportPathUtil.sanitizeFileName(widget.songTitle, fallback: 'chart');
+
+      final archive = Archive();
+      archive
+          .add(ArchiveFile.bytes('$safeName/maidata.txt', assets.maidataBytes));
+      if (assets.coverBytes != null) {
+        archive.add(ArchiveFile.bytes('$safeName/bg.png', assets.coverBytes!));
+      }
+      if (assets.audioBytes != null) {
+        archive
+            .add(ArchiveFile.bytes('$safeName/track.mp3', assets.audioBytes!));
+      }
+
+      final zipData = ZipEncoder().encode(archive);
+      final file = await ExportPathUtil.writeExportFile(
+        fileName: '$safeName.adx',
+        bytes: zipData,
+        subDir: '谱面',
+        onFallback: (p) => _fallbackPath = p,
+      );
+      return (file.path, '$safeName.adx', assets.missingHint);
+    });
+  }
+
+  /// 统一的导出流程：进度弹窗 → 执行 → 成功/失败提示
+  Future<void> _runExport(
+    Future<(String path, String fileName, String? warning)> Function() job,
+  ) async {
+    setState(() => _isExporting = true);
+    _fallbackPath = null;
+
     if (mounted) {
       showDialog(
         context: context,
@@ -155,70 +285,19 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
     }
 
     try {
-      // 1. 获取maidata内容
-      final maidataBytes = Uint8List.fromList(_maidataContent.codeUnits);
+      final (path, fileName, warning) = await job();
 
-      // 2. 获取曲绘字节数据
-      Uint8List? coverBytes = await _getCoverBytes();
-
-      // 3. 获取音源字节数据
-      Uint8List? audioBytes = await _getAudioBytes();
-
-      // 4. 创建zip压缩包
-      final archive = Archive();
-      archive.add(ArchiveFile.bytes('maidata.txt', maidataBytes));
-      if (coverBytes != null) {
-        archive.add(ArchiveFile.bytes('bg.png', coverBytes));
-      }
-      if (audioBytes != null) {
-        archive.add(ArchiveFile.bytes('track.mp3', audioBytes));
-      }
-
-      final zipData = ZipEncoder().encode(archive);
-
-      // 5. 保存到文件（优先使用系统下载目录，方便用户通过文件管理器直接访问）
-      String? dirPath;
-      try {
-        dirPath = (await getDownloadsDirectory())?.path;
-      } catch (_) {
-        dirPath = null;
-      }
-      if (dirPath == null) {
-        // iOS / 备选方案：回退到外置存储或应用文档目录
-        try {
-          dirPath = (await getExternalStorageDirectory())?.path;
-        } catch (_) {
-          dirPath = null;
-        }
-      }
-      dirPath ??= (await getApplicationDocumentsDirectory()).path;
-
-      final exportDir = Directory('$dirPath/maidata_exports');
-      if (!await exportDir.exists()) {
-        await exportDir.create(recursive: true);
-      }
-
-      // 清理文件名中的非法字符
-      String safeName = widget.songTitle.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-      final filePath = '${exportDir.path}/$safeName.zip';
-      final file = File(filePath);
-      await file.writeAsBytes(zipData);
-
-      // 关闭加载对话框
       if (mounted) {
         Navigator.of(context).pop();
       }
 
-      // 显示导出成功对话框（含路径与复制按钮）
       if (mounted) {
-        await _showExportSuccessDialog(filePath, '$safeName.zip');
+        await _showExportSuccessDialog(path, fileName, warning: warning);
       }
     } catch (e) {
-      // 关闭加载对话框
       if (mounted) {
         Navigator.of(context).pop();
       }
-      // 显示错误提示
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -228,7 +307,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
           ),
         );
       }
-      debugPrint('[DEBUG][SongMaidataPage] 导出zip失败: $e');
+      debugPrint('[DEBUG][SongMaidataPage] 导出失败: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -239,7 +318,11 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
   }
 
   /// 显示导出成功对话框：展示导出路径并提供复制按钮
-  Future<void> _showExportSuccessDialog(String filePath, String fileName) async {
+  Future<void> _showExportSuccessDialog(
+    String filePath,
+    String fileName, {
+    String? warning,
+  }) async {
     await showDialog(
       context: context,
       builder: (ctx) {
@@ -293,6 +376,37 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                     ),
                   ),
                 ),
+                if (_fallbackPath != null || warning != null) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.maxFinite,
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                      border:
+                          Border.all(color: Colors.orange.withValues(alpha: 0.4)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_fallbackPath != null)
+                          const Text(
+                            '公开目录不可写，文件已保存到应用私有目录，'
+                            '可能无法在系统文件管理器中直接找到。',
+                            style: TextStyle(fontSize: 12, height: 1.4),
+                          ),
+                        if (_fallbackPath != null && warning != null)
+                          const SizedBox(height: 4),
+                        if (warning != null)
+                          Text(
+                            warning,
+                            style: const TextStyle(fontSize: 12, height: 1.4),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
             actions: [
@@ -735,7 +849,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                             ),
                             IconButton(
                               icon: Icon(_isExporting ? Icons.hourglass_empty : Icons.download, color: textPrimaryColor, size: 20),
-                              onPressed: _isExporting ? null : _exportToZip,
+                              onPressed: _isExporting ? null : _showExportOptions,
                               tooltip: '导出',
                               visualDensity: VisualDensity.compact,
                               padding: const EdgeInsets.all(4),
@@ -982,5 +1096,29 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
         ],
       ),
     );
+  }
+}
+
+/// 一次导出需要的三件套
+class _ChartExportAssets {
+  final Uint8List maidataBytes;
+  final Uint8List? coverBytes;
+  final Uint8List? audioBytes;
+
+  _ChartExportAssets({
+    required this.maidataBytes,
+    this.coverBytes,
+    this.audioBytes,
+  });
+
+  /// 缺件提示。缺少音源/曲绘时 AstroDX 仍能装谱，但游玩体验不完整，
+  /// 所以这里不阻断导出，只在成功弹窗里提醒。
+  String? get missingHint {
+    final missing = <String>[];
+    if (coverBytes == null) missing.add('曲绘');
+    if (audioBytes == null) missing.add('音源');
+    if (missing.isEmpty) return null;
+    return '未能获取${missing.join('、')}，压缩包里只有谱面数据，'
+        '导入后需要自行补齐才能正常游玩。';
   }
 }

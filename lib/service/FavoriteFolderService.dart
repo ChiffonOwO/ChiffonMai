@@ -274,6 +274,71 @@ class FavoriteFolderService {
     return sorted;
   }
 
+  /// 批量导入收藏夹。
+  ///
+  /// - [replaceAll] 为 true 时先清空所有现有收藏夹（覆盖式导入）。
+  /// - 否则按「合并」语义：先按名字、再按 id 找同目标收藏夹，命中就把谱面并进去
+  ///   （按 uniqueKey 去重），都没命中才新建。
+  ///
+  /// 只在最后写一次 SharedPreferences，避免逐条保存带来的卡顿。
+  Future<FavoriteImportStats> importFolders(
+    List<FavoriteFolder> incoming, {
+    bool replaceAll = false,
+  }) async {
+    if (!_loaded) await loadFolders();
+
+    if (replaceAll) _folders = [];
+
+    int foldersCreated = 0;
+    int foldersMerged = 0;
+    int chartsAdded = 0;
+    int chartsSkipped = 0;
+
+    for (final source in incoming) {
+      // 1) 按名字找（用户视角的同一性）
+      int index = _folders.indexWhere((f) => f.name == source.name);
+      // 2) 名字没命中时再按 id 找（同一份数据被改过名的场景）
+      if (index < 0 && source.id.isNotEmpty) {
+        index = _folders.indexWhere((f) => f.id == source.id);
+      }
+
+      FavoriteFolder target;
+      if (index >= 0) {
+        target = _folders[index];
+        foldersMerged++;
+      } else {
+        target = FavoriteFolder(
+          id: source.id.isEmpty ? null : source.id,
+          name: source.name,
+          createdAt: source.createdAt,
+        );
+        _folders.add(target);
+        foldersCreated++;
+      }
+
+      final existing = target.charts.map((c) => c.uniqueKey).toSet();
+      for (final chart in source.charts) {
+        if (existing.contains(chart.uniqueKey)) {
+          chartsSkipped++;
+          continue;
+        }
+        existing.add(chart.uniqueKey);
+        target.charts.add(chart);
+        chartsAdded++;
+      }
+      target.updatedAt = DateTime.now().millisecondsSinceEpoch;
+    }
+
+    await _saveFolders();
+
+    return FavoriteImportStats(
+      foldersCreated: foldersCreated,
+      foldersMerged: foldersMerged,
+      chartsAdded: chartsAdded,
+      chartsSkipped: chartsSkipped,
+    );
+  }
+
   /// 清除所有数据
   Future<void> clearAll() async {
     _folders = [];

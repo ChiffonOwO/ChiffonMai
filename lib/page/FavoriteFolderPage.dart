@@ -1,16 +1,16 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:my_first_flutter_app/entity/FavoriteFolder.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/service/FavoriteFolderService.dart';
+import 'package:my_first_flutter_app/service/FavoriteTransferService.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
+import 'package:my_first_flutter_app/utils/FavoriteImportFlow.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/UserPlayDataEntity.dart';
@@ -47,6 +47,14 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
         _folders = folders;
         _isLoading = false;
       });
+    }
+  }
+
+  /// 从文件导入收藏夹（后缀可在设置页自定义，导入按内容校验而非后缀）
+  Future<void> _importFolders() async {
+    final imported = await runFavoriteImportFlow(context);
+    if (imported && mounted) {
+      await _loadData();
     }
   }
 
@@ -246,24 +254,42 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
                   ),
                   child: Column(
                     children: [
-                      // 新建按钮
+                      // 新建 / 导入按钮
                       Padding(
                         padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: _createFolder,
-                            icon: const Icon(Icons.add, size: 20),
-                            label: const Text('新建收藏夹'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.onSurface,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(borderRadiusSmall),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: _createFolder,
+                                icon: const Icon(Icons.add, size: 20),
+                                label: const Text('新建收藏夹'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Theme.of(context).colorScheme.primary,
+                                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(borderRadiusSmall),
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: _importFolders,
+                                icon: const Icon(Icons.file_download_outlined, size: 20),
+                                label: const Text('导入收藏夹'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Theme.of(context).colorScheme.onSurface,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(borderRadiusSmall),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       // 内容
@@ -300,6 +326,15 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
           Text(
             '在乐曲详情页中可以将谱面收藏到收藏夹',
             style: TextStyle(fontSize: 14, color: AppColors.greyHint(Theme.of(context).brightness)),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              '也可以点上方「导入收藏夹」按钮，${favoriteImportHint()}',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: AppColors.greyHint(Theme.of(context).brightness)),
+            ),
           ),
         ],
       ),
@@ -420,6 +455,9 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
   FavoriteSortOption _sortOption = FavoriteSortOption.byDsDesc;
   bool _isBatchMode = false;
   final Set<String> _selectedKeys = {};
+
+  /// 公开目录不可写时记录实际落盘的私有路径，用于在成功弹窗里提示用户
+  String? _fallbackPath;
 
   // 样式常量
   final double borderRadiusSmall = 8.0;
@@ -620,8 +658,8 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
                             icon: const Icon(Icons.label_outline, size: 18),
                             label: const Text('标签统计'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).colorScheme.onSurface,
-                              foregroundColor: Colors.white,
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              foregroundColor: Theme.of(context).colorScheme.onPrimary,
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(borderRadiusSmall),
@@ -1292,45 +1330,47 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
     }
   }
 
-  /// 导出收藏夹为文本文件
+  /// 导出收藏夹为 ChiffonMai 自定义格式（可一键导回）
+  ///
+  /// 后缀取设置页里配置的值（默认 `.cmf`），文件落到公开的
+  /// `Download/ChiffonMai/收藏夹/` 下，文件管理器可以直接找到。
   Future<void> _exportFolder() async {
+    if (_charts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('这个收藏夹还是空的，没有可导出的谱面')),
+      );
+      return;
+    }
+
+    _fallbackPath = null;
     try {
       final sortedCharts = _service.sortCharts(_charts, _sortOption);
-      final buffer = StringBuffer();
-      buffer.writeln('${widget.folderName}');
-      buffer.writeln('共 ${sortedCharts.length} 个谱面');
-      buffer.writeln('---');
-      for (final chart in sortedCharts) {
-        final song = _songMap[chart.songId];
-        final version = StringUtil.formatVersion2WithFlag(song?.basicInfo.from ?? '', song?.isExtra ?? false);
-        buffer.writeln(
-            '${chart.songTitle} | ${chart.ds.toStringAsFixed(1)} | $version | ${chart.level}');
-      }
-      buffer.writeln('---');
-      buffer.writeln('由 ChiffonMai 导出');
+      final folder = FavoriteFolder(
+        id: widget.folderId,
+        name: widget.folderName,
+        charts: sortedCharts,
+      );
 
-      // 保存到应用文档目录（与 FavoriteExportService.saveImageBytes 保持一致）
-      final dir = await getApplicationDocumentsDirectory();
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final safeName = widget.folderName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-      final fileName = 'favorites_${safeName}_$timestamp.txt';
-      final file = File('${dir.path}/$fileName');
-      await file.writeAsString(buffer.toString());
+      final file = await FavoriteTransferService().exportFolders(
+        [folder],
+        fileBaseName: '${favoriteExportPrefix}_${widget.folderName}',
+        onFallback: (p) => _fallbackPath = p,
+      );
 
       if (!mounted) return;
-      await _showExportSuccessDialog(file.path);
+      await _showExportSuccessDialog(file.path, file.uri.pathSegments.last);
     } catch (e) {
       debugPrint('导出收藏夹失败: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('导出失败')),
+          SnackBar(content: Text('导出失败: $e')),
         );
       }
     }
   }
 
   /// 显示导出成功对话框：展示导出路径并提供复制按钮
-  Future<void> _showExportSuccessDialog(String filePath) async {
+  Future<void> _showExportSuccessDialog(String filePath, [String? fileName]) async {
     await showDialog(
       context: context,
       builder: (ctx) {
@@ -1348,6 +1388,24 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (fileName != null) ...[
+                  Text(
+                    '已导出 $fileName',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  Text(
+                    '可以直接在 App 内「导入收藏夹」，'
+                    '或在文件管理器里点开该文件一键导回',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 Text(
                   '文件已保存到：',
                   style: TextStyle(
@@ -1376,6 +1434,25 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
                     ),
                   ),
                 ),
+                if (_fallbackPath != null) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.maxFinite,
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: Colors.orange.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: const Text(
+                      '公开目录不可写，文件已保存到应用私有目录，'
+                      '可能无法在系统文件管理器中直接找到。',
+                      style: TextStyle(fontSize: 12, height: 1.4),
+                    ),
+                  ),
+                ],
               ],
             ),
             actions: [

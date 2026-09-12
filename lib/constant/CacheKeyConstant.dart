@@ -2,64 +2,75 @@
 class CacheKeyConstant {
   // 音乐数据相关
   static const String cachedSongs = 'cached_songs';
-  
+  static const String cachedSongsTimestamp = 'cached_songs_timestamp';
+
   // Maidata相关
   static const String maidataFullCache = 'maidata_full_cache';
-  static const String maidataFullCacheTimestamp = 'maidata_full_cache_timestamp';
+  static const String maidataFullCacheTimestamp =
+      'maidata_full_cache_timestamp';
   static const String maidataAddedSongs = 'maidata_added_songs';
-  static const String maidataAddedSongsTimestamp = 'maidata_added_songs_timestamp';
+  static const String maidataAddedSongsTimestamp =
+      'maidata_added_songs_timestamp';
   static const String maidataIndexCache = 'maidata_index_cache';
-  static const String maidataIndexCacheTimestamp = 'maidata_index_cache_timestamp';
+  static const String maidataIndexCacheTimestamp =
+      'maidata_index_cache_timestamp';
 
   // Union API 独有歌曲（仅在新API中存在，不参与推荐系统）
   static const String unionExtraSongIds = 'union_extra_song_ids';
-  // Union uni 元数据缓存（含 cn/jp 可游玩地区等）
-  static const String unionUniCache = 'union_uni_cache';
-  
+  // union 元数据缓存（含 cn/jp 可游玩地区等）
+  static const String unionCache = 'union_cache';
+  static const String unionCacheTimestamp = 'union_cache_timestamp';
+
   // 知识数据相关
   static const String knowledgeData = 'knowledge_data';
   static const String knowledgeTimestamp = 'knowledge_timestamp';
-  
+
   // 落雪歌曲相关
   static const String luoxueSongsCache = 'luoxue_songs_cache';
-  
+
   // 落雪OAuth相关
   static const String luoxueAccessToken = 'luoxue_access_token';
   static const String luoxueRefreshToken = 'luoxue_refresh_token';
   static const String luoxueExpiresAt = 'luoxue_expires_at';
   static const String luoxueTokenType = 'luoxue_token_type';
-  
+
   // 收藏的功能相关
   static const String favoriteFeatures = 'favorite_features';
 
   // 收藏数据相关
-  static const String trophiesCollectionsCacheData = 'trophies_collections_cache_data';
-  static const String iconsCollectionsCacheData = 'icons_collections_cache_data';
-  static const String platesCollectionsCacheData = 'plates_collections_cache_data';
-  static const String framesCollectionsCacheData = 'frames_collections_cache_data';
-  
+  static const String trophiesCollectionsCacheData =
+      'trophies_collections_cache_data';
+  static const String iconsCollectionsCacheData =
+      'icons_collections_cache_data';
+  static const String platesCollectionsCacheData =
+      'plates_collections_cache_data';
+  static const String framesCollectionsCacheData =
+      'frames_collections_cache_data';
+
   // 标签数据相关
   static const String maiTagsCache = 'mai_tags_cache';
   static const String maiTagsCacheTimestamp = 'mai_tags_cache_timestamp';
-  
+
   // 用户数据相关
   static const String userPlayData = 'user_play_data';
-  
+
   // 舞萌CN探针相关
   static const String maimaiCNUserId = 'maimai_cn_user_id';
   static const String maimaiCNT = 'maimai_cn_t';
-  
+
   // 难度数据相关
   static const String diffMusicData = 'diff_music_data';
-  
+  static const String diffMusicDataTimestamp = 'diff_music_data_timestamp';
+
   // 推荐结果相关
   static const String recommendationResults = 'recommendation_results';
-  
+
   // 谱面数据缓存前缀
   static const String maidataCachePrefix = 'maidata_cache_';
 
   // 猜歌游戏设置相关
-  static const String guessChartSelectedVersions = 'guessChart_selectedVersions';
+  static const String guessChartSelectedVersions =
+      'guessChart_selectedVersions';
   static const String guessChartMasterMinDx = 'guessChart_masterMinDx';
   static const String guessChartMasterMaxDx = 'guessChart_masterMaxDx';
   static const String guessChartSelectedGenres = 'guessChart_selectedGenres';
@@ -67,35 +78,60 @@ class CacheKeyConstant {
   static const String guessChartTimeLimit = 'guessChart_timeLimit';
   static const String guessChartBlurLevel = 'guessChart_blurLevel';
   static const String guessChartSongCount = 'guessChart_songCount';
-  static const String guessChartNonEnglishCharThreshold = 'guessChart_nonEnglishCharThreshold';
-  
+  static const String guessChartNonEnglishCharThreshold =
+      'guessChart_nonEnglishCharThreshold';
+
   // KaleidXScope 标记歌曲相关
-  static const String kaleidXBlackGateMarkedSongs = 'kaleidx_black_gate_marked_songs';
-  static const String kaleidXBlueGateMarkedSongs = 'kaleidx_blue_gate_marked_songs';
-  static const String kaleidXYellowGateMarkedSongs = 'kaleidx_yellow_gate_marked_songs';
-  static const String kaleidXRedGateMarkedSongs = 'kaleidx_red_gate_marked_songs';
-  
+  static const String kaleidXBlackGateMarkedSongs =
+      'kaleidx_black_gate_marked_songs';
+  static const String kaleidXBlueGateMarkedSongs =
+      'kaleidx_blue_gate_marked_songs';
+  static const String kaleidXYellowGateMarkedSongs =
+      'kaleidx_yellow_gate_marked_songs';
+  static const String kaleidXRedGateMarkedSongs =
+      'kaleidx_red_gate_marked_songs';
+
   // 上次更新使用的数据源
   static const String lastDataSource = 'last_data_source';
-  
+
   // 排行榜相关设置
   static const String participateRankings = 'participate_rankings';
   static const String showNickname = 'show_nickname';
-  
+  static const String forceFullRefresh = 'force_full_refresh';
+
+  // 高级刷新模式下用户上次勾选的强制刷新缓存源 ID 列表（来自 CacheSourceRegistry）
+  static const String advancedRefreshForceSources =
+      'advanced_refresh_force_sources';
+
   // 排行榜缓存相关
   static const String totalRankingsCache = 'total_rankings_cache';
-  static const String totalRankingsCacheTimestamp = 'total_rankings_cache_timestamp';
+  static const String totalRankingsCacheTimestamp =
+      'total_rankings_cache_timestamp';
   static const String shuiyuRankingsCache = 'shuiyu_rankings_cache';
-  static const String shuiyuRankingsCacheTimestamp = 'shuiyu_rankings_cache_timestamp';
+  static const String shuiyuRankingsCacheTimestamp =
+      'shuiyu_rankings_cache_timestamp';
   static const String luoxueRankingsCache = 'luoxue_rankings_cache';
-  static const String luoxueRankingsCacheTimestamp = 'luoxue_rankings_cache_timestamp';
-  
+  static const String luoxueRankingsCacheTimestamp =
+      'luoxue_rankings_cache_timestamp';
+
+  // 平均值排行榜缓存相关（平均达成率 / 平均DX分数）
+  static const String avgRankingsCache = 'avg_rankings_cache';
+  static const String avgRankingsCacheTimestamp = 'avg_rankings_cache_timestamp';
+  static const String avgRankingsLastMetric = 'avg_rankings_last_metric';
+
+  // 拟合总Rating排行榜缓存相关（按模式拼接 key）
+  static const String fittedRankingsCachePrefix = 'fitted_rankings_cache_';
+  static const String fittedRankingsCacheTimestampPrefix =
+      'fitted_rankings_cache_timestamp_';
+
   // 免责声明相关
-  static const String songRankingDisclaimerShown = 'song_ranking_disclaimer_shown';
+  static const String songRankingDisclaimerShown =
+      'song_ranking_disclaimer_shown';
 
   // 歌曲评论缓存相关
   static const String songCommentsCachePrefix = 'song_comments_cache_';
-  static const String songCommentsCacheTimestampPrefix = 'song_comments_cache_timestamp_';
+  static const String songCommentsCacheTimestampPrefix =
+      'song_comments_cache_timestamp_';
 
   // 评论身份相关
   static const String commentDataSource = 'comment_data_source';
@@ -112,7 +148,8 @@ class CacheKeyConstant {
   static const String selectedPlateIdCache = 'selected_plate_id_cache';
 
   // 首页后台初始化时间戳（用于控制初始化频率）
-  static const String lastInitializationTimestamp = 'last_initialization_timestamp';
+  static const String lastInitializationTimestamp =
+      'last_initialization_timestamp';
 
   // 曲绘识别相关
   static const String coverHashCache = 'cover_hash_cache_v5';
@@ -122,6 +159,12 @@ class CacheKeyConstant {
   static const String themeMode = 'theme_mode';
   static const String pureBlackEnabled = 'pure_black_enabled';
   static const String lightOverlayOpacity = 'light_overlay_opacity';
+  // 自定义主题 seed 色（int, ARGB），null = 使用 AppTheme 默认
+  static const String themeSeedColor = 'theme_seed_color';
+  // 自定义背景图绝对路径（应用文档目录下），null/空 = 使用 assets/background.png
+  static const String customBackgroundPath = 'custom_background_path';
+  // chiffon2.png 装饰图透明度（0.0 ~ 1.0），默认 0.40
+  static const String chiffonOpacity = 'chiffon_opacity';
 
   // 首页个人信息展示风格（true=卡片式，false=经典式）
   static const String profileCardStyle = 'profile_card_style';
@@ -131,7 +174,8 @@ class CacheKeyConstant {
   static const String probeFriendCode = 'probe_friend_code';
   static const String probeLastSyncTime = 'probe_last_sync_time';
   static const String probeDivingFishToken = 'probe_diving_fish_token';
-  static const String probeDivingFishImportToken = 'probe_diving_fish_import_token';
+  static const String probeDivingFishImportToken =
+      'probe_diving_fish_import_token';
   static const String probeDivingFishBindQQ = 'probe_diving_fish_bind_qq';
   static const String probeLxnsImportToken = 'probe_lxns_import_token';
 }

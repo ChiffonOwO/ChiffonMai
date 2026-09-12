@@ -61,6 +61,16 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 
+	<!--
+	  让导出的文件出现在「文件」App → 我的 iPhone/iPad → ChiffonMai 下。
+	  没有这两项时 Documents 目录对用户完全不可见，
+	  导出就等于丢进了私有沙箱。
+	-->
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>bilibili</string>

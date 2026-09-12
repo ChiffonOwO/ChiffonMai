@@ -883,9 +883,10 @@ class _GameRoomPageState extends State<GameRoomPage> {
                   ElevatedButton(
                     onPressed: _handleRestartGame,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.onSurface,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     ),
-                    child: const Text('开始新一轮', style: TextStyle(color: Colors.white)),
+                    child: const Text('开始新一轮'),
                   ),
                   const SizedBox(width: 16),
                   ElevatedButton(
@@ -935,9 +936,10 @@ class _GameRoomPageState extends State<GameRoomPage> {
             ElevatedButton(
               onPressed: _handleNextRound,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.onSurface,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
               ),
-              child: const Text('下一轮', style: TextStyle(color: Colors.white)),
+              child: const Text('下一轮'),
             ),
         ],
       );
@@ -2540,9 +2542,10 @@ class _GameRoomPageState extends State<GameRoomPage> {
                             ElevatedButton(
                               onPressed: _handleStartGame,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Theme.of(context).colorScheme.onSurface,
+                                backgroundColor: Theme.of(context).colorScheme.primary,
+                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                               ),
-                              child: const Text('开始游戏', style: TextStyle(color: Colors.white)),
+                              child: const Text('开始游戏'),
                             ),
                           SizedBox(height: paddingL * 1.5),
                           _buildGameArea(brightness),

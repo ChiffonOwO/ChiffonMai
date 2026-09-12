@@ -17,10 +17,26 @@ class DiffMusicDataManager {
   static const String _apiUrl = ApiUrls.DiffMusicDataApi;
 
   // 缓存时间戳键
-  static const String _lastUpdateKey = 'diff_music_data_last_update';
+  static const String _lastUpdateKey = CacheKeyConstant.diffMusicDataTimestamp;
+
+  Future<bool> isCacheValid({
+    Duration maxAge = const Duration(days: 1),
+  }) async {
+    if (!await hasCachedData()) return false;
+    final prefs = await SharedPreferences.getInstance();
+    final timestamp = prefs.getInt(_lastUpdateKey);
+    if (timestamp == null) return false;
+    return DateTime.now().millisecondsSinceEpoch - timestamp <=
+        maxAge.inMilliseconds;
+  }
 
   // 从 API 获取音乐难度数据并更新缓存
-  Future<bool> fetchAndUpdateDiffData() async {
+  Future<bool> fetchAndUpdateDiffData({bool forceNetwork = false}) async {
+    if (!forceNetwork && await isCacheValid()) {
+      debugPrint('难度数据缓存有效，跳过网络刷新');
+      return true;
+    }
+
     try {
       // 发送 GET 请求
       final response = await ApiClient.get(Uri.parse(_apiUrl));
@@ -95,7 +111,7 @@ class DiffMusicDataManager {
 
   // 手动刷新缓存
   Future<void> refreshCache() async {
-    await fetchAndUpdateDiffData();
+    await fetchAndUpdateDiffData(forceNetwork: true);
   }
 
   // 获取最后更新时间

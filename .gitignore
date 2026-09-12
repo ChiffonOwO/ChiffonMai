@@ -50,3 +50,6 @@ app.*.map.json
 lib/api/DeveloperToken.dart
 # Environment variables
 .env.local
+
+# 人工/工具产生的源码备份（用于无 git 历史时回退，不该进版本库）
+tool/backup/

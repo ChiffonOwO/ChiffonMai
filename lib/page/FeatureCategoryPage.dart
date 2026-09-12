@@ -1,11 +1,9 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../entity/FeatureModels.dart';
-import '../constant/CacheKeyConstant.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/AppTheme.dart';
 import '../utils/AppConstants.dart';
+import '../utils/FavoriteFeaturesNotifier.dart';
 import '../widgets/FeatureButton.dart';
 import '../widgets/QuickSearchBar.dart';
 
@@ -29,46 +27,17 @@ class FeatureCategoryPage extends StatefulWidget {
 
 class _FeatureCategoryPageState extends State<FeatureCategoryPage> {
   String _searchQuery = '';
-  Set<String> _favoriteTitles = {};
-  Timer? _saveTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadFavorites();
-  }
 
   @override
   void dispose() {
-    _saveTimer?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadFavorites() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getStringList(CacheKeyConstant.favoriteFeatures) ?? [];
-    if (mounted) {
-      setState(() => _favoriteTitles = raw.toSet());
-    }
-  }
+  bool _isFavorited(String title) =>
+      FavoriteFeaturesNotifier.titles.contains(title);
 
-  void _toggleFavorite(String title) {
-    setState(() {
-      if (_favoriteTitles.contains(title)) {
-        _favoriteTitles.remove(title);
-      } else {
-        _favoriteTitles.add(title);
-      }
-    });
-    _saveTimer?.cancel();
-    _saveTimer = Timer(const Duration(milliseconds: 300), _saveFavorites);
-  }
-
-  Future<void> _saveFavorites() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(
-        CacheKeyConstant.favoriteFeatures, _favoriteTitles.toList());
-  }
+  Future<void> _toggleFavorite(String title) =>
+      FavoriteFeaturesNotifier.toggle(title);
 
   List<ButtonItem> _buildItems(bool isLoggedIn) {
     // 根据当前登录状态动态替换"系统"分类中的登录/登出按钮
@@ -132,7 +101,7 @@ class _FeatureCategoryPageState extends State<FeatureCategoryPage> {
           return FeatureButton(
             item: item,
             onTap: () => widget.onFeatureTap(item),
-            isFavorited: _favoriteTitles.contains(item.title),
+            isFavorited: _isFavorited(item.title),
             onToggleFavorite: () => _toggleFavorite(item.title),
           );
         },
@@ -202,14 +171,19 @@ class _FeatureCategoryPageState extends State<FeatureCategoryPage> {
                       ),
                       // 功能按钮网格 — 监听登录状态实时切换按钮
                       Expanded(
-                        child: widget.loginStateNotifier != null
-                            ? ValueListenableBuilder<bool>(
-                                valueListenable: widget.loginStateNotifier!,
-                                builder: (context, isLoggedIn, _) {
-                                  return buildGrid(_buildItems(isLoggedIn));
-                                },
-                              )
-                            : buildGrid(_buildItems(false)),
+                        child: ValueListenableBuilder<FavoritesPayload>(
+                          valueListenable: FavoriteFeaturesNotifier.instance,
+                          builder: (context, payload, _) {
+                            return widget.loginStateNotifier != null
+                                ? ValueListenableBuilder<bool>(
+                                    valueListenable: widget.loginStateNotifier!,
+                                    builder: (context, isLoggedIn, _) {
+                                      return buildGrid(_buildItems(isLoggedIn));
+                                    },
+                                  )
+                                : buildGrid(_buildItems(false));
+                          },
+                        ),
                       ),
                     ],
                   ),

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>ChiffonMai 视觉比对探针</title>
+<style>
+  /* 目的：做一个可量化的测试页，用于验证「HTML → 截图 → 像素比对」链路。
+     刻意用确定的几何值，这样像素比对的结果可预期、可判读。 */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 390px;            /* iPhone 14 逻辑宽度，模拟移动端视口 */
+    height: 844px;
+    background: #F4FBFA;     /* 实测：本项目浅色主题 surface 色 */
+    font-family: "Inter", "Noto Sans SC", system-ui, sans-serif;
+    color: #1A1C1C;
+  }
+  .titlebar {
+    padding: 56px 22px 32px;  /* top 56 = 状态栏 + 标题栏留白 */
+    display: flex; align-items: center; gap: 14px;
+  }
+  .circle {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: #EFF5F4;      /* 实测：surfaceContainerLow */
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.6px; }
+  .card {
+    margin: 0 22px 16px;
+    background: #FFFFFF;      /* 实测：surfaceContainerLowest */
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,.08);
+  }
+  .hero { display: flex; align-items: baseline; gap: 8px; }
+  .hero .num { font-size: 26px; font-weight: 700; color: #00696B; }
+  .hero .grade { font-size: 14px; font-weight: 700; color: #00696B; }
+  .label { font-size: 12px; color: #5A6362; margin-top: 3px; }
+  .bar {
+    margin: 0 22px; height: 56px; border-radius: 28px;
+    background: #FFFFFF; box-shadow: 0 4px 24px rgba(0,0,0,.08);
+    display: flex; align-items: center; padding: 0 8px;
+  }
+  .cta {
+    flex: 1; height: 44px; border-radius: 22px;
+    background: #00696B; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14.5px; font-weight: 600;
+  }
+</style>
+</head>
+<body>
+  <div class="titlebar">
+    <div class="circle">←</div>
+    <h1>结算画面识别</h1>
+  </div>
+
+  <div class="card">
+    <div class="hero">
+      <span class="num">100.8039%</span>
+      <span class="grade">SSS</span>
+    </div>
+    <div class="label">达成率</div>
+  </div>
+
+  <div class="bar">
+    <div class="cta">开始识别</div>
+  </div>
+</body>
+</html>

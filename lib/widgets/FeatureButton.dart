@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../entity/FeatureModels.dart';
-import '../utils/AppTheme.dart';
 import '../utils/AppConstants.dart';
 
 /// 功能按钮组件：纯 UI，点击行为由父组件通过 onTap 控制
@@ -26,7 +25,7 @@ class FeatureButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    final brightness = Theme.of(context).brightness;
+    final scheme = Theme.of(context).colorScheme;
 
     final button = SizedBox(
       height: screenHeight * 0.12,
@@ -34,7 +33,7 @@ class FeatureButton extends StatelessWidget {
         style: TextButton.styleFrom(
           backgroundColor: Colors.transparent,
           side: BorderSide(
-            color: AppColors.buttonBorder(brightness),
+            color: scheme.outlineVariant,
             width: AppConstants.borderWidth,
           ),
           padding: EdgeInsets.zero,
@@ -46,11 +45,11 @@ class FeatureButton extends StatelessWidget {
         onPressed: onTap,
         child: Column(
           children: [
-            // 上半部分：原背景色，居中图标
+            // 上半部分：主题色淡色背景，居中图标
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppColors.buttonBackground(brightness),
+                  color: scheme.primary.withValues(alpha: 0.15),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(AppConstants.borderRadiusLarge),
                     topRight: Radius.circular(AppConstants.borderRadiusLarge),
@@ -61,13 +60,13 @@ class FeatureButton extends StatelessWidget {
                     width: screenWidth * 0.09,
                     height: screenWidth * 0.09,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
+                      color: scheme.surface,
                       shape: BoxShape.circle,
                     ),
                     child: Center(
                       child: Icon(
                         item.icon,
-                        color: Theme.of(context).colorScheme.onSurface,
+                        color: scheme.primary,
                         size: screenWidth * 0.05,
                       ),
                     ),
@@ -79,7 +78,7 @@ class FeatureButton extends StatelessWidget {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
+                  color: scheme.surface,
                   borderRadius: const BorderRadius.only(
                     bottomLeft: Radius.circular(AppConstants.borderRadiusLarge),
                     bottomRight: Radius.circular(AppConstants.borderRadiusLarge),
@@ -92,7 +91,7 @@ class FeatureButton extends StatelessWidget {
                       Text(
                         item.title,
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
+                          color: scheme.onSurface,
                           fontSize: screenWidth * 0.035,
                           fontWeight: FontWeight.bold,
                           fontStyle: FontStyle.normal,
@@ -105,7 +104,7 @@ class FeatureButton extends StatelessWidget {
                       Text(
                         item.subtitle,
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                          color: scheme.onSurface.withValues(alpha: 0.8),
                           fontSize: screenWidth * 0.025,
                           fontWeight: FontWeight.w300,
                         ),
@@ -133,16 +132,16 @@ class FeatureButton extends StatelessWidget {
         children: [
           Positioned.fill(child: button),
           Positioned(
-            top: 4,
-            right: 4,
+            top: 2,
+            right: 2,
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(18),
                 onTap: onToggleFavorite,
                 child: Container(
-                  width: 28,
-                  height: 28,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                     color: isFavorited!
                         ? Colors.amber.withValues(alpha: 0.2)
@@ -151,7 +150,7 @@ class FeatureButton extends StatelessWidget {
                   ),
                   child: Icon(
                     isFavorited! ? Icons.star : Icons.star_border,
-                    size: 18,
+                    size: 24,
                     color: isFavorited! ? Colors.amber : Colors.grey,
                   ),
                 ),

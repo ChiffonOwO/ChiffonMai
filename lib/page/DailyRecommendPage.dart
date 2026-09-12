@@ -4,7 +4,6 @@ import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
-import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'SongInfoPage.dart';
 
@@ -60,6 +59,62 @@ class _DailyRecommendPageState extends State<DailyRecommendPage> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  /// 歌曲类型标签：与最近评论页一致。
+  /// UTAGE 优先用 songId.length == 6 判断（DivingFish 部分 UTAGE 曲目
+  /// 的 type 字段会标为 DX，此处按 6 位数 ID 强纠正为红/UT）；
+  /// 其余按 song.type 区分 DX / ST。
+  Widget _buildTypeTag(String songId, String songType, Brightness brightness) {
+    final bool isUtage = songId.length == 6;
+    final String label = isUtage
+        ? 'UT'
+        : (songType == 'DX' ? 'DX' : 'ST');
+
+    Color bgColor;
+    Color textColor;
+    switch (label) {
+      case 'UT':
+        // 与 SongInfoPage 一致：粉色主题（背景 = utageCard，文字 = utageAccent）
+        bgColor = brightness == Brightness.dark
+            ? const Color(0xFF5C3545)
+            : const Color(0xFFFFB3D1);
+        textColor = brightness == Brightness.dark
+            ? const Color(0xFFFF85B9)
+            : const Color(0xFFFF69B4);
+        break;
+      case 'DX':
+        bgColor = brightness == Brightness.dark
+            ? Colors.orange.withValues(alpha: 0.2)
+            : Colors.orange.shade100;
+        textColor = brightness == Brightness.dark
+            ? Colors.orange[300]!
+            : Colors.orange;
+        break;
+      default:
+        bgColor = brightness == Brightness.dark
+            ? Colors.blue.withValues(alpha: 0.2)
+            : Colors.blue.shade100;
+        textColor = brightness == Brightness.dark
+            ? Colors.blue[300]!
+            : Colors.blue;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: textColor,
+        ),
+      ),
+    );
   }
 
 
@@ -267,15 +322,24 @@ class _DailyRecommendPageState extends State<DailyRecommendPage> {
                                                 child: Column(
                                                   crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
-                                                    Text(
-                                                      song.basicInfo.title,
-                                                      style: TextStyle(
-                                                        fontSize: 16,
-                                                        fontWeight: FontWeight.bold,
-                                                        color: textPrimaryColor,
-                                                      ),
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
+                                                    // 第一行：类型标签 + 歌名
+                                                    Row(
+                                                      children: [
+                                                        _buildTypeTag(song.id, song.type, brightness),
+                                                        const SizedBox(width: 6),
+                                                        Expanded(
+                                                          child: Text(
+                                                            song.basicInfo.title,
+                                                            style: TextStyle(
+                                                              fontSize: 16,
+                                                              fontWeight: FontWeight.bold,
+                                                              color: textPrimaryColor,
+                                                            ),
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
                                                     const SizedBox(height: 4),
                                                     Text(
@@ -288,27 +352,11 @@ class _DailyRecommendPageState extends State<DailyRecommendPage> {
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
                                                     const SizedBox(height: 8),
+                                                    // 只展示难度定数标签，类型标签已上移到歌名前
                                                     Wrap(
                                                       spacing: 4,
                                                       runSpacing: 4,
-                                                      children: [
-                                                        ...diffChips,
-                                                        Container(
-                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                          decoration: BoxDecoration(
-                                                            border: Border.all(
-                                                              color: song.type == 'DX' ? AppColors.warningOrange(brightness) : AppColors.linkBlue(brightness),
-                                                              width: 1.5),
-                                                            borderRadius: BorderRadius.circular(6),
-                                                          ),
-                                                          child: Text(
-                                                            StringUtil.formatSongType(song.type),
-                                                            style: TextStyle(fontSize: 11,
-                                                                fontWeight: FontWeight.bold,
-                                                                color: song.type == 'DX' ? AppColors.warningOrange(brightness) : AppColors.linkBlue(brightness)),
-                                                          ),
-                                                        ),
-                                                      ],
+                                                      children: diffChips,
                                                     ),
                                                   ],
                                                 ),
