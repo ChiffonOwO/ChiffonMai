@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// 应用启动加载页：纯白背景 + 应用图标 + 应用名称 + 加载动画。
 /// 设计目标：克制、聚焦，把视觉权重留给 Logo。
@@ -58,7 +59,7 @@ class SplashPage extends StatelessWidget {
   Widget _buildBrand(ColorScheme scheme) {
     return Text(
       'ChiffonMai',
-      style: TextStyle(
+      style: GoogleFonts.poppins(
         fontSize: 28,
         fontWeight: FontWeight.w800,
         letterSpacing: 1.6,

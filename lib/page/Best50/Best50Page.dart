@@ -1498,6 +1498,7 @@ class _B50PageState extends State<B50Page> {
     String decimalPart = parts.length > 1 ? '.${parts[1]}' : '';
     String percentageSymbol = isPercentage ? '%' : '';
 
+    // 整数与小数共用基线，数字底边自然齐平（与 B50 卡片一致）
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.baseline,

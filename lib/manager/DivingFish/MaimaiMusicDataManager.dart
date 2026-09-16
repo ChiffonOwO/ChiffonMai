@@ -5,6 +5,7 @@ import '../../api/ApiUrls.dart';
 import '../../entity/DivingFish/Song.dart';
 import '../../service/GuessChartGame/MultiplayerCloudBaseService.dart';
 import '../../utils/MaidataDecodeUtil.dart';
+import '../../utils/SongFilterUtil.dart';
 import '../../constant/CacheKeyConstant.dart';
 import '../../constant/CacheTimestampConstant.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -658,12 +659,6 @@ class MaimaiMusicDataManager {
   /// 检查歌曲是否应被排除在推荐/计算之外
   /// 排除条件：1) cids全为0 (maidata追加) 2) isExtra (union独有) 3) 6位数ID (宴会场)
   static bool isSongExcludedFromRecommendations(Song song) {
-    // 6位数ID的歌曲（宴会场）
-    if (song.id.length == 6) return true;
-    // maidata 追加的歌曲（cids全为0）
-    if (song.cids.isNotEmpty && song.cids.every((cid) => cid == 0)) return true;
-    // union API 独有的额外歌曲
-    if (song.isExtra) return true;
-    return false;
+    return SongFilterUtil.isExtra(song);
   }
 }

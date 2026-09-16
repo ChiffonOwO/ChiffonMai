@@ -5,7 +5,6 @@ import 'SongSearchPage.dart';
 import 'UserScoreSearchPage.dart';
 import 'PersonalizedScorePage.dart';
 import 'PaiziProgressPage.dart';
-import 'KnowledgeSearchPage.dart';
 import 'Collection/CollectionSearchPage.dart';
 
 class LibraryHubPage extends StatefulWidget {
@@ -38,7 +37,7 @@ class _LibraryHubPageState extends State<LibraryHubPage> {
             title: '曲库入口',
             icon: Icons.search_rounded,
             subtitle: '搜索与浏览舞萌曲库',
-            badgeCount: 2,
+            badgeCount: 1,
             children: [
               HubActionTile(
                 title: '乐曲查询',
@@ -47,14 +46,6 @@ class _LibraryHubPageState extends State<LibraryHubPage> {
                 isFavorited: _isFavorited('乐曲查询'),
                 onToggleFavorite: () => _toggleFavorite('乐曲查询'),
                 onTap: () => _open(context, const SongSearchPage()),
-              ),
-              HubActionTile(
-                title: '舞萌百科',
-                subtitle: '查阅舞萌相关知识',
-                icon: Icons.menu_book_outlined,
-                isFavorited: _isFavorited('舞萌百科'),
-                onToggleFavorite: () => _toggleFavorite('舞萌百科'),
-                onTap: () => _open(context, const KnowledgeSearchPage()),
               ),
             ],
           ),

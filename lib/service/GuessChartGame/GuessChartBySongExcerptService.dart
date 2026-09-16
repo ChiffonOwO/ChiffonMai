@@ -15,18 +15,10 @@ class GuessChartBySongExcerptService {
   factory GuessChartBySongExcerptService() => _instance;
   GuessChartBySongExcerptService._internal();
 
-  // 播放时长设置（默认5秒，最长30秒）
-  int _playDuration = 5;
-  
-  // 设置播放时长
-  void setPlayDuration(int seconds) {
-    _playDuration = min(30, max(1, seconds));
-  }
-  
-  // 获取当前播放时长
-  int getPlayDuration() {
-    return _playDuration;
-  }
+  // 播放时长不在这里维护：它是用户设置，统一由
+  // GuessChartCommonSettingsService 持久化、由页面自己读取。
+  // 原先这里有一份 _playDuration + set/get 方法，但**从未被调用过**
+  // （页面用的是自己的 _playDuration 字段），留着只会让人误以为改这里能生效。
 
   // 加载所有落雪歌曲数据
   Future<Map<Song, dynamic>?> loadAllSongs() async {
@@ -49,7 +41,20 @@ class GuessChartBySongExcerptService {
 
       // 构建歌曲映射
       final Map<Song, dynamic> songMap = {};
-      
+
+      // 预建「曲名+类型 → Song」索引。
+      // 原先对每首落雪曲都做一次 cachedSongs.firstWhere(...)，是 O(n×m) 全量扫描：
+      // 落雪曲库两千多首、水鱼曲库也是四位数，累计上百万次字符串比较，
+      // 而且判断条件里还先比 title 再比 type。建一次索引后变成 O(n+m)。
+      final Map<String, Song> songIndex = {};
+      for (final song in cachedSongs) {
+        // 同一 key 多次出现时保留第一个，与原先 firstWhere 的语义一致
+        songIndex.putIfAbsent(
+          '${song.basicInfo.title}\u0000${song.type}',
+          () => song,
+        );
+      }
+
       for (final luoXueSong in luoXueSongEntity.songs) {
         // 检查是否有standard或dx难度
         bool hasStandard = luoXueSong.difficulties.standard != null && luoXueSong.difficulties.standard!.isNotEmpty;
@@ -64,32 +69,12 @@ class GuessChartBySongExcerptService {
             ? (Random().nextBool() ? 'SD' : 'DX') 
             : (hasStandard ? 'SD' : 'DX');
 
-        // 查找对应的缓存歌曲
-        Song? matchedSong;
-        try {
-          matchedSong = cachedSongs.firstWhere(
-            (song) => song.basicInfo.title == luoXueSong.title && song.type == selectedType,
-            orElse: () => Song(
-              id: '',
-              title: luoXueSong.title,
-              type: selectedType,
-              ds: [],
-              level: [],
-              cids: [],
-              charts: [],
-              basicInfo: BasicInfo(
-                title: luoXueSong.title,
-                artist: luoXueSong.artist,
-                genre: luoXueSong.genre,
-                bpm: luoXueSong.bpm,
-                releaseDate: '',
-                from: luoXueSong.version.toString(),
-                isNew: false,
-              ),
-            ),
-          );
-        } catch (e) {
-          // 如果查找失败，创建一个默认歌曲
+        // 查找对应的缓存歌曲（走上面的索引）
+        Song? matchedSong = songIndex['${luoXueSong.title}\u0000$selectedType'];
+        if (matchedSong == null) {
+          // 曲库里没有这首（或类型对不上）：构造一个只带落雪信息的占位 Song，
+          // 保证后续按版本/流派/定数筛选时仍有可用的 basicInfo。
+          // 注意：占位 Song 的 ds 为空 → 定数筛选会把它排除，与原行为一致。
           matchedSong = Song(
             id: '',
             title: luoXueSong.title,

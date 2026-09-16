@@ -16,7 +16,6 @@ class FeatureRegistry {
       const ButtonItem(icon: Icons.wysiwyg_rounded, title: '牌子进度', subtitle: '查看各版本与目标牌子'),
       const ButtonItem(icon: Icons.grading_rounded, title: '个性化成绩查询', subtitle: '按等级或谱师查看成绩'),
       const ButtonItem(icon: Icons.collections_bookmark, title: '收藏品查询', subtitle: '查看头像、姓名框等收藏品'),
-      const ButtonItem(icon: Icons.bookmark_add, title: '舞萌百科', subtitle: '查阅舞萌相关知识'),
     ]),
     ButtonCategory(name: 'Best50与排行榜', items: [
       const ButtonItem(icon: Icons.leaderboard, title: 'Best50', subtitle: '查看当前 Best35 与 Best15'),
@@ -56,8 +55,9 @@ class FeatureRegistry {
       const ButtonItem(icon: Icons.play_arrow, title: '自定义谱面播放', subtitle: '播放本地自定义谱面'),
       const ButtonItem(icon: Icons.today, title: '每日推荐', subtitle: '今天打什么？交给推荐'),
       const ButtonItem(icon: Icons.people, title: '好友对比', subtitle: '看看你和好友的成绩差异'),
-      const ButtonItem(icon: Icons.map, title: '全国音游地图', subtitle: '看看哪里有你想玩的机台（BemaniCN）'),
+      const ButtonItem(icon: Icons.map, title: '全国音游地图', subtitle: '看看哪里有你想玩的机台'),
       const ButtonItem(icon: Icons.public, title: '全球音游街机地图', subtitle: '查看 NearCade 全球街机店铺'),
+      const ButtonItem(icon: Icons.bookmark_add, title: '舞萌百科', subtitle: '查阅舞萌相关知识'),
     ]),
     ButtonCategory(name: '友情链接', icon: Icons.handshake_outlined, items: [
       const ButtonItem(

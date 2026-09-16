@@ -22,6 +22,7 @@ import '../manager/LuoXue/CollectionsManager.dart';
 import '../manager/LuoXue/LuoXueUserPlayDataManager.dart';
 import '../manager/MaiTagsManager.dart';
 import '../manager/SongAliasManager.dart';
+import '../service/AccountSwitchService.dart';
 import '../service/ConnectivityService.dart';
 import '../service/PaiziProgressService.dart';
 import '../service/PersonalizedScoreService.dart';
@@ -30,8 +31,13 @@ import '../service/RankingList/SongRankingService.dart';
 import '../utils/ApiClient.dart';
 import '../utils/AppTheme.dart';
 import '../utils/CacheSourceRegistry.dart';
+import '../utils/CurrentDataSourceNotifier.dart';
 import '../utils/StringUtil.dart';
 import '../utils/UserProfileNotifier.dart';
+
+// 数据源枚举 / 当前数据源 Notifier 已抽到 utils，这里 re-export，
+// 让既有 `import 'RefreshDataDialog.dart' show RefreshDataSource, ...` 继续可用。
+export '../utils/CurrentDataSourceNotifier.dart';
 
 // ============================================================
 // 公共入口：旧版"刷新数据"对话框
@@ -39,31 +45,6 @@ import '../utils/UserProfileNotifier.dart';
 // 对话框内部的所有状态写入通过 UserProfileNotifier 共享，
 // 调用方只要监听 UserProfileNotifier 即可拿到最新昵称 / Rating / QQ。
 // ============================================================
-
-enum RefreshDataSource { shuiyu, luoxue }
-
-/// 当前数据源（首页摘要显示使用），由刷新对话框更新。
-class CurrentDataSourceNotifier extends ValueNotifier<RefreshDataSource> {
-  CurrentDataSourceNotifier._(RefreshDataSource source) : super(source);
-  static final CurrentDataSourceNotifier instance =
-      CurrentDataSourceNotifier._(RefreshDataSource.shuiyu);
-
-  static Future<void> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final lastSource =
-        prefs.getString(CacheKeyConstant.lastDataSource) ?? 'shuiyu';
-    instance.value = lastSource == 'luoxue'
-        ? RefreshDataSource.luoxue
-        : RefreshDataSource.shuiyu;
-  }
-
-  Future<void> set(RefreshDataSource source) async {
-    value = source;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(CacheKeyConstant.lastDataSource,
-        source == RefreshDataSource.shuiyu ? 'shuiyu' : 'luoxue');
-  }
-}
 
 class RatingLimits {
   final int best35Limit;
@@ -113,7 +94,10 @@ class RefreshDataRequest {
 /// - `null`  → 用户取消
 /// - 非 null → 用户点了「确认」，调用方应执行 [executeRefreshData] 并把进度
 ///             显示在自己的按钮上（见 SystemHubPage 的实现）
-Future<RefreshDataRequest?> showRefreshDataDialog(BuildContext context) async {
+Future<RefreshDataRequest?> showRefreshDataDialog(
+  BuildContext context, {
+  RefreshDataSource? initialSource,
+}) async {
   await CurrentDataSourceNotifier.load();
   final prefs = await SharedPreferences.getInstance();
   final jwt = prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '';
@@ -129,6 +113,7 @@ Future<RefreshDataRequest?> showRefreshDataDialog(BuildContext context) async {
       isDivingFishLoggedIn: isDivingFishLoggedIn,
       bindQQ: bindQQ,
       cachedQQ: cachedQQ,
+      initialSource: initialSource,
     ),
   );
 }
@@ -141,8 +126,15 @@ Future<bool> executeRefreshData(
   RefreshDataRequest request, {
   required void Function(int progress, String text) onProgress,
 }) async {
+  final source = request.isShuiyu
+      ? RefreshDataSource.shuiyu
+      : RefreshDataSource.luoxue;
+  final bool willRefresh =
+      request.isShuiyu ? request.qq.isNotEmpty : request.authCode.isNotEmpty;
   try {
     onProgress(0, '开始刷新数据...');
+    // 先把活动槽切换到本次要刷新的数据源，避免覆盖另一个账号的活动数据
+    if (willRefresh) await AccountSwitchService.prepareForRefresh(source);
     if (request.isShuiyu) {
       if (request.qq.isNotEmpty) {
         await _saveQQ(request.qq);
@@ -165,7 +157,8 @@ Future<bool> executeRefreshData(
         );
       }
     }
-    await _saveLastDataSource(request.isShuiyu ? 'shuiyu' : 'luoxue');
+    // 刷新完把活动槽存进该源存档并更新元信息（不再单独写 lastDataSource）
+    if (willRefresh) await AccountSwitchService.onRefreshCompleted(source);
     onProgress(100, '数据刷新完成');
     return true;
   } finally {
@@ -193,8 +186,14 @@ Future<bool> executeAdvancedRefreshData(
     }
   }
 
+  final source = request.isShuiyu
+      ? RefreshDataSource.shuiyu
+      : RefreshDataSource.luoxue;
+  final bool willRefresh =
+      request.isShuiyu ? request.qq.isNotEmpty : request.authCode.isNotEmpty;
   try {
     onProgress(0, '开始刷新数据...');
+    if (willRefresh) await AccountSwitchService.prepareForRefresh(source);
     if (request.isShuiyu) {
       if (request.qq.isNotEmpty) {
         await _saveQQ(request.qq);
@@ -217,7 +216,7 @@ Future<bool> executeAdvancedRefreshData(
         );
       }
     }
-    await _saveLastDataSource(request.isShuiyu ? 'shuiyu' : 'luoxue');
+    if (willRefresh) await AccountSwitchService.onRefreshCompleted(source);
     onProgress(100, '数据刷新完成');
     return true;
   } finally {
@@ -233,11 +232,14 @@ class _RefreshDataDialog extends StatefulWidget {
   final bool isDivingFishLoggedIn;
   final String bindQQ;
   final String cachedQQ;
+  /// 打开对话框时预选的数据源（账号切换面板「去刷新」时传入）。
+  final RefreshDataSource? initialSource;
 
   const _RefreshDataDialog({
     required this.isDivingFishLoggedIn,
     required this.bindQQ,
     required this.cachedQQ,
+    this.initialSource,
   });
 
   @override
@@ -259,7 +261,8 @@ class _RefreshDataDialogState extends State<_RefreshDataDialog> {
   @override
   void initState() {
     super.initState();
-    _currentDataSource = CurrentDataSourceNotifier.instance.value;
+    _currentDataSource =
+        widget.initialSource ?? CurrentDataSourceNotifier.instance.value;
     qqController.text =
         widget.bindQQ.isNotEmpty ? widget.bindQQ : widget.cachedQQ;
     _loadRankingSettings();
@@ -325,10 +328,12 @@ class _RefreshDataDialogState extends State<_RefreshDataDialog> {
                     _currentDataSource == RefreshDataSource.luoxue,
                   ],
                   onPressed: (index) {
+                    // 这里只选「本次要刷新的数据源」，不直接切活动源：
+                    // 真正的切换/换槽在 executeRefreshData 里由 prepareForRefresh 完成，
+                    // 否则活动槽与数据源会不一致。
                     final newSource = index == 0
                         ? RefreshDataSource.shuiyu
                         : RefreshDataSource.luoxue;
-                    CurrentDataSourceNotifier.instance.set(newSource);
                     setState(() {
                       _currentDataSource = newSource;
                       authCodeController.clear();
@@ -819,8 +824,7 @@ Future<void> refreshBest50DataWithProgress(
     String? rankingError;
     final userId = 'shuiyu:$qq';
     final prefs = await SharedPreferences.getInstance();
-    // 先清掉另一数据源的身份，避免 SharedPreferences 留「幽灵身份」
-    await prefs.remove(CacheKeyConstant.luoxueUserId);
+    // 双账号：只写自己源的身份，不再删对方的（两套缓存各自保留）
     await prefs.setString(CacheKeyConstant.shuiyuUserId, userId);
 
     if (participateRankings) {
@@ -991,16 +995,17 @@ Future<void> _handleLuoXueAuthWithProgress(
     String currentNickname = UserProfileNotifier.instance.value.nickname;
     int best35RA = 0;
     int best15RA = 0;
-    String cachedQQ = UserProfileNotifier.instance.value.cachedQQ;
+    // 落雪的 id 只能来自 playerInfo.friendCode，绝不回退到上一个账号的
+    // cachedQQ——否则 getPlayerInfo() 失败时会把水鱼 QQ 当成落雪 ID 存下来。
+    String cachedQQ = '';
     if (playerInfo != null) {
       final halfWidthName = StringUtil.toHalfWidth(playerInfo.name);
       currentNickname = halfWidthName.isNotEmpty ? halfWidthName : '未知玩家';
       final prefs = await SharedPreferences.getInstance();
+      // 双账号：只写自己源的身份，不再删对方的（两套缓存各自保留）
       await prefs.setString(
           CacheKeyConstant.luoxueUserId,
           'luoxue:${playerInfo.friendCode}');
-      // 先清掉另一数据源的身份，避免 SharedPreferences 留「幽灵身份」
-      await prefs.remove(CacheKeyConstant.shuiyuUserId);
       cachedQQ = playerInfo.friendCode.toString();
     }
 

@@ -303,10 +303,11 @@ class _AdvancedRefreshDataDialogState
             _currentDataSource == RefreshDataSource.luoxue,
           ],
           onPressed: (index) {
+            // 只选「本次要刷新的数据源」；真正的切换由 executeAdvancedRefreshData
+            // 里的 prepareForRefresh 完成，避免活动槽与数据源不一致。
             final newSource = index == 0
                 ? RefreshDataSource.shuiyu
                 : RefreshDataSource.luoxue;
-            CurrentDataSourceNotifier.instance.set(newSource);
             setState(() {
               _currentDataSource = newSource;
               _authCodeController.clear();

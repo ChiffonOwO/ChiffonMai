@@ -66,6 +66,9 @@ class DataBackupService {
     CacheKeyConstant.fittedRankingsCacheTimestampPrefix,
     CacheKeyConstant.songCommentsCachePrefix, // song_comments_cache_<songId>
     CacheKeyConstant.songCommentsCacheTimestampPrefix,
+    // 双账号：成绩存档（可重新拉取）不进备份；
+    // 身份存档 account_archive_identity_* 与 account_store 属于用户数据，保留在备份里
+    CacheKeyConstant.accountArchivePlayPrefix, // account_archive_play_<source>
   ];
 
   /// 是否是「可重新拉取的缓存」——这类键不写进备份

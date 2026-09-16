@@ -42,6 +42,11 @@ class CommonWidgetUtil {
 
   /**
    * 构建猜歌通用设置Widget
+   *
+   * 注意：这里**不再**有 onReset 形参。原先它是个从未被使用的死参数，
+   * 各页面因此各自手写一份「重置所有设置」按钮和默认值字面量，
+   * 结果歌曲片段页那份漏了播放时长。默认值现在统一来自
+   * `GuessChartCommonSettingsService.defaultSettings()`。
    */
   static Widget buildGuessChartSettingsWidget(
     BuildContext context,
@@ -58,8 +63,18 @@ class CommonWidgetUtil {
     Function(List<String>) onGenresChanged,
     Function(int) onMaxGuessesChanged,
     Function(int) onTimeLimitChanged,
-    Function() onReset,
-  ) {
+    {
+    // 定数范围这一节的标题。
+    //
+    // 默认面向「按 MASTER 难度定数筛选」的模式（无提示 / 曲绘 / 模糊曲绘 /
+    // 歌曲片段 / 别名 / 开字母），那里确实只看 MASTER 的定数。
+    // 但**谱面片段猜歌**是按「难度随机池」抽谱的，判定用的是池内各难度
+    // 各自的定数，写「MASTER定数范围」会让用户以为只按 MASTER 筛 —— 与实际不符，
+    // 所以那一页传「定数范围」。
+    String dxRangeTitle = 'MASTER定数范围',
+    // 定数范围下方的补充说明（可选），用于点明判定口径。
+    String? dxRangeHint,
+  }) {
     return SingleChildScrollView(
       padding: EdgeInsets.all(16),
       child: Column(
@@ -74,13 +89,25 @@ class CommonWidgetUtil {
             (version) => StringUtil.formatVersion2(version),
           ),
           SizedBox(height: 20),
-          _buildSectionTitle('MASTER定数范围'),
+          _buildSectionTitle(dxRangeTitle),
           _buildMasterDxRangeInput(
             context,
             masterMinDx,
             masterMaxDx,
             onMasterDxRangeChanged,
           ),
+          if (dxRangeHint != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                dxRangeHint,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.greyHint(
+                      Theme.of(context).brightness),
+                ),
+              ),
+            ),
           SizedBox(height: 20),
           _buildSectionTitle('选择流派（支持复选，默认全部，不选表示所有）'),
           _buildMultiSelectList(
@@ -96,7 +123,10 @@ class CommonWidgetUtil {
             value: maxGuesses == 0 ? 20.0 : maxGuesses.toDouble(),
             min: 1,
             max: 20,
-            divisions: 20,
+            // divisions 必须是 (max-min) 的约数：原来写 20，步长 = 19/20 = 0.95，
+            // 拖动会取到 10 两次（9.5→10、10.45→10）且拿不到整数序列。
+            // 19 段 → 步长正好 1，取值 1..20 一一对应。
+            divisions: 19,
             label: maxGuesses == 0 || maxGuesses == 20 ? '无限制' : '$maxGuesses',
             onChanged: (value) {
               onMaxGuessesChanged(value.toInt() == 20 ? 0 : value.toInt());
@@ -175,67 +205,10 @@ class CommonWidgetUtil {
     double maxValue,
     Function(double, double) onChanged,
   ) {
-    final brightness = Theme.of(context).brightness;
-    double formattedMin = double.parse(minValue.toStringAsFixed(1));
-    double formattedMax = double.parse(maxValue.toStringAsFixed(1));
-    TextEditingController minController = TextEditingController(text: formattedMin.toString());
-    TextEditingController maxController = TextEditingController(text: formattedMax.toString());
-
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('最小:'),
-                  TextField(
-                    keyboardType: TextInputType.numberWithOptions(decimal: true),
-                    controller: minController,
-                    onEditingComplete: () {
-                      String value = minController.text;
-                      if (value.isEmpty) { onChanged(1.0, maxValue); }
-                      else { double? newMin = double.tryParse(value); if (newMin != null && newMin >= 1.0 && newMin <= 15.0) { onChanged(newMin, maxValue); } }
-                    },
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('最大:'),
-                  TextField(
-                    keyboardType: TextInputType.numberWithOptions(decimal: true),
-                    controller: maxController,
-                    onEditingComplete: () {
-                      String value = maxController.text;
-                      if (value.isEmpty) { onChanged(minValue, 15.0); }
-                      else { double? newMax = double.tryParse(value); if (newMax != null && newMax >= 1.0 && newMax <= 15.0) { onChanged(minValue, newMax); } }
-                    },
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: 8),
-        Text('范围：1.0 - 15.0', style: TextStyle(fontSize: 12, color: AppColors.greyHint(brightness))),
-        SizedBox(height: 4),
-        Text('输入完毕后请点击输入法的回车键', style: TextStyle(fontSize: 12, color: AppColors.greyHint(brightness))),
-      ],
+    return _MasterDxRangeInput(
+      minValue: minValue,
+      maxValue: maxValue,
+      onChanged: onChanged,
     );
   }
 
@@ -260,6 +233,168 @@ class CommonWidgetUtil {
 }
 
 // ============ 内部主题感知组件 ============
+
+/// MASTER 定数范围输入框。
+///
+/// 必须是 StatefulWidget，且**由它自己持有 TextEditingController**：
+/// 原先这个输入框直接建在 `buildGuessChartSettingsWidget` 里，每次外层
+/// setState（勾选版本、拖滑块……）都会新建 controller，导致
+/// - 用户输入到一半、去点了别的控件 → 输入内容被重置回旧值；
+/// - 提交时机是 `onEditingComplete`，只有按回车才生效，点「确定」直接
+///   关掉对话框时改动会**静默丢失**（widget 测试里实测 committed=0）。
+///
+/// 现在改为：controller 由本 State 持有，失焦（onTapOutside）与回车都会提交，
+/// 并且 controller 文本只在「外部值变化」时才同步，不会打断用户输入。
+class _MasterDxRangeInput extends StatefulWidget {
+  const _MasterDxRangeInput({
+    required this.minValue,
+    required this.maxValue,
+    required this.onChanged,
+  });
+
+  final double minValue;
+  final double maxValue;
+  final Function(double, double) onChanged;
+
+  @override
+  State<_MasterDxRangeInput> createState() => _MasterDxRangeInputState();
+}
+
+class _MasterDxRangeInputState extends State<_MasterDxRangeInput> {
+  static const double _absoluteMin = 1.0;
+  static const double _absoluteMax = 15.0;
+
+  late final TextEditingController _minController;
+  late final TextEditingController _maxController;
+  late final FocusNode _minFocus;
+  late final FocusNode _maxFocus;
+
+  @override
+  void initState() {
+    super.initState();
+    _minController = TextEditingController(text: _fmt(widget.minValue));
+    _maxController = TextEditingController(text: _fmt(widget.maxValue));
+    _minFocus = FocusNode();
+    _maxFocus = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _minController.dispose();
+    _maxController.dispose();
+    _minFocus.dispose();
+    _maxFocus.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _MasterDxRangeInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 只有外部值**真的变了**才回写文本，否则会把用户正在输入的内容抹掉
+    // （例如「14.」这种还没输入完、暂不非法的中间态）。
+    if (widget.minValue != oldWidget.minValue && !_minFocus.hasFocus) {
+      _minController.text = _fmt(widget.minValue);
+    }
+    if (widget.maxValue != oldWidget.maxValue && !_maxFocus.hasFocus) {
+      _maxController.text = _fmt(widget.maxValue);
+    }
+  }
+
+  static String _fmt(double v) => v.toStringAsFixed(1);
+
+  /// 提交一个输入框的值。非法输入（空/非数字/越界）一律**回滚成当前外部值**，
+  /// 而不是悄悄丢弃——否则用户会看着一个和实际生效值不一致的数字。
+  void _commit({required bool isMin}) {
+    final TextEditingController controller = isMin ? _minController : _maxController;
+    final double fallback = isMin ? widget.minValue : widget.maxValue;
+    final double? parsed = double.tryParse(controller.text.trim());
+    final bool valid = parsed != null &&
+        parsed >= _absoluteMin &&
+        parsed <= _absoluteMax;
+    if (!valid) {
+      controller.text = _fmt(fallback);
+      return;
+    }
+    final double newMin = isMin ? parsed : widget.minValue;
+    final double newMax = isMin ? widget.maxValue : parsed;
+    // 归一化显示（14 -> 14.0），并保持 min <= max：
+    // 若用户把最小值填得比最大值还大，就把最大值一起顶上去。
+    if (newMin > newMax) {
+      final double unified = isMin ? newMin : newMax;
+      _minController.text = _fmt(unified);
+      _maxController.text = _fmt(unified);
+      widget.onChanged(unified, unified);
+      return;
+    }
+    controller.text = _fmt(parsed);
+    widget.onChanged(newMin, newMax);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('最小:'),
+                  TextField(
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    controller: _minController,
+                    focusNode: _minFocus,
+                    onSubmitted: (_) => _commit(isMin: true),
+                    onTapOutside: (_) => _commit(isMin: true),
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('最大:'),
+                  TextField(
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    controller: _maxController,
+                    focusNode: _maxFocus,
+                    onSubmitted: (_) => _commit(isMin: false),
+                    onTapOutside: (_) => _commit(isMin: false),
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text('范围：1.0 - 15.0',
+            style:
+                TextStyle(fontSize: 12, color: AppColors.greyHint(brightness))),
+        const SizedBox(height: 4),
+        Text('输入后点其它位置或按回车即可生效',
+            style:
+                TextStyle(fontSize: 12, color: AppColors.greyHint(brightness))),
+      ],
+    );
+  }
+}
 
 /// 主题感知的背景图组件（StatelessWidget）
 /// 性能：用 Stack + 半透明覆层代替 ColorFiltered + BlendMode.darken，避免 saveLayer

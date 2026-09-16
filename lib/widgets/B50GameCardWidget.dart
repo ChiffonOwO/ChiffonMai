@@ -169,6 +169,9 @@ class B50GameCardWidget extends StatelessWidget {
                               alignment: Alignment.centerLeft,
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
+                                // 整数与小数共用基线：数字都坐在基线上，底边自然齐平。
+                                // 不要用 CrossAxisAlignment.end（盒底对齐），
+                                // 盒底比字形底边低一个 descent，小数会沉到整数底边之下。
                                 crossAxisAlignment: CrossAxisAlignment.baseline,
                                 textBaseline: TextBaseline.alphabetic,
                                 children: [
@@ -399,7 +402,8 @@ class B50GameCardWidget extends StatelessWidget {
     // ✦0 / ✦5.5 / ✦6 等情况：用占位 SizedBox 保持与有星卡片对齐；
     // Text 用 FittedBox + 大字号自动缩放到与图片星等高，加粗加深可读性。
     // 5.5 / 6 字号比图片星略小一点（1.5x vs 2.0x），避免视觉过重。
-    // 5.5 / 6 走细描边（4 方向 Shadow 偏移 1.0）让数字更"立"起来。
+    // 5.5 / 6 走细描边（8 方向 Shadow 偏移 1.0）让数字更"立"起来。
+    // 只描上下左右 4 个方向时，字形的斜角会露出缝隙，补上 4 个对角方向才是完整一圈。
     // ✦ 与数字拆成 Row 用 baseline 对齐，避免 ✦ 与数字上下错位。
     final bool needsStroke = stars == '✦6' || stars == '✦5.5';
     final String digits =
@@ -415,6 +419,10 @@ class B50GameCardWidget extends StatelessWidget {
               Shadow(color: Colors.black87, offset: Offset(1.0, 0), blurRadius: 0),
               Shadow(color: Colors.black87, offset: Offset(0, -1.0), blurRadius: 0),
               Shadow(color: Colors.black87, offset: Offset(0, 1.0), blurRadius: 0),
+              Shadow(color: Colors.black87, offset: Offset(-1.0, -1.0), blurRadius: 0),
+              Shadow(color: Colors.black87, offset: Offset(1.0, -1.0), blurRadius: 0),
+              Shadow(color: Colors.black87, offset: Offset(-1.0, 1.0), blurRadius: 0),
+              Shadow(color: Colors.black87, offset: Offset(1.0, 1.0), blurRadius: 0),
             ]
           : null,
     );

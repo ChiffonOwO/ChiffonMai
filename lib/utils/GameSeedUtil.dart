@@ -102,6 +102,93 @@ class GameSeedUtil {
     final offset = random.nextInt(11) - 5; // -5 to +5
     return (baseBlurLevel + offset).clamp(0, 100);
   }
+
+  /// 带 salt 的确定性随机源。
+  ///
+  /// 同一个 (房间, 回合, 曲目) 下往往需要**多个互不相关**的随机量
+  /// （例如 chartPeek 既要挑难度、又要挑片段窗口）。若共用同一个 seed，
+  /// 两个量会耦合在同一条随机序列上，改动其中一个的取值顺序就会让另一个也变。
+  /// 加盐后各管各的。
+  static Random seededRandom({
+    required String roomId,
+    required int roundNumber,
+    required String targetSongId,
+    String salt = '',
+  }) {
+    return Random('$roomId-$roundNumber-$targetSongId-$salt'.hashCode.abs());
+  }
+
+  /// 生成拼图揭示顺序（把 tileCount 个块洗牌成一条固定序列）
+  ///
+  /// 所有玩家用同一个种子 → 同一顺序，「你看到的已揭示块」与队友一致。
+  static List<int> generateTileRevealOrder({
+    required String roomId,
+    required int roundNumber,
+    required String targetSongId,
+    required int tileCount,
+  }) {
+    final order = List<int>.generate(tileCount, (i) => i);
+    order.shuffle(seededRandom(
+      roomId: roomId,
+      roundNumber: roundNumber,
+      targetSongId: targetSongId,
+      salt: 'tileReveal',
+    ));
+    return order;
+  }
+
+  /// 生成谱面片段窗口（chartPeek 模式）
+  ///
+  /// [totalDuration] 谱面总时长（秒），[clipLength] 片段长度（秒）。
+  /// 与单人谱面片段猜歌同一口径：片段不超出谱面，且至少留 1 秒余量。
+  static ClipWindow generateClipWindow({
+    required String roomId,
+    required int roundNumber,
+    required String targetSongId,
+    required double totalDuration,
+    required double clipLength,
+  }) {
+    final random = seededRandom(
+      roomId: roomId,
+      roundNumber: roundNumber,
+      targetSongId: targetSongId,
+      salt: 'chartPeekWindow',
+    );
+    final double latestStart = totalDuration - clipLength;
+    final double start = latestStart <= 0 ? 0.0 : random.nextDouble() * latestStart;
+    final double end = (start + clipLength).clamp(0.0, totalDuration);
+    return ClipWindow(start: start, end: end);
+  }
+
+  /// 从候选列表里确定性地挑一个（空列表返回 null）
+  ///
+  /// 用于 chartPeek 的「难度池 ∩ 定数范围」结果：所有玩家挑到同一个难度。
+  static String? pickDeterministic({
+    required String roomId,
+    required int roundNumber,
+    required String targetSongId,
+    required List<String> candidates,
+    String salt = '',
+  }) {
+    if (candidates.isEmpty) return null;
+    final random = seededRandom(
+      roomId: roomId,
+      roundNumber: roundNumber,
+      targetSongId: targetSongId,
+      salt: salt,
+    );
+    return candidates[random.nextInt(candidates.length)];
+  }
+}
+
+/// 谱面片段窗口（秒）
+class ClipWindow {
+  final double start;
+  final double end;
+
+  const ClipWindow({required this.start, required this.end});
+
+  double get length => end - start;
 }
 
 /// 曲绘截取区域

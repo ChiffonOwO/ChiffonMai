@@ -5,6 +5,8 @@ import 'Best50/Best50Page.dart';
 import 'Best50/DiffBest50Page.dart';
 import 'Best50/PersonalizedBest50Page.dart';
 import 'Best50/PersonalizedDiffBest50Page.dart';
+import 'Best50/CustomBest50Page.dart';
+import 'Best50/IdealBest50Page.dart';
 import 'RankingList/AvgScoreRankingListPage.dart';
 import 'RankingList/FittedRatingRankingListPage.dart';
 import 'RankingList/RatingRankListPage.dart';
@@ -41,7 +43,7 @@ class _Best50HubPageState extends State<Best50HubPage> {
             title: 'Best50 分析',
             icon: Icons.leaderboard_outlined,
             subtitle: '多维度 Best50 综合分析',
-            badgeCount: 4,
+            badgeCount: 6,
             children: [
               HubActionTile(
                 title: 'Best50',
@@ -75,6 +77,22 @@ class _Best50HubPageState extends State<Best50HubPage> {
                 onToggleFavorite: () => _toggleFavorite('个性化拟合 Best50'),
                 onTap: () => _open(context, const PersonalizedDiffBest50Page()),
               ),
+              HubActionTile(
+                title: '自定义 Best50',
+                subtitle: '手动填写 50 张成绩卡片',
+                icon: Icons.edit_note_rounded,
+                isFavorited: _isFavorited('自定义 Best50'),
+                onToggleFavorite: () => _toggleFavorite('自定义 Best50'),
+                onTap: () => _open(context, const CustomBest50Page()),
+              ),
+              HubActionTile(
+                title: '理想 Best50',
+                subtitle: '全员升一档后的 Best50 模拟',
+                icon: Icons.auto_fix_high_rounded,
+                isFavorited: _isFavorited('理想 Best50'),
+                onToggleFavorite: () => _toggleFavorite('理想 Best50'),
+                onTap: () => _open(context, const IdealBest50Page()),
+              ),
             ],
           ),
           const SizedBox(height: 24),
@@ -94,7 +112,7 @@ class _Best50HubPageState extends State<Best50HubPage> {
               ),
               HubActionTile(
                 title: '拟合总Rating排行榜',
-                subtitle: '查看拟合总 Rating 与官方 Best50 差值',
+                subtitle: '拟合总 Rating 站内排行',
                 icon: Icons.auto_graph_rounded,
                 isFavorited: _isFavorited('拟合总Rating排行榜'),
                 onToggleFavorite: () => _toggleFavorite('拟合总Rating排行榜'),
@@ -120,7 +138,7 @@ class _Best50HubPageState extends State<Best50HubPage> {
               ),
               HubActionTile(
                 title: '特殊排行榜',
-                subtitle: '发现有趣的玩家数据',
+                subtitle: 'BPM 55？BPM 339？！',
                 icon: Icons.workspace_premium_outlined,
                 isFavorited: _isFavorited('特殊排行榜'),
                 onToggleFavorite: () => _toggleFavorite('特殊排行榜'),

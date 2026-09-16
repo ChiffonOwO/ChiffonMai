@@ -7,6 +7,9 @@ import 'GuessChartGame/GuessChartByCoverPage.dart';
 import 'GuessChartGame/GuessChartByBlurredCoverPage.dart';
 import 'GuessChartGame/GuessChartBySongExcerptPage.dart';
 import 'GuessChartGame/GuessSongByOpenLettersPage.dart';
+import 'GuessChartGame/GuessChartByFlashCoverPage.dart';
+import 'GuessChartGame/GuessChartByTileRevealPage.dart';
+import 'GuessChartGame/GuessChartByChartPeekPage.dart';
 import 'Multiplayer/MultiplayerLobbyPage.dart';
 
 class GuessHubPage extends StatefulWidget {
@@ -39,7 +42,7 @@ class _GuessHubPageState extends State<GuessHubPage> {
             title: '单人猜歌',
             icon: Icons.lightbulb_outline_rounded,
             subtitle: '换个方式熟悉曲库',
-            badgeCount: 6,
+            badgeCount: 9,
             children: [
               HubActionTile(
                 title: '无提示猜歌',
@@ -88,6 +91,30 @@ class _GuessHubPageState extends State<GuessHubPage> {
                 isFavorited: _isFavorited('舞萌开字母'),
                 onToggleFavorite: () => _toggleFavorite('舞萌开字母'),
                 onTap: () => _open(context, const GuessSongByOpenLettersPage()),
+              ),
+              HubActionTile(
+                title: '曲绘快闪猜歌',
+                subtitle: '曲绘一闪而过，凭记忆猜歌',
+                icon: Icons.flash_on_outlined,
+                isFavorited: _isFavorited('曲绘快闪猜歌'),
+                onToggleFavorite: () => _toggleFavorite('曲绘快闪猜歌'),
+                onTap: () => _open(context, const GuessChartByFlashCoverPage()),
+              ),
+              HubActionTile(
+                title: '曲绘拼图猜歌',
+                subtitle: '曲绘碎块随时间逐步拼合显现',
+                icon: Icons.grid_on_outlined,
+                isFavorited: _isFavorited('曲绘拼图猜歌'),
+                onToggleFavorite: () => _toggleFavorite('曲绘拼图猜歌'),
+                onTap: () => _open(context, const GuessChartByTileRevealPage()),
+              ),
+              HubActionTile(
+                title: '谱面片段猜歌',
+                subtitle: '看一段无声谱面动画猜出歌曲',
+                icon: Icons.graphic_eq_outlined,
+                isFavorited: _isFavorited('谱面片段猜歌'),
+                onToggleFavorite: () => _toggleFavorite('谱面片段猜歌'),
+                onTap: () => _open(context, const GuessChartByChartPeekPage()),
               ),
             ],
           ),

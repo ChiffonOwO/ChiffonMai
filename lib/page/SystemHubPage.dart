@@ -38,7 +38,9 @@ import '../widgets/RefreshDataDialog.dart'
         showRefreshDataDialog,
         executeRefreshData,
         executeAdvancedRefreshData,
-        CurrentDataSourceNotifier;
+        CurrentDataSourceNotifier,
+        RefreshDataSource;
+import '../service/AccountSwitchService.dart';
 import '../widgets/AdvancedRefreshDataDialog.dart' show showAdvancedRefreshDataDialog;
 import '../constant/CacheKeyConstant.dart';
 import '../utils/FavoriteFeaturesNotifier.dart';
@@ -674,7 +676,8 @@ class _SystemHubPageState extends State<SystemHubPage> {
     });
     try {
       await UserProfileNotifier.clearShuiyuAccountCache();
-      await CurrentDataSourceNotifier.load();
+      // 双账号：清掉水鱼账号存档；若当前正是水鱼则回落到落雪（有缓存时）
+      await AccountSwitchService.onAccountLoggedOut(RefreshDataSource.shuiyu);
       if (!mounted) return;
       LoginStateNotifier.setLoggedIn(false);
       Fluttertoast.showToast(msg: '已登出水鱼账号');

@@ -1,0 +1,5364 @@
+{
+  "info": {
+    "room_created": {
+      "room": {
+        "id": "8d78f8fe-982f-4792-8f5f-5a58669df965",
+        "code": "344539",
+        "gameType": "info",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "2b24d1a3-dbd9-4d00-8b31-bc03b52d93ef",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "2b24d1a3-dbd9-4d00-8b31-bc03b52d93ef",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493076845,
+        "lastActivityAt": 1789493076845,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      }
+    },
+    "room_joined": {
+      "room": {
+        "id": "8d78f8fe-982f-4792-8f5f-5a58669df965",
+        "code": "344539",
+        "gameType": "info",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "2b24d1a3-dbd9-4d00-8b31-bc03b52d93ef",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          },
+          {
+            "id": "5ded13bf-32b4-491f-a58c-f0688bb431ea",
+            "nickname": "采集2",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": false,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "2b24d1a3-dbd9-4d00-8b31-bc03b52d93ef",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493076845,
+        "lastActivityAt": 1789493076888,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      },
+      "player": {
+        "id": "5ded13bf-32b4-491f-a58c-f0688bb431ea",
+        "nickname": "采集2",
+        "ready": false,
+        "score": 0,
+        "surrendered": false
+      }
+    },
+    "round_start": {
+      "gameState": {
+        "roomId": "8d78f8fe-982f-4792-8f5f-5a58669df965",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 0,
+        "currentSong": {
+          "id": "11469",
+          "title": "\"411Ψ892\"",
+          "type": "DX",
+          "ds": [
+            5,
+            8.7,
+            12.7,
+            14.3
+          ],
+          "level": [
+            "5",
+            "8+",
+            "12+",
+            "14"
+          ],
+          "cids": [
+            7921,
+            7922,
+            7923,
+            7924
+          ],
+          "charts": [
+            {
+              "notes": [
+                179,
+                15,
+                4,
+                21,
+                8
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                298,
+                31,
+                12,
+                31,
+                10
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                416,
+                53,
+                52,
+                25,
+                85
+              ],
+              "charter": "ロシェ@ペンギン"
+            },
+            {
+              "notes": [
+                664,
+                53,
+                86,
+                39,
+                103
+              ],
+              "charter": "サファ太 vs じゃこレモン"
+            }
+          ],
+          "basic_info": {
+            "title": "\"411Ψ892\"",
+            "artist": "Tanchiky",
+            "genre": "舞萌",
+            "bpm": 184,
+            "release_date": "",
+            "from": "maimai でらっくす FESTiVAL",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "11469",
+            "title": "\"411Ψ892\"",
+            "type": "DX",
+            "ds": [
+              5,
+              8.7,
+              12.7,
+              14.3
+            ],
+            "level": [
+              "5",
+              "8+",
+              "12+",
+              "14"
+            ],
+            "cids": [
+              7921,
+              7922,
+              7923,
+              7924
+            ],
+            "charts": [
+              {
+                "notes": [
+                  179,
+                  15,
+                  4,
+                  21,
+                  8
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  298,
+                  31,
+                  12,
+                  31,
+                  10
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  416,
+                  53,
+                  52,
+                  25,
+                  85
+                ],
+                "charter": "ロシェ@ペンギン"
+              },
+              {
+                "notes": [
+                  664,
+                  53,
+                  86,
+                  39,
+                  103
+                ],
+                "charter": "サファ太 vs じゃこレモン"
+              }
+            ],
+            "basic_info": {
+              "title": "\"411Ψ892\"",
+              "artist": "Tanchiky",
+              "genre": "舞萌",
+              "bpm": 184,
+              "release_date": "",
+              "from": "maimai でらっくす FESTiVAL",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [],
+        "foundSongIds": [],
+        "guesses": [],
+        "players": [
+          {
+            "id": "2b24d1a3-dbd9-4d00-8b31-bc03b52d93ef",
+            "nickname": "报文采集",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          },
+          {
+            "id": "5ded13bf-32b4-491f-a58c-f0688bb431ea",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": false,
+        "isGameOver": false
+      }
+    }
+  },
+  "info_wrong_guess": {
+    "action": "guess_received",
+    "payload": {
+      "guess": {
+        "playerId": "2b24d1a3-dbd9-4d00-8b31-bc03b52d93ef",
+        "playerNickname": "报文采集",
+        "songId": "__wrong__",
+        "songName": "___不存在___",
+        "correct": false,
+        "score": 0,
+        "timeSpent": 0.021
+      }
+    }
+  },
+  "info_right_guess": {
+    "action": "guess_received",
+    "payload": {
+      "guess": {
+        "playerId": "2b24d1a3-dbd9-4d00-8b31-bc03b52d93ef",
+        "playerNickname": "报文采集",
+        "songId": "11469",
+        "songName": "\"411Ψ892\"",
+        "correct": true,
+        "score": 100,
+        "timeSpent": 0.041,
+        "matchedSongId": "11469"
+      }
+    }
+  },
+  "info_round_over": {
+    "action": "round_over",
+    "payload": {
+      "gameState": {
+        "roomId": "8d78f8fe-982f-4792-8f5f-5a58669df965",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 2,
+        "currentSong": {
+          "id": "11469",
+          "title": "\"411Ψ892\"",
+          "type": "DX",
+          "ds": [
+            5,
+            8.7,
+            12.7,
+            14.3
+          ],
+          "level": [
+            "5",
+            "8+",
+            "12+",
+            "14"
+          ],
+          "cids": [
+            7921,
+            7922,
+            7923,
+            7924
+          ],
+          "charts": [
+            {
+              "notes": [
+                179,
+                15,
+                4,
+                21,
+                8
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                298,
+                31,
+                12,
+                31,
+                10
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                416,
+                53,
+                52,
+                25,
+                85
+              ],
+              "charter": "ロシェ@ペンギン"
+            },
+            {
+              "notes": [
+                664,
+                53,
+                86,
+                39,
+                103
+              ],
+              "charter": "サファ太 vs じゃこレモン"
+            }
+          ],
+          "basic_info": {
+            "title": "\"411Ψ892\"",
+            "artist": "Tanchiky",
+            "genre": "舞萌",
+            "bpm": 184,
+            "release_date": "",
+            "from": "maimai でらっくす FESTiVAL",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "11469",
+            "title": "\"411Ψ892\"",
+            "type": "DX",
+            "ds": [
+              5,
+              8.7,
+              12.7,
+              14.3
+            ],
+            "level": [
+              "5",
+              "8+",
+              "12+",
+              "14"
+            ],
+            "cids": [
+              7921,
+              7922,
+              7923,
+              7924
+            ],
+            "charts": [
+              {
+                "notes": [
+                  179,
+                  15,
+                  4,
+                  21,
+                  8
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  298,
+                  31,
+                  12,
+                  31,
+                  10
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  416,
+                  53,
+                  52,
+                  25,
+                  85
+                ],
+                "charter": "ロシェ@ペンギン"
+              },
+              {
+                "notes": [
+                  664,
+                  53,
+                  86,
+                  39,
+                  103
+                ],
+                "charter": "サファ太 vs じゃこレモン"
+              }
+            ],
+            "basic_info": {
+              "title": "\"411Ψ892\"",
+              "artist": "Tanchiky",
+              "genre": "舞萌",
+              "bpm": 184,
+              "release_date": "",
+              "from": "maimai でらっくす FESTiVAL",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [],
+        "foundSongIds": [],
+        "guesses": [
+          {
+            "playerId": "2b24d1a3-dbd9-4d00-8b31-bc03b52d93ef",
+            "playerNickname": "报文采集",
+            "songId": "__wrong__",
+            "songName": "___不存在___",
+            "correct": false,
+            "score": 0,
+            "timeSpent": 0.021
+          },
+          {
+            "playerId": "2b24d1a3-dbd9-4d00-8b31-bc03b52d93ef",
+            "playerNickname": "报文采集",
+            "songId": "11469",
+            "songName": "\"411Ψ892\"",
+            "correct": true,
+            "score": 100,
+            "timeSpent": 0.041,
+            "matchedSongId": "11469"
+          }
+        ],
+        "players": [
+          {
+            "id": "2b24d1a3-dbd9-4d00-8b31-bc03b52d93ef",
+            "nickname": "报文采集",
+            "score": 100,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 2
+          },
+          {
+            "id": "5ded13bf-32b4-491f-a58c-f0688bb431ea",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": true,
+        "isGameOver": false
+      }
+    }
+  },
+  "cover": {
+    "room_created": {
+      "room": {
+        "id": "85abae3f-2146-4842-bde8-0a12ed0732fc",
+        "code": "151044",
+        "gameType": "cover",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "6e0d8e96-c02f-41b0-8b44-1f3bf712a2b3",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "6e0d8e96-c02f-41b0-8b44-1f3bf712a2b3",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493077919,
+        "lastActivityAt": 1789493077919,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      }
+    },
+    "room_joined": {
+      "room": {
+        "id": "85abae3f-2146-4842-bde8-0a12ed0732fc",
+        "code": "151044",
+        "gameType": "cover",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "6e0d8e96-c02f-41b0-8b44-1f3bf712a2b3",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          },
+          {
+            "id": "327d38e0-8091-4f4d-8e1d-d000dfbf5fc4",
+            "nickname": "采集2",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": false,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "6e0d8e96-c02f-41b0-8b44-1f3bf712a2b3",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493077919,
+        "lastActivityAt": 1789493077964,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      },
+      "player": {
+        "id": "327d38e0-8091-4f4d-8e1d-d000dfbf5fc4",
+        "nickname": "采集2",
+        "ready": false,
+        "score": 0,
+        "surrendered": false
+      }
+    },
+    "round_start": {
+      "gameState": {
+        "roomId": "85abae3f-2146-4842-bde8-0a12ed0732fc",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 0,
+        "currentSong": {
+          "id": "437",
+          "title": "Yet Another ”drizzly rain”",
+          "type": "SD",
+          "ds": [
+            4,
+            7.6,
+            10.4,
+            12.6
+          ],
+          "level": [
+            "4",
+            "7+",
+            "10",
+            "12+"
+          ],
+          "cids": [
+            1094,
+            1095,
+            1096,
+            1097
+          ],
+          "charts": [
+            {
+              "notes": [
+                134,
+                4,
+                8,
+                6
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                286,
+                16,
+                8,
+                4
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                348,
+                25,
+                43,
+                20
+              ],
+              "charter": "ぴちネコ"
+            },
+            {
+              "notes": [
+                467,
+                35,
+                72,
+                23
+              ],
+              "charter": "某S氏"
+            }
+          ],
+          "basic_info": {
+            "title": "Yet Another ”drizzly rain”",
+            "artist": "myu314 feat.あまね(COOL&CREATE)",
+            "genre": "东方Project",
+            "bpm": 175,
+            "release_date": "",
+            "from": "maimai ORANGE PLUS",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "437",
+            "title": "Yet Another ”drizzly rain”",
+            "type": "SD",
+            "ds": [
+              4,
+              7.6,
+              10.4,
+              12.6
+            ],
+            "level": [
+              "4",
+              "7+",
+              "10",
+              "12+"
+            ],
+            "cids": [
+              1094,
+              1095,
+              1096,
+              1097
+            ],
+            "charts": [
+              {
+                "notes": [
+                  134,
+                  4,
+                  8,
+                  6
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  286,
+                  16,
+                  8,
+                  4
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  348,
+                  25,
+                  43,
+                  20
+                ],
+                "charter": "ぴちネコ"
+              },
+              {
+                "notes": [
+                  467,
+                  35,
+                  72,
+                  23
+                ],
+                "charter": "某S氏"
+              }
+            ],
+            "basic_info": {
+              "title": "Yet Another ”drizzly rain”",
+              "artist": "myu314 feat.あまね(COOL&CREATE)",
+              "genre": "东方Project",
+              "bpm": 175,
+              "release_date": "",
+              "from": "maimai ORANGE PLUS",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [],
+        "foundSongIds": [],
+        "guesses": [],
+        "players": [
+          {
+            "id": "6e0d8e96-c02f-41b0-8b44-1f3bf712a2b3",
+            "nickname": "报文采集",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          },
+          {
+            "id": "327d38e0-8091-4f4d-8e1d-d000dfbf5fc4",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": false,
+        "isGameOver": false
+      }
+    }
+  },
+  "cover_wrong_guess": {
+    "action": "guess_received",
+    "payload": {
+      "guess": {
+        "playerId": "6e0d8e96-c02f-41b0-8b44-1f3bf712a2b3",
+        "playerNickname": "报文采集",
+        "songId": "__wrong__",
+        "songName": "___不存在___",
+        "correct": false,
+        "score": 0,
+        "timeSpent": 0.021
+      }
+    }
+  },
+  "cover_right_guess": {
+    "action": "guess_received",
+    "payload": {
+      "guess": {
+        "playerId": "6e0d8e96-c02f-41b0-8b44-1f3bf712a2b3",
+        "playerNickname": "报文采集",
+        "songId": "437",
+        "songName": "Yet Another ”drizzly rain”",
+        "correct": true,
+        "score": 100,
+        "timeSpent": 0.042,
+        "matchedSongId": "437"
+      }
+    }
+  },
+  "cover_round_over": {
+    "action": "round_over",
+    "payload": {
+      "gameState": {
+        "roomId": "85abae3f-2146-4842-bde8-0a12ed0732fc",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 2,
+        "currentSong": {
+          "id": "437",
+          "title": "Yet Another ”drizzly rain”",
+          "type": "SD",
+          "ds": [
+            4,
+            7.6,
+            10.4,
+            12.6
+          ],
+          "level": [
+            "4",
+            "7+",
+            "10",
+            "12+"
+          ],
+          "cids": [
+            1094,
+            1095,
+            1096,
+            1097
+          ],
+          "charts": [
+            {
+              "notes": [
+                134,
+                4,
+                8,
+                6
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                286,
+                16,
+                8,
+                4
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                348,
+                25,
+                43,
+                20
+              ],
+              "charter": "ぴちネコ"
+            },
+            {
+              "notes": [
+                467,
+                35,
+                72,
+                23
+              ],
+              "charter": "某S氏"
+            }
+          ],
+          "basic_info": {
+            "title": "Yet Another ”drizzly rain”",
+            "artist": "myu314 feat.あまね(COOL&CREATE)",
+            "genre": "东方Project",
+            "bpm": 175,
+            "release_date": "",
+            "from": "maimai ORANGE PLUS",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "437",
+            "title": "Yet Another ”drizzly rain”",
+            "type": "SD",
+            "ds": [
+              4,
+              7.6,
+              10.4,
+              12.6
+            ],
+            "level": [
+              "4",
+              "7+",
+              "10",
+              "12+"
+            ],
+            "cids": [
+              1094,
+              1095,
+              1096,
+              1097
+            ],
+            "charts": [
+              {
+                "notes": [
+                  134,
+                  4,
+                  8,
+                  6
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  286,
+                  16,
+                  8,
+                  4
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  348,
+                  25,
+                  43,
+                  20
+                ],
+                "charter": "ぴちネコ"
+              },
+              {
+                "notes": [
+                  467,
+                  35,
+                  72,
+                  23
+                ],
+                "charter": "某S氏"
+              }
+            ],
+            "basic_info": {
+              "title": "Yet Another ”drizzly rain”",
+              "artist": "myu314 feat.あまね(COOL&CREATE)",
+              "genre": "东方Project",
+              "bpm": 175,
+              "release_date": "",
+              "from": "maimai ORANGE PLUS",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [],
+        "foundSongIds": [],
+        "guesses": [
+          {
+            "playerId": "6e0d8e96-c02f-41b0-8b44-1f3bf712a2b3",
+            "playerNickname": "报文采集",
+            "songId": "__wrong__",
+            "songName": "___不存在___",
+            "correct": false,
+            "score": 0,
+            "timeSpent": 0.021
+          },
+          {
+            "playerId": "6e0d8e96-c02f-41b0-8b44-1f3bf712a2b3",
+            "playerNickname": "报文采集",
+            "songId": "437",
+            "songName": "Yet Another ”drizzly rain”",
+            "correct": true,
+            "score": 100,
+            "timeSpent": 0.042,
+            "matchedSongId": "437"
+          }
+        ],
+        "players": [
+          {
+            "id": "6e0d8e96-c02f-41b0-8b44-1f3bf712a2b3",
+            "nickname": "报文采集",
+            "score": 100,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 2
+          },
+          {
+            "id": "327d38e0-8091-4f4d-8e1d-d000dfbf5fc4",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": true,
+        "isGameOver": false
+      }
+    }
+  },
+  "blurred": {
+    "room_created": {
+      "room": {
+        "id": "5da1e67c-795d-4bfa-9d5a-f76a62855d41",
+        "code": "992608",
+        "gameType": "blurred",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "e97c3d1d-bbf3-4dc8-b4ce-5ed9f21d2018",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "e97c3d1d-bbf3-4dc8-b4ce-5ed9f21d2018",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493078994,
+        "lastActivityAt": 1789493078994,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      }
+    },
+    "room_joined": {
+      "room": {
+        "id": "5da1e67c-795d-4bfa-9d5a-f76a62855d41",
+        "code": "992608",
+        "gameType": "blurred",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "e97c3d1d-bbf3-4dc8-b4ce-5ed9f21d2018",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          },
+          {
+            "id": "0812bf81-e1a6-4951-9df8-c33907849fae",
+            "nickname": "采集2",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": false,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "e97c3d1d-bbf3-4dc8-b4ce-5ed9f21d2018",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493078994,
+        "lastActivityAt": 1789493079037,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      },
+      "player": {
+        "id": "0812bf81-e1a6-4951-9df8-c33907849fae",
+        "nickname": "采集2",
+        "ready": false,
+        "score": 0,
+        "surrendered": false
+      }
+    },
+    "round_start": {
+      "gameState": {
+        "roomId": "5da1e67c-795d-4bfa-9d5a-f76a62855d41",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 0,
+        "currentSong": {
+          "id": "494",
+          "title": "CITRUS MONSTER",
+          "type": "SD",
+          "ds": [
+            7,
+            9.3,
+            12.9,
+            14.5
+          ],
+          "level": [
+            "7",
+            "9",
+            "12+",
+            "14"
+          ],
+          "cids": [
+            1210,
+            1211,
+            1212,
+            1213
+          ],
+          "charts": [
+            {
+              "notes": [
+                281,
+                18,
+                4,
+                5
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                394,
+                25,
+                9,
+                4
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                499,
+                73,
+                52,
+                24
+              ],
+              "charter": "ぴちネコ"
+            },
+            {
+              "notes": [
+                817,
+                48,
+                122,
+                45
+              ],
+              "charter": "ロシェ@ペンギン"
+            }
+          ],
+          "basic_info": {
+            "title": "CITRUS MONSTER",
+            "artist": "D-Cee",
+            "genre": "舞萌",
+            "bpm": 220,
+            "release_date": "",
+            "from": "maimai PiNK PLUS",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "494",
+            "title": "CITRUS MONSTER",
+            "type": "SD",
+            "ds": [
+              7,
+              9.3,
+              12.9,
+              14.5
+            ],
+            "level": [
+              "7",
+              "9",
+              "12+",
+              "14"
+            ],
+            "cids": [
+              1210,
+              1211,
+              1212,
+              1213
+            ],
+            "charts": [
+              {
+                "notes": [
+                  281,
+                  18,
+                  4,
+                  5
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  394,
+                  25,
+                  9,
+                  4
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  499,
+                  73,
+                  52,
+                  24
+                ],
+                "charter": "ぴちネコ"
+              },
+              {
+                "notes": [
+                  817,
+                  48,
+                  122,
+                  45
+                ],
+                "charter": "ロシェ@ペンギン"
+              }
+            ],
+            "basic_info": {
+              "title": "CITRUS MONSTER",
+              "artist": "D-Cee",
+              "genre": "舞萌",
+              "bpm": 220,
+              "release_date": "",
+              "from": "maimai PiNK PLUS",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [],
+        "foundSongIds": [],
+        "guesses": [],
+        "players": [
+          {
+            "id": "e97c3d1d-bbf3-4dc8-b4ce-5ed9f21d2018",
+            "nickname": "报文采集",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          },
+          {
+            "id": "0812bf81-e1a6-4951-9df8-c33907849fae",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": false,
+        "isGameOver": false
+      }
+    }
+  },
+  "blurred_wrong_guess": {
+    "action": "guess_received",
+    "payload": {
+      "guess": {
+        "playerId": "e97c3d1d-bbf3-4dc8-b4ce-5ed9f21d2018",
+        "playerNickname": "报文采集",
+        "songId": "__wrong__",
+        "songName": "___不存在___",
+        "correct": false,
+        "score": 0,
+        "timeSpent": 0.019
+      }
+    }
+  },
+  "blurred_right_guess": {
+    "action": "guess_received",
+    "payload": {
+      "guess": {
+        "playerId": "e97c3d1d-bbf3-4dc8-b4ce-5ed9f21d2018",
+        "playerNickname": "报文采集",
+        "songId": "494",
+        "songName": "CITRUS MONSTER",
+        "correct": true,
+        "score": 100,
+        "timeSpent": 0.04,
+        "matchedSongId": "494"
+      }
+    }
+  },
+  "blurred_round_over": {
+    "action": "round_over",
+    "payload": {
+      "gameState": {
+        "roomId": "5da1e67c-795d-4bfa-9d5a-f76a62855d41",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 2,
+        "currentSong": {
+          "id": "494",
+          "title": "CITRUS MONSTER",
+          "type": "SD",
+          "ds": [
+            7,
+            9.3,
+            12.9,
+            14.5
+          ],
+          "level": [
+            "7",
+            "9",
+            "12+",
+            "14"
+          ],
+          "cids": [
+            1210,
+            1211,
+            1212,
+            1213
+          ],
+          "charts": [
+            {
+              "notes": [
+                281,
+                18,
+                4,
+                5
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                394,
+                25,
+                9,
+                4
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                499,
+                73,
+                52,
+                24
+              ],
+              "charter": "ぴちネコ"
+            },
+            {
+              "notes": [
+                817,
+                48,
+                122,
+                45
+              ],
+              "charter": "ロシェ@ペンギン"
+            }
+          ],
+          "basic_info": {
+            "title": "CITRUS MONSTER",
+            "artist": "D-Cee",
+            "genre": "舞萌",
+            "bpm": 220,
+            "release_date": "",
+            "from": "maimai PiNK PLUS",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "494",
+            "title": "CITRUS MONSTER",
+            "type": "SD",
+            "ds": [
+              7,
+              9.3,
+              12.9,
+              14.5
+            ],
+            "level": [
+              "7",
+              "9",
+              "12+",
+              "14"
+            ],
+            "cids": [
+              1210,
+              1211,
+              1212,
+              1213
+            ],
+            "charts": [
+              {
+                "notes": [
+                  281,
+                  18,
+                  4,
+                  5
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  394,
+                  25,
+                  9,
+                  4
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  499,
+                  73,
+                  52,
+                  24
+                ],
+                "charter": "ぴちネコ"
+              },
+              {
+                "notes": [
+                  817,
+                  48,
+                  122,
+                  45
+                ],
+                "charter": "ロシェ@ペンギン"
+              }
+            ],
+            "basic_info": {
+              "title": "CITRUS MONSTER",
+              "artist": "D-Cee",
+              "genre": "舞萌",
+              "bpm": 220,
+              "release_date": "",
+              "from": "maimai PiNK PLUS",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [],
+        "foundSongIds": [],
+        "guesses": [
+          {
+            "playerId": "e97c3d1d-bbf3-4dc8-b4ce-5ed9f21d2018",
+            "playerNickname": "报文采集",
+            "songId": "__wrong__",
+            "songName": "___不存在___",
+            "correct": false,
+            "score": 0,
+            "timeSpent": 0.019
+          },
+          {
+            "playerId": "e97c3d1d-bbf3-4dc8-b4ce-5ed9f21d2018",
+            "playerNickname": "报文采集",
+            "songId": "494",
+            "songName": "CITRUS MONSTER",
+            "correct": true,
+            "score": 100,
+            "timeSpent": 0.04,
+            "matchedSongId": "494"
+          }
+        ],
+        "players": [
+          {
+            "id": "e97c3d1d-bbf3-4dc8-b4ce-5ed9f21d2018",
+            "nickname": "报文采集",
+            "score": 100,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 2
+          },
+          {
+            "id": "0812bf81-e1a6-4951-9df8-c33907849fae",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": true,
+        "isGameOver": false
+      }
+    }
+  },
+  "audio": {
+    "room_created": {
+      "room": {
+        "id": "199fde42-0dca-4f9e-8707-a2c1202fa00e",
+        "code": "454745",
+        "gameType": "audio",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "d0383ea6-1806-4e12-96f8-965c03c5d52c",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "d0383ea6-1806-4e12-96f8-965c03c5d52c",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493080062,
+        "lastActivityAt": 1789493080062,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      }
+    },
+    "room_joined": {
+      "room": {
+        "id": "199fde42-0dca-4f9e-8707-a2c1202fa00e",
+        "code": "454745",
+        "gameType": "audio",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "d0383ea6-1806-4e12-96f8-965c03c5d52c",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          },
+          {
+            "id": "3baba42e-f4e7-4f4b-90f2-feafa6ef21fa",
+            "nickname": "采集2",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": false,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "d0383ea6-1806-4e12-96f8-965c03c5d52c",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493080062,
+        "lastActivityAt": 1789493080104,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      },
+      "player": {
+        "id": "3baba42e-f4e7-4f4b-90f2-feafa6ef21fa",
+        "nickname": "采集2",
+        "ready": false,
+        "score": 0,
+        "surrendered": false
+      }
+    },
+    "round_start": {
+      "gameState": {
+        "roomId": "199fde42-0dca-4f9e-8707-a2c1202fa00e",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 0,
+        "currentSong": {
+          "id": "11266",
+          "title": "キラメキ居残り大戦争",
+          "type": "DX",
+          "ds": [
+            4,
+            7.5,
+            10.8,
+            13.2
+          ],
+          "level": [
+            "4",
+            "7",
+            "10+",
+            "13"
+          ],
+          "cids": [
+            6275,
+            6276,
+            6277,
+            6278
+          ],
+          "charts": [
+            {
+              "notes": [
+                136,
+                17,
+                2,
+                16,
+                2
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                270,
+                42,
+                24,
+                22,
+                8
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                434,
+                48,
+                29,
+                25,
+                32
+              ],
+              "charter": "サファ太"
+            },
+            {
+              "notes": [
+                536,
+                38,
+                135,
+                41,
+                48
+              ],
+              "charter": "はっぴー"
+            }
+          ],
+          "basic_info": {
+            "title": "キラメキ居残り大戦争",
+            "artist": "森羅万象",
+            "genre": "其他游戏",
+            "bpm": 212,
+            "release_date": "",
+            "from": "maimai でらっくす UNiVERSE",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "11266",
+            "title": "キラメキ居残り大戦争",
+            "type": "DX",
+            "ds": [
+              4,
+              7.5,
+              10.8,
+              13.2
+            ],
+            "level": [
+              "4",
+              "7",
+              "10+",
+              "13"
+            ],
+            "cids": [
+              6275,
+              6276,
+              6277,
+              6278
+            ],
+            "charts": [
+              {
+                "notes": [
+                  136,
+                  17,
+                  2,
+                  16,
+                  2
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  270,
+                  42,
+                  24,
+                  22,
+                  8
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  434,
+                  48,
+                  29,
+                  25,
+                  32
+                ],
+                "charter": "サファ太"
+              },
+              {
+                "notes": [
+                  536,
+                  38,
+                  135,
+                  41,
+                  48
+                ],
+                "charter": "はっぴー"
+              }
+            ],
+            "basic_info": {
+              "title": "キラメキ居残り大戦争",
+              "artist": "森羅万象",
+              "genre": "其他游戏",
+              "bpm": 212,
+              "release_date": "",
+              "from": "maimai でらっくす UNiVERSE",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [],
+        "foundSongIds": [],
+        "guesses": [],
+        "players": [
+          {
+            "id": "d0383ea6-1806-4e12-96f8-965c03c5d52c",
+            "nickname": "报文采集",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          },
+          {
+            "id": "3baba42e-f4e7-4f4b-90f2-feafa6ef21fa",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": false,
+        "isGameOver": false
+      }
+    }
+  },
+  "audio_wrong_guess": {
+    "action": "guess_received",
+    "payload": {
+      "guess": {
+        "playerId": "d0383ea6-1806-4e12-96f8-965c03c5d52c",
+        "playerNickname": "报文采集",
+        "songId": "__wrong__",
+        "songName": "___不存在___",
+        "correct": false,
+        "score": 0,
+        "timeSpent": 0.02
+      }
+    }
+  },
+  "audio_right_guess": {
+    "action": "guess_received",
+    "payload": {
+      "guess": {
+        "playerId": "d0383ea6-1806-4e12-96f8-965c03c5d52c",
+        "playerNickname": "报文采集",
+        "songId": "11266",
+        "songName": "キラメキ居残り大戦争",
+        "correct": true,
+        "score": 100,
+        "timeSpent": 0.041,
+        "matchedSongId": "11266"
+      }
+    }
+  },
+  "audio_round_over": {
+    "action": "round_over",
+    "payload": {
+      "gameState": {
+        "roomId": "199fde42-0dca-4f9e-8707-a2c1202fa00e",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 2,
+        "currentSong": {
+          "id": "11266",
+          "title": "キラメキ居残り大戦争",
+          "type": "DX",
+          "ds": [
+            4,
+            7.5,
+            10.8,
+            13.2
+          ],
+          "level": [
+            "4",
+            "7",
+            "10+",
+            "13"
+          ],
+          "cids": [
+            6275,
+            6276,
+            6277,
+            6278
+          ],
+          "charts": [
+            {
+              "notes": [
+                136,
+                17,
+                2,
+                16,
+                2
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                270,
+                42,
+                24,
+                22,
+                8
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                434,
+                48,
+                29,
+                25,
+                32
+              ],
+              "charter": "サファ太"
+            },
+            {
+              "notes": [
+                536,
+                38,
+                135,
+                41,
+                48
+              ],
+              "charter": "はっぴー"
+            }
+          ],
+          "basic_info": {
+            "title": "キラメキ居残り大戦争",
+            "artist": "森羅万象",
+            "genre": "其他游戏",
+            "bpm": 212,
+            "release_date": "",
+            "from": "maimai でらっくす UNiVERSE",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "11266",
+            "title": "キラメキ居残り大戦争",
+            "type": "DX",
+            "ds": [
+              4,
+              7.5,
+              10.8,
+              13.2
+            ],
+            "level": [
+              "4",
+              "7",
+              "10+",
+              "13"
+            ],
+            "cids": [
+              6275,
+              6276,
+              6277,
+              6278
+            ],
+            "charts": [
+              {
+                "notes": [
+                  136,
+                  17,
+                  2,
+                  16,
+                  2
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  270,
+                  42,
+                  24,
+                  22,
+                  8
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  434,
+                  48,
+                  29,
+                  25,
+                  32
+                ],
+                "charter": "サファ太"
+              },
+              {
+                "notes": [
+                  536,
+                  38,
+                  135,
+                  41,
+                  48
+                ],
+                "charter": "はっぴー"
+              }
+            ],
+            "basic_info": {
+              "title": "キラメキ居残り大戦争",
+              "artist": "森羅万象",
+              "genre": "其他游戏",
+              "bpm": 212,
+              "release_date": "",
+              "from": "maimai でらっくす UNiVERSE",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [],
+        "foundSongIds": [],
+        "guesses": [
+          {
+            "playerId": "d0383ea6-1806-4e12-96f8-965c03c5d52c",
+            "playerNickname": "报文采集",
+            "songId": "__wrong__",
+            "songName": "___不存在___",
+            "correct": false,
+            "score": 0,
+            "timeSpent": 0.02
+          },
+          {
+            "playerId": "d0383ea6-1806-4e12-96f8-965c03c5d52c",
+            "playerNickname": "报文采集",
+            "songId": "11266",
+            "songName": "キラメキ居残り大戦争",
+            "correct": true,
+            "score": 100,
+            "timeSpent": 0.041,
+            "matchedSongId": "11266"
+          }
+        ],
+        "players": [
+          {
+            "id": "d0383ea6-1806-4e12-96f8-965c03c5d52c",
+            "nickname": "报文采集",
+            "score": 100,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 2
+          },
+          {
+            "id": "3baba42e-f4e7-4f4b-90f2-feafa6ef21fa",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": true,
+        "isGameOver": false
+      }
+    }
+  },
+  "alia": {
+    "room_created": {
+      "room": {
+        "id": "9645bcc1-ce2a-4303-87e6-07857d8aa976",
+        "code": "538382",
+        "gameType": "alia",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "b169e1ba-f998-4260-81f2-ba24c3b538a0",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "b169e1ba-f998-4260-81f2-ba24c3b538a0",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493081128,
+        "lastActivityAt": 1789493081128,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      }
+    },
+    "room_joined": {
+      "room": {
+        "id": "9645bcc1-ce2a-4303-87e6-07857d8aa976",
+        "code": "538382",
+        "gameType": "alia",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "b169e1ba-f998-4260-81f2-ba24c3b538a0",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          },
+          {
+            "id": "112c7113-d549-42b1-984c-ee721e1cc212",
+            "nickname": "采集2",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": false,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "b169e1ba-f998-4260-81f2-ba24c3b538a0",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493081128,
+        "lastActivityAt": 1789493081172,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      },
+      "player": {
+        "id": "112c7113-d549-42b1-984c-ee721e1cc212",
+        "nickname": "采集2",
+        "ready": false,
+        "score": 0,
+        "surrendered": false
+      }
+    },
+    "round_start": {
+      "gameState": {
+        "roomId": "9645bcc1-ce2a-4303-87e6-07857d8aa976",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 0,
+        "currentSong": {
+          "id": "11597",
+          "title": "ノンブレス・オブリージュ",
+          "type": "DX",
+          "ds": [
+            3,
+            7.2,
+            10,
+            13.1
+          ],
+          "level": [
+            "3",
+            "7",
+            "10",
+            "13"
+          ],
+          "cids": [
+            8407,
+            8408,
+            8409,
+            8410
+          ],
+          "charts": [
+            {
+              "notes": [
+                109,
+                9,
+                4,
+                16,
+                3
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                227,
+                11,
+                8,
+                25,
+                8
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                241,
+                38,
+                26,
+                25,
+                15
+              ],
+              "charter": "鳩ホルダー"
+            },
+            {
+              "notes": [
+                102,
+                281,
+                39,
+                15,
+                28
+              ],
+              "charter": "はっぴー"
+            }
+          ],
+          "basic_info": {
+            "title": "ノンブレス・オブリージュ",
+            "artist": "ピノキオピー",
+            "genre": "niconico & VOCALOID",
+            "bpm": 148,
+            "release_date": "",
+            "from": "maimai でらっくす BUDDiES",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "11597",
+            "title": "ノンブレス・オブリージュ",
+            "type": "DX",
+            "ds": [
+              3,
+              7.2,
+              10,
+              13.1
+            ],
+            "level": [
+              "3",
+              "7",
+              "10",
+              "13"
+            ],
+            "cids": [
+              8407,
+              8408,
+              8409,
+              8410
+            ],
+            "charts": [
+              {
+                "notes": [
+                  109,
+                  9,
+                  4,
+                  16,
+                  3
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  227,
+                  11,
+                  8,
+                  25,
+                  8
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  241,
+                  38,
+                  26,
+                  25,
+                  15
+                ],
+                "charter": "鳩ホルダー"
+              },
+              {
+                "notes": [
+                  102,
+                  281,
+                  39,
+                  15,
+                  28
+                ],
+                "charter": "はっぴー"
+              }
+            ],
+            "basic_info": {
+              "title": "ノンブレス・オブリージュ",
+              "artist": "ピノキオピー",
+              "genre": "niconico & VOCALOID",
+              "bpm": 148,
+              "release_date": "",
+              "from": "maimai でらっくす BUDDiES",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [],
+        "foundSongIds": [],
+        "guesses": [],
+        "players": [
+          {
+            "id": "b169e1ba-f998-4260-81f2-ba24c3b538a0",
+            "nickname": "报文采集",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          },
+          {
+            "id": "112c7113-d549-42b1-984c-ee721e1cc212",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": false,
+        "isGameOver": false
+      }
+    }
+  },
+  "alia_wrong_guess": {
+    "action": "guess_received",
+    "payload": {
+      "guess": {
+        "playerId": "b169e1ba-f998-4260-81f2-ba24c3b538a0",
+        "playerNickname": "报文采集",
+        "songId": "__wrong__",
+        "songName": "___不存在___",
+        "correct": false,
+        "score": 0,
+        "timeSpent": 0.022
+      }
+    }
+  },
+  "alia_right_guess": {
+    "action": "guess_received",
+    "payload": {
+      "guess": {
+        "playerId": "b169e1ba-f998-4260-81f2-ba24c3b538a0",
+        "playerNickname": "报文采集",
+        "songId": "11597",
+        "songName": "ノンブレス・オブリージュ",
+        "correct": true,
+        "score": 100,
+        "timeSpent": 0.042,
+        "matchedSongId": "11597"
+      }
+    }
+  },
+  "alia_round_over": {
+    "action": "round_over",
+    "payload": {
+      "gameState": {
+        "roomId": "9645bcc1-ce2a-4303-87e6-07857d8aa976",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 2,
+        "currentSong": {
+          "id": "11597",
+          "title": "ノンブレス・オブリージュ",
+          "type": "DX",
+          "ds": [
+            3,
+            7.2,
+            10,
+            13.1
+          ],
+          "level": [
+            "3",
+            "7",
+            "10",
+            "13"
+          ],
+          "cids": [
+            8407,
+            8408,
+            8409,
+            8410
+          ],
+          "charts": [
+            {
+              "notes": [
+                109,
+                9,
+                4,
+                16,
+                3
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                227,
+                11,
+                8,
+                25,
+                8
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                241,
+                38,
+                26,
+                25,
+                15
+              ],
+              "charter": "鳩ホルダー"
+            },
+            {
+              "notes": [
+                102,
+                281,
+                39,
+                15,
+                28
+              ],
+              "charter": "はっぴー"
+            }
+          ],
+          "basic_info": {
+            "title": "ノンブレス・オブリージュ",
+            "artist": "ピノキオピー",
+            "genre": "niconico & VOCALOID",
+            "bpm": 148,
+            "release_date": "",
+            "from": "maimai でらっくす BUDDiES",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "11597",
+            "title": "ノンブレス・オブリージュ",
+            "type": "DX",
+            "ds": [
+              3,
+              7.2,
+              10,
+              13.1
+            ],
+            "level": [
+              "3",
+              "7",
+              "10",
+              "13"
+            ],
+            "cids": [
+              8407,
+              8408,
+              8409,
+              8410
+            ],
+            "charts": [
+              {
+                "notes": [
+                  109,
+                  9,
+                  4,
+                  16,
+                  3
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  227,
+                  11,
+                  8,
+                  25,
+                  8
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  241,
+                  38,
+                  26,
+                  25,
+                  15
+                ],
+                "charter": "鳩ホルダー"
+              },
+              {
+                "notes": [
+                  102,
+                  281,
+                  39,
+                  15,
+                  28
+                ],
+                "charter": "はっぴー"
+              }
+            ],
+            "basic_info": {
+              "title": "ノンブレス・オブリージュ",
+              "artist": "ピノキオピー",
+              "genre": "niconico & VOCALOID",
+              "bpm": 148,
+              "release_date": "",
+              "from": "maimai でらっくす BUDDiES",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [],
+        "foundSongIds": [],
+        "guesses": [
+          {
+            "playerId": "b169e1ba-f998-4260-81f2-ba24c3b538a0",
+            "playerNickname": "报文采集",
+            "songId": "__wrong__",
+            "songName": "___不存在___",
+            "correct": false,
+            "score": 0,
+            "timeSpent": 0.022
+          },
+          {
+            "playerId": "b169e1ba-f998-4260-81f2-ba24c3b538a0",
+            "playerNickname": "报文采集",
+            "songId": "11597",
+            "songName": "ノンブレス・オブリージュ",
+            "correct": true,
+            "score": 100,
+            "timeSpent": 0.042,
+            "matchedSongId": "11597"
+          }
+        ],
+        "players": [
+          {
+            "id": "b169e1ba-f998-4260-81f2-ba24c3b538a0",
+            "nickname": "报文采集",
+            "score": 100,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 2
+          },
+          {
+            "id": "112c7113-d549-42b1-984c-ee721e1cc212",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": true,
+        "isGameOver": false
+      }
+    }
+  },
+  "letters": {
+    "room_created": {
+      "room": {
+        "id": "1bc6360f-0858-482f-8f27-8af7f5481990",
+        "code": "928271",
+        "gameType": "letters",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "8edd0184-db99-415d-bea5-5bcdbe33a8c2",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "8edd0184-db99-415d-bea5-5bcdbe33a8c2",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493082205,
+        "lastActivityAt": 1789493082205,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      }
+    },
+    "room_joined": {
+      "room": {
+        "id": "1bc6360f-0858-482f-8f27-8af7f5481990",
+        "code": "928271",
+        "gameType": "letters",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "8edd0184-db99-415d-bea5-5bcdbe33a8c2",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          },
+          {
+            "id": "249c6120-87e3-4731-b5fb-0f5f152c9468",
+            "nickname": "采集2",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": false,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "8edd0184-db99-415d-bea5-5bcdbe33a8c2",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493082205,
+        "lastActivityAt": 1789493082247,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      },
+      "player": {
+        "id": "249c6120-87e3-4731-b5fb-0f5f152c9468",
+        "nickname": "采集2",
+        "ready": false,
+        "score": 0,
+        "surrendered": false
+      }
+    },
+    "round_start": {
+      "gameState": {
+        "roomId": "1bc6360f-0858-482f-8f27-8af7f5481990",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 0,
+        "currentSong": {
+          "id": "11080",
+          "title": "Jump!! Jump!! Jump!!",
+          "type": "DX",
+          "ds": [
+            3,
+            7.5,
+            9.5,
+            12
+          ],
+          "level": [
+            "3",
+            "7",
+            "9",
+            "12"
+          ],
+          "cids": [
+            2481,
+            2482,
+            2483,
+            2484
+          ],
+          "charts": [
+            {
+              "notes": [
+                120,
+                15,
+                4,
+                14,
+                3
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                253,
+                43,
+                11,
+                17,
+                14
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                328,
+                64,
+                20,
+                62,
+                6
+              ],
+              "charter": "サファ太"
+            },
+            {
+              "notes": [
+                352,
+                61,
+                90,
+                59,
+                12
+              ],
+              "charter": "ロシェ@ペンギン"
+            }
+          ],
+          "basic_info": {
+            "title": "Jump!! Jump!! Jump!!",
+            "artist": "曲：宮崎誠／歌：オンゲキシューターズ",
+            "genre": "音击&中二节奏",
+            "bpm": 183,
+            "release_date": "",
+            "from": "maimai でらっくす",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "11080",
+            "title": "Jump!! Jump!! Jump!!",
+            "type": "DX",
+            "ds": [
+              3,
+              7.5,
+              9.5,
+              12
+            ],
+            "level": [
+              "3",
+              "7",
+              "9",
+              "12"
+            ],
+            "cids": [
+              2481,
+              2482,
+              2483,
+              2484
+            ],
+            "charts": [
+              {
+                "notes": [
+                  120,
+                  15,
+                  4,
+                  14,
+                  3
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  253,
+                  43,
+                  11,
+                  17,
+                  14
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  328,
+                  64,
+                  20,
+                  62,
+                  6
+                ],
+                "charter": "サファ太"
+              },
+              {
+                "notes": [
+                  352,
+                  61,
+                  90,
+                  59,
+                  12
+                ],
+                "charter": "ロシェ@ペンギン"
+              }
+            ],
+            "basic_info": {
+              "title": "Jump!! Jump!! Jump!!",
+              "artist": "曲：宮崎誠／歌：オンゲキシューターズ",
+              "genre": "音击&中二节奏",
+              "bpm": 183,
+              "release_date": "",
+              "from": "maimai でらっくす",
+              "is_new": false
+            }
+          },
+          {
+            "id": "10702",
+            "title": "WARNING×WARNING×WARNING",
+            "type": "DX",
+            "ds": [
+              3,
+              7.5,
+              9.8,
+              11.9
+            ],
+            "level": [
+              "3",
+              "7",
+              "9+",
+              "11+"
+            ],
+            "cids": [
+              2239,
+              2240,
+              2241,
+              2242
+            ],
+            "charts": [
+              {
+                "notes": [
+                  108,
+                  17,
+                  9,
+                  17,
+                  2
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  298,
+                  33,
+                  14,
+                  11,
+                  14
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  377,
+                  40,
+                  38,
+                  92,
+                  22
+                ],
+                "charter": "サファ太"
+              },
+              {
+                "notes": [
+                  467,
+                  22,
+                  137,
+                  105,
+                  14
+                ],
+                "charter": "玉子豆腐"
+              }
+            ],
+            "basic_info": {
+              "title": "WARNING×WARNING×WARNING",
+              "artist": "暁Records",
+              "genre": "东方Project",
+              "bpm": 172,
+              "release_date": "",
+              "from": "maimai でらっくす",
+              "is_new": false
+            }
+          },
+          {
+            "id": "11720",
+            "title": "Re:Unknown X",
+            "type": "DX",
+            "ds": [
+              6,
+              9,
+              12.5,
+              14.7
+            ],
+            "level": [
+              "6",
+              "9",
+              "12",
+              "14+"
+            ],
+            "cids": [
+              8822,
+              8823,
+              8824,
+              8825
+            ],
+            "charts": [
+              {
+                "notes": [
+                  208,
+                  14,
+                  8,
+                  23,
+                  4
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  322,
+                  22,
+                  12,
+                  25,
+                  12
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  505,
+                  30,
+                  36,
+                  29,
+                  49
+                ],
+                "charter": "鳩ホルダー"
+              },
+              {
+                "notes": [
+                  983,
+                  76,
+                  50,
+                  59,
+                  21
+                ],
+                "charter": "アミノハバキリ"
+              }
+            ],
+            "basic_info": {
+              "title": "Re:Unknown X",
+              "artist": "まらしぃ",
+              "genre": "东方Project",
+              "bpm": 190,
+              "release_date": "",
+              "from": "maimai でらっくす PRiSM",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [],
+        "maskedTitles": {
+          "10702": "□□□□□□□□□□□□□□□□□□□□□□□",
+          "11080": "□□□□□□ □□□□□□ □□□□□□",
+          "11720": "□□□□□□□□□□ □"
+        },
+        "foundSongIds": [],
+        "guesses": [],
+        "players": [
+          {
+            "id": "8edd0184-db99-415d-bea5-5bcdbe33a8c2",
+            "nickname": "报文采集",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          },
+          {
+            "id": "249c6120-87e3-4731-b5fb-0f5f152c9468",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": false,
+        "isGameOver": false
+      }
+    }
+  },
+  "letters_letter_opened": {
+    "action": "letter_opened",
+    "payload": {
+      "success": true,
+      "letter": "J",
+      "openedLetters": [
+        "J"
+      ]
+    }
+  },
+  "letters_after_open": {
+    "action": "game_state_updated",
+    "payload": {
+      "gameState": {
+        "roomId": "1bc6360f-0858-482f-8f27-8af7f5481990",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 0,
+        "currentSong": {
+          "id": "11080",
+          "title": "Jump!! Jump!! Jump!!",
+          "type": "DX",
+          "ds": [
+            3,
+            7.5,
+            9.5,
+            12
+          ],
+          "level": [
+            "3",
+            "7",
+            "9",
+            "12"
+          ],
+          "cids": [
+            2481,
+            2482,
+            2483,
+            2484
+          ],
+          "charts": [
+            {
+              "notes": [
+                120,
+                15,
+                4,
+                14,
+                3
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                253,
+                43,
+                11,
+                17,
+                14
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                328,
+                64,
+                20,
+                62,
+                6
+              ],
+              "charter": "サファ太"
+            },
+            {
+              "notes": [
+                352,
+                61,
+                90,
+                59,
+                12
+              ],
+              "charter": "ロシェ@ペンギン"
+            }
+          ],
+          "basic_info": {
+            "title": "Jump!! Jump!! Jump!!",
+            "artist": "曲：宮崎誠／歌：オンゲキシューターズ",
+            "genre": "音击&中二节奏",
+            "bpm": 183,
+            "release_date": "",
+            "from": "maimai でらっくす",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "11080",
+            "title": "Jump!! Jump!! Jump!!",
+            "type": "DX",
+            "ds": [
+              3,
+              7.5,
+              9.5,
+              12
+            ],
+            "level": [
+              "3",
+              "7",
+              "9",
+              "12"
+            ],
+            "cids": [
+              2481,
+              2482,
+              2483,
+              2484
+            ],
+            "charts": [
+              {
+                "notes": [
+                  120,
+                  15,
+                  4,
+                  14,
+                  3
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  253,
+                  43,
+                  11,
+                  17,
+                  14
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  328,
+                  64,
+                  20,
+                  62,
+                  6
+                ],
+                "charter": "サファ太"
+              },
+              {
+                "notes": [
+                  352,
+                  61,
+                  90,
+                  59,
+                  12
+                ],
+                "charter": "ロシェ@ペンギン"
+              }
+            ],
+            "basic_info": {
+              "title": "Jump!! Jump!! Jump!!",
+              "artist": "曲：宮崎誠／歌：オンゲキシューターズ",
+              "genre": "音击&中二节奏",
+              "bpm": 183,
+              "release_date": "",
+              "from": "maimai でらっくす",
+              "is_new": false
+            }
+          },
+          {
+            "id": "10702",
+            "title": "WARNING×WARNING×WARNING",
+            "type": "DX",
+            "ds": [
+              3,
+              7.5,
+              9.8,
+              11.9
+            ],
+            "level": [
+              "3",
+              "7",
+              "9+",
+              "11+"
+            ],
+            "cids": [
+              2239,
+              2240,
+              2241,
+              2242
+            ],
+            "charts": [
+              {
+                "notes": [
+                  108,
+                  17,
+                  9,
+                  17,
+                  2
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  298,
+                  33,
+                  14,
+                  11,
+                  14
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  377,
+                  40,
+                  38,
+                  92,
+                  22
+                ],
+                "charter": "サファ太"
+              },
+              {
+                "notes": [
+                  467,
+                  22,
+                  137,
+                  105,
+                  14
+                ],
+                "charter": "玉子豆腐"
+              }
+            ],
+            "basic_info": {
+              "title": "WARNING×WARNING×WARNING",
+              "artist": "暁Records",
+              "genre": "东方Project",
+              "bpm": 172,
+              "release_date": "",
+              "from": "maimai でらっくす",
+              "is_new": false
+            }
+          },
+          {
+            "id": "11720",
+            "title": "Re:Unknown X",
+            "type": "DX",
+            "ds": [
+              6,
+              9,
+              12.5,
+              14.7
+            ],
+            "level": [
+              "6",
+              "9",
+              "12",
+              "14+"
+            ],
+            "cids": [
+              8822,
+              8823,
+              8824,
+              8825
+            ],
+            "charts": [
+              {
+                "notes": [
+                  208,
+                  14,
+                  8,
+                  23,
+                  4
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  322,
+                  22,
+                  12,
+                  25,
+                  12
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  505,
+                  30,
+                  36,
+                  29,
+                  49
+                ],
+                "charter": "鳩ホルダー"
+              },
+              {
+                "notes": [
+                  983,
+                  76,
+                  50,
+                  59,
+                  21
+                ],
+                "charter": "アミノハバキリ"
+              }
+            ],
+            "basic_info": {
+              "title": "Re:Unknown X",
+              "artist": "まらしぃ",
+              "genre": "东方Project",
+              "bpm": 190,
+              "release_date": "",
+              "from": "maimai でらっくす PRiSM",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [
+          "J"
+        ],
+        "maskedTitles": {
+          "10702": "□□□□□□□□□□□□□□□□□□□□□□□",
+          "11080": "J□□□□□ J□□□□□ J□□□□□",
+          "11720": "□□□□□□□□□□ □"
+        },
+        "foundSongIds": [],
+        "guesses": [],
+        "players": [
+          {
+            "id": "8edd0184-db99-415d-bea5-5bcdbe33a8c2",
+            "nickname": "报文采集",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          },
+          {
+            "id": "249c6120-87e3-4731-b5fb-0f5f152c9468",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": false,
+        "isGameOver": false
+      }
+    }
+  },
+  "letters_guess": {
+    "action": "guess_received",
+    "payload": {
+      "guess": {
+        "playerId": "8edd0184-db99-415d-bea5-5bcdbe33a8c2",
+        "playerNickname": "报文采集",
+        "songId": "11080",
+        "songName": "Jump!! Jump!! Jump!!",
+        "correct": true,
+        "score": 100,
+        "timeSpent": 0.062,
+        "matchedSongId": "11080"
+      }
+    }
+  },
+  "letters_after_guess": {
+    "action": "game_state_updated",
+    "payload": {
+      "gameState": {
+        "roomId": "1bc6360f-0858-482f-8f27-8af7f5481990",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 1,
+        "currentSong": {
+          "id": "11080",
+          "title": "Jump!! Jump!! Jump!!",
+          "type": "DX",
+          "ds": [
+            3,
+            7.5,
+            9.5,
+            12
+          ],
+          "level": [
+            "3",
+            "7",
+            "9",
+            "12"
+          ],
+          "cids": [
+            2481,
+            2482,
+            2483,
+            2484
+          ],
+          "charts": [
+            {
+              "notes": [
+                120,
+                15,
+                4,
+                14,
+                3
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                253,
+                43,
+                11,
+                17,
+                14
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                328,
+                64,
+                20,
+                62,
+                6
+              ],
+              "charter": "サファ太"
+            },
+            {
+              "notes": [
+                352,
+                61,
+                90,
+                59,
+                12
+              ],
+              "charter": "ロシェ@ペンギン"
+            }
+          ],
+          "basic_info": {
+            "title": "Jump!! Jump!! Jump!!",
+            "artist": "曲：宮崎誠／歌：オンゲキシューターズ",
+            "genre": "音击&中二节奏",
+            "bpm": 183,
+            "release_date": "",
+            "from": "maimai でらっくす",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "11080",
+            "title": "Jump!! Jump!! Jump!!",
+            "type": "DX",
+            "ds": [
+              3,
+              7.5,
+              9.5,
+              12
+            ],
+            "level": [
+              "3",
+              "7",
+              "9",
+              "12"
+            ],
+            "cids": [
+              2481,
+              2482,
+              2483,
+              2484
+            ],
+            "charts": [
+              {
+                "notes": [
+                  120,
+                  15,
+                  4,
+                  14,
+                  3
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  253,
+                  43,
+                  11,
+                  17,
+                  14
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  328,
+                  64,
+                  20,
+                  62,
+                  6
+                ],
+                "charter": "サファ太"
+              },
+              {
+                "notes": [
+                  352,
+                  61,
+                  90,
+                  59,
+                  12
+                ],
+                "charter": "ロシェ@ペンギン"
+              }
+            ],
+            "basic_info": {
+              "title": "Jump!! Jump!! Jump!!",
+              "artist": "曲：宮崎誠／歌：オンゲキシューターズ",
+              "genre": "音击&中二节奏",
+              "bpm": 183,
+              "release_date": "",
+              "from": "maimai でらっくす",
+              "is_new": false
+            }
+          },
+          {
+            "id": "10702",
+            "title": "WARNING×WARNING×WARNING",
+            "type": "DX",
+            "ds": [
+              3,
+              7.5,
+              9.8,
+              11.9
+            ],
+            "level": [
+              "3",
+              "7",
+              "9+",
+              "11+"
+            ],
+            "cids": [
+              2239,
+              2240,
+              2241,
+              2242
+            ],
+            "charts": [
+              {
+                "notes": [
+                  108,
+                  17,
+                  9,
+                  17,
+                  2
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  298,
+                  33,
+                  14,
+                  11,
+                  14
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  377,
+                  40,
+                  38,
+                  92,
+                  22
+                ],
+                "charter": "サファ太"
+              },
+              {
+                "notes": [
+                  467,
+                  22,
+                  137,
+                  105,
+                  14
+                ],
+                "charter": "玉子豆腐"
+              }
+            ],
+            "basic_info": {
+              "title": "WARNING×WARNING×WARNING",
+              "artist": "暁Records",
+              "genre": "东方Project",
+              "bpm": 172,
+              "release_date": "",
+              "from": "maimai でらっくす",
+              "is_new": false
+            }
+          },
+          {
+            "id": "11720",
+            "title": "Re:Unknown X",
+            "type": "DX",
+            "ds": [
+              6,
+              9,
+              12.5,
+              14.7
+            ],
+            "level": [
+              "6",
+              "9",
+              "12",
+              "14+"
+            ],
+            "cids": [
+              8822,
+              8823,
+              8824,
+              8825
+            ],
+            "charts": [
+              {
+                "notes": [
+                  208,
+                  14,
+                  8,
+                  23,
+                  4
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  322,
+                  22,
+                  12,
+                  25,
+                  12
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  505,
+                  30,
+                  36,
+                  29,
+                  49
+                ],
+                "charter": "鳩ホルダー"
+              },
+              {
+                "notes": [
+                  983,
+                  76,
+                  50,
+                  59,
+                  21
+                ],
+                "charter": "アミノハバキリ"
+              }
+            ],
+            "basic_info": {
+              "title": "Re:Unknown X",
+              "artist": "まらしぃ",
+              "genre": "东方Project",
+              "bpm": 190,
+              "release_date": "",
+              "from": "maimai でらっくす PRiSM",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [
+          "J"
+        ],
+        "maskedTitles": {
+          "10702": "□□□□□□□□□□□□□□□□□□□□□□□",
+          "11080": "Jump!! Jump!! Jump!!",
+          "11720": "□□□□□□□□□□ □"
+        },
+        "foundSongIds": [
+          "11080"
+        ],
+        "guesses": [
+          {
+            "playerId": "8edd0184-db99-415d-bea5-5bcdbe33a8c2",
+            "playerNickname": "报文采集",
+            "songId": "11080",
+            "songName": "Jump!! Jump!! Jump!!",
+            "correct": true,
+            "score": 100,
+            "timeSpent": 0.062,
+            "matchedSongId": "11080"
+          }
+        ],
+        "players": [
+          {
+            "id": "8edd0184-db99-415d-bea5-5bcdbe33a8c2",
+            "nickname": "报文采集",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 1
+          },
+          {
+            "id": "249c6120-87e3-4731-b5fb-0f5f152c9468",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": false,
+        "isGameOver": false
+      }
+    }
+  },
+  "flash": {
+    "room_created": {
+      "room": {
+        "id": "357d07fe-e389-4e85-819b-efbf99a6db6b",
+        "code": "074506",
+        "gameType": "flash",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "d3f772a6-f400-4b16-9cb3-4b7a204ac2e1",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "d3f772a6-f400-4b16-9cb3-4b7a204ac2e1",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493083296,
+        "lastActivityAt": 1789493083296,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      }
+    },
+    "room_joined": {
+      "room": {
+        "id": "357d07fe-e389-4e85-819b-efbf99a6db6b",
+        "code": "074506",
+        "gameType": "flash",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "d3f772a6-f400-4b16-9cb3-4b7a204ac2e1",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          },
+          {
+            "id": "b603db48-d93f-4568-9556-a39f3fff7d85",
+            "nickname": "采集2",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": false,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "d3f772a6-f400-4b16-9cb3-4b7a204ac2e1",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493083296,
+        "lastActivityAt": 1789493083338,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      },
+      "player": {
+        "id": "b603db48-d93f-4568-9556-a39f3fff7d85",
+        "nickname": "采集2",
+        "ready": false,
+        "score": 0,
+        "surrendered": false
+      }
+    },
+    "round_start": {
+      "gameState": {
+        "roomId": "357d07fe-e389-4e85-819b-efbf99a6db6b",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 0,
+        "currentSong": {
+          "id": "528",
+          "title": "Invitation",
+          "type": "SD",
+          "ds": [
+            4,
+            7.6,
+            9.9,
+            13
+          ],
+          "level": [
+            "4",
+            "7+",
+            "9+",
+            "13"
+          ],
+          "cids": [
+            1288,
+            1289,
+            1290,
+            1291
+          ],
+          "charts": [
+            {
+              "notes": [
+                155,
+                12,
+                9,
+                6
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                357,
+                8,
+                19,
+                6
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                491,
+                29,
+                39,
+                9
+              ],
+              "charter": "rioN"
+            },
+            {
+              "notes": [
+                720,
+                21,
+                68,
+                25
+              ],
+              "charter": "某S氏"
+            }
+          ],
+          "basic_info": {
+            "title": "Invitation",
+            "artist": "れるりり feat.ろん",
+            "genre": "音击&中二节奏",
+            "bpm": 147,
+            "release_date": "",
+            "from": "maimai PiNK PLUS",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "528",
+            "title": "Invitation",
+            "type": "SD",
+            "ds": [
+              4,
+              7.6,
+              9.9,
+              13
+            ],
+            "level": [
+              "4",
+              "7+",
+              "9+",
+              "13"
+            ],
+            "cids": [
+              1288,
+              1289,
+              1290,
+              1291
+            ],
+            "charts": [
+              {
+                "notes": [
+                  155,
+                  12,
+                  9,
+                  6
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  357,
+                  8,
+                  19,
+                  6
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  491,
+                  29,
+                  39,
+                  9
+                ],
+                "charter": "rioN"
+              },
+              {
+                "notes": [
+                  720,
+                  21,
+                  68,
+                  25
+                ],
+                "charter": "某S氏"
+              }
+            ],
+            "basic_info": {
+              "title": "Invitation",
+              "artist": "れるりり feat.ろん",
+              "genre": "音击&中二节奏",
+              "bpm": 147,
+              "release_date": "",
+              "from": "maimai PiNK PLUS",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [],
+        "foundSongIds": [],
+        "guesses": [],
+        "players": [
+          {
+            "id": "d3f772a6-f400-4b16-9cb3-4b7a204ac2e1",
+            "nickname": "报文采集",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          },
+          {
+            "id": "b603db48-d93f-4568-9556-a39f3fff7d85",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": false,
+        "isGameOver": false
+      }
+    }
+  },
+  "flash_wrong_guess": {
+    "action": "guess_received",
+    "payload": {
+      "guess": {
+        "playerId": "d3f772a6-f400-4b16-9cb3-4b7a204ac2e1",
+        "playerNickname": "报文采集",
+        "songId": "__wrong__",
+        "songName": "___不存在___",
+        "correct": false,
+        "score": 0,
+        "timeSpent": 0.021
+      }
+    }
+  },
+  "flash_right_guess": {
+    "action": "guess_received",
+    "payload": {
+      "guess": {
+        "playerId": "d3f772a6-f400-4b16-9cb3-4b7a204ac2e1",
+        "playerNickname": "报文采集",
+        "songId": "528",
+        "songName": "Invitation",
+        "correct": true,
+        "score": 100,
+        "timeSpent": 0.042,
+        "matchedSongId": "528"
+      }
+    }
+  },
+  "flash_round_over": {
+    "action": "round_over",
+    "payload": {
+      "gameState": {
+        "roomId": "357d07fe-e389-4e85-819b-efbf99a6db6b",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 2,
+        "currentSong": {
+          "id": "528",
+          "title": "Invitation",
+          "type": "SD",
+          "ds": [
+            4,
+            7.6,
+            9.9,
+            13
+          ],
+          "level": [
+            "4",
+            "7+",
+            "9+",
+            "13"
+          ],
+          "cids": [
+            1288,
+            1289,
+            1290,
+            1291
+          ],
+          "charts": [
+            {
+              "notes": [
+                155,
+                12,
+                9,
+                6
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                357,
+                8,
+                19,
+                6
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                491,
+                29,
+                39,
+                9
+              ],
+              "charter": "rioN"
+            },
+            {
+              "notes": [
+                720,
+                21,
+                68,
+                25
+              ],
+              "charter": "某S氏"
+            }
+          ],
+          "basic_info": {
+            "title": "Invitation",
+            "artist": "れるりり feat.ろん",
+            "genre": "音击&中二节奏",
+            "bpm": 147,
+            "release_date": "",
+            "from": "maimai PiNK PLUS",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "528",
+            "title": "Invitation",
+            "type": "SD",
+            "ds": [
+              4,
+              7.6,
+              9.9,
+              13
+            ],
+            "level": [
+              "4",
+              "7+",
+              "9+",
+              "13"
+            ],
+            "cids": [
+              1288,
+              1289,
+              1290,
+              1291
+            ],
+            "charts": [
+              {
+                "notes": [
+                  155,
+                  12,
+                  9,
+                  6
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  357,
+                  8,
+                  19,
+                  6
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  491,
+                  29,
+                  39,
+                  9
+                ],
+                "charter": "rioN"
+              },
+              {
+                "notes": [
+                  720,
+                  21,
+                  68,
+                  25
+                ],
+                "charter": "某S氏"
+              }
+            ],
+            "basic_info": {
+              "title": "Invitation",
+              "artist": "れるりり feat.ろん",
+              "genre": "音击&中二节奏",
+              "bpm": 147,
+              "release_date": "",
+              "from": "maimai PiNK PLUS",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [],
+        "foundSongIds": [],
+        "guesses": [
+          {
+            "playerId": "d3f772a6-f400-4b16-9cb3-4b7a204ac2e1",
+            "playerNickname": "报文采集",
+            "songId": "__wrong__",
+            "songName": "___不存在___",
+            "correct": false,
+            "score": 0,
+            "timeSpent": 0.021
+          },
+          {
+            "playerId": "d3f772a6-f400-4b16-9cb3-4b7a204ac2e1",
+            "playerNickname": "报文采集",
+            "songId": "528",
+            "songName": "Invitation",
+            "correct": true,
+            "score": 100,
+            "timeSpent": 0.042,
+            "matchedSongId": "528"
+          }
+        ],
+        "players": [
+          {
+            "id": "d3f772a6-f400-4b16-9cb3-4b7a204ac2e1",
+            "nickname": "报文采集",
+            "score": 100,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 2
+          },
+          {
+            "id": "b603db48-d93f-4568-9556-a39f3fff7d85",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": true,
+        "isGameOver": false
+      }
+    }
+  },
+  "tileReveal": {
+    "room_created": {
+      "room": {
+        "id": "bc6cdf3c-376d-434b-b46a-505a7ffcce43",
+        "code": "094447",
+        "gameType": "tileReveal",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "60efe2fb-45bc-478c-a41b-6d43996e86f6",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "60efe2fb-45bc-478c-a41b-6d43996e86f6",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493084367,
+        "lastActivityAt": 1789493084367,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      }
+    },
+    "room_joined": {
+      "room": {
+        "id": "bc6cdf3c-376d-434b-b46a-505a7ffcce43",
+        "code": "094447",
+        "gameType": "tileReveal",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "60efe2fb-45bc-478c-a41b-6d43996e86f6",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          },
+          {
+            "id": "4347f255-bf0e-4503-b243-5f6d9befcfc6",
+            "nickname": "采集2",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": false,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "60efe2fb-45bc-478c-a41b-6d43996e86f6",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493084367,
+        "lastActivityAt": 1789493084408,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      },
+      "player": {
+        "id": "4347f255-bf0e-4503-b243-5f6d9befcfc6",
+        "nickname": "采集2",
+        "ready": false,
+        "score": 0,
+        "surrendered": false
+      }
+    },
+    "round_start": {
+      "gameState": {
+        "roomId": "bc6cdf3c-376d-434b-b46a-505a7ffcce43",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 0,
+        "currentSong": {
+          "id": "555",
+          "title": "GOODMEN",
+          "type": "SD",
+          "ds": [
+            6,
+            8.1,
+            11.7,
+            13.4
+          ],
+          "level": [
+            "6",
+            "8",
+            "11+",
+            "13"
+          ],
+          "cids": [
+            1373,
+            1374,
+            1375,
+            1376
+          ],
+          "charts": [
+            {
+              "notes": [
+                241,
+                12,
+                8,
+                13
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                389,
+                12,
+                33,
+                4
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                442,
+                67,
+                53,
+                10
+              ],
+              "charter": "ぴちネコ"
+            },
+            {
+              "notes": [
+                646,
+                78,
+                136,
+                15
+              ],
+              "charter": "はっぴー"
+            }
+          ],
+          "basic_info": {
+            "title": "GOODMEN",
+            "artist": "EBIMAYO",
+            "genre": "其他游戏",
+            "bpm": 175,
+            "release_date": "",
+            "from": "maimai MURASAKi",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "555",
+            "title": "GOODMEN",
+            "type": "SD",
+            "ds": [
+              6,
+              8.1,
+              11.7,
+              13.4
+            ],
+            "level": [
+              "6",
+              "8",
+              "11+",
+              "13"
+            ],
+            "cids": [
+              1373,
+              1374,
+              1375,
+              1376
+            ],
+            "charts": [
+              {
+                "notes": [
+                  241,
+                  12,
+                  8,
+                  13
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  389,
+                  12,
+                  33,
+                  4
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  442,
+                  67,
+                  53,
+                  10
+                ],
+                "charter": "ぴちネコ"
+              },
+              {
+                "notes": [
+                  646,
+                  78,
+                  136,
+                  15
+                ],
+                "charter": "はっぴー"
+              }
+            ],
+            "basic_info": {
+              "title": "GOODMEN",
+              "artist": "EBIMAYO",
+              "genre": "其他游戏",
+              "bpm": 175,
+              "release_date": "",
+              "from": "maimai MURASAKi",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [],
+        "foundSongIds": [],
+        "guesses": [],
+        "players": [
+          {
+            "id": "60efe2fb-45bc-478c-a41b-6d43996e86f6",
+            "nickname": "报文采集",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          },
+          {
+            "id": "4347f255-bf0e-4503-b243-5f6d9befcfc6",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": false,
+        "isGameOver": false
+      }
+    }
+  },
+  "tileReveal_wrong_guess": {
+    "action": "guess_received",
+    "payload": {
+      "guess": {
+        "playerId": "60efe2fb-45bc-478c-a41b-6d43996e86f6",
+        "playerNickname": "报文采集",
+        "songId": "__wrong__",
+        "songName": "___不存在___",
+        "correct": false,
+        "score": 0,
+        "timeSpent": 0.021
+      }
+    }
+  },
+  "tileReveal_right_guess": {
+    "action": "guess_received",
+    "payload": {
+      "guess": {
+        "playerId": "60efe2fb-45bc-478c-a41b-6d43996e86f6",
+        "playerNickname": "报文采集",
+        "songId": "555",
+        "songName": "GOODMEN",
+        "correct": true,
+        "score": 100,
+        "timeSpent": 0.042,
+        "matchedSongId": "555"
+      }
+    }
+  },
+  "tileReveal_round_over": {
+    "action": "round_over",
+    "payload": {
+      "gameState": {
+        "roomId": "bc6cdf3c-376d-434b-b46a-505a7ffcce43",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 2,
+        "currentSong": {
+          "id": "555",
+          "title": "GOODMEN",
+          "type": "SD",
+          "ds": [
+            6,
+            8.1,
+            11.7,
+            13.4
+          ],
+          "level": [
+            "6",
+            "8",
+            "11+",
+            "13"
+          ],
+          "cids": [
+            1373,
+            1374,
+            1375,
+            1376
+          ],
+          "charts": [
+            {
+              "notes": [
+                241,
+                12,
+                8,
+                13
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                389,
+                12,
+                33,
+                4
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                442,
+                67,
+                53,
+                10
+              ],
+              "charter": "ぴちネコ"
+            },
+            {
+              "notes": [
+                646,
+                78,
+                136,
+                15
+              ],
+              "charter": "はっぴー"
+            }
+          ],
+          "basic_info": {
+            "title": "GOODMEN",
+            "artist": "EBIMAYO",
+            "genre": "其他游戏",
+            "bpm": 175,
+            "release_date": "",
+            "from": "maimai MURASAKi",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "555",
+            "title": "GOODMEN",
+            "type": "SD",
+            "ds": [
+              6,
+              8.1,
+              11.7,
+              13.4
+            ],
+            "level": [
+              "6",
+              "8",
+              "11+",
+              "13"
+            ],
+            "cids": [
+              1373,
+              1374,
+              1375,
+              1376
+            ],
+            "charts": [
+              {
+                "notes": [
+                  241,
+                  12,
+                  8,
+                  13
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  389,
+                  12,
+                  33,
+                  4
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  442,
+                  67,
+                  53,
+                  10
+                ],
+                "charter": "ぴちネコ"
+              },
+              {
+                "notes": [
+                  646,
+                  78,
+                  136,
+                  15
+                ],
+                "charter": "はっぴー"
+              }
+            ],
+            "basic_info": {
+              "title": "GOODMEN",
+              "artist": "EBIMAYO",
+              "genre": "其他游戏",
+              "bpm": 175,
+              "release_date": "",
+              "from": "maimai MURASAKi",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [],
+        "foundSongIds": [],
+        "guesses": [
+          {
+            "playerId": "60efe2fb-45bc-478c-a41b-6d43996e86f6",
+            "playerNickname": "报文采集",
+            "songId": "__wrong__",
+            "songName": "___不存在___",
+            "correct": false,
+            "score": 0,
+            "timeSpent": 0.021
+          },
+          {
+            "playerId": "60efe2fb-45bc-478c-a41b-6d43996e86f6",
+            "playerNickname": "报文采集",
+            "songId": "555",
+            "songName": "GOODMEN",
+            "correct": true,
+            "score": 100,
+            "timeSpent": 0.042,
+            "matchedSongId": "555"
+          }
+        ],
+        "players": [
+          {
+            "id": "60efe2fb-45bc-478c-a41b-6d43996e86f6",
+            "nickname": "报文采集",
+            "score": 100,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 2
+          },
+          {
+            "id": "4347f255-bf0e-4503-b243-5f6d9befcfc6",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": true,
+        "isGameOver": false
+      }
+    }
+  },
+  "chartPeek": {
+    "room_created": {
+      "room": {
+        "id": "c75c586a-ace3-4f73-9ebf-d144f31b22c7",
+        "code": "874142",
+        "gameType": "chartPeek",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "2fb0bdc5-acbe-4f95-8af5-3edfc61a88a7",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "2fb0bdc5-acbe-4f95-8af5-3edfc61a88a7",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493085439,
+        "lastActivityAt": 1789493085439,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      }
+    },
+    "room_joined": {
+      "room": {
+        "id": "c75c586a-ace3-4f73-9ebf-d144f31b22c7",
+        "code": "874142",
+        "gameType": "chartPeek",
+        "maxPlayers": 4,
+        "timeLimit": 40,
+        "maxGuesses": 10,
+        "totalRounds": 2,
+        "players": [
+          {
+            "id": "2fb0bdc5-acbe-4f95-8af5-3edfc61a88a7",
+            "nickname": "报文采集",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": true,
+            "currentGuesses": 0
+          },
+          {
+            "id": "c8e3c76c-e26e-448d-a49e-1a780cd816fa",
+            "nickname": "采集2",
+            "ready": false,
+            "score": 0,
+            "surrendered": false,
+            "host": false,
+            "currentGuesses": 0
+          }
+        ],
+        "hostId": "2fb0bdc5-acbe-4f95-8af5-3edfc61a88a7",
+        "status": "waiting",
+        "currentRound": 0,
+        "createdAt": 1789493085439,
+        "lastActivityAt": 1789493085482,
+        "selectedVersions": [],
+        "masterMinDx": 1,
+        "masterMaxDx": 15,
+        "selectedGenres": [],
+        "blurLevel": 60,
+        "playDuration": 8,
+        "songCount": 3,
+        "nonEnglishCharThreshold": 50,
+        "flashDurationMs": 800,
+        "tileCount": 1600,
+        "tileRevealIntervalMs": 900,
+        "peekDurationSeconds": 12,
+        "peekDifficulties": [
+          "3",
+          "4"
+        ]
+      },
+      "player": {
+        "id": "c8e3c76c-e26e-448d-a49e-1a780cd816fa",
+        "nickname": "采集2",
+        "ready": false,
+        "score": 0,
+        "surrendered": false
+      }
+    },
+    "round_start": {
+      "gameState": {
+        "roomId": "c75c586a-ace3-4f73-9ebf-d144f31b22c7",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 0,
+        "currentSong": {
+          "id": "11698",
+          "title": "酔いどれ知らず",
+          "type": "DX",
+          "ds": [
+            2,
+            6,
+            8.5,
+            11.6,
+            13.2
+          ],
+          "level": [
+            "2",
+            "6",
+            "8",
+            "11+",
+            "13"
+          ],
+          "cids": [
+            8670,
+            8671,
+            8672,
+            8673,
+            8674
+          ],
+          "charts": [
+            {
+              "notes": [
+                95,
+                16,
+                4,
+                12,
+                4
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                180,
+                20,
+                8,
+                11,
+                6
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                234,
+                32,
+                28,
+                12,
+                8
+              ],
+              "charter": "Luxizhel"
+            },
+            {
+              "notes": [
+                373,
+                41,
+                72,
+                18,
+                9
+              ],
+              "charter": "緑風 犬三郎"
+            },
+            {
+              "notes": [
+                497,
+                56,
+                100,
+                12,
+                35
+              ],
+              "charter": "サファ太"
+            }
+          ],
+          "basic_info": {
+            "title": "酔いどれ知らず",
+            "artist": "Kanaria",
+            "genre": "niconico & VOCALOID",
+            "bpm": 115,
+            "release_date": "",
+            "from": "maimai でらっくす PRiSM",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "11698",
+            "title": "酔いどれ知らず",
+            "type": "DX",
+            "ds": [
+              2,
+              6,
+              8.5,
+              11.6,
+              13.2
+            ],
+            "level": [
+              "2",
+              "6",
+              "8",
+              "11+",
+              "13"
+            ],
+            "cids": [
+              8670,
+              8671,
+              8672,
+              8673,
+              8674
+            ],
+            "charts": [
+              {
+                "notes": [
+                  95,
+                  16,
+                  4,
+                  12,
+                  4
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  180,
+                  20,
+                  8,
+                  11,
+                  6
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  234,
+                  32,
+                  28,
+                  12,
+                  8
+                ],
+                "charter": "Luxizhel"
+              },
+              {
+                "notes": [
+                  373,
+                  41,
+                  72,
+                  18,
+                  9
+                ],
+                "charter": "緑風 犬三郎"
+              },
+              {
+                "notes": [
+                  497,
+                  56,
+                  100,
+                  12,
+                  35
+                ],
+                "charter": "サファ太"
+              }
+            ],
+            "basic_info": {
+              "title": "酔いどれ知らず",
+              "artist": "Kanaria",
+              "genre": "niconico & VOCALOID",
+              "bpm": 115,
+              "release_date": "",
+              "from": "maimai でらっくす PRiSM",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [],
+        "foundSongIds": [],
+        "guesses": [],
+        "players": [
+          {
+            "id": "2fb0bdc5-acbe-4f95-8af5-3edfc61a88a7",
+            "nickname": "报文采集",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          },
+          {
+            "id": "c8e3c76c-e26e-448d-a49e-1a780cd816fa",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": false,
+        "isGameOver": false
+      }
+    }
+  },
+  "chartPeek_wrong_guess": {
+    "action": "guess_received",
+    "payload": {
+      "guess": {
+        "playerId": "2fb0bdc5-acbe-4f95-8af5-3edfc61a88a7",
+        "playerNickname": "报文采集",
+        "songId": "__wrong__",
+        "songName": "___不存在___",
+        "correct": false,
+        "score": 0,
+        "timeSpent": 0.02
+      }
+    }
+  },
+  "chartPeek_right_guess": {
+    "action": "guess_received",
+    "payload": {
+      "guess": {
+        "playerId": "2fb0bdc5-acbe-4f95-8af5-3edfc61a88a7",
+        "playerNickname": "报文采集",
+        "songId": "11698",
+        "songName": "酔いどれ知らず",
+        "correct": true,
+        "score": 100,
+        "timeSpent": 0.042,
+        "matchedSongId": "11698"
+      }
+    }
+  },
+  "chartPeek_round_over": {
+    "action": "round_over",
+    "payload": {
+      "gameState": {
+        "roomId": "c75c586a-ace3-4f73-9ebf-d144f31b22c7",
+        "currentRound": 1,
+        "totalRounds": 2,
+        "timeLimit": 40,
+        "timeRemaining": 40,
+        "maxGuesses": 10,
+        "currentGuesses": 2,
+        "currentSong": {
+          "id": "11698",
+          "title": "酔いどれ知らず",
+          "type": "DX",
+          "ds": [
+            2,
+            6,
+            8.5,
+            11.6,
+            13.2
+          ],
+          "level": [
+            "2",
+            "6",
+            "8",
+            "11+",
+            "13"
+          ],
+          "cids": [
+            8670,
+            8671,
+            8672,
+            8673,
+            8674
+          ],
+          "charts": [
+            {
+              "notes": [
+                95,
+                16,
+                4,
+                12,
+                4
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                180,
+                20,
+                8,
+                11,
+                6
+              ],
+              "charter": "-"
+            },
+            {
+              "notes": [
+                234,
+                32,
+                28,
+                12,
+                8
+              ],
+              "charter": "Luxizhel"
+            },
+            {
+              "notes": [
+                373,
+                41,
+                72,
+                18,
+                9
+              ],
+              "charter": "緑風 犬三郎"
+            },
+            {
+              "notes": [
+                497,
+                56,
+                100,
+                12,
+                35
+              ],
+              "charter": "サファ太"
+            }
+          ],
+          "basic_info": {
+            "title": "酔いどれ知らず",
+            "artist": "Kanaria",
+            "genre": "niconico & VOCALOID",
+            "bpm": 115,
+            "release_date": "",
+            "from": "maimai でらっくす PRiSM",
+            "is_new": false
+          }
+        },
+        "targetSongs": [
+          {
+            "id": "11698",
+            "title": "酔いどれ知らず",
+            "type": "DX",
+            "ds": [
+              2,
+              6,
+              8.5,
+              11.6,
+              13.2
+            ],
+            "level": [
+              "2",
+              "6",
+              "8",
+              "11+",
+              "13"
+            ],
+            "cids": [
+              8670,
+              8671,
+              8672,
+              8673,
+              8674
+            ],
+            "charts": [
+              {
+                "notes": [
+                  95,
+                  16,
+                  4,
+                  12,
+                  4
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  180,
+                  20,
+                  8,
+                  11,
+                  6
+                ],
+                "charter": "-"
+              },
+              {
+                "notes": [
+                  234,
+                  32,
+                  28,
+                  12,
+                  8
+                ],
+                "charter": "Luxizhel"
+              },
+              {
+                "notes": [
+                  373,
+                  41,
+                  72,
+                  18,
+                  9
+                ],
+                "charter": "緑風 犬三郎"
+              },
+              {
+                "notes": [
+                  497,
+                  56,
+                  100,
+                  12,
+                  35
+                ],
+                "charter": "サファ太"
+              }
+            ],
+            "basic_info": {
+              "title": "酔いどれ知らず",
+              "artist": "Kanaria",
+              "genre": "niconico & VOCALOID",
+              "bpm": 115,
+              "release_date": "",
+              "from": "maimai でらっくす PRiSM",
+              "is_new": false
+            }
+          }
+        ],
+        "openedLetters": [],
+        "foundSongIds": [],
+        "guesses": [
+          {
+            "playerId": "2fb0bdc5-acbe-4f95-8af5-3edfc61a88a7",
+            "playerNickname": "报文采集",
+            "songId": "__wrong__",
+            "songName": "___不存在___",
+            "correct": false,
+            "score": 0,
+            "timeSpent": 0.02
+          },
+          {
+            "playerId": "2fb0bdc5-acbe-4f95-8af5-3edfc61a88a7",
+            "playerNickname": "报文采集",
+            "songId": "11698",
+            "songName": "酔いどれ知らず",
+            "correct": true,
+            "score": 100,
+            "timeSpent": 0.042,
+            "matchedSongId": "11698"
+          }
+        ],
+        "players": [
+          {
+            "id": "2fb0bdc5-acbe-4f95-8af5-3edfc61a88a7",
+            "nickname": "报文采集",
+            "score": 100,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 2
+          },
+          {
+            "id": "c8e3c76c-e26e-448d-a49e-1a780cd816fa",
+            "nickname": "采集2",
+            "score": 0,
+            "ready": false,
+            "surrendered": false,
+            "currentGuesses": 0
+          }
+        ],
+        "status": "playing",
+        "isRoundOver": true,
+        "isGameOver": false
+      }
+    }
+  }
+}

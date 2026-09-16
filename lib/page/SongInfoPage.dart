@@ -8040,12 +8040,45 @@ class _SongInfoPageState extends State<SongInfoPage> {
               content: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: aliases
-                      .map((alias) => Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2),
-                            child: Text('- $alias'),
-                          ))
-                      .toList(),
+                  children: [
+                    Text(
+                      '点击任意别名即可复制',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    // 每条别名可点击复制到剪贴板（点击后不关闭弹窗，方便连续复制）
+                    ...aliases.map((alias) => InkWell(
+                          borderRadius: BorderRadius.circular(6),
+                          onTap: () async {
+                            await Clipboard.setData(
+                                ClipboardData(text: alias));
+                            Fluttertoast.showToast(msg: '已复制：$alias');
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 6, horizontal: 4),
+                            // 用 Expanded 撑满宽度，保证整行都是可点区域
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    alias,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )),
+                  ],
                 ),
               ),
               actions: [

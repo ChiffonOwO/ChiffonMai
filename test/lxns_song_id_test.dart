@@ -6,6 +6,7 @@
 // 不分标准、DX 谱面，曲目 ID 大于 100000」。
 import 'package:flutter_test/flutter_test.dart';
 import 'package:my_first_flutter_app/service/LuoXueScoreUploadService.dart';
+import 'package:my_first_flutter_app/utils/LuoXueSongUtil.dart';
 
 void main() {
   group('toLxnsSongId', () {
@@ -55,6 +56,40 @@ void main() {
           LuoXueScoreUploadService.toLxnsSongType(
               divingFishId: 118009, type: 'SD'),
           'utage');
+    });
+  });
+  // ---------------------------------------------------------------------------
+  // 音源文件 id（与上面的成绩 API 规则**不同**，别把两者混用）
+  // ---------------------------------------------------------------------------
+  group('LuoXueSongUtil.toLxnsMusicId（音源文件命名）', () {
+    test('5 位 DX 曲：取余（11466 → 1466）', () {
+      // 线上实测：assets2.lxns.net/maimai/music/1466.mp3 = 200，
+      // 而 11466.mp3 = 404
+      expect(LuoXueSongUtil.toLxnsMusicId('11466'), 1466);
+      expect(LuoXueSongUtil.toLxnsMusicId('11399'), 1399);
+    });
+
+    test('4 位及以下：取余后不变', () {
+      expect(LuoXueSongUtil.toLxnsMusicId('1399'), 1399);
+      expect(LuoXueSongUtil.toLxnsMusicId('18'), 18);
+      expect(LuoXueSongUtil.toLxnsMusicId('834'), 834);
+    });
+
+    test('6 位宴会场：**同样取余**（与成绩 API 规则相反）', () {
+      // 宴会场 62 首逐首实测：取余后全部 200，原始 6 位全部 404。
+      // 这里与 toLxnsSongId 的「原样保留」是刻意不同 —— 成绩 API 的曲库
+      // 条目用 6 位 id，但音频文件没有按那套命名。
+      expect(LuoXueSongUtil.toLxnsMusicId('100018'), 18);
+      expect(LuoXueSongUtil.toLxnsMusicId('100022'), 22);
+      expect(LuoXueSongUtil.toLxnsMusicId('100199'), 199);
+    });
+
+    test('非法输入返回 0（调用方据此跳过播放）', () {
+      expect(LuoXueSongUtil.toLxnsMusicId(null), 0);
+      expect(LuoXueSongUtil.toLxnsMusicId(''), 0);
+      expect(LuoXueSongUtil.toLxnsMusicId('abc'), 0);
+      expect(LuoXueSongUtil.toLxnsMusicId('-5'), 0);
+      expect(LuoXueSongUtil.toLxnsMusicId('0'), 0);
     });
   });
 }

@@ -382,6 +382,25 @@ class WebSocketBroadcastService {
     }
   }
   
+  // 发送开字母消息（letters 模式）
+  Future<void> sendOpenLetter(String letter) async {
+    if (!_isConnected || _channel == null) {
+      debugPrint('[WebSocket] 未连接，无法发送消息');
+      return;
+    }
+
+    try {
+      final data = json.encode({
+        'action': 'open_letter',
+        'payload': {'letter': letter},
+      });
+      _channel!.sink.add(data);
+      debugPrint('[WebSocket] 发送开字母消息: $letter');
+    } catch (e) {
+      debugPrint('[WebSocket] 发送开字母消息失败: $e');
+    }
+  }
+
   // 发送离开房间消息
   Future<void> sendLeaveRoom() async {
     if (!_isConnected || _channel == null) {

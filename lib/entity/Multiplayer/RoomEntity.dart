@@ -65,6 +65,21 @@ class RoomEntity {
   /// 非英文字符过滤阈值（0-100），用于 letters 模式
   final int nonEnglishCharThreshold;
 
+  /// 快闪时长（毫秒），用于 flash 模式
+  final int flashDurationMs;
+
+  /// 拼图切块总数，用于 tileReveal 模式
+  final int tileCount;
+
+  /// 拼图每批揭示间隔（毫秒），用于 tileReveal 模式
+  final int tileRevealIntervalMs;
+
+  /// 谱面片段时长（秒），用于 chartPeek 模式
+  final int peekDurationSeconds;
+
+  /// 谱面片段难度随机池（inote 编号 '2'..'6'），用于 chartPeek 模式
+  final List<String> peekDifficulties;
+
   RoomEntity({
     required this.roomId,
     String roomCode = '',
@@ -86,6 +101,11 @@ class RoomEntity {
     this.playDuration = 5,
     this.songCount = 3,
     this.nonEnglishCharThreshold = 50,
+    this.flashDurationMs = 300,
+    this.tileCount = 1000,
+    this.tileRevealIntervalMs = 1500,
+    this.peekDurationSeconds = 8,
+    this.peekDifficulties = const ['4'],
   }) : _roomCode = roomCode,
        lastActivityAt = lastActivityAt ?? createdAt;
 
@@ -130,6 +150,13 @@ class RoomEntity {
       return int.tryParse(value.toString()) ?? defaultValue;
     }
 
+    /// 定数范围：后端可能给 double / int / 字符串，缺省时回落到默认区间。
+    double parseDouble(dynamic value, double defaultValue) {
+      if (value == null) return defaultValue;
+      if (value is num) return value.toDouble();
+      return double.tryParse(value.toString()) ?? defaultValue;
+    }
+
     return RoomEntity(
       roomId: roomId,
       roomCode: json['room_code'] ?? json['roomCode'] ?? json['code'] ?? '',
@@ -144,17 +171,23 @@ class RoomEntity {
       createdAt: parseDateTime(json['created_at'] ?? json['createdAt']),
       lastActivityAt: parseDateTime(json['last_activity_at'] ?? json['lastActivityAt']),
       selectedVersions: parseStringList(json['selectedVersions'] ?? json['selected_versions']),
-      masterMinDx: (json['masterMinDx'] ?? json['master_min_dx'] ?? 1.0) is double
-          ? (json['masterMinDx'] ?? json['master_min_dx'])
-          : double.parse((json['masterMinDx'] ?? json['master_min_dx'] ?? '1.0').toString()),
-      masterMaxDx: (json['masterMaxDx'] ?? json['master_max_dx'] ?? 15.0) is double
-          ? (json['masterMaxDx'] ?? json['master_max_dx'])
-          : double.parse((json['masterMaxDx'] ?? json['master_max_dx'] ?? '15.0').toString()),
+      // 注意：这里原来的三元写法在**两个 key 都缺失**时会返回 null
+      // （true 分支里没有兜底值），minimal 报文（老服务端 / 单测构造）会直接抛
+      // 类型错误。改成 num?.toDouble() + 兜底。
+      masterMinDx: parseDouble(json['masterMinDx'] ?? json['master_min_dx'], 1.0),
+      masterMaxDx: parseDouble(json['masterMaxDx'] ?? json['master_max_dx'], 15.0),
       selectedGenres: parseStringList(json['selectedGenres'] ?? json['selected_genres']),
       blurLevel: parseInt(json['blur_level'] ?? json['blurLevel'], 50),
       playDuration: parseInt(json['play_duration'] ?? json['playDuration'], 5),
       songCount: parseInt(json['song_count'] ?? json['songCount'], 3),
       nonEnglishCharThreshold: parseInt(json['non_english_char_threshold'] ?? json['nonEnglishCharThreshold'], 50),
+      flashDurationMs: parseInt(json['flash_duration_ms'] ?? json['flashDurationMs'], 300),
+      tileCount: parseInt(json['tile_count'] ?? json['tileCount'], 1000),
+      tileRevealIntervalMs: parseInt(json['tile_reveal_interval_ms'] ?? json['tileRevealIntervalMs'], 1500),
+      peekDurationSeconds: parseInt(json['peek_duration_seconds'] ?? json['peekDurationSeconds'], 8),
+      peekDifficulties: parseStringList(json['peek_difficulties'] ?? json['peekDifficulties']).isEmpty
+          ? const ['4']
+          : parseStringList(json['peek_difficulties'] ?? json['peekDifficulties']),
     );
   }
 
@@ -180,6 +213,11 @@ class RoomEntity {
       'play_duration': playDuration,
       'song_count': songCount,
       'non_english_char_threshold': nonEnglishCharThreshold,
+      'flash_duration_ms': flashDurationMs,
+      'tile_count': tileCount,
+      'tile_reveal_interval_ms': tileRevealIntervalMs,
+      'peek_duration_seconds': peekDurationSeconds,
+      'peek_difficulties': peekDifficulties,
     };
   }
 
@@ -205,6 +243,11 @@ class RoomEntity {
     int? playDuration,
     int? songCount,
     int? nonEnglishCharThreshold,
+    int? flashDurationMs,
+    int? tileCount,
+    int? tileRevealIntervalMs,
+    int? peekDurationSeconds,
+    List<String>? peekDifficulties,
   }) {
     return RoomEntity(
       roomId: roomId ?? this.roomId,
@@ -227,6 +270,11 @@ class RoomEntity {
       playDuration: playDuration ?? this.playDuration,
       songCount: songCount ?? this.songCount,
       nonEnglishCharThreshold: nonEnglishCharThreshold ?? this.nonEnglishCharThreshold,
+      flashDurationMs: flashDurationMs ?? this.flashDurationMs,
+      tileCount: tileCount ?? this.tileCount,
+      tileRevealIntervalMs: tileRevealIntervalMs ?? this.tileRevealIntervalMs,
+      peekDurationSeconds: peekDurationSeconds ?? this.peekDurationSeconds,
+      peekDifficulties: peekDifficulties ?? this.peekDifficulties,
     );
   }
 
@@ -245,6 +293,14 @@ class RoomEntity {
         return GameType.alia;
       case 'letters':
         return GameType.letters;
+      case 'flash':
+        return GameType.flash;
+      case 'tileReveal':
+      case 'tile_reveal':
+        return GameType.tileReveal;
+      case 'chartPeek':
+      case 'chart_peek':
+        return GameType.chartPeek;
       // 中文显示名（兼容旧版 / 服务端可能返回中文）
       case '无提示猜歌':
         return GameType.info;
@@ -258,6 +314,12 @@ class RoomEntity {
         return GameType.alia;
       case '开字母':
         return GameType.letters;
+      case '曲绘快闪':
+        return GameType.flash;
+      case '曲绘拼图':
+        return GameType.tileReveal;
+      case '谱面片段':
+        return GameType.chartPeek;
       default:
         debugPrint('[WARN][RoomEntity] 未知的游戏类型: $type，默认使用 info');
         return GameType.info;

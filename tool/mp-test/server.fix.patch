@@ -1,0 +1,791 @@
+diff --git a/server.js b/server.js
+index 7bc8b44..05db069 100644
+--- a/server.js
++++ b/server.js
+@@ -619,9 +619,27 @@ function generateRoomCode() {
+   return code;
+ }
+ 
++// 把客户端传来的模式专属数值夹到合法区间（客户端不可信，越界会直接
++// 反映到别人的题面上，例如 tileCount=0 会让拼图瞬间全揭示）
++function clampInt(value, min, max, fallback) {
++  const n = Number(value);
++  if (!Number.isFinite(n)) return fallback;
++  return Math.min(max, Math.max(min, Math.round(n)));
++}
++
++// 谱面难度池：只接受 inote '2'..'6'（BASIC 是 2，没有 '1'），空则回退 EXPERT
++function sanitizePeekDifficulties(value) {
++  const allowed = ['2', '3', '4', '5', '6'];
++  const list = Array.isArray(value)
++    ? value.map(v => String(v)).filter(v => allowed.includes(v))
++    : [];
++  const unique = [...new Set(list)];
++  return unique.length > 0 ? unique : ['4'];
++}
++
+ // 房间类
+ class Room {
+-  constructor(id, gameType, maxPlayers, timeLimit, maxGuesses, totalRounds, hostId, selectedVersions = [], masterMinDx = 1.0, masterMaxDx = 15.0, selectedGenres = [], blurLevel = 50, playDuration = 5, songCount = 3, nonEnglishCharThreshold = 50) {
++  constructor(id, gameType, maxPlayers, timeLimit, maxGuesses, totalRounds, hostId, selectedVersions = [], masterMinDx = 1.0, masterMaxDx = 15.0, selectedGenres = [], blurLevel = 50, playDuration = 5, songCount = 3, nonEnglishCharThreshold = 50, flashDurationMs = 300, tileCount = 1000, tileRevealIntervalMs = 1500, peekDurationSeconds = 8, peekDifficulties = ['4']) {
+     this.id = id;
+     this.code = generateRoomCode(); // 6位房间码
+     this.gameType = gameType;
+@@ -652,6 +670,22 @@ class Room {
+     this.playDuration = playDuration;
+     this.songCount = songCount;
+     this.nonEnglishCharThreshold = nonEnglishCharThreshold;
++    // flash / tileReveal / chartPeek 的专属参数。服务端只负责保存与广播，
++    // 具体题面（快闪、拼图、谱面片段）由各客户端按确定性种子本地渲染。
++    this.flashDurationMs = flashDurationMs;
++    this.tileCount = tileCount;
++    this.tileRevealIntervalMs = tileRevealIntervalMs;
++    this.peekDurationSeconds = peekDurationSeconds;
++    this.peekDifficulties = peekDifficulties;
++
++    // 本回合目标曲目（letters 模式可能多首；其它模式恒为 1 首）
++    this.currentSongs = [];
++    // letters 模式：本回合已开的字母（房间共享）与本回合已猜中的曲目 id
++    this.openedLetters = [];
++    this.foundSongIds = [];
++    // 本回合开始时间（毫秒）。原先用 roundTimer._idleStart 取到的是 libuv
++    // 事件循环时刻，与 Date.now() 基准不同，导致 timeSpent 恒为 0、计分退化成常量。
++    this.roundStartedAt = null;
+   }
+ 
+   // 更新最后活动时间
+@@ -718,16 +752,44 @@ class Room {
+   }
+ 
+   // 开始游戏
++  // 开始游戏
++  // - waiting：正常开局
++  // - ended  ：房主点「开始新一轮」，重置回合与分数后重开
++  //   （原先 ended 状态直接返回 false，客户端点「开始新一轮」只会弹「游戏已开始」）
+   startGame() {
+-    if (this.status !== 'waiting') return false;
++    if (this.status === 'playing') return false;
+     if (this.players.length < 2) return false;
+-    
++
++    if (this.status === 'ended') {
++      this.resetForNewGame();
++    }
++
+     this.status = 'playing';
+     this.currentRound = 0;
+     this.updateActivity();
+     return true;
+   }
+ 
++  // 重开新一轮前的状态重置
++  resetForNewGame() {
++    if (this.roundTimer) {
++      clearTimeout(this.roundTimer);
++      this.roundTimer = null;
++    }
++    this.currentRound = 0;
++    this.currentSong = null;
++    this.currentSongs = [];
++    this.guesses = [];
++    this.isRoundOver = false;
++    this.roundStartedAt = null;
++    this.players.forEach(p => {
++      p.score = 0;
++      p.ready = false;
++      p.surrendered = false;
++      p.currentGuesses = 0;
++    });
++  }
++
+   // 开始回合
+   startRound() {
+     if (this.currentRound >= this.totalRounds) {
+@@ -736,13 +798,28 @@ class Room {
+     }
+     
+     this.currentRound++;
+-    // 使用房间设置的筛选参数生成随机歌曲
+-    this.currentSong = generateRandomSong(
++    // letters（开字母）模式按用户设置抽取多首；其它模式固定 1 首
++    const wantCount = this.gameType === 'letters'
++      ? Math.max(1, Number(this.songCount) || 1)
++      : 1;
++    const picked = generateRandomSongs(
++      wantCount,
+       this.selectedVersions,
+       this.masterMinDx,
+       this.masterMaxDx,
+-      this.selectedGenres
++      this.selectedGenres,
++      this.gameType === 'letters' ? (Number(this.nonEnglishCharThreshold) || 0) : 0
+     );
++    if (picked.length === 0) {
++      // 筛选条件过严：明确失败，交由调用方提示，绝不伪造「ヒバナ」假数据
++      this.currentRound--;
++      return null;
++    }
++    this.currentSongs = picked;
++    this.currentSong = picked[0];
++    this.roundStartedAt = Date.now();
++    this.openedLetters = [];
++    this.foundSongIds = [];
+     this.guesses = [];
+     this.isRoundOver = false; // 重置回合结束状态
+     this.updateActivity();
+@@ -765,16 +842,52 @@ class Room {
+     return this.currentSong;
+   }
+ 
+-  // 结束回合
++  // 结束回合（得分统一在这里结算，保证每回合每人只计一次）
+   endRound() {
+-    this.isRoundOver = true; // 标记回合结束
+-    // 计算得分
++    if (this.isRoundOver) {
++      // 幂等：重复调用不重复加分（原先回合结束后再提交正确答案会再次加分）
++      return;
++    }
++    this.isRoundOver = true;
++    // 计算得分：用 addGuess 已经算好的 score，口径与下发到客户端的一致。
++    //
++    // **每道题只计一次分**：同一首可以被重复提交（letters 模式下玩家重试、
++    // 客户端重发都可能发生），直接累加会把同一首算很多遍 —— 实测连猜同一首
++    // 3 次再猜完其余两首，本该 300 分却拿到 500 分。所以先按 (playerId, songId)
++    // 去重取该玩家在这首上的最高分。
++    const bestByPlayerAndSong = new Map();
+     this.guesses.forEach(guess => {
+-      const player = this.players.find(p => p.id === guess.playerId);
+-      if (player && !player.surrendered && guess.correct) {
+-        player.score += Math.max(100 - guess.timeSpent, 10);
++      if (!guess.correct) return;
++      const songKey = guess.matchedSongId != null
++        ? String(guess.matchedSongId)
++        : String(guess.songId);
++      const key = guess.playerId + '\u0000' + songKey;
++      const score = (typeof guess.score === 'number')
++        ? guess.score
++        : Math.max(100 - guess.timeSpent, 10);
++      const prev = bestByPlayerAndSong.get(key);
++      if (prev === undefined || score > prev.score) {
++        bestByPlayerAndSong.set(key, { playerId: guess.playerId, songKey, score });
+       }
+     });
++    // letters（开字母）模式：**每首曲目只有最先猜中的那个人得分**，与其它模式
++    // 「先答对者独占本题」保持一致。
++    //
++    // 原先这里对 letters 也按 (playerId, songId) 逐个累加，等于每人把每首曲目
++    // 都答对一遍就都计分：实测先猜中者 99 分、随后照抄公开曲名者 98 分。分差
++    // 只是「谁先动手」的噪声（别的模式慢答的人是 0 分），排行榜失去区分度；
++    // 而且猜中即公开完整曲名，等于把答案送给对手、自己只领先 1 分。
++    const awardedSongs = new Set();
++    bestByPlayerAndSong.forEach(({ playerId, songKey, score }) => {
++      const player = this.players.find(p => p.id === playerId);
++      // 投降者不计分；这一首留给下一个猜中的人
++      if (!player || player.surrendered) return;
++      if (this.gameType === 'letters') {
++        if (awardedSongs.has(songKey)) return;
++        awardedSongs.add(songKey);
++      }
++      player.score += score;
++    });
+     
+     this.updateActivity();
+   }
+@@ -790,19 +903,45 @@ class Room {
+   }
+ 
+   // 添加猜测
++  // 判定规则（与客户端「选中曲库里的那首歌」交互一致）：以 songId 命中为准；
++  // 次选用曲名精确相等（归一化后），绝不做子串包含匹配 —— 否则「Future」会命
++  // 中「Catch The Future」、「地獄」会命中「天国と地獄」，且伪造 songId 也能得分。
+   addGuess(playerId, songId, songName, timeSpent) {
+-    const correct = songId === this.currentSong.id || 
+-      songName.toLowerCase().includes(this.currentSong.title.toLowerCase()) ||
+-      this.currentSong.title.toLowerCase().includes(songName.toLowerCase());
+-    
++    const targets = (this.currentSongs && this.currentSongs.length > 0)
++      ? this.currentSongs
++      : (this.currentSong ? [this.currentSong] : []);
++
++    const normalizedGuess = normalizeTitle(songName);
++    const matched = targets.find(song => {
++      if (songId && String(songId) === String(song.id)) return true;
++      return normalizedGuess.length > 0 && normalizeTitle(song.title) === normalizedGuess;
++    });
++    const correct = !!matched;
++
++    // letters 模式：命中后把该曲标记为已猜中并公开其完整曲名，
++    // 回合要等所有目标曲都被猜中才算完成。
++    if (correct && this.gameType === 'letters' && matched) {
++      const id = String(matched.id);
++      if (!this.foundSongIds.includes(id)) this.foundSongIds.push(id);
++    }
++
++    // 得分：按剩余时间给速度奖励（下限 10 分），与 endRound 累加口径一致
++    const spent = Math.max(0, Number(timeSpent) || 0);
++    const score = correct ? Math.max(100 - Math.floor(spent), 10) : 0;
++
+     const guess = {
+       playerId,
+       playerNickname: this.players.find(p => p.id === playerId)?.nickname || '',
+       songId,
+       songName,
+       correct,
+-      timeSpent: Math.max(0, timeSpent)
++      score,
++      timeSpent: spent
+     };
++
++    // 命中后记录「实际命中的题目 id」。letters 模式允许同一首被反复提交
++    // （玩家会重试、或客户端重发），结算时按它去重，避免同一首重复计分。
++    if (correct && matched) guess.matchedSongId = String(matched.id);
+     
+     this.guesses.push(guess);
+     this.updateActivity();
+@@ -844,10 +983,81 @@ class Room {
+       blurLevel: this.blurLevel,
+       playDuration: this.playDuration,
+       songCount: this.songCount,
+-      nonEnglishCharThreshold: this.nonEnglishCharThreshold
++      nonEnglishCharThreshold: this.nonEnglishCharThreshold,
++      flashDurationMs: this.flashDurationMs,
++      tileCount: this.tileCount,
++      tileRevealIntervalMs: this.tileRevealIntervalMs,
++      peekDurationSeconds: this.peekDurationSeconds,
++      peekDifficulties: this.peekDifficulties
+     };
+   }
+ 
++  // 按已开字母计算掩码：空格始终可见，已开的字母（大小写不敏感）可见，其余为 □
++  maskedTitleOf(song) {
++    const title = String(song && song.title ? song.title : '');
++    if (this.foundSongIds.includes(String(song.id))) return title; // 已猜中直接公开
++    const opened = this.openedLetters.map(c => String(c).toLowerCase());
++    let out = '';
++    for (const ch of title) {
++      if (ch === ' ') { out += ch; continue; }
++      out += opened.includes(ch.toLowerCase()) ? ch : '□';
++    }
++    return out;
++  }
++
++  // 开一个字母（房间共享，所有人可见）
++  openLetter(letter) {
++    const ch = String(letter == null ? '' : letter).trim();
++    if (ch.length === 0) return { ok: false, reason: '请输入一个字符' };
++    // 按字符（而非 UTF-16 码元）校验，避免 emoji / 代理对被拆成两半
++    if ([...ch].length > 1) return { ok: false, reason: '一次只能开一个字符' };
++    if (this.openedLetters.includes(ch)) return { ok: false, reason: '该字母已经开过了' };
++    this.openedLetters.push(ch);
++    this.updateActivity();
++    return { ok: true };
++  }
++
++  // 本回合所有目标曲是否已全部猜中
++  allSongsFound() {
++    const targets = (this.currentSongs && this.currentSongs.length > 0)
++      ? this.currentSongs
++      : (this.currentSong ? [this.currentSong] : []);
++    if (targets.length === 0) return false;
++    return targets.every(song => this.foundSongIds.includes(String(song.id)));
++  }
++
++  // 猜对后本回合是否应当结束：
++  // - letters 模式需要把全部目标曲都猜出来
++  // - 其它模式猜中即结束
++  isRoundComplete() {
++    if (this.gameType === 'letters') return this.allSongsFound();
++    return true;
++  }
++
++  // 本回合剩余秒数（无限制或未开始返回 timeLimit / 0）
++  remainingSeconds() {
++    if (!this.roundStartedAt) return this.timeLimit;
++    const elapsed = Math.floor((Date.now() - this.roundStartedAt) / 1000);
++    return Math.max(0, this.timeLimit - elapsed);
++  }
++
++  // 本局获胜者（并列则返回多人）。
++  //
++  // 胜负判定原先**根本不存在**：endGame() 只把 status 置为 'ended'，客户端按
++  // score 降序摆个排行榜就完事 —— 既没有「谁赢了」，也没有平局概念。而且客户端
++  // 用 List.sort 排序，Dart 的排序不保证稳定，同分玩家每帧的名次还会来回跳。
++  //
++  // 口径：
++  // - 分数最高者获胜；**同分并列，都算赢**（不再靠排序先后分高下）
++  // - 全场最高分为 0（没人得分）时返回空数组 → 客户端显示「平局」
++  // - 投降只是「本回合不再计分」，已累积的分数仍然有效，因此不按 surrendered 过滤
++  winners() {
++    if (this.players.length === 0) return [];
++    const top = Math.max(...this.players.map(p => p.score));
++    if (!(top > 0)) return [];
++    return this.players.filter(p => p.score === top).map(p => p.id);
++  }
++
+   // 获取游戏状态（用于游戏中）
+   getGameState() {
+     return {
+@@ -855,9 +1065,26 @@ class Room {
+       currentRound: this.currentRound,
+       totalRounds: this.totalRounds,
+       timeLimit: this.timeLimit,
++      // 剩余秒数：客户端 GameStateEntity 缺省是 60，不主动下发会让倒计时
++      // 与房间设置（例如 30 秒）不一致。
++      timeRemaining: this.remainingSeconds(),
+       maxGuesses: this.maxGuesses,
+       currentGuesses: this.guesses.length,
+       currentSong: this.currentSong,
++      // letters 模式的多首目标曲（其它模式长度为 1）
++      targetSongs: (this.currentSongs && this.currentSongs.length > 0)
++        ? this.currentSongs
++        : (this.currentSong ? [this.currentSong] : []),
++      // letters 模式：房间共享的已开字母与各曲掩码
++      openedLetters: this.openedLetters || [],
++      maskedTitles: (this.gameType === 'letters')
++        ? Object.fromEntries(
++            ((this.currentSongs && this.currentSongs.length > 0)
++              ? this.currentSongs
++              : (this.currentSong ? [this.currentSong] : [])
++            ).map(song => [String(song.id), this.maskedTitleOf(song)]))
++        : undefined,
++      foundSongIds: this.foundSongIds || [],
+       guesses: this.guesses,
+       players: this.players.map(p => ({
+         id: p.id,
+@@ -869,7 +1096,10 @@ class Room {
+       })),
+       status: this.status,
+       isRoundOver: this.isRoundOver || this.allPlayersSurrendered(),
+-      isGameOver: this.status === 'ended'
++      isGameOver: this.status === 'ended',
++      // 仅在对局真正结束时下发获胜者。回合进行中最高分只是「暂时领先」，
++      // 当成获胜者会让客户端在终局前就弹「XXX 获胜」。
++      winners: this.status === 'ended' ? this.winners() : undefined
+     };
+   }
+ }
+@@ -1153,90 +1383,101 @@ function getSongCacheCount() {
+   return songCache.length;
+ }
+ 
+-// 生成随机歌曲（支持筛选参数）
+-function generateRandomSong(selectedVersions = [], masterMinDx = 1.0, masterMaxDx = 15.0, selectedGenres = []) {
+-  if (songCache.length === 0) {
+-    // 如果缓存为空，返回默认歌曲（与前端 Song.dart 结构对齐）
+-    return { 
+-      id: '1', 
+-      title: 'ヒバナ', 
+-      type: 'original',
+-      ds: [10.0],
+-      level: ['MASTER'],
+-      cids: [1],
+-      charts: [{ notes: [], charter: '' }],
+-      basic_info: {
+-        title: 'ヒバナ',
+-        artist: 'DECO*27',
+-        genre: 'VOCALOID',
+-        bpm: 128,
+-        release_date: '2023-01-01',
+-        from: 'Maimai DX',
+-        is_new: false
+-      }
+-    };
++// 取 MASTER 定数：乐谱 ds 数组为 [BASIC, ADVANCED, EXPERT, MASTER, Re:MASTER]
++// 客户端各模式（GuessChartByInfoService 等）一律用 ds[3]，服务端必须一致，
++// 否则定数筛选会全部落空并退化成固定曲。
++function masterDsOf(song) {
++  const ds = song && song.ds;
++  if (!Array.isArray(ds) || ds.length <= 3) return null;
++  const v = Number(ds[3]);
++  return Number.isFinite(v) ? v : null;
++}
++
++// 非英文字符占比（不含空格），与客户端 GuessSongByOpenLettersService 保持一致
++function nonEnglishCharRatio(title) {
++  if (!title) return 0;
++  const total = title.replace(/ /g, '').length;
++  if (total === 0) return 0;
++  let nonEnglish = 0;
++  for (const ch of title) {
++    if (ch !== ' ' && !/^[a-zA-Z0-9]$/.test(ch)) nonEnglish++;
+   }
+-  
+-  // 过滤掉ID为6位数的歌曲（ID范围: 100000 - 999999）
++  return nonEnglish / total;
++}
++
++// 曲名归一化，用于精确比对（避免子串误判）
++function normalizeTitle(value) {
++  return String(value == null ? '' : value)
++    .normalize('NFC')
++    .trim()
++    .toLowerCase()
++    .replace(/\s+/g, ' ');
++}
++
++// 生成随机歌曲列表（支持筛选参数）
++// count=1 时即原先的单曲行为；letters 模式可传多首。
++function generateRandomSongs(count = 1, selectedVersions = [], masterMinDx = 1.0,
++                            masterMaxDx = 15.0, selectedGenres = [], nonEnglishCharThreshold = 0) {
++  if (songCache.length === 0) return [];
++
++  // 过滤掉宴会场谱面（id 为六位数）
+   let filteredSongs = songCache.filter(song => {
+     const id = String(song.id);
+-    // 检查是否为6位数
+     if (id.length === 6 && /^\d+$/.test(id)) {
+       const numId = parseInt(id, 10);
+       return numId < 100000 || numId > 999999;
+     }
+     return true;
+   });
+-  
+-  // 应用版本筛选
++
+   if (selectedVersions && selectedVersions.length > 0) {
+-    filteredSongs = filteredSongs.filter(song => {
+-      return selectedVersions.includes(song.basic_info?.from);
+-    });
++    filteredSongs = filteredSongs.filter(song => selectedVersions.includes(song.basic_info?.from));
+   }
+-  
+-  // 应用流派筛选
++
+   if (selectedGenres && selectedGenres.length > 0) {
+-    filteredSongs = filteredSongs.filter(song => {
+-      return selectedGenres.includes(song.basic_info?.genre);
+-    });
++    filteredSongs = filteredSongs.filter(song => selectedGenres.includes(song.basic_info?.genre));
+   }
+-  
+-  // 应用 MASTER 定数范围筛选
++
++  // MASTER 定数范围（与客户端同口径）
+   filteredSongs = filteredSongs.filter(song => {
+-    const masterDs = song.ds?.[0]; // MASTER 难度的定数通常在第一个位置
+-    if (masterDs === undefined || masterDs === null) return false;
++    const masterDs = masterDsOf(song);
++    if (masterDs === null) return false;
+     return masterDs >= masterMinDx && masterDs <= masterMaxDx;
+   });
+-  
+-  // 如果过滤后没有可选歌曲，返回默认歌曲
++
++  // 非英文字符占比阈值（letters 模式用于排除难以输入的日文曲名）
++  if (nonEnglishCharThreshold > 0) {
++    filteredSongs = filteredSongs.filter(
++      song => nonEnglishCharRatio(song.title) < nonEnglishCharThreshold / 100.0);
++  }
++
+   if (filteredSongs.length === 0) {
+-    console.log('[WARNING][generateRandomSong] 过滤后无可用歌曲，使用默认歌曲');
+-    console.log(`[WARNING][generateRandomSong] 筛选条件: selectedVersions=${JSON.stringify(selectedVersions)}, masterMinDx=${masterMinDx}, masterMaxDx=${masterMaxDx}, selectedGenres=${JSON.stringify(selectedGenres)}`);
+-    return { 
+-      id: '1', 
+-      title: 'ヒバナ', 
+-      type: 'original',
+-      ds: [10.0],
+-      level: ['MASTER'],
+-      cids: [1],
+-      charts: [{ notes: [], charter: '' }],
+-      basic_info: {
+-        title: 'ヒバナ',
+-        artist: 'DECO*27',
+-        genre: 'VOCALOID',
+-        bpm: 128,
+-        release_date: '2023-01-01',
+-        from: 'Maimai DX',
+-        is_new: false
+-      }
+-    };
++    console.log('[WARNING][generateRandomSongs] 过滤后无可用歌曲');
++    console.log('[WARNING][generateRandomSongs] 筛选条件: ' +
++      'selectedVersions=' + JSON.stringify(selectedVersions) +
++      ', masterMinDx=' + masterMinDx + ', masterMaxDx=' + masterMaxDx +
++      ', selectedGenres=' + JSON.stringify(selectedGenres) +
++      ', nonEnglishCharThreshold=' + nonEnglishCharThreshold);
++    return [];
+   }
+-  
+-  console.log(`[DEBUG][generateRandomSong] 过滤前歌曲数: ${songCache.length}, 过滤后歌曲数: ${filteredSongs.length}`);
+-  console.log(`[DEBUG][generateRandomSong] 筛选条件: selectedVersions=${JSON.stringify(selectedVersions)}, masterMinDx=${masterMinDx}, masterMaxDx=${masterMaxDx}, selectedGenres=${JSON.stringify(selectedGenres)}`);
+-  
+-  return filteredSongs[Math.floor(Math.random() * filteredSongs.length)];
++
++  console.log('[DEBUG][generateRandomSongs] 过滤前: ' + songCache.length +
++    ', 过滤后: ' + filteredSongs.length + ', 抽取: ' + count);
++
++  // 洗牌后取前 count 首，避免抽到重复曲目
++  const pool = filteredSongs.slice();
++  for (let i = pool.length - 1; i > 0; i--) {
++    const j = Math.floor(Math.random() * (i + 1));
++    [pool[i], pool[j]] = [pool[j], pool[i]];
++  }
++  return pool.slice(0, Math.max(1, Math.min(count, pool.length)));
++}
++
++// 兼容旧调用：单曲
++function generateRandomSong(selectedVersions = [], masterMinDx = 1.0,
++                            masterMaxDx = 15.0, selectedGenres = []) {
++  const list = generateRandomSongs(1, selectedVersions, masterMinDx, masterMaxDx, selectedGenres);
++  return list.length > 0 ? list[0] : null;
+ }
+ 
+ // 广播消息到房间内所有玩家
+@@ -1339,9 +1580,14 @@ wss.on('connection', (ws) => {
+ 
+         // 创建房间
+         case 'create_room': {
+-          const { gameType, maxPlayers = 4, timeLimit = 60, maxGuesses = 10, totalRounds = 5, selectedVersions = [], masterMinDx = 1.0, masterMaxDx = 15.0, selectedGenres = [], blurLevel = 50, playDuration = 5, songCount = 3, nonEnglishCharThreshold = 50 } = payload || {};
++          const { gameType, maxPlayers = 4, timeLimit = 60, maxGuesses = 10, totalRounds = 5, selectedVersions = [], masterMinDx = 1.0, masterMaxDx = 15.0, selectedGenres = [], blurLevel = 50, playDuration = 5, songCount = 3, nonEnglishCharThreshold = 50, flashDurationMs = 300, tileCount = 1000, tileRevealIntervalMs = 1500, peekDurationSeconds = 8, peekDifficulties = ['4'] } = payload || {};
+           const roomId = uuidv4();
+-          const room = new Room(roomId, gameType, maxPlayers, timeLimit, maxGuesses, totalRounds, playerId, selectedVersions, masterMinDx, masterMaxDx, selectedGenres, blurLevel, playDuration, songCount, nonEnglishCharThreshold);
++          const room = new Room(roomId, gameType, maxPlayers, timeLimit, maxGuesses, totalRounds, playerId, selectedVersions, masterMinDx, masterMaxDx, selectedGenres, blurLevel, playDuration, songCount, nonEnglishCharThreshold,
++            clampInt(flashDurationMs, 100, 3000, 300),
++            clampInt(tileCount, 100, 10000, 1000),
++            clampInt(tileRevealIntervalMs, 100, 10000, 1500),
++            clampInt(peekDurationSeconds, 3, 60, 8),
++            sanitizePeekDifficulties(peekDifficulties));
+           
+           room.addPlayer(player);
+           rooms.set(roomId, room);
+@@ -1583,7 +1829,7 @@ wss.on('connection', (ws) => {
+             return;
+           }
+           
+-          if (room.status !== 'waiting') {
++          if (room.status === 'playing') {
+             sendToPlayer(playerId, {
+               action: 'error',
+               payload: { message: '游戏已开始，无法修改准备状态' }
+@@ -1646,8 +1892,10 @@ wss.on('connection', (ws) => {
+             return;
+           }
+           
+-          // 检查房间状态
+-          if (room.status !== 'waiting') {
++﻿          // 检查房间状态
++          // waiting → 正常开局；ended → 房主点「开始新一轮」重开
++          // （原先 ended 也走这里被拒，导致结束后无法重开）
++          if (room.status === 'playing') {
+             sendToPlayer(playerId, {
+               action: 'error',
+               payload: { message: '游戏已开始' }
+@@ -1664,8 +1912,9 @@ wss.on('connection', (ws) => {
+             return;
+           }
+           
+-          // 检查是否所有玩家都准备好
+-          if (!room.allPlayersReady()) {
++          // 重开新一轮时无需重新准备（结束后点「开始新一轮」即可）
++          const isRestart = room.status === 'ended';
++          if (!isRestart && !room.allPlayersReady()) {
+             sendToPlayer(playerId, {
+               action: 'error',
+               payload: { message: '并非所有玩家都已准备' }
+@@ -1673,7 +1922,7 @@ wss.on('connection', (ws) => {
+             return;
+           }
+           
+-          // 开始游戏
++          // 开始游戏（ended 状态会自动重置回合与分数）
+           if (!room.startGame()) {
+             sendToPlayer(playerId, {
+               action: 'error',
+@@ -1685,9 +1934,11 @@ wss.on('connection', (ws) => {
+           // 开始第一回合
+           const song = room.startRound();
+           if (!song) {
++            // 抽曲失败：把房间退回等待态，避免卡在 playing 却无题目
++            room.status = 'waiting';
+             sendToPlayer(playerId, {
+               action: 'error',
+-              payload: { message: '无法开始回合' }
++              payload: { message: '没有符合条件的乐曲，请放宽筛选条件后重试' }
+             });
+             return;
+           }
+@@ -1760,13 +2011,25 @@ wss.on('connection', (ws) => {
+             });
+             return;
+           }
++
++          // 本回合必须真的已结束，才允许开下一回合。
++          // 客户端只要看到 isRoundOver 就会给房主显示「下一轮」，中间可能夹杂
++          // 本地超时标记与服务端状态不同步；这里以服务端为准，避免把还在进行
++          // 的回合直接跳过去（那样本回合所有人的得分都会凭空消失）。
++          if (!room.isRoundOver) {
++            sendToPlayer(playerId, {
++              action: 'error',
++              payload: { message: '本回合尚未结束' }
++            });
++            return;
++          }
+           
+           // 开始下一回合
+           const song = room.startRound();
+           if (!song) {
+             sendToPlayer(playerId, {
+               action: 'error',
+-              payload: { message: '无法开始回合' }
++              payload: { message: '没有符合条件的乐曲，请放宽筛选条件后重试' }
+             });
+             return;
+           }
+@@ -1821,8 +2084,19 @@ wss.on('connection', (ws) => {
+             return;
+           }
+           
+-          // 检查该玩家是否已达到最大猜测次数
+-          // 检查房间是否已达到最大猜测次数（共享）
++          // 已投降的玩家不再参与本回合：投降后既不该继续消耗全房间共享的
++          // 猜测次数池，也不该再拿分（endRound 本来就不给投降者计分）。
++          // 原先 submit_guess 完全不看 surrendered，投降的人照样能提交、
++          // 照样消耗共享次数池，等于拖累还在玩的队友。
++          if (player.surrendered) {
++            sendToPlayer(playerId, {
++              action: 'error',
++              payload: { message: '您已投降，本回合无法再提交猜测' }
++            });
++            return;
++          }
++
++          // 检查房间是否已达到最大猜测次数（共享，全房间一个池子）
+           if (room.guesses.length >= room.maxGuesses) {
+             sendToPlayer(playerId, {
+               action: 'error',
+@@ -1831,8 +2105,22 @@ wss.on('connection', (ws) => {
+             return;
+           }
+           
++          // 回合已结束（含被答对提前结束、全部投降、超时）后不再接受猜测，
++          // 否则可以在一回合内反复提交正确答案刷分。
++          if (room.isRoundOver) {
++            sendToPlayer(playerId, {
++              action: 'error',
++              payload: { message: '本回合已结束，请等待房主开始下一回合' }
++            });
++            return;
++          }
++          
+           const { songId, songName } = payload || {};
+-          const timeSpent = room.timeLimit - Math.floor((room.roundTimer?._idleStart ? (Date.now() - room.roundTimer._idleStart) / 1000 : 0));
++          // 作答耗时以回合开始时间为基准（roundTimer._idleStart 是 libuv 内部
++          // 时间戳，与 Date.now() 不同基准，会让 timeSpent 恒为 0）
++          const timeSpent = room.roundStartedAt
++            ? Math.max(0, (Date.now() - room.roundStartedAt) / 1000)
++            : 0;
+           
+           // 增加该玩家的猜测次数（保留用于统计）
+           player.incrementGuesses();
+@@ -1864,8 +2152,15 @@ wss.on('connection', (ws) => {
+             payload: { gameState: room.getGameState() }
+           });
+           
+-          // 如果答对了，结束回合
+-          if (guess.correct) {
++          // 答对后判断本回合是否完成（letters 需全部猜中才结束）
++          if (guess.correct && room.isRoundComplete()) {
++            clearTimeout(room.roundTimer);
++            endRoundHandler(roomId);
++          } else if (room.guesses.length >= room.maxGuesses) {
++            // 共享次数池用尽 → 本回合结束。规则弹窗写的是「用完本回合即结束」，
++            // 但原先只是拒绝后续提交、从不结束回合，回合会一直挂到超时，
++            // 期间所有人只能干等（超时后如果没人答对、也没全投降，房主还会
++            // 因为看不到「下一轮」按钮而卡死）。
+             clearTimeout(room.roundTimer);
+             endRoundHandler(roomId);
+           }
+@@ -1874,6 +2169,54 @@ wss.on('connection', (ws) => {
+           break;
+         }
+ 
++﻿        // 开字母（letters 模式；房间共享）
++        case 'open_letter': {
++          const roomId = player.currentRoomId;
++          if (!roomId) {
++            sendToPlayer(playerId, { action: 'error', payload: { message: '您不在任何房间中' } });
++            return;
++          }
++
++          const room = rooms.get(roomId);
++          if (!room) {
++            player.currentRoomId = null;
++            sendToPlayer(playerId, { action: 'error', payload: { message: '房间不存在' } });
++            return;
++          }
++
++          if (room.status !== 'playing' || room.gameType !== 'letters') {
++            sendToPlayer(playerId, { action: 'error', payload: { message: '当前模式不支持开字母' } });
++            return;
++          }
++          if (room.isRoundOver) {
++            sendToPlayer(playerId, { action: 'error', payload: { message: '本回合已结束' } });
++            return;
++          }
++
++          const result = room.openLetter(payload && payload.letter);
++          if (!result.ok) {
++            sendToPlayer(playerId, { action: 'error', payload: { message: result.reason } });
++            return;
++          }
++
++          // 开字母是房间共享进度：回执给发起者，并把新掩码广播给所有人
++          sendToPlayer(playerId, {
++            action: 'letter_opened',
++            payload: {
++              success: true,
++              letter: String(payload.letter).trim(),
++              openedLetters: room.openedLetters
++            }
++          });
++          broadcast(roomId, {
++            action: 'game_state_updated',
++            payload: { gameState: room.getGameState() }
++          });
++
++          console.log(`Player ${playerId} opened letter in room ${roomId}`);
++          break;
++        }
++
+         // 投降
+         case 'surrender': {
+           const roomId = player.currentRoomId;
+@@ -2092,6 +2435,12 @@ function endRoundHandler(roomId) {
+   // 结束当前回合
+   room.endRound();
+   
++  // 结算后分数才真正加进 player.score，必须再广播一次 room_updated。
++  // 原顺序是「结算前广播 room_updated → 结算 → 广播 round_over」，结算结果
++  // 再没随 room_updated 下发过，于是客户端读 room.players 的排行榜永远慢
++  // 一回合（真机表现为答对横幅 +62 分、排行榜还停在上一回合）。
++  const settledRoomState = room.getState();
++
+   // 检查是否所有回合都已完成
+   if (room.currentRound >= room.totalRounds) {
+     room.endGame();
+@@ -2099,6 +2448,10 @@ function endRoundHandler(roomId) {
+       action: 'game_over',
+       payload: { gameState: room.getGameState() }
+     });
++    broadcast(roomId, {
++      action: 'room_updated',
++      payload: { room: settledRoomState }
++    });
+     console.log(`Game ended in room: ${roomId}`);
+     return;
+   }
+@@ -2108,6 +2461,12 @@ function endRoundHandler(roomId) {
+     action: 'round_over',
+     payload: { gameState: room.getGameState() }
+   });
++
++  // 补发结算后的房间状态（分数、玩家状态以这一条为准）
++  broadcast(roomId, {
++    action: 'room_updated',
++    payload: { room: settledRoomState }
++  });
+   
+   console.log(`Round ${room.currentRound} ended in room: ${roomId}, waiting for host to start next round`);
+ }

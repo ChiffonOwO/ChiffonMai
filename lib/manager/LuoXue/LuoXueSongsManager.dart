@@ -18,8 +18,32 @@ class LuoXueSongsManager {
   // 落雪歌曲实体
   LuoXueSongEntity? _luoXueSongEntity;
 
+  // 进行中的加载（避免并发重复解析）
+  Future<LuoXueSongEntity?>? _loadFuture;
+
   // 获取落雪歌曲数据
   Future<LuoXueSongEntity?> getLuoXueSongs() async {
+    // 内存缓存短路：**这一步原先缺失**，导致每次调用都要重新读 prefs 并在
+    // 主 isolate 上把整份落雪曲库（数百 KB~数 MB）json.decode 一遍。
+    // 猜歌设置对话框「确定」时会跑一次抽曲校验、开局又跑一次，于是每次
+    // 都要白等一次全量解析；曲库越大越慢，且卡的是 UI 线程。
+    // 落雪曲库只在 clearCache()（拉取新数据/恢复备份）时失效，这里做进程内
+    // 缓存是安全的。
+    final cachedEntity = _luoXueSongEntity;
+    if (cachedEntity != null) return cachedEntity;
+    final inFlight = _loadFuture;
+    if (inFlight != null) return inFlight;
+
+    final future = _loadLuoXueSongs();
+    _loadFuture = future;
+    try {
+      return await future;
+    } finally {
+      _loadFuture = null;
+    }
+  }
+
+  Future<LuoXueSongEntity?> _loadLuoXueSongs() async {
     try {
       // 尝试从缓存加载
       final cachedData = await _loadFromCache();

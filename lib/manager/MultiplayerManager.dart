@@ -18,6 +18,7 @@ class MultiplayerManager {
   StreamSubscription? _eventSubscription;
 
   String? _currentRoomId;
+  RoomEntity? _currentRoom;  // 当前房间（判定 letters 等模式需要）
   PlayerEntity? _currentPlayer;
   GameStateEntity? _currentGameState;  // 本地缓存游戏状态
   DateTime? _newRoundStartTime;  // 新回合开始时间，用于过滤旧回合的延迟猜测
@@ -64,6 +65,7 @@ class MultiplayerManager {
       case MultiplayerEventType.roomCreated:
         if (event is RoomCreatedEvent && event.room != null) {
           _currentRoomId = event.room.roomId;
+          _currentRoom = event.room;
           _roomController.add(event.room);
           _refreshRoomList();
         }
@@ -71,6 +73,7 @@ class MultiplayerManager {
       case MultiplayerEventType.roomJoined:
         if (event is RoomJoinedEvent) {
           _currentRoomId = event.room.roomId;
+          _currentRoom = event.room;
           _currentPlayer = event.player;
           _roomController.add(event.room);
           _refreshRoomList();
@@ -152,6 +155,15 @@ class MultiplayerManager {
             isRoundOver: event.gameState.isRoundOver,
             maxGuesses: event.gameState.maxGuesses,
             currentGuesses: isNewRound ? 0 : event.gameState.currentGuesses,
+            // 这几个字段必须原样带过来，否则整个 game_started 分支会丢掉它们：
+            // timeLimit 丢了倒计时退回 60 秒默认值，targetSongs/maskedTitles
+            // 丢了则 letters 模式开局就只剩 □ 占位、多首目标曲也看不到。
+            timeLimit: event.gameState.timeLimit,
+            targetSongs: event.gameState.targetSongs,
+            openedLetters: event.gameState.openedLetters,
+            maskedTitles: event.gameState.maskedTitles,
+            foundSongIds: event.gameState.foundSongIds,
+            players: event.gameState.players,
           );
           
           if (isNewRound) {
@@ -180,13 +192,35 @@ class MultiplayerManager {
           if (_currentGameState != null) {
             List<GuessRecord> updatedGuesses = List.from(_currentGameState!.guesses);
             updatedGuesses.add(event.guess);
-            
-            bool isRoundOver = event.guess.isCorrect;
+
+            // 猜对不等于回合结束：letters 模式要求把 songCount 首目标曲全部
+            // 猜出来才结束。原先这里无条件用 isCorrect 当回合结束，导致猜中
+            // 3 首里的第 1 首就把本地状态标记成回合结束。
+            // 非 letters 模式维持原行为（猜中即结束，服务端随后的 round_over
+            // 确认一致）；letters 模式则只把该曲记入 foundSongIds。
+            final bool isLetters = _currentRoom?.gameType == GameType.letters;
+            bool isRoundOver;
+            List<String> foundSongIds = _currentGameState!.foundSongIds;
+            if (!event.guess.isCorrect) {
+              isRoundOver = false;
+            } else if (!isLetters) {
+              isRoundOver = true;
+            } else {
+              final String id = event.guess.songId;
+              if (id.isNotEmpty && !foundSongIds.contains(id)) {
+                foundSongIds = [...foundSongIds, id];
+              }
+              final int targetCount = _currentGameState!.targetSongs.isNotEmpty
+                  ? _currentGameState!.targetSongs.length
+                  : 1;
+              isRoundOver = foundSongIds.length >= targetCount;
+            }
             debugPrint('[DEBUG][Manager] Setting isRoundOver=$isRoundOver');
-            
+
             _currentGameState = _currentGameState!.copyWith(
               guesses: updatedGuesses,
               isRoundOver: isRoundOver,
+              foundSongIds: foundSongIds,
             );
             _gameStateController.add(_currentGameState);
             debugPrint('[DEBUG][Manager] Game state updated and added to controller');
@@ -205,6 +239,7 @@ class MultiplayerManager {
         break;
       case MultiplayerEventType.disconnected:
         _currentRoomId = null;
+        _currentRoom = null;
         _currentPlayer = null;
         _roomController.add(null);
         _gameStateController.add(null);
@@ -226,11 +261,13 @@ class MultiplayerManager {
       case MultiplayerEventType.roomUpdated:
         if (event is RoomUpdatedEvent) {
           debugPrint('[DEBUG][Manager] 收到 roomUpdated 事件，发送到 roomController');
+          _currentRoom = event.room;
           _roomController.add(event.room);
         }
         break;
       case MultiplayerEventType.leftRoom:
         _currentRoomId = null;
+        _currentRoom = null;
         _currentPlayer = null;
         _roomController.add(null);
         _gameStateController.add(null);
@@ -254,11 +291,19 @@ class MultiplayerManager {
     int playDuration = 5,
     int songCount = 3,
     int nonEnglishCharThreshold = 50,
+    int flashDurationMs = 300,
+    int tileCount = 1000,
+    int tileRevealIntervalMs = 1500,
+    int peekDurationSeconds = 8,
+    List<String> peekDifficulties = const ['4'],
   }) async {
     debugPrint('[DEBUG][Manager] 开始创建房间请求...');
     debugPrint('[DEBUG][Manager] 参数: gameType=${gameType.name}, maxPlayers=$maxPlayers, timeLimit=$timeLimit, maxGuesses=$maxGuesses');
     debugPrint('[DEBUG][Manager] 歌曲筛选参数: selectedVersions=$selectedVersions, masterMinDx=$masterMinDx, masterMaxDx=$masterMaxDx, selectedGenres=$selectedGenres');
     debugPrint('[DEBUG][Manager] 模式专属参数: blurLevel=$blurLevel, playDuration=$playDuration, songCount=$songCount');
+    debugPrint('[DEBUG][Manager] 新模式参数: flashDurationMs=$flashDurationMs, '
+        'tileCount=$tileCount, tileRevealIntervalMs=$tileRevealIntervalMs, '
+        'peekDurationSeconds=$peekDurationSeconds, peekDifficulties=$peekDifficulties');
 
     await initialize();
     debugPrint('[DEBUG][Manager] 初始化完成');
@@ -299,6 +344,11 @@ class MultiplayerManager {
       playDuration: playDuration,
       songCount: songCount,
       nonEnglishCharThreshold: nonEnglishCharThreshold,
+      flashDurationMs: flashDurationMs,
+      tileCount: tileCount,
+      tileRevealIntervalMs: tileRevealIntervalMs,
+      peekDurationSeconds: peekDurationSeconds,
+      peekDifficulties: peekDifficulties,
     );
 
     debugPrint('[DEBUG][Manager] 等待房间创建结果...');
@@ -372,6 +422,11 @@ class MultiplayerManager {
 
   Future<void> submitGuess(String songId, String songName) async {
     await _cloudService.submitGuess(songId, songName);
+  }
+
+  /// 开字母（letters 模式）
+  Future<void> openLetter(String letter) async {
+    await _cloudService.openLetter(letter);
   }
 
   Future<List<RoomEntity>> getRoomList() async {

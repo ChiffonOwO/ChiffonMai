@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:marquee/marquee.dart';
 import '../utils/AppDesignTokens.dart';
 
 /// Hub 页面通用组件库：Section、ActionTile、Scaffold。
@@ -248,15 +249,11 @@ class HubActionTile extends StatelessWidget {
             )
           : Padding(
               padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                loading ? (loadingText ?? subtitle) : subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: loading ? scheme.primary : scheme.onSurfaceVariant,
-                  fontWeight: loading ? FontWeight.w600 : null,
-                ),
+              child: _MarqueeSubtitle(
+                text: loading ? (loadingText ?? subtitle) : subtitle,
+                color: loading ? scheme.primary : scheme.onSurfaceVariant,
+                fontWeight: loading ? FontWeight.w600 : FontWeight.normal,
+                fontSize: 12,
               ),
             ),
       trailing: loading
@@ -326,6 +323,71 @@ class _StarToggleButton extends StatelessWidget {
   }
 }
 
+/// 副标题：宽度够就静态显示；超长才走 marquee 自动横向滚动，
+/// 短文本不会被无意义的循环动画干扰。
+class _MarqueeSubtitle extends StatelessWidget {
+  final String text;
+  final Color color;
+  final FontWeight fontWeight;
+  final double fontSize;
+
+  const _MarqueeSubtitle({
+    required this.text,
+    required this.color,
+    required this.fontWeight,
+    required this.fontSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textStyle = TextStyle(
+      fontSize: fontSize,
+      color: color,
+      fontWeight: fontWeight,
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 量一下文本宽度，判断是否真需要滚动
+        final tp = TextPainter(
+          text: TextSpan(text: text, style: textStyle),
+          textDirection: TextDirection.ltr,
+          maxLines: 1,
+        )..layout(maxWidth: double.infinity);
+        final overflows = tp.size.width > constraints.maxWidth;
+
+        if (!overflows) {
+          // 短文本：纯静态，没有任何动画
+          return SizedBox(
+            height: fontSize * 1.35,
+            child: Text(
+              text,
+              style: textStyle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          );
+        }
+
+        // 溢出：marquee 自动横向滚动（无文本时仍会创建 controller，但不动画）
+        return SizedBox(
+          height: fontSize * 1.35,
+          child: Marquee(
+            text: text,
+            style: textStyle,
+            scrollAxis: Axis.horizontal,
+            blankSpace: 40,
+            velocity: 30,
+            pauseAfterRound: const Duration(milliseconds: 1500),
+            // startPadding 必须为 0：跟主标题左对齐；非 0 的话滚动起来左侧有
+            // 间隙，副标题起始位置和主标题错开。
+            startPadding: 0,
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// Hub 页面顶层 Scaffold：标题 + 副标题 + 可选 hero + 区块列表
 class HubPageScaffold extends StatelessWidget {
   final String title;
@@ -360,14 +422,7 @@ class HubPageScaffold extends StatelessWidget {
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        scheme.primaryContainer,
-                        scheme.primary.withValues(alpha: 0.18),
-                      ],
-                    ),
+                    color: scheme.primary.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   alignment: Alignment.center,

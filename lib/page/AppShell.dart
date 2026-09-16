@@ -57,6 +57,15 @@ class _AppShellState extends State<AppShell> {
     ),
   ];
 
+  // ===== 底部导航尺寸 =====
+  // 药丸 indicator 与图标槽共用 pillH/iconTop，图标天生在药丸内垂直居中，
+  // 不再依赖 Column 在整栏里的居中位置（那样药丸和图标会有几像素错位）。
+  static const double barH = 70; // 导航栏总高
+  static const double pillW = 48; // 药丸宽
+  static const double pillH = 28; // 药丸高（也是图标槽高）
+  static const double iconTop = 11; // 药丸/图标槽的顶部偏移
+  static const double labelGap = 3; // 图标与文字间距
+
   @override
   void initState() {
     super.initState();
@@ -108,75 +117,82 @@ class _AppShellState extends State<AppShell> {
         ),
         child: SafeArea(
           top: false,
-          child: SizedBox(
-            height: 70,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                const double pillW = 48;
-                const double pillH = 28;
-                final double tabW = constraints.maxWidth / _tabs.length;
-                return Stack(
-                  children: [
-                    // 滑动的药丸 indicator（核心改动：AnimatedPositioned）
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 360),
-                      curve: Curves.easeOutCubic,
-                      left: _index * tabW + (tabW - pillW) / 2,
-                      top: 8,
-                      width: pillW,
-                      height: pillH,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: scheme.primary.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(pillH / 2),
+            child: SizedBox(
+              height: barH,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final double tabW = constraints.maxWidth / _tabs.length;
+                  return Stack(
+                    children: [
+                      // 滑动的药丸 indicator（核心改动：AnimatedPositioned）
+                      AnimatedPositioned(
+                        duration: const Duration(milliseconds: 360),
+                        curve: Curves.easeOutCubic,
+                        left: _index * tabW + (tabW - pillW) / 2,
+                        top: iconTop,
+                        width: pillW,
+                        height: pillH,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: scheme.primary.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(pillH / 2),
+                          ),
                         ),
                       ),
-                    ),
-                    // Tab row：icon + label，点击切换 _index
-                    Row(
-                      children: [
-                        for (int i = 0; i < _tabs.length; i++)
-                          Expanded(
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () => setState(() => _index = i),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    i == _index
-                                        ? _tabs[i].activeIcon
-                                        : _tabs[i].icon,
-                                    size: 24,
-                                    color: i == _index
-                                        ? scheme.primary
-                                        : scheme.onSurfaceVariant,
+                      // Tab row：icon + label，点击切换 _index
+                      Row(
+                        children: [
+                          for (int i = 0; i < _tabs.length; i++)
+                            Expanded(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => setState(() => _index = i),
+                                child: Padding(
+                                  // 图标槽与药丸同高同顶，保证图标在药丸内垂直居中
+                                  padding: const EdgeInsets.only(top: iconTop),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        height: pillH,
+                                        child: Center(
+                                          child: Icon(
+                                            i == _index
+                                                ? _tabs[i].activeIcon
+                                                : _tabs[i].icon,
+                                            size: 24,
+                                            color: i == _index
+                                                ? scheme.primary
+                                                : scheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: labelGap),
+                                      Text(
+                                        _tabs[i].label,
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: i == _index
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                          letterSpacing: 0.4,
+                                          color: i == _index
+                                              ? scheme.primary
+                                              : scheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _tabs[i].label,
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: i == _index
-                                          ? FontWeight.w700
-                                          : FontWeight.w500,
-                                      letterSpacing: 0.4,
-                                      color: i == _index
-                                          ? scheme.primary
-                                          : scheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
-                  ],
-                );
-              },
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
         ),
       ),
     );

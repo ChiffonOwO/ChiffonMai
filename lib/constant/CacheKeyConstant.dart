@@ -54,6 +54,19 @@ class CacheKeyConstant {
   // 用户数据相关
   static const String userPlayData = 'user_play_data';
 
+  // 自定义 Best50 手动录入数据（50 个固定卡位）
+  static const String customBest50Data = 'custom_best50_data_v1';
+
+  // ===== 双账号系统（水鱼 / 落雪各一套缓存）=====
+  // 账号元信息（昵称 / Rating / id / 是否有缓存），一个 JSON map
+  static const String accountStore = 'account_store_v1';
+  // 账号身份存档（昵称 / QQ / id / 评论身份 / 排行榜参与开关）：属于用户数据，进备份
+  static const String accountArchiveIdentityPrefix = 'account_archive_identity_';
+  // 账号成绩存档（游玩数据 / Best50 / 推荐结果）：可重新拉取，不进备份
+  static const String accountArchivePlayPrefix = 'account_archive_play_';
+  // 切换中途被杀时的恢复标记（值 = 目标数据源的 key）
+  static const String accountRotationPending = 'account_rotation_pending';
+
   // 舞萌CN探针相关
   static const String maimaiCNUserId = 'maimai_cn_user_id';
   static const String maimaiCNT = 'maimai_cn_t';
@@ -80,6 +93,14 @@ class CacheKeyConstant {
   static const String guessChartSongCount = 'guessChart_songCount';
   static const String guessChartNonEnglishCharThreshold =
       'guessChart_nonEnglishCharThreshold';
+  static const String guessChartFlashDuration = 'guessChart_flashDuration';
+  static const String guessChartTileCount = 'guessChart_tileCount';
+  static const String guessTileRevealInterval = 'guessTile_revealInterval';
+  static const String guessChartPeekDuration = 'guessChart_peekDuration';
+  static const String guessChartPeekDifficulties =
+      'guessChart_peekDifficulties';
+  // 歌曲片段猜歌的音频片段播放时长
+  static const String guessChartPlayDuration = 'guessChart_playDuration';
 
   // KaleidXScope 标记歌曲相关
   static const String kaleidXBlackGateMarkedSongs =

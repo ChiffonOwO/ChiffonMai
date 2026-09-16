@@ -8,6 +8,7 @@ import 'package:my_first_flutter_app/utils/ExportSettings.dart';
 import 'package:my_first_flutter_app/utils/FavoriteFeaturesNotifier.dart';
 import 'package:my_first_flutter_app/utils/FavoriteImportFlow.dart';
 import 'package:my_first_flutter_app/utils/LoginStateNotifier.dart';
+import 'package:my_first_flutter_app/utils/PlayerThemeScope.dart';
 import 'package:my_first_flutter_app/utils/ThemeManager.dart';
 import 'package:my_first_flutter_app/utils/UserProfileNotifier.dart';
 import 'package:my_first_flutter_app/service/ConnectivityService.dart';
@@ -173,26 +174,41 @@ class _MyAppState extends State<MyApp> {
         final themeMode = ThemeManager().themeMode;
         final pureBlack = ThemeManager().pureBlackEnabled;
         final seedColor = ThemeManager().seedColor;
-        return MaterialApp(
-          debugShowCheckedModeBanner: false,
-          navigatorKey: _navigatorKey,
-          home: AppShell(onFirstFrameRendered: _loadFonts),
-          theme:
-              _buildThemeWithFonts(AppTheme.lightTheme(seedColor: seedColor)),
-          darkTheme: _buildThemeWithFonts(
-            pureBlack
-                ? AppTheme.pureBlackTheme(seedColor: seedColor)
-                : AppTheme.darkTheme(seedColor: seedColor),
-          ),
-          themeMode: themeMode,
-          builder: (context, child) {
-            return MediaQuery(
-              data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
-              child: DefaultTextStyle(
-                style:
-                    _fontsLoaded ? GoogleFonts.notoSansSc() : const TextStyle(),
-                child: child!,
-              ),
+        final lightThemeData =
+            _buildThemeWithFonts(AppTheme.lightTheme(seedColor: seedColor));
+        final darkThemeData = _buildThemeWithFonts(
+          pureBlack
+              ? AppTheme.pureBlackTheme(seedColor: seedColor)
+              : AppTheme.darkTheme(seedColor: seedColor),
+        );
+        // 播放页存活期间，在 MaterialApp 层强制深色主题（详见 PlayerThemeScope）。
+        // 必须在 theme/themeMode 上强制，而不是在 builder 里包一层 Theme：
+        // simai_flutter 的游玩/导出页没有自己的背景色，浅色主题下会透出后面全黑的
+        // 播放器，出现「黑底 + 深色文字」看不清的情况。
+        return ValueListenableBuilder<bool>(
+          valueListenable: PlayerThemeScope.forceDarkTheme,
+          builder: (context, forceDark, _) {
+            return MaterialApp(
+              debugShowCheckedModeBanner: false,
+              navigatorKey: _navigatorKey,
+              home: AppShell(onFirstFrameRendered: _loadFonts),
+              theme: forceDark ? darkThemeData : lightThemeData,
+              darkTheme: darkThemeData,
+              themeMode: forceDark ? ThemeMode.dark : themeMode,
+              // 强制深色时立即切换，避免主题渐变在播放器页面上再闪一下
+              themeAnimationDuration:
+                  forceDark ? Duration.zero : kThemeAnimationDuration,
+              builder: (context, child) {
+                return MediaQuery(
+                  data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
+                  child: DefaultTextStyle(
+                    style: _fontsLoaded
+                        ? GoogleFonts.notoSansSc()
+                        : const TextStyle(),
+                    child: child!,
+                  ),
+                );
+              },
             );
           },
         );

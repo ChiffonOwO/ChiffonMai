@@ -115,6 +115,10 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   void dispose() {
     _isDisposed = true;
     _tipSubscription?.cancel();
+    // 加载提示用的是**全局静态**定时器：只 cancel 自己的订阅不够，
+    // 定时器仍会 3 秒一次地往广播流里推（订阅都取消了，纯属空转，
+    // 但会一直活到进程结束）。与项目里其它页面的做法保持一致。
+    LoadingTipsConstant.stopAutoSwitch();
     _scrollController.dispose();
     super.dispose();
   }

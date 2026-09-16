@@ -19,6 +19,7 @@ import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import '../../constant/LoadingTipsConstant.dart';
 import '../../constant/VersionListConstant.dart';
+import 'GuessChartLoadingView.dart';
 
 class GuessChartBySongExcerptPage extends StatefulWidget {
   const GuessChartBySongExcerptPage({super.key});
@@ -31,6 +32,9 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
   // 游戏状态
   bool _isGameStarted = false;
   String _currentLoadingTip = '';
+
+  // 加载提示的流订阅（必须存下来，dispose 时 cancel）
+  StreamSubscription<String>? _tipSubscription;
   Song? _targetSong;
   int? _luoXueSongId;
   List<GuessSong> _guessHistory = [];
@@ -39,6 +43,7 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
   int _timeLimit = 0; // 从设置中加载，0表示无限制
   bool _isGameOver = false;
   bool _isWon = false;
+  String _loadFailureMessage = ''; // 开局取曲失败时的提示（空 = 加载中/没失败）
   
   // 播放时长设置（默认5秒，最长30秒）
   int _playDuration = 5;
@@ -112,7 +117,8 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
       _currentLoadingTip = LoadingTipsConstant.getRandomLoadingTip();
     });
     LoadingTipsConstant.startAutoSwitch();
-    LoadingTipsConstant.tipStream.listen((newTip) {
+    // 订阅必须存下来、在 dispose 里 cancel，否则页面关掉后流仍在推送
+    _tipSubscription = LoadingTipsConstant.tipStream.listen((newTip) {
       if (mounted) {
         setState(() {
           _currentLoadingTip = newTip;
@@ -177,6 +183,7 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
       _selectedGenres = settings['selectedGenres'] ?? [];
       _maxGuesses = settings['maxGuesses'] ?? 10;
       _timeLimit = settings['timeLimit'] ?? 0;
+      _playDuration = settings['playDurationSeconds'] ?? 5;
     });
   }
 
@@ -188,6 +195,13 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
     _positionSubscription?.cancel();
     _audioPlayer?.dispose();
     _countdownTimer?.cancel();
+    // 加载提示是**全局静态**的定时器 + 广播流：
+    // 这里不 stop/cancel 的话，页面关掉之后 3 秒周期定时器仍在跑、
+    // 订阅也仍挂在流上（回调里虽有 mounted 判断不会崩，但定时器与订阅
+    // 会一直存活到进程结束）。其它用它的页面（PaiziProgressPage、
+    // UpdateLuoXueScorePage 等）都是在 dispose 里收尾的，这里对齐。
+    _tipSubscription?.cancel();
+    LoadingTipsConstant.stopAutoSwitch();
     super.dispose();
   }
 
@@ -216,6 +230,7 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
       _isGameStarted = false;
       _isGameOver = false;
       _isWon = false;
+      _loadFailureMessage = '';
       _guessHistory = [];
       _guessCount = 0;
       _searchController.clear();
@@ -245,11 +260,47 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
         _targetSong = entry.key;
         _luoXueSongId = entry.value['luoXueId'];
         _isGameStarted = true;
+        _loadFailureMessage = '';
       });
       
       // 启动倒计时
       _startCountdown();
+      return;
     }
+
+    // 抽曲失败：**绝不能**就此留在加载态（详见 GuessChartLoadingView 注释）。
+    // 原先这里没有 else 分支，曲库缓存为空时页面会永久转圈。
+    final libraryEmpty = await GuessChartLoadingView.isSongLibraryEmpty();
+    if (!mounted) return;
+    setState(() {
+      // 与谱面片段猜歌同一思路：照常进入游戏界面，只把题面区换成原因说明。
+      // 停在 _isGameStarted == false 的话设置齿轮就点不到，用户只能退出去重进。
+      _isGameStarted = true;
+      _loadFailureMessage = libraryEmpty
+          ? GuessChartLoadingView.emptyLibraryMessage
+          : GuessChartLoadingView.filterTooStrictMessage;
+    });
+  }
+
+  /// 失败态下的「重新拉取曲库」：先把曲库缓存拉回来，再重开一局。
+  /// 返回 true 表示这局已经成功进入游戏。
+  Future<bool> _retryStartGame() async {
+    await GuessChartLoadingView.refreshSongLibrary();
+    if (!mounted) return false;
+    await _startNewGame();
+    return mounted && _targetSong != null;
+  }
+
+  /// 失败态下的「打开设置」：弹设置对话框，用户关掉后立刻重开一局。
+  ///
+  /// 为什么要有它：设置入口（齿轮）长在游戏内容里，抽不到曲时页面停在失败态，
+  /// 那句「请在设置中放宽条件」指向的按钮根本点不到，用户只能退出去重进。
+  /// 返回 true 表示这局已经成功进入游戏（失败视图会因此被替换掉）。
+  Future<bool> _openSettingsAndRestart() async {
+    await _showSettingsDialog();
+    if (!mounted) return false;
+    await _startNewGame();
+    return mounted && _targetSong != null;
   }
   
   // 启动倒计时
@@ -354,7 +405,8 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
 
   // 处理猜测
   Future<void> _handleGuess(Song guessedSong) async {
-    if (_isGameOver) return;
+    // 抽不到曲时整页仍然可用（题面区显示原因），但猜是空操作
+    if (_isGameOver || _targetSong == null) return;
 
     // 检查是否已经猜过这首歌
     bool hasGuessed = _guessHistory.any((guess) => guess.songId == int.parse(guessedSong.id));
@@ -900,8 +952,42 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
 
 
   
+  /// 后台校验「当前筛选条件是否还能抽到曲」，抽不到就用 SnackBar 提醒。
+  ///
+  /// 放在保存**之后**异步执行：设置已经落盘、用户也已看到「已保存」，
+  /// 这里慢一点不会让人干等。校验意义在于尽早发现「条件过严导致开局空转」，
+  /// 而不是阻止保存。
+  Future<void> _warnIfNoSongMatches({
+    required List<String> selectedVersions,
+    required double masterMinDx,
+    required double masterMaxDx,
+    required List<String> selectedGenres,
+  }) async {
+    // 先取好 messenger：下面 await 之后再用 context 会踩
+    // use_build_context_synchronously
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final testResult =
+          await GuessChartBySongExcerptService().randomSelectSong(
+        selectedVersions: selectedVersions,
+        masterMinDx: masterMinDx,
+        masterMaxDx: masterMaxDx,
+        selectedGenres: selectedGenres,
+      );
+      if ((testResult != null && testResult.isNotEmpty) || !mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('当前筛选条件抽不到曲目，请放宽筛选条件'),
+          duration: Duration(seconds: 4),
+        ),
+      );
+    } catch (e) {
+      debugPrint('校验筛选条件失败: $e');
+    }
+  }
+
   // 显示设置对话框
-  void _showSettingsDialog() async {
+  Future<void> _showSettingsDialog() async {
     // 加载最新的设置
     await _loadSettings();
     
@@ -938,9 +1024,22 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
     int tempMaxGuesses = _maxGuesses;
     int tempTimeLimit = _timeLimit;
     int tempPlayDuration = _playDuration;
-    bool showNoSongsError = false;
-    
-    showDialog(
+
+    // 「重置所有设置」用：默认值统一取自设置服务，页面不再手写字面量。
+    void applySettingsDefaults() {
+      final defaults = _settingsService.defaultSettings();
+      tempSelectedVersions =
+          List<String>.from(defaults['selectedVersions'] as List);
+      tempMasterMinDx = (defaults['masterMinDx'] as num).toDouble();
+      tempMasterMaxDx = (defaults['masterMaxDx'] as num).toDouble();
+      tempSelectedGenres = List<String>.from(defaults['selectedGenres'] as List);
+      tempMaxGuesses = defaults['maxGuesses'] as int;
+      tempTimeLimit = defaults['timeLimit'] as int;
+      tempPlayDuration = defaults['playDurationSeconds'] as int;
+    }
+
+
+    await showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
@@ -966,44 +1065,27 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
                       (versions) {
                         setState(() {
                           tempSelectedVersions = versions;
-                          showNoSongsError = false; // 重置错误提示
                         });
                       },
                       (min, max) {
                         setState(() {
                           tempMasterMinDx = min;
                           tempMasterMaxDx = max;
-                          showNoSongsError = false; // 重置错误提示
                         });
                       },
                       (genres) {
                         setState(() {
                           tempSelectedGenres = genres;
-                          showNoSongsError = false; // 重置错误提示
                         });
                       },
                       (guesses) {
                         setState(() {
                           tempMaxGuesses = guesses;
-                          showNoSongsError = false; // 重置错误提示
                         });
                       },
                       (time) {
                         setState(() {
                           tempTimeLimit = time;
-                          showNoSongsError = false; // 重置错误提示
-                        });
-                      },
-                      () {
-                        setState(() {
-                          tempSelectedVersions = [];
-                          tempMasterMinDx = 1.0;
-                          tempMasterMaxDx = 15.0;
-                          tempSelectedGenres = [];
-                          tempMaxGuesses = 10;
-                          tempTimeLimit = 0;
-                          tempPlayDuration = 5;
-                          showNoSongsError = false; // 重置错误提示
                         });
                       },
                     ),
@@ -1048,29 +1130,12 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
                       child: Center(
                         child: ElevatedButton(
                           onPressed: () {
-                            setState(() {
-                              tempSelectedVersions = [];
-                              tempMasterMinDx = 1.0;
-                              tempMasterMaxDx = 15.0;
-                              tempSelectedGenres = [];
-                              tempMaxGuesses = 10;
-                              tempTimeLimit = 0;
-                              showNoSongsError = false; // 重置错误提示
-                            });
+                            setState(applySettingsDefaults);
                           },
                           child: Text('重置所有设置'),
                         ),
                       ),
                     ),
-                    // 显示错误提示
-                    if (showNoSongsError)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Text(
-                          '没有找到符合条件的乐曲！请检查设置！',
-                          style: TextStyle(color: AppColors.errorRed(Theme.of(context).brightness), fontSize: 14),
-                        ),
-                      ),
                   ],
                 ),
               );
@@ -1085,37 +1150,14 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
             ),
             TextButton(
               onPressed: () async {
-                // 检查是否有符合条件的乐曲
-                final testResult = await GuessChartBySongExcerptService().randomSelectSong(
-                  selectedVersions: tempSelectedVersions,
-                  masterMinDx: tempMasterMinDx,
-                  masterMaxDx: tempMasterMaxDx,
-                  selectedGenres: tempSelectedGenres,
-                );
-                
-                if (testResult == null || testResult.isEmpty) {
-                  // 没有找到符合条件的乐曲，显示错误提示
-                  showDialog(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return AlertDialog(
-                        title: const Text('提示'),
-                        content: const Text('没有找到符合条件的乐曲！请检查设置！'),
-                        actions: [
-                          TextButton(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                            },
-                            child: const Text('确定'),
-                          ),
-                        ],
-                      );
-                    },
-                  );
-                  return;
-                }
-                
-                // 保存设置到持久化存储
+                // 提示设置已保存，将在下局生效
+                final navigator = Navigator.of(context);
+                final messenger = ScaffoldMessenger.of(context);
+
+                // 先落盘并立刻反馈：saveSettings 只要 2ms，而抽曲校验要遍历
+                // 整份曲库（本模式还要读落雪曲库，冷启动含读盘解析），是秒级
+                // 操作。原先「先校验、通过才保存」会让用户点完「确定」干等
+                // 数秒。校验只用于提示「这组条件抽不到曲」，不影响该不该保存。
                 await _settingsService.saveSettings(
                   selectedVersions: tempSelectedVersions,
                   masterMinDx: tempMasterMinDx,
@@ -1123,18 +1165,26 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
                   selectedGenres: tempSelectedGenres,
                   maxGuesses: tempMaxGuesses,
                   timeLimit: tempTimeLimit,
+                  playDurationSeconds: tempPlayDuration,
                 );
-                
-                // 保存播放时长设置
+
+                // 本地同步一份，让界面上立刻反映新值；持久化已在上面的
+                // saveSettings 里完成，下次进页面 _loadSettings 会读回来。
                 setState(() {
                   _playDuration = tempPlayDuration;
                 });
-                
-                Navigator.of(context).pop();
-                
-                // 提示设置已保存，将在下局生效
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('设置已保存，将在下局游戏生效')),
+
+                if (!navigator.mounted) return;
+                navigator.pop();
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('设置已保存，将在下局游戏生效')),
+                );
+
+                _warnIfNoSongMatches(
+                  selectedVersions: tempSelectedVersions,
+                  masterMinDx: tempMasterMinDx,
+                  masterMaxDx: tempMasterMaxDx,
+                  selectedGenres: tempSelectedGenres,
                 );
               },
               child: const Text('确定'),
@@ -1292,6 +1342,13 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
 
   // 构建音乐播放器组件
   Widget _buildMusicPlayer() {
+    // 抽不到曲：题面区换成原因说明（整页仍照常可用，搜索框与 5 个按钮都在）
+    if (_targetSong == null) {
+      return GuessChartNoSongNotice(
+        message: _loadFailureMessage,
+        height: 140,
+      );
+    }
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1545,16 +1602,15 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
                                           ),
                                           const SizedBox(height: 20),
 
-                                          // 音乐播放器
-                                          if (_targetSong != null)
-                                            Center(
-                                              child: Column(
-                                                children: [
-                                                  _buildMusicPlayer(),
-                                                  const SizedBox(height: 16),
-                                                ],
-                                              ),
+                                          // 音乐播放器（抽不到曲时这块换成原因说明）
+                                          Center(
+                                            child: Column(
+                                              children: [
+                                                _buildMusicPlayer(),
+                                                const SizedBox(height: 16),
+                                              ],
                                             ),
+                                          ),
                                           
                                           // 搜索输入框和结果
                                           Container(
@@ -1590,6 +1646,8 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
                                                     ),
                                                     constraints: BoxConstraints(maxHeight: screenHeight * 0.3),
                                                     child: ListView.builder(
+                                                      // 去掉 ListView 默认把状态栏安全区算进列表顶部的空白
+                                                      padding: EdgeInsets.zero,
                                                       itemCount: _searchResults.length,
                                                       itemBuilder: (context, index) {
                                                         return _buildSearchResultItem(_searchResults[index]);
@@ -1834,15 +1892,17 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
                                               ),
                                             ),
                                         ])
-                                        : Center(
-                                            child: Column(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                CircularProgressIndicator(),
-                                                SizedBox(height: 16),
-                                                Text(_currentLoadingTip),
-                                              ],
-                                            ),
+                                        : GuessChartLoadingView(
+                                            message: _loadFailureMessage,
+                                            onOpenSettings: _openSettingsAndRestart,
+                                            loadingTip: _currentLoadingTip,
+                                            // 只有「曲库真的没数据」才给重拉按钮：
+                                            // 筛选太严时该做的是去设置里放宽条件。
+                                            onRetry: _loadFailureMessage ==
+                                                    GuessChartLoadingView
+                                                        .emptyLibraryMessage
+                                                ? _retryStartGame
+                                                : null,
                                           ),
                                   ],
                                 ),

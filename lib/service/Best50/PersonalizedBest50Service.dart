@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
+import 'package:my_first_flutter_app/utils/SongFilterUtil.dart';
 
 class PersonalizedBest50Service {
   // 单例模式
@@ -506,9 +507,10 @@ class PersonalizedBest50Service {
       final allSongs = await MaimaiMusicDataManager().getCachedSongs();
       if (allSongs == null) return {};
 
-      // 统计charter出现次数
+      // 统计charter出现次数（extra 歌曲不计入）
       Map<String, int> charterCounts = {};
       for (var song in allSongs) {
+        if (SongFilterUtil.isExtra(song)) continue;
         for (var chart in song.charts) {
           if (chart.charter.isNotEmpty) {
             String charter = chart.charter;
@@ -551,7 +553,7 @@ class PersonalizedBest50Service {
           final song = songMap[songId.toString()];
           
           if (song != null && levelIndex >= 0 && levelIndex < song.charts.length) {
-            return song.charts[levelIndex].charter == charter;
+            return song.charts[levelIndex].charter == charter && !SongFilterUtil.isExtra(song);
           }
         }
         return false;
@@ -594,7 +596,7 @@ class PersonalizedBest50Service {
       Map<String, int> versionCounts = {};
       for (var song in allSongs) {
         // 过滤掉从maidata追加的歌曲
-        if (!_isMaidataSong(song)) {
+        if (!SongFilterUtil.isExtra(song)) {
           String version = song.basicInfo.from;
           versionCounts[version] = (versionCounts[version] ?? 0) + 1;
         }
@@ -632,7 +634,7 @@ class PersonalizedBest50Service {
           final song = songMap[songId.toString()];
           
           if (song != null) {
-            return song.basicInfo.from == version && !_isMaidataSong(song);
+            return song.basicInfo.from == version && !SongFilterUtil.isExtra(song);
           }
         }
         return false;
@@ -689,7 +691,7 @@ class PersonalizedBest50Service {
           final song = songMap[songId.toString()];
           
           if (song != null) {
-            return song.type == 'DX';
+            return song.type == 'DX' && !SongFilterUtil.isExtra(song);
           }
         }
         return false;
@@ -745,7 +747,7 @@ class PersonalizedBest50Service {
           final song = songMap[songId.toString()];
           
           if (song != null) {
-            return song.type == 'SD';
+            return song.type == 'SD' && !SongFilterUtil.isExtra(song);
           }
         }
         return false;
@@ -1061,9 +1063,10 @@ class PersonalizedBest50Service {
       final allSongs = await MaimaiMusicDataManager().getCachedSongs();
       if (allSongs == null) return {};
 
-      // 统计流派出现次数
+      // 统计流派出现次数（extra 歌曲不计入）
       Map<String, int> genreCounts = {};
       for (var song in allSongs) {
+        if (SongFilterUtil.isExtra(song)) continue;
         String genre = song.basicInfo.genre;
         if (genre.isNotEmpty) {
           genreCounts[genre] = (genreCounts[genre] ?? 0) + 1;
@@ -1243,7 +1246,7 @@ class PersonalizedBest50Service {
           final song = songMap[songId.toString()];
           
           if (song != null) {
-            return song.basicInfo.genre == genre;
+            return song.basicInfo.genre == genre && !SongFilterUtil.isExtra(song);
           }
         }
         return false;
@@ -1401,14 +1404,250 @@ class PersonalizedBest50Service {
     }
   }
 
-  // 判断是否是从maidata追加的歌曲（cids全为0表示从maidata解析）
-  bool _isMaidataSong(dynamic song) {
-    if (song == null || song.cids == null || song.cids.isEmpty) {
-      if (song != null && song.isExtra == true) return true;
-      return false;
+  /// Best N：用户全量游玩记录按 ra 降序取前 N 条（包含 extra 过滤）。
+  /// N 由页面传入（默认 50，上限 500）。
+  Future<Map<String, dynamic>?> getBestNData(int n) async {
+    try {
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      final allSongs = await MaimaiMusicDataManager().getCachedSongs();
+      if (allSongs == null) return null;
+      final songMap = { for (var song in allSongs) song.id: song };
+
+      final pool = records.where((r) {
+        if (r is Map<String, dynamic>) {
+          final song = songMap[r['song_id']?.toString()];
+          if (song == null) return false;
+          // extra 歌曲不参与
+          if (SongFilterUtil.isExtra(song)) return false;
+          return true;
+        }
+        return false;
+      }).toList();
+      if (pool.isEmpty) return null;
+
+      // 按 ra 降序
+      pool.sort((a, b) {
+        int raB = (b is Map<String, dynamic> ? (b['ra'] ?? 0) : 0) as int;
+        int raA = (a is Map<String, dynamic> ? (a['ra'] ?? 0) : 0) as int;
+        return raB.compareTo(raA);
+      });
+
+      final topN = pool.take(n).toList();
+      return {
+        'records': topN,
+        'total': topN.length,
+        'type': 'best_n',
+      };
+    } catch (e) {
+      debugPrint('获取Best $n 数据时出错: $e');
+      return null;
     }
-    if (song.cids.every((cid) => cid == 0)) return true;
-    if (song.isExtra == true) return true;
-    return false;
+  }
+
+  // ===== 新增：随机50 / 越级50 / 难度50 / UTAGE 50 =====
+
+  /// 随机 50：从用户全量游玩记录里随机抽 50 条，按 ra 降序展示。
+  /// 每次调用都重新洗牌，因此「再抽一次」按钮只需重跑此方法即可。
+  Future<Map<String, dynamic>?> getRandom50Data() async {
+    try {
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      final allSongs = await MaimaiMusicDataManager().getCachedSongs();
+      if (allSongs == null) return null;
+      final songMap = { for (var song in allSongs) song.id: song };
+
+      final pool = records.where((r) {
+        if (r is Map<String, dynamic>) {
+          final song = songMap[r['song_id']?.toString()];
+          if (song == null) return false;
+          // extra 歌曲（宴会场 / maidata 追加 / union 独有）不参与随机抽取
+          return !SongFilterUtil.isExtra(song);
+        }
+        return false;
+      }).toList();
+      if (pool.isEmpty) return null;
+
+      pool.shuffle();
+      final picked = pool.take(50).toList();
+
+      picked.sort((a, b) {
+        int raB = (b['ra'] ?? 0) as int;
+        int raA = (a['ra'] ?? 0) as int;
+        return raB.compareTo(raA);
+      });
+
+      return {
+        'records': picked,
+        'total': picked.length,
+        'type': 'random_50',
+      };
+    } catch (e) {
+      debugPrint('获取随机50数据时出错: $e');
+      return null;
+    }
+  }
+
+  /// 越级 50：达成率 ≤ 95% 且 ra 排前 50 的记录。
+  /// 「越级」字面意思是没拿满、还能推分的。
+  Future<Map<String, dynamic>?> getBeyond50Data() async {
+    try {
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      final allSongs = await MaimaiMusicDataManager().getCachedSongs();
+      if (allSongs == null) return null;
+      final songMap = { for (var song in allSongs) song.id: song };
+
+      final filtered = records.where((r) {
+        if (r is Map<String, dynamic>) {
+          final song = songMap[r['song_id']?.toString()];
+          if (song == null) return false;
+          // extra 歌曲不参与（越级是给正式曲库用的）
+          if (SongFilterUtil.isExtra(song)) return false;
+          final ach = double.tryParse(r['achievements']?.toString() ?? '') ?? 0.0;
+          return ach <= 95.0;
+        }
+        return false;
+      }).toList();
+
+      filtered.sort((a, b) {
+        int raB = (b is Map<String, dynamic> ? (b['ra'] ?? 0) : 0) as int;
+        int raA = (a is Map<String, dynamic> ? (a['ra'] ?? 0) : 0) as int;
+        return raB.compareTo(raA);
+      });
+
+      final top50 = filtered.take(50).toList();
+      return {
+        'records': top50,
+        'total': top50.length,
+        'type': 'beyond_50',
+      };
+    } catch (e) {
+      debugPrint('获取越级50数据时出错: $e');
+      return null;
+    }
+  }
+
+  /// 难度 50（前 5 个难度用此）：用户游玩记录中 record.level_index == levelIndex
+  /// 且歌曲在对应难度下有谱面的，按 ra 降序取前 50。
+  /// level_index: 0=BASIC, 1=ADVANCED, 2=EXPERT, 3=MASTER, 4=Re:MASTER。
+  Future<Map<String, dynamic>?> getDifficulty50Data(int levelIndex) async {
+    try {
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      final allSongs = await MaimaiMusicDataManager().getCachedSongs();
+      if (allSongs == null) return null;
+      final songMap = { for (var song in allSongs) song.id: song };
+
+      final filtered = records.where((r) {
+        if (r is Map<String, dynamic>) {
+          final song = songMap[r['song_id']?.toString()];
+          if (song == null) return false;
+          // extra 歌曲不参与
+          if (SongFilterUtil.isExtra(song)) return false;
+          if (_resolveLevelIndex(r) != levelIndex) return false;
+          return true;
+        }
+        return false;
+      }).toList();
+
+      filtered.sort((a, b) {
+        int raB = (b is Map<String, dynamic> ? (b['ra'] ?? 0) : 0) as int;
+        int raA = (a is Map<String, dynamic> ? (a['ra'] ?? 0) : 0) as int;
+        return raB.compareTo(raA);
+      });
+
+      final top50 = filtered.take(50).toList();
+      return {
+        'records': top50,
+        'total': top50.length,
+        'type': 'difficulty_50',
+        'level_index': levelIndex,
+      };
+    } catch (e) {
+      debugPrint('获取难度50数据时出错: $e');
+      return null;
+    }
+  }
+
+  /// 从 record 推断难度索引：优先 `level_index`（int / 数字字符串），回退到 `level` 字符串。
+  /// 返回 null 表示无法识别。
+  int? _resolveLevelIndex(Map<String, dynamic> record) {
+    final v = record['level_index'];
+    if (v is int) return v;
+    if (v is num) return v.toInt(); // 防御 double (如 4.0)
+    if (v is String) {
+      final parsed = int.tryParse(v);
+      if (parsed != null) return parsed;
+    }
+    const map = {
+      'BASIC': 0,
+      'ADVANCED': 1,
+      'EXPERT': 2,
+      'MASTER': 3,
+      'Re:MASTER': 4,
+    };
+    // 回退到 `level` 或 `level_label` 字符串
+    for (final key in const ['level', 'level_label']) {
+      final level = record[key];
+      if (level is String && map.containsKey(level)) return map[level];
+    }
+    return null;
+  }
+
+  /// UTAGE 50：6 位数 songId（宴会场）记录，按歌曲的 ds 降序取前 50。
+  Future<Map<String, dynamic>?> getUtage50Data() async {
+    try {
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+      final records = userPlayData['records'];
+      if (!(records is List)) return null;
+
+      final allSongs = await MaimaiMusicDataManager().getCachedSongs();
+      if (allSongs == null) return null;
+      final songMap = { for (var song in allSongs) song.id: song };
+
+      final filtered = records.where((r) {
+        if (r is Map<String, dynamic>) {
+          final songId = r['song_id'];
+          final song = songMap[songId.toString()];
+          if (song == null) return false;
+          return songId.toString().length == 6;
+        }
+        return false;
+      }).toList();
+
+      filtered.sort((a, b) {
+        final aSong = songMap[(a is Map<String, dynamic> ? a['song_id'] : '').toString()];
+        final bSong = songMap[(b is Map<String, dynamic> ? b['song_id'] : '').toString()];
+        final aLevel = a is Map<String, dynamic> ? (a['level_index'] ?? 0) : 0;
+        final bLevel = b is Map<String, dynamic> ? (b['level_index'] ?? 0) : 0;
+        final aDs = (aSong != null && aLevel < aSong.ds.length) ? aSong.ds[aLevel] : 0.0;
+        final bDs = (bSong != null && bLevel < bSong.ds.length) ? bSong.ds[bLevel] : 0.0;
+        return bDs.compareTo(aDs);
+      });
+
+      final top50 = filtered.take(50).toList();
+      return {
+        'records': top50,
+        'total': top50.length,
+        'type': 'utage_50',
+      };
+    } catch (e) {
+      debugPrint('获取UTAGE 50数据时出错: $e');
+      return null;
+    }
   }
 }

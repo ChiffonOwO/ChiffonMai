@@ -361,6 +361,41 @@ class AppColors {
           ? const Color(0xFF1B3820)
           : const Color(0xFFE8F5E9);
 
+  // -------- 柔和语义底色 / 前景（成对使用，不要只取一半） --------
+  // 多人房间页原先直接用 Colors.green[100] / Colors.yellow[50] / Colors.blue[100]
+  // 这类硬编码浅色：浅色主题下正常，暗色主题下就是一块亮斑，与周围深色卡片严重
+  // 不搭。这里按 Brightness 分成「深底 + 浅字」的一对，两套主题都能保证对比度。
+
+  /// 柔和成功底色（答对横幅等），配 [successForeground] 使用
+  static Color successSurface(Brightness brightness) =>
+      brightness == Brightness.dark
+          ? const Color(0xFF1B3A22)
+          : const Color(0xFFE7F6E9);
+
+  /// 柔和成功前景色（答对文字）
+  static Color successForeground(Brightness brightness) =>
+      brightness == Brightness.dark
+          ? const Color(0xFF8BD48F)
+          : const Color(0xFF2E7D32);
+
+  /// 柔和信息底色（房主变更提示等），配 [infoForeground] 使用
+  static Color infoSurface(Brightness brightness) =>
+      brightness == Brightness.dark
+          ? const Color(0xFF1B2E3F)
+          : const Color(0xFFE3F2FD);
+
+  /// 柔和信息前景色
+  static Color infoForeground(Brightness brightness) =>
+      brightness == Brightness.dark
+          ? const Color(0xFF9CC7F0)
+          : const Color(0xFF1565C0);
+
+  /// 排行榜前三名底色（暖色点缀，暗色主题下降饱和）
+  static Color podiumSurface(Brightness brightness) =>
+      brightness == Brightness.dark
+          ? const Color(0xFF37301C)
+          : const Color(0xFFFFF7E0);
+
   /// 语义蓝色（链接、信息）
   static Color linkBlue(Brightness brightness) =>
       brightness == Brightness.dark

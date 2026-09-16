@@ -119,7 +119,7 @@ class GuessChartByInfoService {
     }
   }
 
-  // 随机选择1首歌曲(不考虑宴会场谱面，即id为六位数的谱面)
+  // 随机选择1首歌曲(不考虑宴会场谱面，即id为六位数的谱面，也不考虑从maidata/union追加的 extra 曲目)
   static Future<Song?> randomSelectSong({
     List<String> selectedVersions = const [],
     double masterMinDx = 1.0,
@@ -132,9 +132,10 @@ class GuessChartByInfoService {
         return null;
       }
 
-      // 过滤掉宴会场谱面（id为六位数的谱面）和从maidata追加的歌曲（cids全为0）
-      var filteredSongs = songs.where((song) => 
-        song.id.length != 6 && 
+      // 过滤掉宴会场谱面（id为六位数的谱面）、extra 曲目（maidata/union 追加）和从maidata追加的歌曲（cids全为0）
+      var filteredSongs = songs.where((song) =>
+        song.id.length != 6 &&
+        !song.isExtra &&
         !_isMaidataSong(song)
       ).toList();
       

@@ -6,6 +6,7 @@ import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartByInfoService.dart';
+import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartCommonSettingsService.dart';
 import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
 
 class RoomCreatePage extends StatefulWidget {
@@ -37,6 +38,21 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
   int _playDuration = 5;           // 音频播放时长秒 (audio 模式)
   int _songCount = 3;              // 抽取歌曲数 (letters 模式)
   int _nonEnglishCharThreshold = 50; // 非英文字符过滤阈值 (letters 模式)
+  int _flashDurationMs = 300;      // 快闪时长毫秒 (flash 模式)
+  int _tileCount = 1000;           // 拼图切块数 (tileReveal 模式)
+  int _tileRevealIntervalMs = 1500; // 拼图揭示间隔毫秒 (tileReveal 模式)
+  int _peekDurationSeconds = 8;    // 谱面片段时长秒 (chartPeek 模式)
+  List<String> _peekDifficulties = ['4']; // 谱面难度随机池 (chartPeek 模式)
+
+  /// chartPeek 难度池可选值（inote 编号 → 显示名，与单人谱面片段猜歌一致：
+  /// BASIC 是 '2'，没有 '1'）
+  static const Map<String, String> _difficultyLabels = {
+    '2': 'BASIC',
+    '3': 'ADVANCED',
+    '4': 'EXPERT',
+    '5': 'MASTER',
+    '6': 'Re:MASTER',
+  };
 
   // 所有版本和流派列表
   List<String> _allVersions = [];
@@ -47,7 +63,44 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
   @override
   void initState() {
     super.initState();
+    _loadModeDefaults();
     _loadSongData();
+  }
+
+  /// 模式专属滑条的初始值取「已保存的单人猜歌设置」。
+  ///
+  /// 为什么要有这一步：单人「曲绘拼图/快闪/谱面片段」的设置和多人房间的参数
+  /// 是两套（房间参数随房间走、由房主决定），但如果房间滑条永远从硬编码默认值
+  /// 起步，用户刚在单人设置里把拼图调成 2500 块、进房间却看到 1000，
+  /// 看起来就像「设置没生效/没同步」。这里只把它当**初值**，
+  /// 房间真正的取值仍以房主在本页的设定为准（不会回写单人设置）。
+  Future<void> _loadModeDefaults() async {
+    try {
+      final settings = await GuessChartCommonSettingsService().loadSettings();
+      if (!mounted) return;
+      setState(() {
+        _blurLevel = settings['blurLevel'] ?? _blurLevel;
+        _playDuration = settings['playDurationSeconds'] ?? _playDuration;
+        _songCount = settings['songCount'] ?? _songCount;
+        _nonEnglishCharThreshold =
+            settings['nonEnglishCharThreshold'] ?? _nonEnglishCharThreshold;
+        _flashDurationMs = settings['flashDurationMs'] ?? _flashDurationMs;
+        _tileCount = settings['tileCount'] ?? _tileCount;
+        _tileRevealIntervalMs =
+            settings['tileRevealIntervalMs'] ?? _tileRevealIntervalMs;
+        _peekDurationSeconds =
+            settings['peekDurationSeconds'] ?? _peekDurationSeconds;
+        final pool = (settings['peekDifficulties'] as List?)?.cast<String>();
+        if (pool != null && pool.isNotEmpty) {
+          _peekDifficulties = List<String>.from(pool);
+        }
+      });
+      debugPrint('[DEBUG][RoomCreatePage] 模式专属默认值已从单人设置载入: '
+          'tileCount=$_tileCount, tileRevealIntervalMs=$_tileRevealIntervalMs, '
+          'flashDurationMs=$_flashDurationMs, peekDurationSeconds=$_peekDurationSeconds');
+    } catch (e) {
+      debugPrint('[DEBUG][RoomCreatePage] 读取单人设置失败（沿用默认值）: $e');
+    }
   }
 
   Future<void> _loadSongData() async {
@@ -126,6 +179,11 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
         playDuration: _playDuration,
         songCount: _songCount,
         nonEnglishCharThreshold: _nonEnglishCharThreshold,
+        flashDurationMs: _flashDurationMs,
+        tileCount: _tileCount,
+        tileRevealIntervalMs: _tileRevealIntervalMs,
+        peekDurationSeconds: _peekDurationSeconds,
+        peekDifficulties: _peekDifficulties,
       );
 
       if (room != null) {
@@ -148,7 +206,10 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
   bool get _needsModeSettings {
     return _gameType == GameType.blurred ||
            _gameType == GameType.audio ||
-           _gameType == GameType.letters;
+           _gameType == GameType.letters ||
+           _gameType == GameType.flash ||
+           _gameType == GameType.tileReveal ||
+           _gameType == GameType.chartPeek;
   }
 
   /// 构建模式专属设置区域
@@ -227,6 +288,64 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                   onChanged: (v) => setState(() => _nonEnglishCharThreshold = v.toInt()),
                 ),
               ],
+              // 快闪时长 (曲绘快闪模式)
+              if (_gameType == GameType.flash)
+                _buildSliderSetting(
+                  label: '快闪时长',
+                  value: _flashDurationMs.toDouble(),
+                  min: 100,
+                  max: 3000,
+                  divisions: 29, // 100ms 步进
+                  suffix: ' ms',
+                  scaleFactor: scaleFactor,
+                  brightness: brightness,
+                  onChanged: (v) =>
+                      setState(() => _flashDurationMs = (v / 100).round() * 100),
+                ),
+              // 切块数与揭示间隔 (曲绘拼图模式)
+              if (_gameType == GameType.tileReveal) ...[
+                _buildSliderSetting(
+                  label: '切块数量',
+                  value: _tileCount.toDouble(),
+                  min: 100,
+                  max: 10000,
+                  divisions: 99,
+                  suffix: ' 块',
+                  scaleFactor: scaleFactor,
+                  brightness: brightness,
+                  onChanged: (v) => setState(() => _tileCount = v.toInt()),
+                ),
+                SizedBox(height: 12 * scaleFactor),
+                _buildSliderSetting(
+                  label: '揭示间隔',
+                  value: _tileRevealIntervalMs.toDouble(),
+                  min: 100,
+                  max: 10000,
+                  divisions: 99,
+                  suffix: ' ms',
+                  scaleFactor: scaleFactor,
+                  brightness: brightness,
+                  onChanged: (v) => setState(
+                      () => _tileRevealIntervalMs = (v / 100).round() * 100),
+                ),
+              ],
+              // 片段时长与难度池 (谱面片段模式)
+              if (_gameType == GameType.chartPeek) ...[
+                _buildSliderSetting(
+                  label: '片段时长',
+                  value: _peekDurationSeconds.toDouble(),
+                  min: 3,
+                  max: 60,
+                  divisions: 57,
+                  suffix: ' 秒',
+                  scaleFactor: scaleFactor,
+                  brightness: brightness,
+                  onChanged: (v) =>
+                      setState(() => _peekDurationSeconds = v.toInt()),
+                ),
+                SizedBox(height: 12 * scaleFactor),
+                _buildDifficultyPoolSetting(scaleFactor, brightness),
+              ],
             ],
           ),
         ),
@@ -269,6 +388,47 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
           divisions: divisions,
           label: '${value.toInt()}$suffix',
           onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+
+  /// 谱面难度随机池（chartPeek 模式）：勾选『难度池』，至少保留一个。
+  ///
+  /// 与单人谱面片段猜歌同一套口径：池内每个难度各自的定数落在房间的
+  /// MASTER 定数范围内即可入选，抽谱时从池内随机挑一个难度播放。
+  Widget _buildDifficultyPoolSetting(double scaleFactor, Brightness brightness) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('难度随机池', style: TextStyle(fontSize: 14 * scaleFactor)),
+        SizedBox(height: 8 * scaleFactor),
+        Wrap(
+          spacing: 8 * scaleFactor,
+          runSpacing: 4 * scaleFactor,
+          children: _difficultyLabels.entries.map((entry) {
+            final String inote = entry.key;
+            final bool selected = _peekDifficulties.contains(inote);
+            return FilterChip(
+              label: Text(entry.value),
+              selected: selected,
+              onSelected: (value) {
+                setState(() {
+                  if (value) {
+                    if (!_peekDifficulties.contains(inote)) {
+                      _peekDifficulties.add(inote);
+                    }
+                  } else {
+                    _peekDifficulties.remove(inote);
+                    // 至少保留一个难度，否则抽谱时没有可播的谱面
+                    if (_peekDifficulties.isEmpty) {
+                      _peekDifficulties.add('4');
+                    }
+                  }
+                });
+              },
+            );
+          }).toList(),
         ),
       ],
     );
@@ -454,16 +614,6 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                                 },
                                 (time) {
                                   setState(() => _timeLimit = time);
-                                },
-                                () {
-                                  setState(() {
-                                    _selectedVersions = [];
-                                    _masterMinDx = 1.0;
-                                    _masterMaxDx = 15.0;
-                                    _selectedGenres = [];
-                                    _maxGuesses = 10;
-                                    _timeLimit = 60;
-                                  });
                                 },
                               ),
 

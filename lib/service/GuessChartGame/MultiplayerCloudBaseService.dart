@@ -212,6 +212,9 @@ class MultiplayerCloudBaseService {
           case 'upload_songs_response':
             _handleUploadSongsResponse(data['payload']);
             break;
+          case 'letter_opened':
+            _handleLetterOpened(data['payload']);
+            break;
           case 'song_count_response':
             _handleSongCountResponse(data['payload']);
             break;
@@ -426,6 +429,11 @@ class MultiplayerCloudBaseService {
     _controller.add(MultiplayerEvent.playerReady(playerId: playerId, ready: ready));
   }
 
+  void _handleLetterOpened(Map<String, dynamic> payload) {
+    // 服务端会把新的掩码通过 game_state_updated 广播，这里仅作回执记录
+    debugPrint('[DEBUG][CloudService] 开字母成功: ${payload['letter']}');
+  }
+
   void _handleGuessReceived(Map<String, dynamic> payload) {
     GuessRecord guess = GuessRecord.fromJson(payload['guess']);
     _controller.add(MultiplayerEvent.guessResult(guess: guess));
@@ -465,6 +473,11 @@ class MultiplayerCloudBaseService {
     int playDuration = 5,
     int songCount = 3,
     int nonEnglishCharThreshold = 50,
+    int flashDurationMs = 300,
+    int tileCount = 1000,
+    int tileRevealIntervalMs = 1500,
+    int peekDurationSeconds = 8,
+    List<String> peekDifficulties = const ['4'],
   }) async {
     try {
       debugPrint('[DEBUG][CloudService] 开始创建房间...');
@@ -502,6 +515,11 @@ class MultiplayerCloudBaseService {
         'playDuration': playDuration,
         'songCount': songCount,
         'nonEnglishCharThreshold': nonEnglishCharThreshold,
+        'flashDurationMs': flashDurationMs,
+        'tileCount': tileCount,
+        'tileRevealIntervalMs': tileRevealIntervalMs,
+        'peekDurationSeconds': peekDurationSeconds,
+        'peekDifficulties': peekDifficulties,
       });
       
     } catch (e) {
@@ -712,6 +730,18 @@ class MultiplayerCloudBaseService {
       
     } catch (e) {
       _controller.add(MultiplayerEvent.error(message: '提交猜测失败: $e'));
+    }
+  }
+
+  /// 开字母（letters 模式，房间共享）
+  Future<void> openLetter(String letter) async {
+    try {
+      if (currentPlayerId == null || currentRoomId == null) return;
+
+      await _wsBroadcast.sendOpenLetter(letter);
+
+    } catch (e) {
+      _controller.add(MultiplayerEvent.error(message: '开字母失败: $e'));
     }
   }
 

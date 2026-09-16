@@ -18,6 +18,7 @@ import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 import 'package:my_first_flutter_app/entity/DXRating/MaiTagsModel.dart';
 import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import '../../widgets/B50GameCardWidget.dart';
 
 class PersonalizedBest50Page extends StatefulWidget {
@@ -62,6 +63,10 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     {'value': 'st_50', 'label': 'ST50'},
     {'value': 'star_50', 'label': '星数50'},
     {'value': 'tag_50', 'label': '标签50'},
+    {'value': 'random_50', 'label': '随机50'},
+    {'value': 'beyond_50', 'label': '越级50'},
+    {'value': 'difficulty_50', 'label': '难度50'},
+    {'value': 'best_n', 'label': 'Best N'},
     {'value': 'all_50', 'label': 'ALL50'},
   ];
 
@@ -80,12 +85,22 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
   String? _selectedStar; // 选中的星数
   int? _selectedTagId; // 选中的标签ID
   String? _selectedTagName; // 选中的标签名称
+  int? _selectedDifficultyLevel; // 难度50 选中的难度（0=BASIC ... 4=Re:MASTER，UTAGE 走独立流程）
+  int _selectedN = 50; // Best N 选项选中的 N，默认 50
+  late final TextEditingController _bestNController; // Best N 输入框 controller
   bool _isInclusiveMode = false; // 包容关系模式开关（仅对连击/同步50有效）
 
   @override
   void initState() {
     super.initState();
+    _bestNController = TextEditingController(text: _selectedN.toString());
     _loadPersonalizedData();
+  }
+
+  @override
+  void dispose() {
+    _bestNController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadPersonalizedData() async {
@@ -180,6 +195,12 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
   // 判断当前选中类型是否支持包容关系模式（连击或同步类型）
   bool _supportsInclusiveMode() {
     return _isComboType() || _isSyncType();
+  }
+
+  // 难度 level → 人类可读标签
+  String _difficultyLabel(int level) {
+    const labels = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'Re:MASTER', 'UTAGE'];
+    return (level >= 0 && level < labels.length) ? labels[level] : '未知';
   }
 
   // 包容关系模式下显示的标签
@@ -317,6 +338,23 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
           if (_selectedTagId != null) {
             data = await service.getTag50Data(_selectedTagId!);
           }
+          break;
+        case 'random_50':
+          data = await service.getRandom50Data();
+          break;
+        case 'beyond_50':
+          data = await service.getBeyond50Data();
+          break;
+        case 'difficulty_50':
+          if (_selectedDifficultyLevel == 5) {
+            // UTAGE：按 ds 降序取前 50
+            data = await service.getUtage50Data();
+          } else if (_selectedDifficultyLevel != null) {
+            data = await service.getDifficulty50Data(_selectedDifficultyLevel!);
+          }
+          break;
+        case 'best_n':
+          data = await service.getBestNData(_selectedN);
           break;
         case 'all_50':
           data = await service.getAll50Data();
@@ -641,7 +679,15 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                                             ? '选择类型: 星数50 - ${_selectedStar!}'
                                             : _selectedType == 'tag_50' && _selectedTagName != null
                                                 ? '选择类型: 标签50 - ${_selectedTagName!}'
-                                                : '选择类型: ${_options.firstWhere((option) => option['value'] == _selectedType)['label']!}',
+                                                : _selectedType == 'random_50'
+                                                    ? '选择类型: 随机50'
+                                                    : _selectedType == 'beyond_50'
+                                                        ? '选择类型: 越级50'
+                                                    : _selectedType == 'difficulty_50' && _selectedDifficultyLevel != null
+                                                        ? '选择类型: 难度50 - ${_difficultyLabel(_selectedDifficultyLevel!)}'
+                                                        : _selectedType == 'best_n'
+                                                            ? '选择类型: Best $_selectedN'
+                                                            : '选择类型: ${_options.firstWhere((option) => option['value'] == _selectedType)['label']!}',
                             style: TextStyle(
                               fontSize: MediaQuery.of(context).size.width * 0.04,
                               color: Colors.white,
@@ -660,6 +706,18 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                         // 数据统计区域
                         _buildStatsSection(),
                         SizedBox(height: 12.0),
+
+                        // 随机50 专属：再抽一次按钮
+                        if (_selectedType == 'random_50')
+                          _buildRerollButton(),
+                        if (_selectedType == 'random_50')
+                          SizedBox(height: 12.0),
+
+                        // Best N 专属：输入框 + 生成按钮
+                        if (_selectedType == 'best_n')
+                          _buildBestNInputRow(),
+                        if (_selectedType == 'best_n')
+                          SizedBox(height: 12.0),
 
                         // 导出按钮
                         _buildExportButton(),
@@ -713,6 +771,10 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                       // 显示标签选择对话框
                       Navigator.of(context).pop();
                       _showTagSelectionDialog();
+                    } else if (option['value'] == 'difficulty_50') {
+                      // 显示难度选择对话框
+                      Navigator.of(context).pop();
+                      _showDifficultySelectionDialog();
                     } else {
                       setState(() {
                         _selectedType = option['value']!;
@@ -722,6 +784,11 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                         _selectedStar = null;
                         _selectedTagId = null;
                         _selectedTagName = null;
+                        _selectedDifficultyLevel = null;
+                        // Best N：切回时把 controller 文本同步成当前的 N
+                        if (option['value'] == 'best_n') {
+                          _bestNController.text = _selectedN.toString();
+                        }
                       });
                       Navigator.of(context).pop();
                       _isInclusiveMode = false; // 切换类型时重置包容关系模式
@@ -917,6 +984,119 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Best N 输入行 + 生成按钮（仅在 _selectedType == 'best_n' 时显示）
+  Widget _buildBestNInputRow() {
+    final brightness = Theme.of(context).brightness;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: AppColors.linkBlue(brightness).withValues(alpha: 0.6),
+          width: 1.5,
+        ),
+        borderRadius: BorderRadius.circular(8),
+        color: AppColors.linkBlue(brightness).withValues(alpha: 0.05),
+      ),
+      child: Row(
+        children: [
+          const Text('N =', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 80,
+            child: TextField(
+              controller: _bestNController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+              decoration: const InputDecoration(
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _triggerBestN,
+              icon: const Icon(Icons.search, color: Colors.white, size: 18),
+              label: const Text(
+                '生成 Best N',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.linkBlue(brightness),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Best N 生成按钮：读 controller，校验后写回 _selectedN 并拉数据
+  void _triggerBestN() {
+    final v = int.tryParse(_bestNController.text.trim());
+    if (v == null || v < 1) {
+      Fluttertoast.showToast(msg: '请输入 ≥ 1 的整数');
+      return;
+    }
+    setState(() {
+      _selectedN = v.clamp(1, 500);
+      _bestNController.text = _selectedN.toString();
+    });
+    _fetchPersonalizedData();
+  }
+
+  // 显示难度选择对话框（难度50）
+  void _showDifficultySelectionDialog() {
+    const options = [
+      _DifficultyOption('BASIC',     0),
+      _DifficultyOption('ADVANCED',   1),
+      _DifficultyOption('EXPERT',    2),
+      _DifficultyOption('MASTER',    3),
+      _DifficultyOption('Re:MASTER', 4),
+      _DifficultyOption('UTAGE',     5), // UTAGE 走 ds 排序的独立服务
+    ];
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('选择难度'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: options.map((opt) {
+                return ListTile(
+                  title: Text(opt.label),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    setState(() {
+                      _selectedType = 'difficulty_50';
+                      _selectedDifficultyLevel = opt.level;
+                    });
+                    _fetchPersonalizedData();
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text('取消'),
+              onPressed: () => Navigator.of(context).pop(),
             ),
           ],
         );
@@ -1283,6 +1463,26 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     );
   }
 
+  // 「再抽一次」按钮（仅随机50 显示）
+  Widget _buildRerollButton() {
+    return OutlinedButton.icon(
+      onPressed: _fetchPersonalizedData,
+      icon: const Icon(Icons.refresh, color: Colors.white, size: 18),
+      label: const Text(
+        '再抽一次',
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      ),
+      style: OutlinedButton.styleFrom(
+        backgroundColor: AppColors.linkBlue(Theme.of(context).brightness),
+        side: BorderSide(color: AppColors.linkBlue(Theme.of(context).brightness)),
+        padding: const EdgeInsets.symmetric(vertical: 12.0),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8.0),
+        ),
+      ),
+    );
+  }
+
   // 构建导出按钮
   Widget _buildExportButton() {
     return ElevatedButton(
@@ -1563,4 +1763,11 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     int notesSum = notes.fold(0, (sum, note) => sum + (note as int));
     return notesSum * 3;
   }
+}
+
+/// 难度 50 对话框选项，强类型避免 map value 推断为 Object。
+class _DifficultyOption {
+  final String label;
+  final int level;
+  const _DifficultyOption(this.label, this.level);
 }

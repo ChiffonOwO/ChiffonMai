@@ -20,6 +20,7 @@ import 'ScoreOcrPage.dart';
 import 'DifficultyDistributionPage.dart';
 import 'FriendComparePage.dart';
 import 'GlobalArcadeMapPage.dart';
+import 'KnowledgeSearchPage.dart';
 import 'KaleidXScope/KaleidXScopeSelectPage.dart';
 import 'PersonalizedChartPlayConfigure.dart';
 
@@ -308,7 +309,7 @@ class _ToolsHubPageState extends State<ToolsHubPage> {
               ),
               HubActionTile(
                 title: '全国音游地图',
-                subtitle: '看看哪里有你想玩的机台（BemaniCN）',
+                subtitle: '看看哪里有你想玩的机台',
                 icon: Icons.map_rounded,
                 isFavorited: _isFavorited('全国音游地图'),
                 onToggleFavorite: () => _toggleFavorite('全国音游地图'),
@@ -322,6 +323,23 @@ class _ToolsHubPageState extends State<ToolsHubPage> {
                 isFavorited: _isFavorited('全球音游街机地图'),
                 onToggleFavorite: () => _toggleFavorite('全球音游街机地图'),
                 onTap: () => _open(context, const GlobalArcadeMapPage()),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          HubSection(
+            title: '资料与百科',
+            icon: Icons.menu_book_outlined,
+            subtitle: '舞萌术语与知识条目',
+            badgeCount: 1,
+            children: [
+              HubActionTile(
+                title: '舞萌百科',
+                subtitle: '查阅舞萌相关知识',
+                icon: Icons.menu_book_outlined,
+                isFavorited: _isFavorited('舞萌百科'),
+                onToggleFavorite: () => _toggleFavorite('舞萌百科'),
+                onTap: () => _open(context, const KnowledgeSearchPage()),
               ),
             ],
           ),

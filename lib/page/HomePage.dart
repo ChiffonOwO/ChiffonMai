@@ -70,10 +70,14 @@ import '../widgets/RefreshDataDialog.dart'
     show
         showRefreshDataDialog,
         executeRefreshData,
+        executeAdvancedRefreshData,
         CurrentDataSourceNotifier,
         RefreshDataSource,
         refreshBest50DataWithProgress,
         launchUrlFallback;
+// PLAYER OVERVIEW 卡片上半部分 → 「刷新数据（高级）」对话框
+import '../widgets/AdvancedRefreshDataDialog.dart'
+    show showAdvancedRefreshDataDialog;
 import 'FriendComparePage.dart';
 import 'RecentCommentsPage.dart';
 import 'RecentRatingsPage.dart';
@@ -83,6 +87,8 @@ import '../manager/DivingFish/DivingFishOAuthManager.dart';
 import 'package:my_first_flutter_app/utils/FavoriteFeaturesNotifier.dart';
 import 'package:my_first_flutter_app/utils/LoginStateNotifier.dart';
 import 'package:my_first_flutter_app/utils/UserProfileNotifier.dart';
+import '../service/AccountSwitchService.dart';
+import '../widgets/AccountSwitchSheet.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -143,8 +149,10 @@ class HomePageState extends State<HomePage> {
     // 监听用户档案共享状态（昵称 / Rating / QQ 跨页面同步）
     UserProfileNotifier.instance.addListener(_onUserProfileChanged);
     _onUserProfileChanged();
-    // 加载当前数据源（首页摘要"数据源"显示用）
-    CurrentDataSourceNotifier.load();
+    // 加载当前数据源（首页摘要"数据源"显示用），并确保旧数据已迁进双账号系统
+    CurrentDataSourceNotifier.load().then((_) {
+      AccountSwitchService.ensureMigrated();
+    });
     _loadUserData();
     _autoCheckUpdate();
     _checkDivingFishLoginStatus();
@@ -202,22 +210,36 @@ class HomePageState extends State<HomePage> {
 
   // 后台初始化数据 - 使用 HomeService
   Future<void> _initializeDataInBackground() async {
-    // 检查上次初始化的时间，如果在冷却时间内则跳过自动初始化
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final lastInitMillis =
-          prefs.getInt(CacheKeyConstant.lastInitializationTimestamp);
-      if (lastInitMillis != null) {
-        final lastInit = DateTime.fromMillisecondsSinceEpoch(lastInitMillis);
-        final diff = DateTime.now().difference(lastInit);
-        if (diff < _InitInterval.initializationCooldown) {
-          debugPrint(
-              '距上次初始化仅 ${diff.inHours} 小时，跳过自动初始化（冷却时间：${_InitInterval.initializationCooldown.inHours} 小时）');
-          return;
+    // 曲库缓存是否可用：用于「冷却期内但缓存缺失」的抢占式兜底。
+    //
+    // 背景（真实故障）：冷却期只看 `lastInitializationTimestamp`，一旦上次
+    // 初始化**失败/被跳过**（离线、接口 502、恢复备份后 prefs 被清空……）
+    // 而这个时间戳照样被写下，就会连续 7 天跳过自动初始化。结果是
+    // `cachedSongs` 长期为空，所有单人猜歌页抽不到曲 → 永久转圈。
+    // 所以缓存缺失时必须无视冷却期，立刻补一次拉取。
+    final hasSongCache = await MaimaiMusicDataManager().hasValidMusicCache(
+      maxAge: const Duration(days: 30),
+    );
+
+    if (hasSongCache) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final lastInitMillis =
+            prefs.getInt(CacheKeyConstant.lastInitializationTimestamp);
+        if (lastInitMillis != null) {
+          final lastInit = DateTime.fromMillisecondsSinceEpoch(lastInitMillis);
+          final diff = DateTime.now().difference(lastInit);
+          if (diff < _InitInterval.initializationCooldown) {
+            debugPrint(
+                '距上次初始化仅 ${diff.inHours} 小时，跳过自动初始化（冷却时间：${_InitInterval.initializationCooldown.inHours} 小时）');
+            return;
+          }
         }
+      } catch (e) {
+        debugPrint('检查上次初始化时间失败: $e，继续执行初始化');
       }
-    } catch (e) {
-      debugPrint('检查上次初始化时间失败: $e，继续执行初始化');
+    } else {
+      debugPrint('曲库缓存缺失，无视 7 天冷却期，立即执行数据初始化');
     }
 
     if (mounted) {
@@ -237,31 +259,42 @@ class HomePageState extends State<HomePage> {
         if (result.success) {
           _isInitializationCompleted = true;
           _initializationProgress = '数据初始化完成！总耗时 ${result.durationStr}';
-
-          // 保存本次成功初始化的时间戳
-          try {
-            SharedPreferences.getInstance().then((prefs) {
-              prefs.setInt(
-                CacheKeyConstant.lastInitializationTimestamp,
-                DateTime.now().millisecondsSinceEpoch,
-              );
-            });
-          } catch (e) {
-            debugPrint('保存初始化时间戳失败: $e');
-          }
-
-          // 4秒后隐藏完成提示
-          Future.delayed(const Duration(seconds: 4), () {
-            if (mounted) {
-              setState(() {
-                _isInitializationCompleted = false;
-                _initializationProgress = '';
-              });
-            }
-          });
         } else {
           _initializationProgress =
               '初始化失败: ${result.errorMessage}\n建议检查网络连接后重启应用';
+        }
+      });
+
+      // 冷却时间戳只在「曲库真的拿到了」时才写。
+      //
+      // 原先无论成功与否都写，于是「首次启动时没网」会让 App 认下这次初始化，
+      // 接下来 7 天都不再自动补拉，`cachedSongs` 一直是空的 ——
+      // 这正是「所有单人猜歌卡加载页」的成因之一。
+      final libraryReady = await MaimaiMusicDataManager().hasValidMusicCache(
+        maxAge: const Duration(days: 30),
+      );
+      if (result.success && libraryReady) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt(
+            CacheKeyConstant.lastInitializationTimestamp,
+            DateTime.now().millisecondsSinceEpoch,
+          );
+        } catch (e) {
+          debugPrint('保存初始化时间戳失败: $e');
+        }
+      } else if (result.success) {
+        debugPrint('曲库仍为空，不记录初始化时间戳（下次进首页会重试）');
+      }
+
+      if (!mounted) return;
+      // 4秒后隐藏完成提示
+      Future.delayed(const Duration(seconds: 4), () {
+        if (mounted) {
+          setState(() {
+            _isInitializationCompleted = false;
+            _initializationProgress = '';
+          });
         }
       });
     }
@@ -363,8 +396,9 @@ class HomePageState extends State<HomePage> {
     );
     try {
       await UserProfileNotifier.clearShuiyuAccountCache();
-      // 同时把内存中的 CurrentDataSourceNotifier 重置为水鱼（load 会读 prefs，已被清空，回退默认）
-      await CurrentDataSourceNotifier.load();
+      // 双账号：清掉水鱼账号的存档；若当前正是水鱼则回落到落雪（有缓存时）。
+      await AccountSwitchService.onAccountLoggedOut(
+          RefreshDataSource.shuiyu);
     } catch (e) {
       debugPrint('登出水鱼账号失败：$e');
     }
@@ -454,8 +488,6 @@ class HomePageState extends State<HomePage> {
             const SizedBox(height: 12),
             _buildQuickActions(context),
             const SizedBox(height: 28),
-            _buildHomeSectionTitle(context, '收藏的功能', '常用功能快速直达'),
-            const SizedBox(height: 12),
             // 顶层 ValueListenableBuilder 已保证整页重建，直接用 notifier 传入的 titles 渲染。
             _buildFavoriteFeaturesSection(context, favoriteTitles),
             if (_isBackgroundInitializing || _isInitializationCompleted) ...[
@@ -485,42 +517,61 @@ class HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(
-              child: Text('PLAYER OVERVIEW',
-                  style: TextStyle(
-                      color: scheme.onPrimary.withValues(alpha: .72),
-                      letterSpacing: 1.5,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800))),
-          Icon(Icons.music_note,
-              color: scheme.onPrimary.withValues(alpha: .3), size: 28),
-        ]),
-        const SizedBox(height: 8),
-        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text(_displayBest50RA(),
-              style: TextStyle(
-                  color: scheme.onPrimary,
-                  fontSize: 36,
-                  height: 1,
-                  fontWeight: FontWeight.w900)),
-          const SizedBox(width: 10),
-          Padding(
-              padding: const EdgeInsets.only(bottom: 3),
-              child: Text('TOTAL RATING',
-                  style: TextStyle(
-                      color: scheme.onPrimary.withValues(alpha: .76),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700))),
-        ]),
+        // 上半部分（PLAYER OVERVIEW 标题 + TOTAL RATING）点击 → 「刷新数据（高级）」
+        Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: _openAdvancedRefreshData,
+            borderRadius: BorderRadius.circular(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Expanded(
+                      child: Text('PLAYER OVERVIEW',
+                          style: TextStyle(
+                              color: scheme.onPrimary.withValues(alpha: .72),
+                              letterSpacing: 1.5,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800))),
+                  Icon(Icons.music_note,
+                      color: scheme.onPrimary.withValues(alpha: .3), size: 28),
+                ]),
+                const SizedBox(height: 8),
+                Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Text(_displayBest50RA(),
+                      style: TextStyle(
+                          color: scheme.onPrimary,
+                          fontSize: 36,
+                          height: 1,
+                          fontWeight: FontWeight.w900)),
+                  const SizedBox(width: 10),
+                  Padding(
+                      padding: const EdgeInsets.only(bottom: 3),
+                      child: Text('TOTAL RATING',
+                          style: TextStyle(
+                              color: scheme.onPrimary.withValues(alpha: .76),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700))),
+                ]),
+              ],
+            ),
+          ),
+        ),
         const SizedBox(height: 20),
         ValueListenableBuilder<RefreshDataSource>(
           valueListenable: CurrentDataSourceNotifier.instance,
           builder: (context, source, _) => Row(children: [
             _summaryMetric(context, 'Best35', _displayBest35RA()),
             _summaryMetric(context, 'Best15', _displayBest15RA()),
-            _summaryMetric(context, '数据源',
-                source == RefreshDataSource.shuiyu ? '水鱼' : '落雪'),
+            // 点「数据源」即可切换水鱼 / 落雪账号（使用缓存，不联网）
+            _summaryMetric(
+              context,
+              '数据源',
+              source.displayName,
+              onTap: _showAccountSwitchSheet,
+              trailingIcon: Icons.swap_horiz_rounded,
+            ),
           ]),
         ),
       ]),
@@ -530,19 +581,41 @@ class HomePageState extends State<HomePage> {
   // 顶部头像 / 姓名框入口已迁移到 MeHubPage；选择结果仍存于 SharedPreferences，
   // 供 Best50 / 拟合等图片导出时由 ExportUserInfoWidget 读取。
 
-  Widget _summaryMetric(BuildContext context, String label, String value) {
+  Widget _summaryMetric(BuildContext context, String label, String value,
+      {VoidCallback? onTap, IconData? trailingIcon}) {
     final onPrimary = Theme.of(context).colorScheme.onPrimary;
+    final content = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  color: onPrimary.withValues(alpha: .68), fontSize: 12)),
+          const SizedBox(height: 3),
+          Row(children: [
+            Flexible(
+              child: Text(value,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: onPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15)),
+            ),
+            if (trailingIcon != null) ...[
+              const SizedBox(width: 2),
+              Icon(trailingIcon,
+                  size: 14, color: onPrimary.withValues(alpha: .8)),
+            ],
+          ]),
+        ]);
     return Expanded(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label,
-          style:
-              TextStyle(color: onPrimary.withValues(alpha: .68), fontSize: 12)),
-      const SizedBox(height: 3),
-      Text(value,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-              color: onPrimary, fontWeight: FontWeight.w700, fontSize: 15)),
-    ]));
+      child: onTap == null
+          ? content
+          : InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(8),
+              child: content,
+            ),
+    );
   }
 
   Widget _buildHomeSectionTitle(
@@ -1781,6 +1854,88 @@ class HomePageState extends State<HomePage> {
   }
 
   // 显示账号管理对话框
+  /// 打开「切换账号」底部面板；目标无缓存时引导去刷新对应数据源。
+  Future<void> _showAccountSwitchSheet() async {
+    await showAccountSwitchSheet(
+      context,
+      onNeedRefresh: (source) => _openRefreshData(initialSource: source),
+    );
+  }
+
+  /// 跑一遍「刷新数据」流程（首页用常驻 SnackBar 显示进度）。
+  Future<void> _openRefreshData({RefreshDataSource? initialSource}) async {
+    final request = await showRefreshDataDialog(
+      context,
+      initialSource: initialSource,
+    );
+    if (request == null || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    // SnackBar 同一时刻只保留一条，所以每次进度更新前先清空旧的，
+    // 否则高频 onProgress 会把 SnackBar 排成长队。
+    void showProgress(String text) {
+      messenger.clearSnackBars();
+      messenger.showSnackBar(SnackBar(
+        content: Text(text),
+        duration: const Duration(minutes: 10),
+      ));
+    }
+
+    showProgress('正在刷新数据...');
+    var failed = false;
+    try {
+      await executeRefreshData(request, onProgress: (p, t) {
+        if (!mounted) return;
+        showProgress('$t ($p%)');
+      });
+    } catch (e) {
+      failed = true;
+      if (mounted) Fluttertoast.showToast(msg: '刷新数据失败：$e');
+    } finally {
+      messenger.clearSnackBars();
+    }
+    if (!failed && mounted) Fluttertoast.showToast(msg: '数据刷新成功!');
+  }
+
+  /// 高级模式刷新数据：和「系统」Tab 的入口同源，只是这里把入口挂在
+  /// PLAYER OVERVIEW 卡片的上半部分（标题 + 总分）上。
+  ///
+  /// 高级对话框返回的 [RefreshDataRequest.forceSourceIds] 非空，
+  /// 交给 executeAdvancedRefreshData 按缓存源强制刷新；进度沿用首页常驻
+  /// SnackBar 的写法（同一时刻只留一条，避免高频进度排成长队）。
+  bool _isAdvancedRefreshing = false;
+
+  Future<void> _openAdvancedRefreshData() async {
+    if (_isAdvancedRefreshing) return;
+    final request = await showAdvancedRefreshDataDialog(context);
+    if (request == null || !mounted) return;
+
+    setState(() => _isAdvancedRefreshing = true);
+    final messenger = ScaffoldMessenger.of(context);
+    void showProgress(String text) {
+      messenger.clearSnackBars();
+      messenger.showSnackBar(SnackBar(
+        content: Text(text),
+        duration: const Duration(minutes: 10),
+      ));
+    }
+
+    showProgress('正在刷新数据（高级）...');
+    var failed = false;
+    try {
+      await executeAdvancedRefreshData(request, onProgress: (p, t) {
+        if (!mounted) return;
+        showProgress('$t ($p%)');
+      });
+    } catch (e) {
+      failed = true;
+      if (mounted) Fluttertoast.showToast(msg: '刷新数据失败：$e');
+    } finally {
+      messenger.clearSnackBars();
+      if (mounted) setState(() => _isAdvancedRefreshing = false);
+    }
+    if (!failed && mounted) Fluttertoast.showToast(msg: '数据刷新成功!');
+  }
+
   void _showAccountManageDialog(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     showDialog(
@@ -2441,36 +2596,7 @@ class HomePageState extends State<HomePage> {
       );
     }
     if (item.title == '刷新数据') {
-      // 对话框只负责收集输入；确认后关闭对话框。
-      // 首页这里没有可承载进度的按钮，所以用一条常驻 SnackBar 显示进度文本。
-      // （系统 Tab 的同类入口走同一套 executeRefreshData，进度显示在按钮上。）
-      final request = await showRefreshDataDialog(context);
-      if (request == null || !mounted) return;
-      final messenger = ScaffoldMessenger.of(context);
-      // SnackBar 同一时刻只保留一条，所以每次进度更新前先清空旧的，
-      // 否则高频 onProgress 会把 SnackBar 排成长队。
-      void showProgress(String text) {
-        messenger.clearSnackBars();
-        messenger.showSnackBar(SnackBar(
-          content: Text(text),
-          duration: const Duration(minutes: 10),
-        ));
-      }
-
-      showProgress('正在刷新数据...');
-      var failed = false;
-      try {
-        await executeRefreshData(request, onProgress: (p, t) {
-          if (!mounted) return;
-          showProgress('$t ($p%)');
-        });
-      } catch (e) {
-        failed = true;
-        if (mounted) Fluttertoast.showToast(msg: '刷新数据失败：$e');
-      } finally {
-        messenger.clearSnackBars();
-      }
-      if (!failed && mounted) Fluttertoast.showToast(msg: '数据刷新成功!');
+      await _openRefreshData();
     }
     if (item.title == '刷新 maidata') {
       final confirmed = await showDialog<bool>(

@@ -35,7 +35,10 @@ class GuessRecord {
       playerNickname: json['player_nickname'] ?? json['playerNickname'] ?? '',
       songId: json['song_id'] ?? json['songId'] ?? '',
       songName: json['song_name'] ?? json['songName'] ?? '',
-      isCorrect: json['is_correct'] ?? json['isCorrect'] ?? false,
+      // 服务端下发的键是 `correct`（见 server 的 addGuess / getGameState），
+      // 只认 `is_correct`/`isCorrect` 的话每一条猜对记录都会被解析成 false，
+      // 表现为「答对了但历史记录显示答错、本地分数不涨」。
+      isCorrect: json['correct'] ?? json['is_correct'] ?? json['isCorrect'] ?? false,
       score: json['score'] ?? 0,
       guessedAt: json['guessed_at'] != null 
           ? DateTime.parse(json['guessed_at']) 

@@ -15,6 +15,28 @@ class LuoXueSongUtil {
   // 音乐文件扩展名
   static const String _fileExtension = '.mp3';
 
+  /// 把**水鱼**歌曲 id 换成**落雪音源** id。
+  ///
+  /// 音源 URL 形如 `assets2.lxns.net/maimai/music/{id}.mp3`，其命名对**所有**
+  /// 曲目都是「水鱼 id % 10000」——包括 6 位数的宴会场。
+  ///
+  /// 线上实测（1394 首全量 + 宴会场 62 首逐首请求）：
+  /// - 5 位 DX 曲：11466 → 1466 命中，11466 本身 404
+  /// - 6 位宴会场：100018 → 18 命中，100018 本身 404
+  ///   （62 首取余后**全部** 200，原始 6 位**全部** 404）
+  ///
+  /// ⚠ 与 `LuoXueScoreUploadService.toLxnsSongId` 的区别：那个是给**成绩 API**
+  /// 用的，宴会场在落雪曲库里确实另有 6 位 id（`song/list` 里存在 100018 这个
+  /// 条目），所以那边原样保留；但**音频文件**没按那套命名，直接原样请求会 404，
+  /// 在播放页表现为「静默无声」。
+  ///
+  /// 非法 id 返回 0，调用方应据此跳过播放（而不是拿 0 去请求）。
+  static int toLxnsMusicId(String? divingFishSongId) {
+    final id = int.tryParse('${divingFishSongId ?? ''}'.trim());
+    if (id == null || id <= 0) return 0;
+    return id % 10000;
+  }
+
   // 自定义缓存管理器
   final CacheManager _cacheManager = CacheManager(
     Config(

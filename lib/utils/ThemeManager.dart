@@ -24,7 +24,8 @@ class ThemeManager {
 
   /// 浅色模式：白色覆层，数值越高背景越淡
   /// 深色模式：暗色覆层，数值越高背景越暗
-  double _lightOverlayOpacity = 0.72;
+  /// 默认 1.0：新用户背景完全不可见（不使用内置背景图），需自行下调才会显示
+  double _lightOverlayOpacity = 1.0;
   double get lightOverlayOpacity => _lightOverlayOpacity;
 
   /// 通知 UI 覆层透明度变化
@@ -74,7 +75,7 @@ class ThemeManager {
       pureBlackNotifier.value = _pureBlackEnabled;
 
       _lightOverlayOpacity =
-          prefs.getDouble(CacheKeyConstant.lightOverlayOpacity) ?? 0.72;
+          prefs.getDouble(CacheKeyConstant.lightOverlayOpacity) ?? 1.0;
       lightOverlayNotifier.value = _lightOverlayOpacity;
 
       // 自定义 seed 色：null 表示使用默认
@@ -99,8 +100,8 @@ class ThemeManager {
       notifier.value = ThemeMode.light;
       _pureBlackEnabled = false;
       pureBlackNotifier.value = false;
-      _lightOverlayOpacity = 0.72;
-      lightOverlayNotifier.value = 0.72;
+      _lightOverlayOpacity = 1.0;
+      lightOverlayNotifier.value = 1.0;
       _seedColor = null;
       seedColorNotifier.value = null;
       _customBackgroundPath = null;

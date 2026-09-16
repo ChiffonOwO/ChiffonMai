@@ -3,3 +3,10 @@
 
 # Production server config with sensitive data
 server.js
+
+# 手工备份出来的 server.js 副本（同样含 client_secret / 数据库口令等敏感项，
+# 命名形如 server.js.bak-20260914-223514，绝不能进版本库）
+server.js.bak-*
+
+# tool/mp-test/mp_harness.js 派生出来的临时测试服（含上面同样的敏感项）
+.mp_harness.runtime.js

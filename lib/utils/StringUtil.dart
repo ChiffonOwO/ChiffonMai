@@ -241,6 +241,29 @@ class StringUtil {
   }
 
   /**
+   * 由达成率反推评级代码（用于 assets/gamrank/<code>.png）。
+   * 阈值与 ScoreOcrPage 的 _achievementGrade 保持一致。
+   * @param achievement 达成率（百分比数值，如 100.5）
+   * @return 评级代码（sssp/sss/ssp/ss/.../d）
+   */
+  static String rateCodeFromAchievement(double achievement) {
+    if (achievement >= 100.5) return 'sssp';
+    if (achievement >= 100.0) return 'sss';
+    if (achievement >= 99.5) return 'ssp';
+    if (achievement >= 99.0) return 'ss';
+    if (achievement >= 98.0) return 'sp';
+    if (achievement >= 97.0) return 's';
+    if (achievement >= 94.0) return 'aaa';
+    if (achievement >= 90.0) return 'aa';
+    if (achievement >= 80.0) return 'a';
+    if (achievement >= 75.0) return 'bbb';
+    if (achievement >= 70.0) return 'bb';
+    if (achievement >= 60.0) return 'b';
+    if (achievement >= 50.0) return 'c';
+    return 'd';
+  }
+
+  /**
    * 格式化星星等级字符串
    * @param scoreRate 得分率
    * @return 格式化后的星星等级字符串

@@ -551,6 +551,7 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
     String decimalPart = parts.length > 1 ? '.${parts[1]}' : '';
     String percentageSymbol = isPercentage ? '%' : '';
 
+    // 整数与小数共用基线，数字底边自然齐平（与 B50 卡片一致）
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -563,7 +564,6 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
             fontSize: MediaQuery.of(context).size.width * 0.045,
             fontWeight: FontWeight.w800,
             color: color,
-            
           ),
         ),
         // 小数部分和百分号
@@ -573,7 +573,6 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
             fontSize: MediaQuery.of(context).size.width * 0.03,
             fontWeight: FontWeight.w800,
             color: color,
-            
           ),
         ),
       ],

@@ -22,7 +22,9 @@ class PersonalizedB50ConvertToImg {
   static GlobalKey _globalKey = GlobalKey();
 
   // 导出为图片的方法
-  static Future<File?> convertToImage(BuildContext context, String title, List<Map<String, dynamic>> personalizedSongs, List<dynamic>? maimaiMusicData, {int? jpegQuality}) async {
+  // [warningText] 非空时在标题与统计区之间插入红色告警文案（自定义 Best50 非法数据提示）。
+  // [sortLabel] 非空时在标题下方标注当前排序状态（自定义 Best50 一键排序）。
+  static Future<File?> convertToImage(BuildContext context, String title, List<Map<String, dynamic>> personalizedSongs, List<dynamic>? maimaiMusicData, {int? jpegQuality, String? warningText, String? sortLabel}) async {
     OverlayEntry? overlayEntry;
     try {
       debugPrint('=== STARTING PERSONALIZED B50 IMAGE CONVERSION ===');
@@ -40,7 +42,7 @@ class PersonalizedB50ConvertToImg {
       // 创建一个Widget，用于生成图片
       Widget imageWidget = RepaintBoundary(
         key: globalKey,
-        child: await _buildExportImageWidget(context, title, personalizedSongs, maimaiMusicData),
+        child: await _buildExportImageWidget(context, title, personalizedSongs, maimaiMusicData, warningText, sortLabel),
       );
 
       // 创建一个屏幕外的OverlayEntry，避免影响主UI
@@ -219,7 +221,7 @@ class PersonalizedB50ConvertToImg {
   }
 
   // 构建用于导出的Widget
-  static Future<Widget> _buildExportImageWidget(BuildContext context, String title, List<Map<String, dynamic>> personalizedSongs, List<dynamic>? maimaiMusicData) async {
+  static Future<Widget> _buildExportImageWidget(BuildContext context, String title, List<Map<String, dynamic>> personalizedSongs, List<dynamic>? maimaiMusicData, String? warningText, String? sortLabel) async {
     double containerWidth = 1700; // 与 Best50ConvertToImgService 对齐：容纳姓名框 + metaRow 横排布局
 
     return Container(
@@ -259,6 +261,45 @@ class PersonalizedB50ConvertToImg {
                 
                 // 标题区域
                 _buildSectionTitle(context, title),
+
+                // 排序状态标注（自定义 Best50）
+                if (sortLabel != null && sortLabel.isNotEmpty) ...[
+                  const SizedBox(height: 12.0),
+                  Center(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: Colors.black, width: 2.0),
+                        borderRadius: BorderRadius.circular(8.0),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20.0, vertical: 8.0),
+                      child: Text(
+                        '当前排序：$sortLabel',
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 28.0,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+
+                // 非法数据告警（自定义 Best50）
+                if (warningText != null && warningText.isNotEmpty) ...[
+                  const SizedBox(height: 12.0),
+                  Text(
+                    warningText,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFFD32F2F),
+                      fontSize: 30.0,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+
                 SizedBox(height: 16.0),
 
                 // 统计区域

@@ -10,6 +10,8 @@ import '../../entity/DivingFish/Song.dart';
 import '../../utils/LuoXueToDivingFishUtil.dart';
 import '../../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../../constant/CacheKeyConstant.dart';
+import '../../service/AccountSwitchService.dart';
+import '../../utils/CurrentDataSourceNotifier.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 /// 落雪用户游玩数据管理器
@@ -166,15 +168,9 @@ class LuoXueUserPlayDataManager {
           CacheKeyConstant.userPlayData, json.encode(cacheData));
       debugPrint('✅ 已更新 RecordItem 缓存（共 ${recordItems.length} 条）');
 
-      // 清除旧的 Best50 缓存，强制重新计算（重要！）
-      final lastQQ = prefs.getString('last_used_qq');
-      if (lastQQ != null) {
-        await prefs.remove('best50_data_$lastQQ');
-        debugPrint('✅ 已清除旧的 Best50 缓存');
-      }
-      await prefs.remove('last_used_qq');
-
-      // 清除可能影响的其他缓存
+      // 落雪不写 Best50 缓存（页面会按成绩重算），也不要动 last_used_qq /
+      // best50_data_<id> —— 那是水鱼账号的活动槽，双账号下由 AccountStore 存档管理。
+      // 只清推荐结果（它依赖个人成绩，换账号后失效）。
       await prefs.remove(CacheKeyConstant.recommendationResults);
       debugPrint('✅ 已清除推荐结果缓存');
     } catch (e) {
@@ -198,15 +194,12 @@ class LuoXueUserPlayDataManager {
     return _oauthManager.isLoggedIn();
   }
 
-  /// 登出（清除本地令牌缓存和用户数据缓存）
+  /// 登出（清除本地令牌缓存和落雪账号存档）
   Future<void> logout() async {
     await _oauthManager.logout();
-
-    // 清除用户数据缓存
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(CacheKeyConstant.userPlayData);
-    await prefs.remove(CacheKeyConstant.lastDataSource);
-    debugPrint('✅ 已清除用户数据缓存');
+    // 双账号：移除落雪账号的存档/元信息；若当前正显示落雪，回落到水鱼
+    await AccountSwitchService.onAccountLoggedOut(RefreshDataSource.luoxue);
+    debugPrint('✅ 已清除落雪账号缓存');
   }
 
   /// 获取当前访问令牌

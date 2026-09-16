@@ -20,6 +20,8 @@ import '../manager/DivingFish/DivingFishOAuthManager.dart';
 import '../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../manager/DivingFishProbeManager.dart';
 import '../manager/LuoXue/LuoXueOAuthManager.dart';
+import '../service/Best50/DiffBest50Service.dart';
+import '../service/SongSearchService.dart';
 import '../service/DivingFishScoreUploadService.dart';
 import '../service/LuoXueScoreUploadService.dart';
 import '../service/MaimaiHubOcrService.dart';
@@ -986,8 +988,6 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
 
   Future<void> _showEditSheet(MaimaiHubOcrItem item) async {
     final scheme = Theme.of(context).colorScheme;
-    // 难度选择是否处于展开状态（内联展开，不跳转页面）
-    var difficultyExpanded = false;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -1030,8 +1030,9 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
                           fontSize: 12, color: scheme.onSurfaceVariant)),
                   const SizedBox(height: 16),
 
-                  _sheetField(
-                    label: '歌曲',
+                  // ── 歌曲：与自定义 Best50 一致的带曲绘输入框 ──
+                  _sheetSongField(
+                    cover: _buildSongCover(item),
                     value: effectiveTitle,
                     onTap: () async {
                       final picked = await _showSongPicker(item);
@@ -1046,72 +1047,69 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
                         : null,
                   ),
 
-                  // ── 难度：点击展开，展开后只列出该歌曲真实存在的难度 ──
-                  _sheetField(
-                    label: '难度',
-                    value: _difficultyLabel(_difficultyOf(item)) ?? '未识别',
-                    trailingIcon: difficultyExpanded
-                        ? Icons.expand_less
-                        : Icons.expand_more,
-                    onTap: () => setSheetState(
-                        () => difficultyExpanded = !difficultyExpanded),
-                    onClear: edit?.difficulty != null
-                        ? () => apply((e) => e.difficulty = null)
-                        : null,
-                  ),
-                  if (difficultyExpanded) ...[
-                    if (!_canPickDifficulty(item))
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Text(
-                          '先选定一首歌曲，才能列出它实际有的难度',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.warningOrange(
-                                  Theme.of(context).brightness)),
-                        ),
-                      )
-                    else ...[
-                      Builder(builder: (context) {
-                        // 绑定成非空局部变量，Dart 才能把它提升为非空类型
-                        final song = _songOf(item)!;
-                        final count = chartCount!;
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '该歌曲共有 $count 个难度',
-                              style: TextStyle(
-                                  fontSize: 11, color: scheme.onSurfaceVariant),
+                  const SizedBox(height: 12),
+
+                  // ── 难度：与自定义 Best50 一致，默认展开并直接列出真实难度 ──
+                  Text('难度',
+                      style: TextStyle(
+                          fontSize: 13, color: scheme.onSurfaceVariant)),
+                  const SizedBox(height: 6),
+                  if (!_canPickDifficulty(item))
+                    Text(
+                      '先选定一首歌曲，才能列出它实际有的难度',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.warningOrange(
+                              Theme.of(context).brightness)),
+                    )
+                  else
+                    Builder(builder: (context) {
+                      // 绑定成非空局部变量，Dart 才能把它提升为非空类型
+                      final song = _songOf(item)!;
+                      final count = chartCount!;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              for (var i = 0; i < count; i++)
+                                ChoiceChip(
+                                  label: Text(_difficultyNameOf(i)),
+                                  selected: diffIndex == i,
+                                  // 带出等级/定数，方便确认选对了没
+                                  tooltip: [
+                                    _levelAtIndex(song, i),
+                                    _dsAtIndex(song, i) == null
+                                        ? null
+                                        : '定数 ${_dsAtIndex(song, i)!.toStringAsFixed(1)}',
+                                  ].whereType<String>().join(' · '),
+                                  onSelected: (_) => apply((e) =>
+                                      e.difficulty =
+                                          _difficultyNameOf(i).toLowerCase()),
+                                ),
+                            ],
+                          ),
+                          // 当前选中难度的标级 / 定数
+                          if (diffIndex != null &&
+                              diffIndex >= 0 &&
+                              diffIndex < count)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Text(
+                                '${_difficultyNameOf(diffIndex)}'
+                                '${_levelAtIndex(song, diffIndex) == null ? '' : ' · ${_levelAtIndex(song, diffIndex)}'}'
+                                '${_dsAtIndex(song, diffIndex) == null ? '' : ' · 定数 ${_dsAtIndex(song, diffIndex)!.toStringAsFixed(1)}'}',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: scheme.onSurfaceVariant),
+                              ),
                             ),
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 6,
-                              children: [
-                                for (var i = 0; i < count; i++)
-                                  ChoiceChip(
-                                    label: Text(_difficultyNameOf(i)),
-                                    selected: diffIndex == i,
-                                    // 带出等级/定数，方便确认选对了没
-                                    tooltip: [
-                                      _levelAtIndex(song, i),
-                                      _dsAtIndex(song, i) == null
-                                          ? null
-                                          : '定数 ${_dsAtIndex(song, i)!.toStringAsFixed(1)}',
-                                    ].whereType<String>().join(' · '),
-                                    onSelected: (_) => apply((e) =>
-                                        e.difficulty =
-                                            _difficultyNameOf(i).toLowerCase()),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        );
-                      }),
-                    ],
-                    const SizedBox(height: 4),
-                  ],
+                        ],
+                      );
+                    }),
+                  const SizedBox(height: 4),
 
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -1147,9 +1145,33 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
                     ),
                   ),
 
+                  // RA 实时预览（定位到歌曲+难度、且已填达成率时显示）
+                  Builder(builder: (context) {
+                    final song = _songOf(item);
+                    final idx = _difficultyIndexEffective(item);
+                    final ach = _achievementOf(item);
+                    final ds = (song != null && idx != null)
+                        ? _dsAtIndex(song, idx)
+                        : null;
+                    if (ds == null || ach == null) {
+                      return const SizedBox.shrink();
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'RA：${DiffBest50Service().calculateSingleRating(ds, ach)}',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                    );
+                  }),
+
                   const SizedBox(height: 12),
                   _sheetChoiceRow(
-                    label: '连击标记 (FC)',
+                    label: '连击',
                     options: _fcOptions,
                     current: _fcOf(item),
                     labelOf: (v) => StringUtil.formatFC(v),
@@ -1160,10 +1182,11 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
                   ),
                   const SizedBox(height: 12),
                   _sheetChoiceRow(
-                    label: '同步标记 (FS)',
+                    label: '同步',
                     options: _fsOptions,
                     current: _fsOf(item),
-                    labelOf: (v) => StringUtil.formatFS(v),
+                    // 仅此处把 sync 显示成 SYNC（formatFS 的通用显示仍是 SC）
+                    labelOf: (v) => v == 'sync' ? 'SYNC' : StringUtil.formatFS(v),
                     onPick: (v) => apply((e) => e.fs = v),
                     onClear: edit?.fs != null
                         ? () => apply((e) => e.fs = null)
@@ -1171,7 +1194,7 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '「空」表示不设置该标记。同步标记会按水鱼的值域提交（FS / FS+ / FDX / FDX+ / SC）。',
+                    '「空」表示不设置该标记。同步标记会按水鱼的值域提交（FS / FS+ / FDX / FDX+ / SYNC）。',
                     style:
                         TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
                   ),
@@ -1207,44 +1230,74 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
     );
   }
 
-  /// 一行「标签 + 当前值 + 可点」的字段
-  Widget _sheetField({
-    required String label,
+  /// 歌曲字段左侧的曲绘；未定位到歌曲时显示占位图标。
+  Widget _buildSongCover(MaimaiHubOcrItem item) {
+    final scheme = Theme.of(context).colorScheme;
+    final song = _songOf(item);
+    if (song == null) {
+      return Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(4.0),
+        ),
+        child: Icon(Icons.music_note, size: 22, color: scheme.onSurfaceVariant),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4.0),
+      child: CoverUtil.buildCoverWidget(song.id, 40),
+    );
+  }
+
+  /// 歌曲输入框：与自定义 Best50 一致——左侧曲绘 + 「歌曲」小标签 + 曲名 + 右侧箭头。
+  Widget _sheetSongField({
+    required Widget cover,
     required String value,
     required VoidCallback onTap,
     VoidCallback? onClear,
-    IconData trailingIcon = Icons.chevron_right,
   }) {
     final scheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+      borderRadius: BorderRadius.circular(4.0),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: scheme.outline),
+          borderRadius: BorderRadius.circular(4.0),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
         child: Row(
           children: [
-            Text(label,
-                style: TextStyle(fontSize: 14, color: scheme.onSurface)),
-            const Spacer(),
-            Flexible(
-              child: Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.right,
-                style: TextStyle(fontSize: 14, color: scheme.primary),
+            cover,
+            const SizedBox(width: 10.0),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('歌曲',
+                      style: TextStyle(
+                          fontSize: 12, color: scheme.onSurfaceVariant)),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 16, color: scheme.onSurface),
+                  ),
+                ],
               ),
             ),
             if (onClear != null)
               IconButton(
-                icon:
-                    Icon(Icons.close, size: 16, color: scheme.onSurfaceVariant),
+                icon: Icon(Icons.close,
+                    size: 16, color: scheme.onSurfaceVariant),
                 tooltip: '恢复为识别结果',
                 onPressed: onClear,
-              )
-            else
-              const SizedBox(width: 8),
-            Icon(trailingIcon, size: 18, color: scheme.onSurfaceVariant),
+                visualDensity: VisualDensity.compact,
+              ),
+            Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
           ],
         ),
       ),
@@ -1324,7 +1377,10 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
     );
   }
 
-  /// 选歌：先给 OCR 的候选，再给本地曲库全量（带搜索）
+  /// 选歌：先给 OCR 的候选，再给本地曲库全量（带搜索）。
+  ///
+  /// 搜索框逻辑与自定义 Best50 选曲器一致：`SongSearchService.searchSongs`
+  /// （歌名/ID/曲师/谱师/流派/版本/别名/BPM），500ms 防抖 + 搜索中指示。
   Future<_SongChoice?> _showSongPicker(MaimaiHubOcrItem item) async {
     final songs = await MaimaiMusicDataManager().getCachedSongs() ?? [];
     if (!mounted) return null;
@@ -1335,106 +1391,162 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
         .toList();
 
     var query = '';
+    var results = <Song>[];
+    var searching = false;
+    Timer? debounce;
 
-    return showModalBottomSheet<_SongChoice>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (sheetCtx) => StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          final scheme = Theme.of(ctx).colorScheme;
-          final q = query.trim().toLowerCase();
-          final filtered = q.isEmpty
-              ? songs
-              : songs
-                  .where((s) =>
-                      s.basicInfo.title.toLowerCase().contains(q) ||
-                      s.basicInfo.artist.toLowerCase().contains(q))
-                  .toList();
+    try {
+      return await showModalBottomSheet<_SongChoice>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (sheetCtx) => StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            final brightness = Theme.of(ctx).brightness;
+            final scheme = Theme.of(ctx).colorScheme;
+            final q = query.trim();
+            final filtered = q.isEmpty ? songs : results;
 
-          return SizedBox(
-            height: MediaQuery.of(ctx).size.height * 0.82,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                  child: TextField(
-                    autofocus: false,
-                    decoration: const InputDecoration(
-                      hintText: '搜索曲名或曲师',
-                      prefixIcon: Icon(Icons.search),
-                      isDense: true,
-                      border: OutlineInputBorder(),
+            Future<void> runSearch(String value) async {
+              final r = await SongSearchService.searchSongs(value);
+              if (!ctx.mounted || value != query) return;
+              setSheetState(() {
+                results = r;
+                searching = false;
+              });
+            }
+
+            return SizedBox(
+              height: MediaQuery.of(ctx).size.height * 0.82,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    child: TextField(
+                      autofocus: false,
+                      decoration: const InputDecoration(
+                        hintText: '歌名/BPM/谱师/曲师/别名/歌曲ID/...',
+                        prefixIcon: Icon(Icons.search),
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (v) {
+                        debounce?.cancel();
+                        setSheetState(() {
+                          query = v;
+                          searching = v.trim().isNotEmpty;
+                          if (v.trim().isEmpty) results = [];
+                        });
+                        if (v.trim().isEmpty) return;
+                        debounce = Timer(
+                          const Duration(milliseconds: 500),
+                          () => runSearch(v),
+                        );
+                      },
                     ),
-                    onChanged: (v) => setSheetState(() => query = v),
                   ),
-                ),
-                if (candidates.isNotEmpty)
-                  SizedBox(
-                    height: 44,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      children: [
-                        for (final t in candidates)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: ActionChip(
-                              label: Text(t),
-                              avatar: const Icon(Icons.auto_awesome, size: 16),
-                              onPressed: () {
-                                final m = _findSong(songs, t, item.isDx);
-                                Navigator.pop(
-                                  ctx,
-                                  _SongChoice(
-                                    song: m,
-                                    // 曲库里没有这个曲名时退化成手填曲名
-                                    manualTitle: m == null ? t : null,
-                                  ),
-                                );
-                              },
+                  if (candidates.isNotEmpty)
+                    SizedBox(
+                      height: 44,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        children: [
+                          for (final t in candidates)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ActionChip(
+                                label: Text(t),
+                                avatar: const Icon(Icons.auto_awesome, size: 16),
+                                onPressed: () {
+                                  final m = _findSong(songs, t, item.isDx);
+                                  Navigator.pop(
+                                    ctx,
+                                    _SongChoice(
+                                      song: m,
+                                      // 曲库里没有这个曲名时退化成手填曲名
+                                      manualTitle: m == null ? t : null,
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: searching
+                        ? const Center(child: CircularProgressIndicator())
+                        : filtered.isEmpty
+                            ? Center(
+                                child: Text(
+                                  q.isEmpty ? '暂无歌曲数据' : '未找到匹配的歌曲',
+                                  style:
+                                      TextStyle(color: scheme.onSurfaceVariant),
+                                ),
+                              )
+                            : ListView.builder(
+                                itemCount: filtered.length,
+                                itemBuilder: (_, i) =>
+                                    _buildPickerRow(ctx, filtered[i], brightness),
+                              ),
                   ),
-                const Divider(height: 1),
-                Expanded(
-                  child: filtered.isEmpty
-                      ? Center(
-                          child: Text('没有匹配的歌曲',
-                              style: TextStyle(color: scheme.onSurfaceVariant)))
-                      : ListView.builder(
-                          itemCount: filtered.length,
-                          itemBuilder: (_, i) {
-                            final s = filtered[i];
-                            return ListTile(
-                              leading: ClipRRect(
-                                borderRadius: BorderRadius.circular(6),
-                                child: CoverUtil.buildCoverWidget(s.id, 44),
-                              ),
-                              title: Text(s.basicInfo.title,
-                                  maxLines: 1, overflow: TextOverflow.ellipsis),
-                              subtitle: Text(
-                                '${s.basicInfo.artist} · ${StringUtil.formatVersion2(s.basicInfo.from)}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              trailing: Text(s.type,
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: scheme.onSurfaceVariant)),
-                              onTap: () => Navigator.pop(
-                                  ctx, _SongChoice(song: s, manualTitle: null)),
-                            );
-                          },
-                        ),
-                ),
-              ],
-            ),
-          );
-        },
+                ],
+              ),
+            );
+          },
+        ),
+      );
+    } finally {
+      debounce?.cancel();
+    }
+  }
+
+  /// 选曲结果行：曲目类型（ST/DX/UTAGE）放在歌名前，颜色/字号与其它页面一致。
+  Widget _buildPickerRow(BuildContext ctx, Song song, Brightness brightness) {
+    final bool isUtage = song.id.length == 6;
+    final String typeLabel =
+        isUtage ? 'UTAGE' : (song.type == 'SD' ? 'ST' : 'DX');
+    final Color typeColor = isUtage
+        ? const Color(0xFFFF6B8B)
+        : (song.type == 'SD'
+            ? AppColors.linkBlue(brightness)
+            : AppColors.warningOrange(brightness));
+    const double nameFontSize = 16.0;
+
+    return ListTile(
+      leading: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: CoverUtil.buildCoverWidget(song.id, 44),
       ),
+      title: Row(
+        children: [
+          Text(
+            typeLabel,
+            style: TextStyle(
+              fontSize: nameFontSize,
+              fontWeight: FontWeight.bold,
+              color: typeColor,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              song.basicInfo.title,
+              style: const TextStyle(fontSize: nameFontSize),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+      subtitle: Text(
+        '${song.basicInfo.artist} · ${StringUtil.formatVersion2(song.basicInfo.from)}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      onTap: () => Navigator.pop(ctx, _SongChoice(song: song, manualTitle: null)),
     );
   }
 

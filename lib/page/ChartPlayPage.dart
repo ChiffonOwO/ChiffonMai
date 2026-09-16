@@ -8,6 +8,7 @@ import 'package:simai_flutter/simai_flutter.dart';
 import 'package:my_first_flutter_app/service/ChartPlaySettingsStore.dart';
 import 'package:my_first_flutter_app/service/SongPlayService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
+import 'package:my_first_flutter_app/utils/PlayerThemeScope.dart';
 import 'package:my_first_flutter_app/utils/RefreshRateUtil.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
@@ -54,6 +55,9 @@ class _ChartPlayPageState extends State<ChartPlayPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // 播放页存活期间强制深色主题：simai_flutter 的游玩/导出页 Scaffold 没有背景色，
+    // 浅色主题下 push 转入时会闪一帧浅色。
+    PlayerThemeScope.forceDarkTheme.value = true;
     // 谱面播放对帧率敏感：Flutter 引擎不会主动向系统要高刷，
     // 不投这一票就会一直在「几秒 120 → 掉 60」之间反复。
     RefreshRateUtil.requestMax();
@@ -413,6 +417,8 @@ E
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    // 离开播放页恢复 App 原本的主题
+    PlayerThemeScope.forceDarkTheme.value = false;
     // 离开播放页就把刷新率交还系统，避免整个 App 一直顶着高刷耗电
     RefreshRateUtil.restore();
     // 先把设置读出来写下去，再拆控制器——saveFrom 需要读控制器的当前值。
