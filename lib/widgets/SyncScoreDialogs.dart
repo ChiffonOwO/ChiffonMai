@@ -1,15 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constant/CacheKeyConstant.dart';
 import '../constant/LoadingTipsConstant.dart';
 import '../manager/DivingFishProbeManager.dart';
+import '../service/SyncStatsService.dart';
 import '../utils/AppTheme.dart';
+import '../utils/SyncRouteNotifier.dart';
+import 'QrQuickFillButtons.dart';
 
 /// 同步成绩相关的回调上下文：用于让同步对话框在父页面（首页 / 我的）之间复用。
 class SyncCallbacks {
@@ -83,6 +83,29 @@ class DivingFishSyncOutcome {
 /// 返回 null 表示用户取消；返回非 null 时调用方应执行
 /// [executeDivingFishSync]，并把进度显示在自己的按钮上。
 ///
+/// 弹窗**彻底消失之后**再释放它用过的 controller。
+///
+/// 为什么不能直接 `await showDialog(...)` 之后就 dispose：`showDialog` 返回的
+/// future 是 **`Route.popped`** —— pop 那一刻就完成，而弹窗此时还在**退场动画**里
+/// （退场期间键盘收起等变化会让 `AlertDialog` 重建，重建过程会再读一次
+/// controller）。于是必现
+/// 「A TextEditingController was used after being disposed」，
+/// 而且因为结果早已从 pop 返回，**同步流程仍会正常往下走**（用户看到的是
+/// 「报错但同步照跑」）。回归测试：`test/sync_dialog_dispose_test.dart`。
+///
+/// [route] 是弹窗自己的 `ModalRoute`（在 builder 里用 `ModalRoute.of(ctx)` 取）。
+/// 等 `Route.completed`：Flutter 文档明确它「退场动画结束、overlay 条目被移除后」
+/// 才完成，正是可以安全释放的时机。
+Future<void> _disposeAfterDialogCloses(
+  ModalRoute<dynamic>? route,
+  List<ChangeNotifier> notifiers,
+) async {
+  await route?.completed;
+  for (final notifier in notifiers) {
+    notifier.dispose();
+  }
+}
+
 /// 注意：二维码的「读取剪贴板 / 相册识别 / 扫码」三个按钮需要 setState 刷新
 /// 输入框，这里用一个局部 StatefulBuilder 承载，输入项本身是自包含的。
 Future<DivingFishSyncInput?> showDivingFishSyncInputDialog(
@@ -93,6 +116,7 @@ Future<DivingFishSyncInput?> showDivingFishSyncInputDialog(
       prefs.getBool(CacheKeyConstant.participateRankings) ?? false;
   var showNickname = prefs.getBool(CacheKeyConstant.showNickname) ?? false;
   final qrController = TextEditingController();
+  ModalRoute<DivingFishSyncInput>? dialogRoute;
 
   if (!context.mounted) return null;
 
@@ -100,6 +124,7 @@ Future<DivingFishSyncInput?> showDivingFishSyncInputDialog(
     context: context,
     barrierDismissible: false,
     builder: (dialogContext) {
+      dialogRoute ??= ModalRoute.of(dialogContext);
       return StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           title: const Row(
@@ -120,18 +145,7 @@ Future<DivingFishSyncInput?> showDivingFishSyncInputDialog(
                       fontSize: 13, color: AppColors.greyHint(brightness)),
                 ),
                 const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    SyncScoreDialogs._buildClipboardButton(
-                        setState, qrController, dialogContext),
-                    SyncScoreDialogs._buildGalleryQrButton(
-                        setState, qrController),
-                    SyncScoreDialogs._buildCameraScanButton(
-                        setState, qrController, dialogContext),
-                  ],
-                ),
+                QrQuickFillButtons(controller: qrController),
                 const SizedBox(height: 12),
                 TextField(
                   controller: qrController,
@@ -216,7 +230,7 @@ Future<DivingFishSyncInput?> showDivingFishSyncInputDialog(
     },
   );
 
-  qrController.dispose();
+  await _disposeAfterDialogCloses(dialogRoute, [qrController]);
   return result;
 }
 
@@ -252,13 +266,16 @@ Future<LuoXueSyncInput?> showLuoXueSyncInputDialog(BuildContext context) async {
   final qrController = TextEditingController();
   final tokenController = TextEditingController();
   String? error;
+  ModalRoute<LuoXueSyncInput>? dialogRoute;
 
   if (!context.mounted) return null;
 
   final result = await showDialog<LuoXueSyncInput>(
     context: context,
     barrierDismissible: false,
-    builder: (dialogContext) => StatefulBuilder(
+    builder: (dialogContext) {
+      dialogRoute ??= ModalRoute.of(dialogContext);
+      return StatefulBuilder(
       builder: (context, setState) => AlertDialog(
         title: const Row(
           children: [
@@ -278,26 +295,10 @@ Future<LuoXueSyncInput?> showLuoXueSyncInputDialog(BuildContext context) async {
                     fontSize: 13, color: AppColors.greyHint(brightness)),
               ),
               const SizedBox(height: 12),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.paste, size: 16),
-                label: const Text('读取剪贴板', style: TextStyle(fontSize: 13)),
-                onPressed: () async {
-                  final data = await Clipboard.getData(Clipboard.kTextPlain);
-                  final text = (data?.text ?? '').trim();
-                  if (text.isEmpty) {
-                    Fluttertoast.showToast(msg: '剪贴板为空');
-                    return;
-                  }
-                  setState(() {
-                    qrController.text = text;
-                    error = null;
-                  });
-                  if (text.startsWith('SGWCMAID')) {
-                    Fluttertoast.showToast(msg: '已识别到有效二维码字符串，已自动填入');
-                  } else {
-                    Fluttertoast.showToast(msg: '剪贴板内容不是登入二维码，请确认后再提交');
-                  }
-                },
+              // 与水鱼同步对话框保持一致：剪贴板 / 相册 / 扫码三件套
+              QrQuickFillButtons(
+                controller: qrController,
+                onFilled: () => setState(() => error = null),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -395,12 +396,13 @@ Future<LuoXueSyncInput?> showLuoXueSyncInputDialog(BuildContext context) async {
             child: const Text('取消'),
           ),
         ],
-      ),
-    ),
+        ),
+      );
+    },
   );
 
-  qrController.dispose();
-  tokenController.dispose();
+  await _disposeAfterDialogCloses(
+      dialogRoute, [qrController, tokenController]);
   return result;
 }
 
@@ -494,6 +496,7 @@ class SyncScoreDialogs {
         TextEditingController(text: presetQrCode ?? '');
     final TextEditingController dfUserController = TextEditingController();
     final TextEditingController dfPassController = TextEditingController();
+    ModalRoute<String?>? dialogRoute;
     bool isSyncing = false;
     // 带 presetQrCode 进来时直接从「绑定水鱼账号」阶段开始
     bool needDivingFishToken = presetQrCode != null;
@@ -522,6 +525,25 @@ class SyncScoreDialogs {
 
     await loadRankingSettings();
 
+    // 本次同步尝试的耗时 / 成败（Redis，尽力而为）。    //
+    // 为什么上报放在对话框里：这个对话框自己跑完整个「抓取 → 刷新本地」流程，
+    // 成功信号只有它内部有（调用方拿到的返回值是好友码）。放在这里，
+    // 从首页 / 我的 / 系统 hub 任一入口打开都会算进同一份「线路1 · 水鱼」统计。
+    // 口径（取消 / 缺绑定不算样本）见 [SyncAttemptTracker]。
+    final attempt = SyncAttemptTracker(
+      line: SyncLine.scoreHub,
+      platform: SyncPlatform.divingFish,
+    );
+
+    void startAttempt() => attempt.start();
+
+    void finishAttempt({required bool ok, bool skip = false}) {
+      if (attempt.finish(ok: ok, skip: skip)) {
+        // 等 Redis 写入落地再刷新，让首页 / hub 的统计行立刻反映这一次
+        SyncRouteNotifier.instance.refreshStatsSoon();
+      }
+    }
+
     // 闭包外持有 timer/subscription/loading tip 状态，弹窗关闭后统一释放避免泄漏
     Timer? autoCloseTimer;
     StreamSubscription<String>? tipSub;
@@ -537,6 +559,7 @@ class SyncScoreDialogs {
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
+        dialogRoute ??= ModalRoute.of(dialogContext);
         int countdown = 3;
         String currentTip = LoadingTipsConstant.getRandomLoadingTip();
         return StatefulBuilder(
@@ -589,17 +612,7 @@ class SyncScoreDialogs {
                               color: AppColors.greyHint(brightness)),
                         ),
                         const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _buildClipboardButton(
-                                setState, qrController, dialogContext),
-                            _buildGalleryQrButton(setState, qrController),
-                            _buildCameraScanButton(
-                                setState, qrController, dialogContext),
-                          ],
-                        ),
+                        QrQuickFillButtons(controller: qrController),
                         const SizedBox(height: 12),
                         TextField(
                           controller: qrController,
@@ -681,6 +694,7 @@ class SyncScoreDialogs {
                               return;
                             }
 
+                            startAttempt();
                             final result =
                                 await DivingFishProbeManager().syncByCabinetQr(
                               qrCode,
@@ -734,6 +748,7 @@ class SyncScoreDialogs {
                                 });
                               }
 
+                              finishAttempt(ok: true);
                               setState(() {
                                 currentStage = SyncStage.completed;
                                 progress = 1.0;
@@ -746,6 +761,7 @@ class SyncScoreDialogs {
                                 }
                               });
                             } else if (result.errorMessage == '用户取消同步') {
+                              finishAttempt(ok: false, skip: true);
                               setState(() {
                                 currentStage = SyncStage.cancelled;
                                 statusText = '同步已取消';
@@ -754,9 +770,13 @@ class SyncScoreDialogs {
                               final msg = result.errorMessage ?? '';
                               if (msg.contains('divingFishImportToken') ||
                                   msg.contains('missing')) {
+                                // 还没绑定 ImportToken：马上会走下面的「绑定并同步」，
+                                // 那一次才算样本
+                                finishAttempt(ok: false, skip: true);
                                 needDivingFishToken = true;
                                 isSyncing = false;
                               } else {
+                                finishAttempt(ok: false);
                                 setState(() {
                                   currentStage = SyncStage.failed;
                                   statusText = msg;
@@ -916,10 +936,12 @@ class SyncScoreDialogs {
                                 progress = 0.68;
                                 bindingError = null;
                               });
+                              startAttempt();
                               final ok = await DivingFishProbeManager()
                                   .bindDivingFishAccount(username, password);
 
                               if (!ok) {
+                                finishAttempt(ok: false);
                                 setState(() {
                                   isBinding = false;
                                   isSyncing = false;
@@ -932,6 +954,7 @@ class SyncScoreDialogs {
                               final loginResult = await DivingFishProbeManager()
                                   .loginDivingFishDirect(username, password);
                               if (loginResult == null) {
+                                finishAttempt(ok: false);
                                 setState(() {
                                   isBinding = false;
                                   isSyncing = false;
@@ -981,6 +1004,7 @@ class SyncScoreDialogs {
                                     showNickname: showNickname,
                                   );
                                 }
+                                finishAttempt(ok: true);
                                 setState(() {
                                   isBinding = false;
                                   currentStage = SyncStage.completed;
@@ -993,6 +1017,7 @@ class SyncScoreDialogs {
                                     DivingFishProbeManager().currentFriendCode;
                                 Navigator.of(dialogContext).pop(fc);
                               } else {
+                                finishAttempt(ok: false);
                                 setState(() {
                                   isBinding = false;
                                   isSyncing = false;
@@ -1014,9 +1039,9 @@ class SyncScoreDialogs {
 
     // 弹窗关闭（无论成功失败或被系统返回）后统一释放资源，避免 Timer/Subscription/Controller 泄漏
     stopLoadingTips();
-    qrController.dispose();
-    dfUserController.dispose();
-    dfPassController.dispose();
+    // controller 要等弹窗**走完退场动画**再释放（否则退场期间的重建会读它）
+    await _disposeAfterDialogCloses(
+        dialogRoute, [qrController, dfUserController, dfPassController]);
 
     return result;
   }
@@ -1027,6 +1052,7 @@ class SyncScoreDialogs {
     final brightness = Theme.of(context).brightness;
     final TextEditingController userController = TextEditingController();
     final TextEditingController passController = TextEditingController();
+    ModalRoute<dynamic>? dialogRoute;
     bool isLoggingIn = false;
     bool loginSuccess = false;
     String? importedToken;
@@ -1037,6 +1063,7 @@ class SyncScoreDialogs {
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
+        dialogRoute ??= ModalRoute.of(dialogContext);
         return StatefulBuilder(
           builder: (ctx, setState) {
             return AlertDialog(
@@ -1199,9 +1226,8 @@ class SyncScoreDialogs {
       },
     );
 
-    // 弹窗关闭后释放 controllers，避免泄漏
-    userController.dispose();
-    passController.dispose();
+    // 弹窗关闭后释放 controllers，避免泄漏（等退场动画结束再放，见助手注释）
+    await _disposeAfterDialogCloses(dialogRoute, [userController, passController]);
   }
 
   // ===== 内部辅助 =====
@@ -1225,172 +1251,4 @@ class SyncScoreDialogs {
     }
   }
 
-  static Widget _buildClipboardButton(StateSetter setState,
-      TextEditingController qrCtrl, BuildContext dialogContext) {
-    return OutlinedButton.icon(
-      icon: const Icon(Icons.paste, size: 16),
-      label: const Text('读取剪贴板', style: TextStyle(fontSize: 13)),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      ),
-      onPressed: () async {
-        final data = await Clipboard.getData(Clipboard.kTextPlain);
-        final text = data?.text ?? '';
-        if (text.trim().startsWith('SGWCMAID')) {
-          setState(() {
-            qrCtrl.text = text.trim();
-          });
-          Fluttertoast.showToast(msg: '已识别到有效二维码字符串，已自动填入');
-        } else if (text.isNotEmpty) {
-          final confirmed = await showDialog<bool>(
-            context: dialogContext,
-            builder: (ctx) => AlertDialog(
-              title: const Text('提示'),
-              content: const Text('剪贴板内容不是有效的登入二维码，仍要填入吗？'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('取消'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('填入'),
-                ),
-              ],
-            ),
-          );
-          if (confirmed == true) {
-            setState(() {
-              qrCtrl.text = text;
-            });
-          }
-        } else {
-          Fluttertoast.showToast(msg: '剪贴板为空');
-        }
-      },
-    );
-  }
-
-  static Widget _buildGalleryQrButton(
-      StateSetter setState, TextEditingController qrCtrl) {
-    return OutlinedButton.icon(
-      icon: const Icon(Icons.photo_library, size: 16),
-      label: const Text('从相册识别', style: TextStyle(fontSize: 13)),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      ),
-      onPressed: () async {
-        try {
-          final picker = ImagePicker();
-          final pickedFile = await picker.pickImage(
-            source: ImageSource.gallery,
-            imageQuality: 100,
-          );
-          if (pickedFile == null) return;
-          final controller = MobileScannerController();
-          try {
-            final barcodes = await controller.analyzeImage(pickedFile.path);
-            if (barcodes != null && barcodes.barcodes.isNotEmpty) {
-              final qrText = barcodes.barcodes.first.rawValue ?? '';
-              if (qrText.isNotEmpty) {
-                setState(() {
-                  qrCtrl.text = qrText;
-                });
-                Fluttertoast.showToast(msg: '已识别到二维码，已自动填入');
-              } else {
-                Fluttertoast.showToast(msg: '未能从图片中识别到二维码内容');
-              }
-            } else {
-              Fluttertoast.showToast(msg: '未在图片中检测到二维码');
-            }
-          } finally {
-            controller.dispose();
-          }
-        } catch (e) {
-          Fluttertoast.showToast(msg: '识别失败: $e');
-        }
-      },
-    );
-  }
-
-  static Widget _buildCameraScanButton(StateSetter setState,
-      TextEditingController qrCtrl, BuildContext dialogContext) {
-    return OutlinedButton.icon(
-      icon: const Icon(Icons.qr_code_scanner, size: 16),
-      label: const Text('扫描二维码', style: TextStyle(fontSize: 13)),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      ),
-      onPressed: () async {
-        try {
-          final qrText = await Navigator.push<String>(
-            dialogContext,
-            MaterialPageRoute(builder: (_) => const QrScannerPage()),
-          );
-          if (qrText != null && qrText.isNotEmpty) {
-            setState(() {
-              qrCtrl.text = qrText;
-            });
-            Fluttertoast.showToast(msg: '已识别到二维码，已自动填入');
-          }
-        } catch (e) {
-          Fluttertoast.showToast(msg: '扫描失败: $e');
-        }
-      },
-    );
-  }
-}
-
-/// 摄像头扫二维码页面
-class QrScannerPage extends StatefulWidget {
-  const QrScannerPage({super.key});
-
-  @override
-  State<QrScannerPage> createState() => _QrScannerPageState();
-}
-
-class _QrScannerPageState extends State<QrScannerPage> {
-  bool _hasPopped = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('扫描二维码'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: MobileScanner(
-        onDetect: (BarcodeCapture capture) {
-          if (_hasPopped) return;
-          final barcode = capture.barcodes.firstOrNull;
-          if (barcode != null &&
-              barcode.rawValue != null &&
-              barcode.rawValue!.isNotEmpty) {
-            _hasPopped = true;
-            Navigator.pop(context, barcode.rawValue);
-          }
-        },
-        errorBuilder: (context, error) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                const SizedBox(height: 16),
-                Text('摄像头错误: $error'),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('返回'),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
 }

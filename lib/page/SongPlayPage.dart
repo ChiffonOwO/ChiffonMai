@@ -9,6 +9,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
+import '../widgets/PageTopBar.dart';
 
 class SongPlayPage extends StatefulWidget {
   final String songId;
@@ -352,34 +353,8 @@ class _SongPlayPageState extends State<SongPlayPage> {
           // 页面内容
           Column(
             children: [
-              // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
-                      onPressed: _stopAndPop,
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '播放音乐',
-                          style: TextStyle(
-                            color: textPrimaryColor,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 占位，保持标题居中
-                    SizedBox(width: 48),
-                  ],
-                ),
-              ),
+              // 标题栏统一走公共组件（返回前要先停掉播放，所以自定义 onBack）
+              PageTopBar(title: '播放音乐', onBack: _stopAndPop),
 
               // 主内容区域
               Expanded(

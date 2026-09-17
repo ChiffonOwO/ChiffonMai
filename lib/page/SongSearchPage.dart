@@ -11,6 +11,7 @@ import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
 import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
 import 'package:my_first_flutter_app/constant/GenreListConstant.dart';
 
@@ -1369,9 +1370,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    final screenWidth = MediaQuery.of(context).size.width;
 
-    final Color textPrimaryColor = Theme.of(context).colorScheme.onSurface;
     final Color cardBgColor = Theme.of(context).colorScheme.surface.withOpacity(0.9);
     final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
     final double borderRadiusSmall = 8.0;
@@ -1390,32 +1389,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
 
           Column(
             children: [
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '歌曲搜索',
-                          style: TextStyle(
-                            color: textPrimaryColor,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 48),
-                  ],
-                ),
-              ),
+              // 标题栏统一走公共组件
+              const PageTopBar(title: '歌曲搜索'),
 
               Expanded(
                 child: Container(

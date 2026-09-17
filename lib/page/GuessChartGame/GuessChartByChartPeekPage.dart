@@ -14,13 +14,14 @@ import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonCacheUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
+import 'package:my_first_flutter_app/utils/SongFilterUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/LuoXueSongUtil.dart';
 import 'package:my_first_flutter_app/utils/PlayerThemeScope.dart';
 import 'package:my_first_flutter_app/utils/RefreshRateUtil.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
+import '../../widgets/PageTopBar.dart';
 
 /// 谱面片段猜歌（看谱猜歌）：从已缓存 maidata 的曲库中随机选一首，
 /// 随机截取一段 N 秒的谱面片段，**无声**播放谱面动画，凭「看谱」猜出歌名。
@@ -92,6 +93,24 @@ class GuessChartByChartPeekPage extends StatefulWidget {
     return controller;
   }
 
+  /// inote 编号 → 难度名（多人「谱面片段猜歌」直接复用这一份，别再抄一遍）
+  static const Map<String, String> difficultyNames = {
+    '2': 'BASIC',
+    '3': 'ADVANCED',
+    '4': 'EXPERT',
+    '5': 'MASTER',
+    '6': 'Re:MASTER',
+  };
+
+  /// 难度标签底色（与 SongMaidataPageService.inoteColorMap 同一套值）
+  static const Map<String, Color> difficultyColors = {
+    '2': Color(0xFF4CAF50), // BASIC - 绿色
+    '3': Color(0xFFFF9800), // ADVANCED - 橙色
+    '4': Color(0xFFF44336), // EXPERT - 红色
+    '5': Color(0xFF9C27B0), // MASTER - 紫色
+    '6': Color(0xFFCE93D8), // Re:MASTER - 淡紫色
+  };
+
   @override
   State<GuessChartByChartPeekPage> createState() =>
       _GuessChartByChartPeekPageState();
@@ -117,21 +136,6 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
   List<String> _peekDifficulties = ['4']; // 难度随机池（inote 编号，从设置中加载）
   String? _resolvedDifficulty; // 本局实际播放的难度（inote 编号）
   String _unavailableReason = ''; // 谱面区不可用时的提示文案
-  static const Map<String, String> _difficultyNames = {
-    '2': 'BASIC',
-    '3': 'ADVANCED',
-    '4': 'EXPERT',
-    '5': 'MASTER',
-    '6': 'Re:MASTER',
-  };
-  // 难度标签底色（与 SongMaidataPageService.inoteColorMap 同一套值）
-  static const Map<String, Color> _difficultyColors = {
-    '2': Color(0xFF4CAF50), // BASIC - 绿色
-    '3': Color(0xFFFF9800), // ADVANCED - 橙色
-    '4': Color(0xFFF44336), // EXPERT - 红色
-    '5': Color(0xFF9C27B0), // MASTER - 紫色
-    '6': Color(0xFFCE93D8), // Re:MASTER - 淡紫色
-  };
   static const int _maxReplays = 3; // 复播次数上限
   int _replaysLeft = _maxReplays;
   bool _clipFinished = false; // 片段是否已播放完毕
@@ -234,7 +238,7 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
           (settings['peekDifficulties'] as List?)?.cast<String>() ?? ['4'];
       // 过滤非法值，且池子为空时退回默认，保证每局都能抽到难度
       _peekDifficulties = loadedDifficulties
-          .where((d) => _difficultyNames.containsKey(d))
+          .where((d) => GuessChartByChartPeekPage.difficultyNames.containsKey(d))
           .toList();
       if (_peekDifficulties.isEmpty) _peekDifficulties = ['4'];
     });
@@ -1352,27 +1356,14 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
     await _loadSettings();
 
     final allSongs = await GuessChartByInfoService.loadAllSongs();
-    Set<String> versions = {};
-    Set<String> genres = {};
-
-    if (allSongs != null) {
-      for (var song in allSongs) {
-        versions.add(song.basicInfo.from);
-        genres.add(song.basicInfo.genre);
-      }
-    }
-
-    versions =
-        versions.where((v) => VersionListConstant.standardVersions.contains(v)).toSet();
-
-    List<String> allVersions = versions.toList()
-      ..sort((a, b) {
-        int orderA = VersionListConstant.versionOrderMap[a] ?? 999;
-        int orderB = VersionListConstant.versionOrderMap[b] ?? 999;
-        return orderA.compareTo(orderB);
-      });
-    genres.remove('宴会场');
-    List<String> allGenres = genres.toList();
+    // 可选版本 / 可选流派统一走 SongFilterUtil.selectableFilters：
+    // 它先剔除非正曲（SongFilterUtil.isExtra：宴会场 / maidata 追加 / union 独有），
+    // 再单独挡掉「宴会场」流派，最后把版本过一遍官方世代白名单并按世代排序。
+    // 口径必须与抽曲池一致，否则列表里会出现「勾了也永远抽不到」的选项。
+    final SongFilterOptions filterOptions =
+        SongFilterUtil.selectableFilters(allSongs ?? const <Song>[]);
+    final List<String> allVersions = filterOptions.versions;
+    final List<String> allGenres = filterOptions.genres;
 
     List<String> tempSelectedVersions = List.from(_selectedVersions);
     double tempMasterMinDx = _masterMinDx;
@@ -1501,7 +1492,7 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: _difficultyNames.entries.map((entry) {
+                            children: GuessChartByChartPeekPage.difficultyNames.entries.map((entry) {
                               final String inote = entry.key;
                               final String label = entry.value;
                               final bool selected =
@@ -1671,32 +1662,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
           Column(
             children: [
               // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back,
-                          color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '猜歌（谱面片段）',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 48),
-                  ],
-                ),
+              PageTopBar(
+                title: '猜歌（谱面片段）',
               ),
 
               // 主内容区域
@@ -1858,7 +1825,7 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                 // 本局播放难度的标签（带难度底色）
                                                 if (_resolvedDifficulty !=
                                                         null &&
-                                                    _difficultyNames
+                                                    GuessChartByChartPeekPage.difficultyNames
                                                         .containsKey(
                                                             _resolvedDifficulty))
                                                   Container(
@@ -1867,7 +1834,7 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                         horizontal: 10,
                                                         vertical: 6),
                                                     decoration: BoxDecoration(
-                                                      color: _difficultyColors[
+                                                      color: GuessChartByChartPeekPage.difficultyColors[
                                                               _resolvedDifficulty] ??
                                                           Colors.grey,
                                                       borderRadius:
@@ -1875,7 +1842,7 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                               8),
                                                     ),
                                                     child: Text(
-                                                      _difficultyNames[
+                                                      GuessChartByChartPeekPage.difficultyNames[
                                                               _resolvedDifficulty!] ??
                                                           '',
                                                       style: const TextStyle(

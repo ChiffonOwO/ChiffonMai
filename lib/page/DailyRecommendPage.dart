@@ -6,6 +6,7 @@ import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'SongInfoPage.dart';
+import '../widgets/PageTopBar.dart';
 
 class DailyRecommendPage extends StatefulWidget {
   const DailyRecommendPage({super.key});
@@ -135,34 +136,16 @@ class _DailyRecommendPageState extends State<DailyRecommendPage> {
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
           Column(
             children: [
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '当日谱面推荐',
-                          style: TextStyle(
-                            color: textPrimaryColor,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+              PageTopBar(
+                title: '当日谱面推荐',
+                actions: [
+  IconButton(
+                        icon: Icon(Icons.refresh, color: textPrimaryColor),
+                        tooltip: '换一批',
+                        onPressed:
+                            _isLoading ? null : () => _loadRecommendations(forceRefresh: true),
                       ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.refresh, color: textPrimaryColor),
-                      tooltip: '换一批',
-                      onPressed:
-                          _isLoading ? null : () => _loadRecommendations(forceRefresh: true),
-                    ),
-                  ],
-                ),
+],
               ),
 
               Expanded(

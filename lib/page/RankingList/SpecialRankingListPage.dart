@@ -4,6 +4,7 @@ import 'package:my_first_flutter_app/service/RankingList/SpecialRankingListServi
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import '../SongInfoPage.dart';
+import '../../widgets/PageTopBar.dart';
 
 class SpecialRankingListPage extends StatefulWidget {
   const SpecialRankingListPage({super.key});
@@ -571,30 +572,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
           Column(
             children: [
               // 头部
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 12),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: AppColors.primaryText(brightness)),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '特殊排行榜',
-                          style: TextStyle(
-                            color: AppColors.primaryText(brightness),
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 48),
-                  ],
-                ),
-              ),
+              PageTopBar(title: '特殊排行榜'),
 
               // 排行榜类型选择 + 刷新行
               Padding(

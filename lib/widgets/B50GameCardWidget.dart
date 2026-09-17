@@ -62,6 +62,45 @@ class B50GameCardWidget extends StatelessWidget {
   static const double _kSpacing = 10.2;
   static const double _kSmallSpacing = 5.1;
 
+  /// 在卡片上**叠**一枚角标（PC50 的 `PC 1234` 就是它）。
+  ///
+  /// 刻意做成叠层、而不是往卡里塞一个格子：卡片上下两块是 7:3 定高，
+  /// 加内容会把里面挤到溢出（调试期就是黄黑条）。位置用本组件的设计稿常量 ——
+  /// 内边距 [10.2] + 曲绘 [100] 高的正下方，那块区域是空的，
+  /// 不压歌名 / 达成率 / `定数 → RA  DX分`，也碰不到下方白色信息条。
+  static Widget withBadgeOverlay({
+    required Widget card,
+    required String text,
+    required double scale,
+  }) {
+    return Stack(
+      children: [
+        card,
+        Positioned(
+          left: _kSpacing * scale,
+          top: (_kSpacing + _kCover + 2.8) * scale,
+          child: Container(
+            padding:
+                EdgeInsets.symmetric(horizontal: 6 * scale, vertical: 2 * scale),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.62),
+              borderRadius: BorderRadius.circular(6 * scale),
+            ),
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12 * scale,
+                height: 1.1,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final double songNameFontSize = _kSongName * scale;

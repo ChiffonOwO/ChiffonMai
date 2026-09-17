@@ -10,6 +10,7 @@ import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'SongInfoPage.dart';
+import '../widgets/PageTopBar.dart';
 
 class FriendComparePage extends StatefulWidget {
   const FriendComparePage({super.key});
@@ -130,29 +131,8 @@ class _FriendComparePageState extends State<FriendComparePage> {
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
           Column(
             children: [
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '好友成绩对比',
-                          style: TextStyle(
-                            color: textPrimaryColor,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 48),
-                  ],
-                ),
+              PageTopBar(
+                title: '好友成绩对比',
               ),
 
               Expanded(

@@ -11,6 +11,8 @@ import '../utils/CommonWidgetUtil.dart';
 import '../utils/CoverUtil.dart';
 import '../utils/AppTheme.dart';
 import '../utils/AppConstants.dart';
+import '../widgets/CoverActionButton.dart';
+import '../widgets/PageTopBar.dart';
 import 'SongInfoPage.dart';
 
 /// 曲绘识别页面
@@ -202,14 +204,9 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
     );
   }
 
-  Widget _buildTitleBar(double sw, Color c) => Container(
-    padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-    child: Row(children: [
-      IconButton(icon: Icon(Icons.arrow_back, color: c), onPressed: () => Navigator.pop(context)),
-      Expanded(child: Center(child: Text('曲绘识别', style: TextStyle(color: c, fontSize: sw * 0.06, fontWeight: FontWeight.bold)))),
-      IconButton(icon: const Icon(Icons.arrow_back, color: Colors.transparent), onPressed: null),
-    ]),
-  );
+  // 顶部栏统一走公共组件（标题样式对齐 Rating 排行榜页的 AppBar）
+  Widget _buildTitleBar(double sw, Color c) =>
+      const PageTopBar(title: '曲绘识别');
 
   Widget _buildContent(double sw, Color c) {
     if (_isPrecomputing) return _buildPrecomputeProgress(sw, c);
@@ -323,7 +320,21 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
             sw: sw,
             c: c,
             label: '输入图片',
-            imageProvider: _photoPath != null ? FileImage(File(_photoPath!)) : null,
+            image: _photoPath != null
+                ? Image.file(
+                    File(_photoPath!),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: Theme.of(context).colorScheme.surface,
+                      child: Center(
+                        child: Icon(Icons.broken_image,
+                            size: sw * 0.08,
+                            color: AppColors.greyHint(
+                                Theme.of(context).brightness)),
+                      ),
+                    ),
+                  )
+                : null,
             borderColor: AppColors.tableBorder(Theme.of(context).brightness),
           ),
           // 中间箭头
@@ -332,11 +343,15 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
             child: Icon(Icons.arrow_forward, color: mc, size: sw * 0.06),
           ),
           // 右侧：匹配曲绘
+          // ⚠️ 不能用 AssetImage(CoverUtil.buildCoverPath(songId))：那是**原始 id**
+          // 的路径，5 位（DX 条目，如 11312 / 10030）与 6 位（宴会场）的曲绘资源
+          // 名字是剔除后的 id（1312.webp / 1634.webp），直读必然 errorBuilder
+          // —— 表现就是「识别结果里的曲绘不显示」。统一走 CoverUtil 的多级兜底。
           _buildSideImage(
             sw: sw,
             c: c,
             label: '匹配曲绘',
-            imageProvider: AssetImage(CoverUtil.buildCoverPath(songId)),
+            image: CoverUtil.buildCoverWidget(songId, sw * 0.35),
             borderColor: mc,
             isMatch: true,
           ),
@@ -389,11 +404,16 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
     );
   }
 
+  /// 左右对比里的一格。
+  ///
+  /// 直接收一个 [image]（而不是 ImageProvider）：曲绘那一格交给
+  /// `CoverUtil.buildCoverWidget` 走多级兜底链，它返回的是 Widget ——
+  /// 用 provider 就没法落地「本地路径规则 + 网络兜底」了。
   Widget _buildSideImage({
     required double sw,
     required Color c,
     required String label,
-    required ImageProvider<Object>? imageProvider,
+    required Widget? image,
     required Color borderColor,
     bool isMatch = false,
   }) {
@@ -415,12 +435,14 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(isMatch ? 7 : 8.5),
-            child: imageProvider != null
-                ? Image(image: imageProvider, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(color: Theme.of(context).colorScheme.surface,
-                        child: Center(child: Icon(Icons.broken_image, size: sw * 0.08, color: AppColors.greyHint(Theme.of(context).brightness)))))
-                : Container(color: Theme.of(context).colorScheme.surface,
-                    child: Center(child: Icon(Icons.image, size: sw * 0.08, color: AppColors.greyHint(Theme.of(context).brightness)))),
+            child: image ??
+                Container(
+                    color: Theme.of(context).colorScheme.surface,
+                    child: Center(
+                        child: Icon(Icons.image,
+                            size: sw * 0.08,
+                            color: AppColors.greyHint(
+                                Theme.of(context).brightness)))),
           ),
         ),
       ],
@@ -486,11 +508,12 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(5),
-                  child: Image.asset(
-                    CoverUtil.buildCoverPath(sid),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Icon(Icons.broken_image, size: sw * 0.05, color: AppColors.greyHint(brightness)),
-                  ),
+                  // ⚠️ 原来直接 Image.asset(CoverUtil.buildCoverPath(sid))：
+                  // 那是**原始 id** 的路径，5 位（DX 条目，如 11312 / 10030）与
+                  // 6 位（宴会场）的曲绘资源名是剔除后的 id（1312.webp / 1634.webp），
+                  // 直读必然失败 → Top10 里部分曲绘显示成裂图。
+                  // 统一走 CoverUtil 的多级兜底（本地规则 + 网络 + dxrating）。
+                  child: CoverUtil.buildCoverWidget(sid, sw * 0.12),
                 ),
               ),
               title: Text(title.isNotEmpty ? title : '歌曲 #$sid',
@@ -542,23 +565,17 @@ class _CoverRecognitionPageState extends State<CoverRecognitionPage> {
     ],
   );
 
-  Widget _btn(double sw, Color c, IconData icon, String label, VoidCallback? onTap, bool primary) =>
-    ElevatedButton.icon(
-      onPressed: onTap,
-      icon: onTap == null && _isRecognizing
-          ? SizedBox(width: sw * 0.035, height: sw * 0.035,
-              child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-          : Icon(icon, size: sw * 0.042),
-      label: Text(label, style: TextStyle(fontSize: sw * 0.032)),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: primary ? c : Theme.of(context).colorScheme.surface,
-        foregroundColor: primary ? Colors.white : c,
-        padding: EdgeInsets.symmetric(horizontal: sw * 0.05, vertical: sw * 0.028),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: primary ? c : c.withValues(alpha: 0.4), width: 1.5)),
-        elevation: primary ? 2 : 0,
-      ),
-    );
+  Widget _btn(double sw, Color c, IconData icon, String label,
+          VoidCallback? onTap, bool primary) =>
+      CoverActionButton(
+        icon: icon,
+        label: label,
+        onPressed: onTap,
+        accent: c,
+        scale: sw,
+        primary: primary,
+        loading: _isRecognizing,
+      );
 
   Widget _buildCacheInfo(double sw, Color c) => FutureBuilder<bool>(
     future: _service.isHashCacheValid(),

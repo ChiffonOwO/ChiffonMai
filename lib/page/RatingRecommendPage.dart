@@ -6,6 +6,7 @@ import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
+import '../widgets/PageTopBar.dart';
 
 class RatingRecommendPage extends StatefulWidget {
   const RatingRecommendPage({super.key});
@@ -161,30 +162,8 @@ class _RatingRecommendPageState extends State<RatingRecommendPage> {
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
           Column(
             children: [
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back,
-                          color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '基于目标Rating推荐',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 48),
-                  ],
-                ),
+              PageTopBar(
+                title: '基于目标Rating推荐',
               ),
               Expanded(
                 child: Container(

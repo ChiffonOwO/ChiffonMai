@@ -11,6 +11,7 @@ import '../manager/DivingFish/UserPlayDataManager.dart';
 import '../entity/DivingFish/Song.dart';
 import '../entity/DivingFish/RecordItem.dart';
 import 'SongInfoPage.dart';
+import '../widgets/PageTopBar.dart';
 
 class KnowledgeInfoPage extends StatefulWidget {
   final int? knowledgeId;
@@ -287,7 +288,6 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    final screenWidth = MediaQuery.of(context).size.width;
     final safeBottom = MediaQuery.of(context).padding.bottom;
     final double borderRadiusSmall = 8.0;
 
@@ -304,37 +304,15 @@ class _KnowledgeInfoPageState extends State<KnowledgeInfoPage> {
           Column(
             children: [
               // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '知识详情',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 占位按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Colors.transparent),
-                      onPressed: () {},
-                    ),
-                  ],
+              PageTopBar(
+                title: '知识详情',
+                actions: [
+                // 占位按钮
+                IconButton(
+                icon: Icon(Icons.arrow_back, color: Colors.transparent),
+                onPressed: () {},
                 ),
+                ],
               ),
 
               // 主内容区域

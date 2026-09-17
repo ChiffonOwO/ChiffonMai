@@ -31,9 +31,8 @@ class ThemeAwareBackground extends StatelessWidget {
       children: [
         // 底层：背景图 + 主题覆层
         _BgImage(isDark: isDark, isPureBlack: isPureBlack),
-        // 上层：chiffon 装饰图 + 主题覆层
-        if (showDecorativeImage)
-          _ChiffonImage(isDark: isDark, isPureBlack: isPureBlack),
+        // 上层：chiffon 装饰图（纯黑模式下不显示）
+        if (showDecorativeImage) _ChiffonImage(isPureBlack: isPureBlack),
         // 子组件
         if (child != null) Positioned.fill(child: child!),
       ],
@@ -57,8 +56,8 @@ class ThemeAwareBgStack extends StatelessWidget {
       children: [
         // 底层：背景图 + 主题覆层
         _BgImage(isDark: isDark, isPureBlack: isPureBlack),
-        // 上层：chiffon 装饰图 + 主题覆层
-        _ChiffonImage(isDark: isDark, isPureBlack: isPureBlack),
+        // 上层：chiffon 装饰图（纯黑模式下不显示）
+        _ChiffonImage(isPureBlack: isPureBlack),
         // 用户自定义内容
         ...children,
       ],
@@ -129,11 +128,20 @@ class _BgImage extends StatelessWidget {
   }
 }
 
-/// 上层 chiffon 装饰图 + 主题半透明遮罩
+/// 上层 chiffon 装饰图。
+///
+/// ⚠️ 深色模式下**不再**往装饰图上铺那层 `(8,8,20)` 的矩形覆层：
+/// 装饰图 `chiffon2.png` 是 1179×2556 的整屏图，`BoxFit.contain` 居中铺开后
+/// 几乎占满整个主体区域，那层 `Positioned.fill(ColoredBox)` 就画成了一整块纯黑：
+///   * 它跟装饰图自己的透明度**无关** —— 装饰图设为 0（默认隐藏）时照样画，
+///     于是「什么都没开」也能看到一块漆黑，背景图越亮（「背景透明度」调得越低）
+///     越刺眼；纯黑模式反而看不到，因为那条分支早就 return 了；
+///   * 覆层比装饰图还大一点点（图片按比例缩放、又整体上移 30），
+///     所以在主体区域留下一条明显的纯黑边界。
+/// 装饰图的浓淡本来就由它自己的滑杆（`chiffonOpacity`）控制，不需要额外的覆层。
 class _ChiffonImage extends StatelessWidget {
-  final bool isDark;
   final bool isPureBlack;
-  const _ChiffonImage({required this.isDark, required this.isPureBlack});
+  const _ChiffonImage({required this.isPureBlack});
 
   @override
   Widget build(BuildContext context) {
@@ -143,37 +151,19 @@ class _ChiffonImage extends StatelessWidget {
     }
 
     return ListenableBuilder(
-      listenable: Listenable.merge([
-        ThemeManager().lightOverlayNotifier,
-        ThemeManager().chiffonOpacityNotifier,
-      ]),
+      listenable: ThemeManager().chiffonOpacityNotifier,
       builder: (context, _) {
-        final opacity = ThemeManager().lightOverlayOpacity;
-        final overlayAlpha = (opacity * 255).round().clamp(0, 255);
+        final opacity = ThemeManager().chiffonOpacity;
+        // 隐藏时直接不占位：既省掉一张全屏图的布局/解码，也不会留下任何覆层
+        if (opacity <= 0) return const SizedBox.shrink();
         return Center(
           child: Transform.translate(
             offset: const Offset(0, -30),
-            child: Transform.scale(
-              scale: 1,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Image.asset(
-                    'assets/chiffon2.png',
-                    fit: BoxFit.contain,
-                    gaplessPlayback: true,
-                    opacity: AlwaysStoppedAnimation(
-                      ThemeManager().chiffonOpacity,
-                    ),
-                  ),
-                  if (isDark)
-                    Positioned.fill(
-                      child: ColoredBox(
-                        color: Color.fromARGB(overlayAlpha, 8, 8, 20),
-                      ),
-                    ),
-                ],
-              ),
+            child: Image.asset(
+              'assets/chiffon2.png',
+              fit: BoxFit.contain,
+              gaplessPlayback: true,
+              opacity: AlwaysStoppedAnimation(opacity),
             ),
           ),
         );

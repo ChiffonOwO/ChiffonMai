@@ -7,6 +7,7 @@ import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPagePURPL
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPageYELLOW.dart';
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPageRED.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import '../../widgets/PageTopBar.dart';
 
 class KaleidXScopeSelectPage extends StatefulWidget {
   const KaleidXScopeSelectPage({super.key});
@@ -61,34 +62,8 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
           Column(
             children: [
               // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          'KALEIDXSCOPE',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 占位，保持标题居中
-                    SizedBox(width: 48),
-                  ],
-                ),
+              PageTopBar(
+                title: 'KALEIDXSCOPE',
               ),
 
               // 主内容区域

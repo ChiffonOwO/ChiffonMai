@@ -18,6 +18,7 @@ import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 import 'package:my_first_flutter_app/utils/TextStyleUtil.dart';
 import '../../widgets/B50GameCardWidget.dart';
+import '../../widgets/PageTopBar.dart';
 
 class PersonalizedDiffBest50Page extends StatefulWidget {
   const PersonalizedDiffBest50Page({super.key});
@@ -394,31 +395,8 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
           Column(
             children: [
               // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '个性化拟合Best50查询',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 48),
-                  ],
-                ),
+              PageTopBar(
+                title: '个性化拟合Best50查询',
               ),
 
               // 内容区域 - 卡片占满可用高度，空状态内容居中显示

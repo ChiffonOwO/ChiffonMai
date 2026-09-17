@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../entity/FeatureModels.dart';
+import 'FeatureFlags.dart';
 
 /// 集中管理所有功能分类和功能项定义
 ///
@@ -84,6 +85,10 @@ class FeatureRegistry {
       const ButtonItem(icon: Icons.backup, title: '数据备份', subtitle: '导入或导出本地数据'),
       const ButtonItem(icon: Icons.comment, title: '最近评论', subtitle: '查看社区最近评论'),
       const ButtonItem(icon: Icons.star, title: '最近评分', subtitle: '查看社区最近评分'),
+      // 「AWMC 网关」入口：默认隐藏（FeatureFlags.awmcGateway），代码一行没删。
+      // 关掉时首页搜索 / 收藏 / 全部功能里也一起看不到。
+      if (FeatureFlags.awmcGateway)
+        const ButtonItem(icon: Icons.shield_outlined, title: 'AWMC 网关', subtitle: '查询/写入机台账号数据（敏感操作）'),
       const ButtonItem(icon: Icons.dark_mode, title: '主题与背景', subtitle: '调整主题色、模式和背景图'),
     ]),
   ];

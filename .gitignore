@@ -51,5 +51,30 @@ lib/api/DeveloperToken.dart
 # Environment variables
 .env.local
 
+# ===== AWMC 网关（内部功能，暂不进版本库）=====
+# 「系统 → AWMC 网关」入口已由 lib/utils/FeatureFlags.dart 的 `awmcGateway`
+# 开关隐藏（代码全部保留在本机，随时可以再打开）。
+# ⚠️ 注意两件事：
+#   1. HomePage / SystemHubPage 仍然 import 这些文件 —— 少了它们的克隆 /
+#      新机器是**编译不过**的（入口隐藏只是 UI 层，不等于解耦）；
+#   2. 被 ignore 的文件不受 `git clean -fd` 影响，但 `git clean -xdf` 会删掉，
+#      清理工作区时务必确认，重要改动请另外备份。
+lib/api/AwmcToken.dart
+lib/api/AwmcTokenShow.dart
+lib/page/Awmc/
+lib/service/AWMC/
+# ⚠️ entity/AWMC 整个目录**不能**忽略：MaimaiServerStatus*.dart 是「服务器状态」
+#    在用的公开模型，只有 AwmcUserMusic.dart 属于网关
+lib/entity/AWMC/AwmcUserMusic.dart
+test/awmc_*_test.dart
+
+# AWMC 网关令牌（构建期注入用，绝不要提交）
+# 用法：flutter build apk --release --dart-define-from-file=awmc_secret.json
+awmc_secret.json
+awmc_secret*.json
+
 # 人工/工具产生的源码备份（用于无 git 历史时回退，不该进版本库）
 tool/backup/
+
+# golden 测试失败时的对比图（flutter test 自动生成，随手可清理）
+**/failures/

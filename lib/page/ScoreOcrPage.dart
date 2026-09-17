@@ -30,7 +30,9 @@ import '../utils/AppConstants.dart';
 import '../utils/AppTheme.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/CoverUtil.dart';
+import '../utils/SongFilterUtil.dart';
 import '../utils/StringUtil.dart';
+import '../widgets/PageTopBar.dart';
 import '../widgets/RefreshDataDialog.dart' show launchUrlFallback;
 
 /// 结算画面识别页（拍摄机台结算画面 → 裁剪 → 识别 → 显示结构化成绩）
@@ -1542,7 +1544,9 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
         ],
       ),
       subtitle: Text(
-        '${song.basicInfo.artist} · ${StringUtil.formatVersion2(song.basicInfo.from)}',
+        // extra 曲目（宴会场 / maidata 追加 / union 独有）没有国服世代年号
+        '${song.basicInfo.artist} · '
+        '${StringUtil.formatVersion2WithFlag(song.basicInfo.from, SongFilterUtil.isExtra(song))}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
@@ -1602,28 +1606,9 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
     );
   }
 
-  Widget _buildTitleBar(double sw, Color c) => Container(
-        padding: const EdgeInsets.fromLTRB(16, 48, 16, 8),
-        child: Row(children: [
-          IconButton(
-            icon: Icon(Icons.arrow_back, color: c),
-            onPressed: () => Navigator.pop(context),
-          ),
-          Expanded(
-            child: Center(
-              child: Text(
-                '结算画面识别',
-                style: TextStyle(
-                    color: c, fontSize: sw * 0.06, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.transparent),
-            onPressed: null,
-          ),
-        ]),
-      );
+  // 顶部栏统一走公共组件（标题样式对齐 Rating 排行榜页的 AppBar）
+  Widget _buildTitleBar(double sw, Color c) =>
+      const PageTopBar(title: '结算画面识别');
 
   Widget _buildContent(double sw, Color c) {
     return SingleChildScrollView(
@@ -1980,10 +1965,10 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
                           children: [
                             if (song.basicInfo.from.trim().isNotEmpty)
                               _buildChip(
-                                  // formatVersion2 把 API 里的完整版本名（如
-                                  // "maimai でらっくす BUDDiES PLUS"）收成短名（"BUDDiES+"）
-                                  StringUtil.formatVersion2(
-                                      song.basicInfo.from),
+                                  // extra 曲目走不带年号的口径（宴会场 / 追加曲）
+                                  StringUtil.formatVersion2WithFlag(
+                                      song.basicInfo.from,
+                                      SongFilterUtil.isExtra(song)),
                                   scheme.primary),
                             if (song.basicInfo.genre.trim().isNotEmpty)
                               _buildChip(song.basicInfo.genre, scheme.tertiary),

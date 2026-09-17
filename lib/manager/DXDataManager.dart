@@ -40,7 +40,10 @@ class DXDataManager {
       final response = await ApiClient.get(
         Uri.parse(ApiUrls.DXDataApi),
         headers: {'Content-Type': 'application/json'},
-        timeout: const Duration(seconds: 30),
+        // ⚠️ 别改回 30s：dxdata 有 4MB，实测从 miruku.dxrating.net 下载要
+        // **200s+**（≈20KB/s，首字节 1s 后开始慢速传输），30s 必然超时 ——
+        // 定数历史与「曲绘兜底索引更新」都会静默失败。
+        timeout: const Duration(seconds: 300),
       );
       if (response.statusCode == 200) {
         return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;

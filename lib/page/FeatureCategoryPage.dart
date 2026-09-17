@@ -5,6 +5,7 @@ import '../utils/AppTheme.dart';
 import '../utils/AppConstants.dart';
 import '../utils/FavoriteFeaturesNotifier.dart';
 import '../widgets/FeatureButton.dart';
+import '../widgets/PageTopBar.dart';
 import '../widgets/QuickSearchBar.dart';
 
 /// 大类子功能页面：显示某个分类下的所有功能按钮
@@ -118,31 +119,8 @@ class _FeatureCategoryPageState extends State<FeatureCategoryPage> {
 
           Column(
             children: [
-              // 自定义顶部栏
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          widget.category.name,
-                          style: TextStyle(
-                            color: textPrimaryColor,
-                            fontSize: screenWidth * 0.055,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 48),
-                  ],
-                ),
-              ),
+              // 顶部栏统一走公共组件（标题是变量，直接传进去即可）
+              PageTopBar(title: widget.category.name),
 
               // 内容区
               Expanded(

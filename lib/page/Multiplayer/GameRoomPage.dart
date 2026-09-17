@@ -115,7 +115,19 @@ class _GameRoomPageState extends State<GameRoomPage> {
   double _peekClipEnd = 0.0;
   bool _peekPlaying = false;
   bool _peekPreparing = false;
+  bool _peekClipFinished = false;
   String? _peekUnavailableReason;
+  /// 本回合实际播放的难度（inote 编号），用于显示与单人一致的难度标签。
+  String? _peekResolvedInote;
+  /// 本回合谱面（回合结束后重建带音频的播放器要用同一份谱面）。
+  MaiChart? _peekChart;
+  /// 答案模式（回合结束后）：
+  /// 音频就绪后把播放器换成带音频实例，可无限复播对答案。
+  bool _peekAnswerModeEntered = false;
+  bool _peekAnswerAudioReady = false;
+  bool _peekAnswerAudioFailed = false;
+  bool _peekAudioAttached = false;
+  String? _peekAnswerAudioPath;
   /// 手动复播次数（自动播放那一次不计）。**每人独立计数**。
   int _peekReplaysLeft = kPeekMaxReplays;
   static const int kPeekMaxReplays = 3; // 与单人谱面片段猜歌一致
@@ -406,29 +418,19 @@ class _GameRoomPageState extends State<GameRoomPage> {
         });
       }
       
-      // 强制创建新的房间对象，确保 Flutter 检测到变化
-      RoomEntity? newRoom = room != null ? RoomEntity(
-        roomId: room.roomId,
-        roomCode: room.roomCode,
-        gameType: room.gameType,
-        players: List.from(room.players),
-        status: room.status,
-        maxPlayers: room.maxPlayers,
-        creatorId: room.creatorId,
-        timeLimit: room.timeLimit,
-        maxGuesses: room.maxGuesses,
-        totalRounds: room.totalRounds,
-        createdAt: room.createdAt,
-        lastActivityAt: room.lastActivityAt,
-        selectedVersions: room.selectedVersions,
-        masterMinDx: room.masterMinDx,
-        masterMaxDx: room.masterMaxDx,
-        selectedGenres: room.selectedGenres,
-        blurLevel: room.blurLevel,
-        playDuration: room.playDuration,
-        songCount: room.songCount,
-        nonEnglishCharThreshold: room.nonEnglishCharThreshold,
-      ) : null;
+      // 强制创建新的房间对象，确保 Flutter 检测到变化。
+      //
+      // ⚠️ 这里**必须用 copyWith()**，不要手写字段列表：以前是逐字段 new 一个
+      // RoomEntity，结果新增的模式设置（flashDurationMs / tileCount /
+      // tileRevealIntervalMs / peekDurationSeconds / peekDifficulties）没被带上，
+      // 服务器一推房间状态就被覆盖成默认值——表现就是「自定义切块数量/揭示间隔
+      // 进游戏后又变回 1000 块 / 1.5s」。
+      //
+      // 再用 withModeSettingsFallback 兜一层：万一某条房间事件没带这些字段
+      // （fromJson 会退回默认值），就沿用本机已知的值（房间创建后这些设置不可改）。
+      RoomEntity? newRoom = room
+          ?.copyWith(players: List.from(room.players))
+          .withModeSettingsFallback(_currentRoom ?? widget.room);
       
       setState(() {
         // 检测房主变更
@@ -498,6 +500,10 @@ class _GameRoomPageState extends State<GameRoomPage> {
             _isRoundOverByTimeout = false;
             // 重置模式专属状态（曲绘截取、音频起始时间等）
             _resetModeSpecificState();
+            // 清空搜索框 / 搜索结果：
+            // 输入框里残留着上一回合的文字时，新回合的搜索列表会被旧关键字过滤，
+            // 玩家看着像「搜不到歌」而错过抢答（也让「输入即匹配」的判定失效）。
+            _clearSearchInput();
             
             // 新回合开始时，使用服务器状态并强制清空猜测历史
             _gameState = state.copyWith(guesses: []);
@@ -564,6 +570,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
           // 回合/游戏结束时停掉本地倒计时（否则会残留一个不动的秒数）
           if (_gameState!.isRoundOver || _gameState!.isGameOver) {
             _countdownTimer?.cancel();
+            // chartPeek：回合结束后进入「答案模式」（照搬单人谱面片段猜歌）——
+            // 备好带音频的片段，之后可无限复播对答案
+            _enterPeekAnswerModeIfNeeded();
           }
           
           // 只有在回合未结束或新回合开始时才加载目标歌曲
@@ -708,6 +717,10 @@ class _GameRoomPageState extends State<GameRoomPage> {
           _gameState = _gameState?.copyWith(isRoundOver: true);
         }
       });
+      if (_isRoundOverByTimeout) {
+        // chartPeek：超时同样要进入答案模式（否则复播没声音）
+        _enterPeekAnswerModeIfNeeded();
+      }
     });
   }
   
@@ -977,10 +990,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
 
       // 更新本地UI状态
       setState(() {
-        _searchController.clear();
-        _searchResults = [];
-        _showSearchResults = false;
-        
+        // 提交后清空搜索框，让下一次猜测从空输入开始
+        _clearSearchInput();
+
         // 猜测次数以服务端 game_state_updated 为准。原先本地先 +1，再在合并时
         // 与服务端值取较大值，导致「提交被拒绝」时次数也会虚高且无法回退。
         
@@ -993,6 +1005,10 @@ class _GameRoomPageState extends State<GameRoomPage> {
           }
         }
       });
+      // 猜对即本回合结束：chartPeek 要立刻进入答案模式（等服务器广播会慢一拍）
+      if (isCorrect && !_isLettersMode) {
+        _enterPeekAnswerModeIfNeeded();
+      }
 
       // 提交猜测到服务器（服务器会推送更新，包括猜测历史）
       await _manager.submitGuess(guessedSong.id, guessedSong.basicInfo.title);
@@ -1006,6 +1022,8 @@ class _GameRoomPageState extends State<GameRoomPage> {
       _guessHistory.clear();
       // 重置回合结束原因
       _isRoundOverByTimeout = false;
+      // 上一回合的搜索关键字不能带到下一回合
+      _clearSearchInput();
     });
     _resetModeSpecificState();
     _manager.startNextRound();
@@ -1015,6 +1033,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
     // 开始新一轮游戏
     setState(() {
       _guessHistory.clear();
+      _clearSearchInput();
     });
     _resetModeSpecificState();
     _manager.startGame();
@@ -2959,6 +2978,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
   Widget _buildChartPeekHint(
       String roomId, int roundNumber, String targetSongId) {
     final bool isGameOver = _gameState?.isGameOver ?? false;
+    final bool isRoundOver = _gameState?.isRoundOver ?? false;
+    // 回合结束后进入「答案模式」：与单人一致，可无限复播（音频就绪后带声音）
+    final bool answerMode = isGameOver || isRoundOver;
 
     if (_peekUnavailableReason != null) {
       return Center(
@@ -3012,7 +3034,34 @@ class _GameRoomPageState extends State<GameRoomPage> {
       );
     }
 
-    final bool canReplay = isGameOver || _peekReplaysLeft > 0;
+    final bool canReplay = answerMode || _peekReplaysLeft > 0;
+
+    // 复播按钮文案（与单人谱面片段猜歌同一套说法）
+    final String replayLabel;
+    if (_peekPlaying) {
+      replayLabel = '暂停';
+    } else if (answerMode) {
+      if (_peekAnswerAudioFailed) {
+        replayLabel = '复播片段（音频不可用）';
+      } else if (_peekAnswerAudioReady) {
+        replayLabel = '复播片段（带音频）';
+      } else {
+        replayLabel = '复播片段（音频准备中）';
+      }
+    } else {
+      replayLabel = '复播片段（还可复播 $_peekReplaysLeft 次）';
+    }
+
+    final String hintText;
+    if (answerMode) {
+      hintText = _peekAnswerAudioFailed
+          ? '本局答案：片段可无限复播（音频不可用，仅有谱面）'
+          : (_peekAnswerAudioReady
+              ? '本局答案：片段可无限复播，带音频'
+              : '本局答案：片段可无限复播（正在准备音频…）');
+    } else {
+      hintText = '片段播完会自动停在结尾';
+    }
 
     return Center(
       child: Column(
@@ -3028,25 +3077,49 @@ class _GameRoomPageState extends State<GameRoomPage> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // 本回合播放难度的标签（与单人同一套名字与底色）
+              if (_peekResolvedInote != null &&
+                  GuessChartByChartPeekPage
+                      .difficultyNames.containsKey(_peekResolvedInote))
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: GuessChartByChartPeekPage
+                            .difficultyColors[_peekResolvedInote] ??
+                        Colors.grey,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    GuessChartByChartPeekPage
+                            .difficultyNames[_peekResolvedInote] ??
+                        '',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              const SizedBox(width: 10),
               ElevatedButton.icon(
                 onPressed: canReplay
                     ? (_peekPlaying ? _pausePeek : _replayPeek)
                     : null,
                 icon: Icon(
-                  _peekPlaying ? Icons.pause : Icons.replay,
+                  (_peekClipFinished || (answerMode && !_peekAnswerAudioFailed))
+                      ? Icons.replay
+                      : Icons.play_arrow,
                   size: 18,
                 ),
-                label: Text(_peekPlaying
-                    ? '暂停'
-                    : (isGameOver
-                        ? '复播片段'
-                        : '复播片段（还可复播 $_peekReplaysLeft 次）')),
+                label: Text(replayLabel),
               ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
-            isGameOver ? '本局答案：无声谱面片段' : '片段播完会自动停在结尾',
+            hintText,
+            textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -3157,6 +3230,9 @@ class _GameRoomPageState extends State<GameRoomPage> {
         _peekClipStart = window.start;
         _peekClipEnd = window.end;
         _peekPlaying = false;
+        _peekClipFinished = false;
+        _peekResolvedInote = inote;
+        _peekChart = chart;
         // 进回合自动播放一次（不计入复播次数）
         _peekReplaysLeft = kPeekMaxReplays;
       });
@@ -3177,6 +3253,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
     if (controller == null) return;
     if (controller.chartTime >= _peekClipEnd) {
       controller.pause();
+      _peekClipFinished = true;
       if (mounted && _peekPlaying) {
         setState(() => _peekPlaying = false);
       }
@@ -3192,20 +3269,114 @@ class _GameRoomPageState extends State<GameRoomPage> {
     if (mounted) setState(() => _peekPlaying = true);
   }
 
+  // ==================== chartPeek：回合结束后的答案模式 ====================
+  //
+  // 照搬单人「谱面片段猜歌」：
+  //   1. 回合结束 → 异步取该曲音频（LuoXueSongUtil，自带磁盘缓存）；
+  //   2. 用户点复播时，把播放器换成带音频的新实例（音频 position 0 与片段
+  //      起点对齐），此后可**无限次**复播，边听边对答案；
+  //   3. 音频拿不到就保持无声，界面上如实说明。
+
+  /// 回合结束只进入一次答案模式（服务端多次推送回合结束 / 本地抢先置位都安全）。
+  void _enterPeekAnswerModeIfNeeded() {
+    if (_peekAnswerModeEntered) return;
+    final gameType = _currentRoom?.gameType ?? widget.room.gameType;
+    if (gameType != GameType.chartPeek) return;
+    _peekAnswerModeEntered = true;
+    unawaited(_enterPeekAnswerMode());
+  }
+
+  Future<void> _enterPeekAnswerMode() async {
+    await _peekController?.pause();
+    if (mounted) setState(() => _peekPlaying = false);
+    final song = _targetSong;
+    if (song == null || _peekChart == null) return;
+    // 异步取音频，不阻塞答案展示
+    unawaited(_preparePeekAnswerAudio(song));
+  }
+
+  Future<void> _preparePeekAnswerAudio(Song song) async {
+    try {
+      final int musicId = LuoXueSongUtil.toLxnsMusicId(song.id);
+      if (musicId <= 0) {
+        debugPrint('[GameRoomPage] chartPeek 歌曲 id 异常，答案模式保持无声: ${song.id}');
+        if (mounted) setState(() => _peekAnswerAudioFailed = true);
+        return;
+      }
+      final file = await LuoXueSongUtil().getMusicFile(musicId.toString());
+      if (!mounted || !_peekAnswerModeEntered) return;
+      if (file == null) {
+        setState(() => _peekAnswerAudioFailed = true);
+        return;
+      }
+      _peekAnswerAudioPath = file.path;
+      setState(() => _peekAnswerAudioReady = true);
+      debugPrint('[GameRoomPage] chartPeek 答案音频就绪: ${file.path}');
+    } catch (e) {
+      debugPrint('[GameRoomPage] chartPeek 答案音频获取失败: $e');
+      if (mounted) setState(() => _peekAnswerAudioFailed = true);
+    }
+  }
+
+  /// 把片段播放器换成带音频的实例并定位到片段起点。
+  ///
+  /// 对齐原理（与单人一致）：包内音频时钟满足 chartTime = audioPosition + offset，
+  /// offset = initialChartTime + musicOffsetMs/1000。答案播放器把 initialChartTime
+  /// 设为 0（offset = 0），随后 seek(_clipStart) 会把谱面时间与音频位置一起放到
+  /// 片段起点；若沿用 initialChartTime = _clipStart，播出来的是整首歌的开头。
+  Future<void> _rebuildPeekPlayerWithAudio() async {
+    final chart = _peekChart;
+    final path = _peekAnswerAudioPath;
+    if (chart == null || path == null || !mounted) return;
+
+    _peekController?.removeListener(_onPeekTimeChanged);
+    _peekController?.dispose();
+
+    final controller = GuessChartByChartPeekPage.buildChartOnlyController(
+      chart: chart,
+      audioFilePath: path,
+      initialChartTime: 0,
+    );
+    setState(() {
+      _peekController = controller;
+      _peekClipFinished = false;
+      _peekAudioAttached = true;
+    });
+    controller.timeNotifier.addListener(_onPeekTimeChanged);
+
+    // 音频刚交给 game 还在异步加载，等 game 就绪再 seek，
+    // 否则 seek 的同步音频分支会因 handle 未建而丢位置。
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    if (!mounted || !identical(_peekController, controller)) return;
+    await controller.seek(_peekClipStart);
+  }
+
   /// 手动复播（对局中消耗复播次数；结束后不限次）
   Future<void> _replayPeek() async {
     final controller = _peekController;
     if (controller == null) return;
     final bool isGameOver = _gameState?.isGameOver ?? false;
-    if (!isGameOver && _peekReplaysLeft <= 0) {
+    final bool isRoundOver = _gameState?.isRoundOver ?? false;
+    final bool answerMode = isGameOver || isRoundOver;
+    if (!answerMode && _peekReplaysLeft <= 0) {
       Fluttertoast.showToast(msg: '复播次数已用完');
       return;
     }
-    if (!isGameOver) {
+    if (!answerMode) {
       setState(() => _peekReplaysLeft--);
     }
-    await controller.seek(_peekClipStart);
-    await controller.play();
+
+    if (answerMode && _peekAnswerAudioReady && _peekAnswerAudioPath != null) {
+      // 答案模式：第一次复播时换成带音频的播放器（之后复用，不再重建）
+      if (!_peekAudioAttached) {
+        await _rebuildPeekPlayerWithAudio();
+      } else {
+        await _peekController?.seek(_peekClipStart);
+      }
+    } else {
+      await controller.seek(_peekClipStart);
+    }
+    await _peekController?.play();
     if (mounted) setState(() => _peekPlaying = true);
   }
 
@@ -3580,6 +3751,19 @@ class _GameRoomPageState extends State<GameRoomPage> {
   }
 
   /// 在新回合开始时重置模式专属状态
+  /// 清空搜索框与搜索结果（换回合 / 开始新游戏时调用）。
+  ///
+  /// 为什么必须清：输入框里留着上一回合的关键字时，新回合的候选列表会被旧
+  /// 关键字过滤，玩家看到「搜不出歌」，或者以为要重新输入而耽误抢答——
+  /// 结果就是白白丢掉一次获胜机会。
+  void _clearSearchInput() {
+    if (_searchController.text.isNotEmpty) {
+      _searchController.clear();
+    }
+    _searchResults = [];
+    _showSearchResults = false;
+  }
+
   void _resetModeSpecificState() {
     _openLetterController.clear();
     _cropRect = null;
@@ -3606,7 +3790,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
     _revealedTileCount = 0;
     _tileRevealPaused = false;
 
-    // chartPeek：谱面片段（控制器、窗口、复播次数）
+    // chartPeek：谱面片段（控制器、窗口、复播次数、答案模式）
     _peekController?.timeNotifier.removeListener(_onPeekTimeChanged);
     _peekController?.dispose();
     _peekController = null;
@@ -3614,8 +3798,16 @@ class _GameRoomPageState extends State<GameRoomPage> {
     _peekClipEnd = 0.0;
     _peekPlaying = false;
     _peekPreparing = false;
+    _peekClipFinished = false;
     _peekUnavailableReason = null;
     _peekReplaysLeft = kPeekMaxReplays;
+    _peekResolvedInote = null;
+    _peekChart = null;
+    _peekAnswerModeEntered = false;
+    _peekAnswerAudioReady = false;
+    _peekAnswerAudioFailed = false;
+    _peekAudioAttached = false;
+    _peekAnswerAudioPath = null;
   }
 
   /// 回合开始时的曲绘快闪：先显示，flashDurationMs 之后消失。

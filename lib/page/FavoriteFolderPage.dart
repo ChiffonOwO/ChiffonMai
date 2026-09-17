@@ -11,6 +11,7 @@ import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/FavoriteImportFlow.dart';
+import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/UserPlayDataEntity.dart';
@@ -199,7 +200,6 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
     final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
 
     return Scaffold(
@@ -214,34 +214,8 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
           // 页面内容
           Column(
             children: [
-              // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '收藏夹',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 占位，保持标题居中
-                    SizedBox(width: 48),
-                  ],
-                ),
-              ),
+              // 标题栏统一走公共组件
+              const PageTopBar(title: '收藏夹'),
 
               // 主内容区域
               Expanded(
@@ -574,32 +548,24 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
           // 页面内容
           Column(
             children: [
-              // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: _isBatchMode ? _buildBatchAppBar() : Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          widget.folderName,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
+              // 标题栏：批量模式是操作工具栏（也给它同样的底色），
+              // 普通模式统一走公共组件
+              if (_isBatchMode)
+                Container(
+                  padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.cardBackground(
+                        Theme.of(context).brightness),
+                  ),
+                  child: _buildBatchAppBar(),
+                )
+              else
+                PageTopBar(
+                  title: widget.folderName,
+                  actions: [
                     // 排序按钮
                     PopupMenuButton<FavoriteSortOption>(
-                      icon: Icon(Icons.sort, color: Theme.of(context).colorScheme.onSurface, size: 22),
+                      icon: const Icon(Icons.sort, size: 22),
                       tooltip: '排序方式',
                       onSelected: (option) {
                         setState(() => _sortOption = option);
@@ -629,13 +595,12 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
                     ),
                     // 导出按钮
                     IconButton(
-                      icon: Icon(Icons.share, color: Theme.of(context).colorScheme.onSurface, size: 22),
+                      icon: const Icon(Icons.share, size: 22),
                       tooltip: '导出收藏夹',
                       onPressed: _exportFolder,
                     ),
                   ],
                 ),
-              ),
 
               // 主内容区域
               Expanded(

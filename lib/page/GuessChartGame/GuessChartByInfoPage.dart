@@ -11,11 +11,12 @@ import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartCommonSett
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonCacheUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
+import 'package:my_first_flutter_app/utils/SongFilterUtil.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
-import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/page/GuessChartGame/GuessChartLoadingView.dart';
+import '../../widgets/PageTopBar.dart';
 
 class GuessChartByInfoPage extends StatefulWidget {
   const GuessChartByInfoPage({super.key});
@@ -390,29 +391,6 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
 
   // 构建搜索结果项
   Widget _buildSearchResultItem(Song song) {
-    // 生成曲绘路径
-    String coverPath = 'assets/cover/${song.id}.webp';
-
-    // 生成fallback的cover_id
-    String generateCoverId(String songId) {
-      if (songId.length == 6) {
-        // 对于6位数的曲绘，只去除第一位，保留后续的0
-        return songId.substring(1);
-      } else if (songId.length >= 5) {
-        // 如果长度大于等于5，万位补1
-        int songIdInt = int.parse(songId);
-        int tenThousandPlace = (songIdInt ~/ 10000) + 1;
-        int remaining = songIdInt % 10000;
-        return '${tenThousandPlace}${remaining.toString().padLeft(4, '0')}';
-      } else {
-        // 如果长度小于5，补1在万位，其余补0
-        return '1${songId.padLeft(4, '0')}';
-      }
-    }
-
-    String coverId = generateCoverId(song.id);
-    String networkCoverUrl = 'https://www.diving-fish.com/covers/$coverId.png';
-
     // 获取别名
     final aliases = _songAliasManager.aliases[song.title] ?? [];
     String aliasText = aliases.isNotEmpty ? aliases.join('、') : '';
@@ -438,24 +416,10 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.asset(
-                  coverPath,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Image.network(
-                      networkCoverUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey[200],
-                          child: const Center(
-                            child: Icon(Icons.music_note, color: Colors.grey),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
+                // 曲绘统一走 CoverUtil 的多级兜底链（本地路径规则 → diving-fish
+                // → dxrating → 默认曲绘）。以前这里自己拼 assets/cover/{原始 id}.webp，
+                // 5/6 位 id 的资源名是剔除后的 id，直读必然失败。
+                child: CoverUtil.buildCoverWidget(song.id, 60),
               ),
             ),
             const SizedBox(width: 12),
@@ -516,29 +480,6 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
   // 构建猜测历史项
   Widget _buildGuessHistoryItem(
       GuessSong guessSong, int index, Song? guessedSong) {
-    // 生成曲绘路径
-    String coverPath = 'assets/cover/${guessSong.songId}.webp';
-
-    // 生成fallback的cover_id
-    String generateCoverId(String songId) {
-      if (songId.length == 6) {
-        // 对于6位数的曲绘，只去除第一位，保留后续的0
-        return songId.substring(1);
-      } else if (songId.length >= 5) {
-        // 如果长度大于等于5，万位补1
-        int songIdInt = int.parse(songId);
-        int tenThousandPlace = (songIdInt ~/ 10000) + 1;
-        int remaining = songIdInt % 10000;
-        return '${tenThousandPlace}${remaining.toString().padLeft(4, '0')}';
-      } else {
-        // 如果长度小于5，补1在万位，其余补0
-        return '1${songId.padLeft(4, '0')}';
-      }
-    }
-
-    String coverId = generateCoverId(guessSong.songId.toString());
-    String networkCoverUrl = 'https://www.diving-fish.com/covers/$coverId.png';
-
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.all(16),
@@ -568,25 +509,9 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(4),
-                  child: Image.asset(
-                    coverPath,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Image.network(
-                        networkCoverUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[200],
-                            child: const Center(
-                              child: Icon(Icons.music_note,
-                                  color: Colors.grey, size: 20),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
+                  // 曲绘统一走 CoverUtil 的多级兜底链（与搜索结果项一致）
+                  child: CoverUtil.buildCoverWidget(
+                      guessSong.songId.toString(), 60),
                 ),
               ),
               const SizedBox(width: 12),
@@ -953,28 +878,14 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
     
     // 加载所有版本和流派
     final allSongs = await GuessChartByInfoService.loadAllSongs();
-    Set<String> versions = {};
-    Set<String> genres = {};
-    
-    if (allSongs != null) {
-      for (var song in allSongs) {
-        versions.add(song.basicInfo.from);
-        genres.add(song.basicInfo.genre);
-      }
-    }
-    
-    // 过滤掉maidata中的版本，只保留标准版本
-    versions = versions.where((v) => VersionListConstant.standardVersions.contains(v)).toSet();
-    
-    // 按照游戏发布顺序排序版本
-    List<String> allVersions = versions.toList()..sort((a, b) {
-      int orderA = VersionListConstant.versionOrderMap[a] ?? 999;
-      int orderB = VersionListConstant.versionOrderMap[b] ?? 999;
-      return orderA.compareTo(orderB);
-    });
-    // 移除宴会场选项
-    genres.remove('\u5bb4\u4f1a\u5834');
-    List<String> allGenres = genres.toList();
+    // 可选版本 / 可选流派统一走 SongFilterUtil.selectableFilters：
+    // 它先剔除非正曲（SongFilterUtil.isExtra：宴会场 / maidata 追加 / union 独有），
+    // 再单独挡掉「宴会场」流派，最后把版本过一遍官方世代白名单并按世代排序。
+    // 口径必须与抽曲池一致，否则列表里会出现「勾了也永远抽不到」的选项。
+    final SongFilterOptions filterOptions =
+        SongFilterUtil.selectableFilters(allSongs ?? const <Song>[]);
+    final List<String> allVersions = filterOptions.versions;
+    final List<String> allGenres = filterOptions.genres;
     
     // 临时变量用于存储设置
     List<String> tempSelectedVersions = List.from(_selectedVersions);
@@ -1181,34 +1092,8 @@ class _GuessChartByInfoPageState extends State<GuessChartByInfoPage> {
           Column(
             children: [
               // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '猜歌',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 占位，保持标题居中
-                    SizedBox(width: 48),
-                  ],
-                ),
+              PageTopBar(
+                title: '猜歌',
               ),
 
               // 主内容区域

@@ -9,6 +9,7 @@ import '../utils/CoverUtil.dart';
 import '../utils/AppTheme.dart';
 import '../utils/ExportPathUtil.dart';
 import '../service/SongMaidataPageService.dart';
+import '../service/DxRatingCoverService.dart';
 import '../service/SongPlayService.dart';
 import '../manager/MaidataManager.dart';
 import 'ChartPlayPage.dart';
@@ -473,6 +474,26 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
       }
     } catch (e) {
       debugPrint('[DEBUG][SongMaidataPage] 网络获取曲绘失败: $e');
+    }
+
+    // 新增兜底：dxrating（shama）曲绘 —— 拿 dxdata 的 imageName 换图
+    // （水鱼的 DX 条目 id = 10000 + 基础 id，上面那条 URL 规则会 404，只能靠这里）
+    try {
+      // 索引通常是现成的（本地缓存）；万一还没建好，最多等 3 秒，
+      // 超时就让后台继续补，本次仍按「没有曲绘」处理，别卡住导出
+      await DxRatingCoverService.instance
+          .ensureLoaded()
+          .timeout(const Duration(seconds: 3), onTimeout: () {});
+      final dxUrl = DxRatingCoverService.instance.coverUrlFor(songId);
+      if (dxUrl != null) {
+        debugPrint('[DEBUG][SongMaidataPage] 从 dxrating 获取曲绘: $dxUrl');
+        final response = await ApiClient.get(Uri.parse(dxUrl));
+        if (response.statusCode == 200) {
+          return response.bodyBytes;
+        }
+      }
+    } catch (e) {
+      debugPrint('[DEBUG][SongMaidataPage] dxrating 曲绘获取失败: $e');
     }
 
     return null;

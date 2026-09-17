@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,6 +12,8 @@ import 'MaimaiServerStatusPage.dart';
 import 'RecentCommentsPage.dart';
 import 'RecentRatingsPage.dart';
 import 'AboutAppPage.dart';
+import 'Awmc/AwmcConsolePage.dart';
+import 'Awmc/AwmcSyncFlow.dart';
 import 'SupportDeveloperPage.dart';
 import 'FriendLinksPage.dart';
 import '../manager/LZYCheckUpdateManager.dart';
@@ -23,6 +27,10 @@ import '../manager/LuoXue/CollectionsManager.dart';
 import '../entity/LuoXue/Collection.dart';
 import '../service/ConnectivityService.dart';
 import '../service/RecommendByTagsService.dart';
+import '../service/SyncRouteStore.dart';
+import '../service/SyncStatsService.dart';
+import '../utils/SyncRouteNotifier.dart';
+import '../widgets/SyncRouteFooter.dart';
 import '../widgets/SyncScoreDialogs.dart'
     show
         SyncScoreDialogs,
@@ -44,6 +52,7 @@ import '../service/AccountSwitchService.dart';
 import '../widgets/AdvancedRefreshDataDialog.dart' show showAdvancedRefreshDataDialog;
 import '../constant/CacheKeyConstant.dart';
 import '../utils/FavoriteFeaturesNotifier.dart';
+import '../utils/FeatureFlags.dart';
 import '../utils/LoginStateNotifier.dart';
 import '../utils/UserProfileNotifier.dart';
 
@@ -60,6 +69,10 @@ class _SystemHubPageState extends State<SystemHubPage> {
   // ===== 账号 / 用户信息（昵称 / QQ 来自 UserProfileNotifier） =====
   String _cachedQQ = '';
   String _userNickname = '';
+
+  // 同步成绩的线路与统计都由 SyncRouteNotifier 统一持有：
+  // 首页「收藏的功能」区里的同名入口读的是同一份状态，两边永远不会显示不一致。
+  // 线路落盘仍走 SyncRouteStore（同一套 prefs 键）。
 
   // ===== 登出水鱼二次确认 + 进度 =====
   bool _logoutConfirming = false;
@@ -102,11 +115,23 @@ class _SystemHubPageState extends State<SystemHubPage> {
     _fetchAvatarIcons();
     _loadCachedPlateId();
     _fetchAvatarPlates();
+    // 线路 + 统计（与首页收藏区共享同一份状态；重复调用幂等）
+    SyncRouteNotifier.instance.addListener(_onSyncRouteChanged);
+    SyncRouteNotifier.instance.ensureLoaded();
   }
+
+  void _onSyncRouteChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// 当前的同步线路（来自共享状态）。
+  int _routeOf(SyncPlatform platform) =>
+      SyncRouteNotifier.instance.routeOf(platform);
 
   @override
   void dispose() {
     UserProfileNotifier.instance.removeListener(_onUserProfileChanged);
+    SyncRouteNotifier.instance.removeListener(_onSyncRouteChanged);
     super.dispose();
   }
 
@@ -579,6 +604,12 @@ class _SystemHubPageState extends State<SystemHubPage> {
       _syncingDivingFish = true;
       _syncText = '正在同步成绩...';
     });
+    // 记录本次同步耗时 / 成败（Redis，尽力而为）
+    final stopwatch = Stopwatch()..start();
+    var syncOk = false;
+    // 缺 ImportToken 时会转交给对话框再走一遍完整流程（那一次由对话框上报），
+    // 这里就不再记一条，免得同一次用户操作算成两条样本
+    var handedOffToDialog = false;
     try {
       final outcome = await executeDivingFishSync(
         _syncCallbacks,
@@ -588,6 +619,7 @@ class _SystemHubPageState extends State<SystemHubPage> {
           setState(() => _syncText = '$t ${(p * 100).round()}%');
         },
       );
+      syncOk = true;
       if (!mounted) return;
       Fluttertoast.showToast(
           msg: outcome.localDataRefreshed
@@ -599,6 +631,7 @@ class _SystemHubPageState extends State<SystemHubPage> {
       // 需要 ImportToken 时按钮上没法输入账号密码，回到原有的对话框完成绑定；
       // 二维码已经抓过一次，直接复用，避免让用户重新粘贴。
       if (e.message.contains('ImportToken')) {
+        handedOffToDialog = true;
         await SyncScoreDialogs.showDivingFishSyncDialog(
           context,
           _syncCallbacks,
@@ -608,6 +641,16 @@ class _SystemHubPageState extends State<SystemHubPage> {
     } catch (e) {
       if (mounted) Fluttertoast.showToast(msg: '同步失败：$e');
     } finally {
+      stopwatch.stop();
+      if (!handedOffToDialog) {
+        unawaited(SyncStatsService.record(
+          line: SyncLine.scoreHub,
+          platform: SyncPlatform.divingFish,
+          durationMs: stopwatch.elapsedMilliseconds,
+          ok: syncOk,
+        ));
+        SyncRouteNotifier.instance.refreshStatsSoon();
+      }
       if (mounted) {
         setState(() {
           _syncingDivingFish = false;
@@ -627,11 +670,14 @@ class _SystemHubPageState extends State<SystemHubPage> {
       _syncingLuoXue = true;
       _luoXueText = '正在同步成绩...';
     });
+    final stopwatch = Stopwatch()..start();
+    var syncOk = false;
     try {
       final count = await executeLuoXueSync(input, onProgress: (p, t) {
         if (!mounted) return;
         setState(() => _luoXueText = '$t ${(p * 100).round()}%');
       });
+      syncOk = true;
       if (!mounted) return;
       Fluttertoast.showToast(msg: '同步完成！共 $count 条成绩已导出到落雪');
     } on SyncFlowException catch (e) {
@@ -639,6 +685,14 @@ class _SystemHubPageState extends State<SystemHubPage> {
     } catch (e) {
       if (mounted) Fluttertoast.showToast(msg: '同步失败：$e');
     } finally {
+      stopwatch.stop();
+      unawaited(SyncStatsService.record(
+        line: SyncLine.scoreHub,
+        platform: SyncPlatform.luoXue,
+        durationMs: stopwatch.elapsedMilliseconds,
+        ok: syncOk,
+      ));
+      SyncRouteNotifier.instance.refreshStatsSoon();
       if (mounted) {
         setState(() {
           _syncingLuoXue = false;
@@ -650,6 +704,71 @@ class _SystemHubPageState extends State<SystemHubPage> {
 
   void _loginDivingFish() {
     SyncScoreDialogs.showDivingFishLoginDialog(context, _syncCallbacks);
+  }
+
+  // ===== 线路2：通过 AWMC 网关同步 =====
+
+  /// 线路2 同步到水鱼：二维码 + 网关令牌 → `/v1/user/music` + `/v1/update-fish`。
+  Future<void> _syncToDivingFishViaAwmc() async {
+    if (_anyBusy) return;
+    final outcome = await AwmcSyncFlow.run(
+      context,
+      target: AwmcSyncTarget.divingFish,
+      onBusy: (label) {
+        if (!mounted) return;
+        setState(() {
+          _syncingDivingFish = true;
+          _syncText = label;
+        });
+      },
+      onIdle: () {
+        if (!mounted) return;
+        setState(() {
+          _syncingDivingFish = false;
+          _syncText = '';
+        });
+      },
+    );
+    if (!mounted || outcome.cancelled) return;
+    if (outcome.ok) {
+      Fluttertoast.showToast(
+          msg: AwmcSyncFlow.successToast(AwmcSyncTarget.divingFish, outcome));
+    } else if (outcome.message != null) {
+      Fluttertoast.showToast(msg: outcome.message!);
+    }
+    // 统计是异步写进 Redis 的，稍等一下再刷新，让这一行尽快反映本次结果
+    SyncRouteNotifier.instance.refreshStatsSoon();
+  }
+
+  /// 线路2 同步到落雪：二维码 + 网关令牌 → `/v1/user/music` + `/v1/update-lx`。
+  Future<void> _syncToLuoXueViaAwmc() async {
+    if (_anyBusy) return;
+    final outcome = await AwmcSyncFlow.run(
+      context,
+      target: AwmcSyncTarget.luoXue,
+      onBusy: (label) {
+        if (!mounted) return;
+        setState(() {
+          _syncingLuoXue = true;
+          _luoXueText = label;
+        });
+      },
+      onIdle: () {
+        if (!mounted) return;
+        setState(() {
+          _syncingLuoXue = false;
+          _luoXueText = '';
+        });
+      },
+    );
+    if (!mounted || outcome.cancelled) return;
+    if (outcome.ok) {
+      Fluttertoast.showToast(
+          msg: AwmcSyncFlow.successToast(AwmcSyncTarget.luoXue, outcome));
+    } else if (outcome.message != null) {
+      Fluttertoast.showToast(msg: outcome.message!);
+    }
+    SyncRouteNotifier.instance.refreshStatsSoon();
   }
 
   /// 登出水鱼账号：第一次点击进入「再次确认」态，第二次点击才真正执行；
@@ -718,7 +837,8 @@ class _SystemHubPageState extends State<SystemHubPage> {
                 title: '数据与账号',
                 icon: Icons.sync_rounded,
                 subtitle: '登录水鱼 · 同步账号 · 数据备份 · 刷新缓存',
-                badgeCount: 8,
+                // 9 个入口里「AWMC 网关」默认隐藏（FeatureFlags.awmcGateway）
+                badgeCount: 8 + (FeatureFlags.awmcGateway ? 1 : 0),
                 children: [
                   HubActionTile(
                     title: loggedIn ? '登出水鱼账号' : '登录水鱼',
@@ -742,9 +862,17 @@ class _SystemHubPageState extends State<SystemHubPage> {
                     icon: Icons.cloud_upload_outlined,
                     isFavorited: _isFavorited('同步成绩到水鱼'),
                     onToggleFavorite: () => _toggleFavorite('同步成绩到水鱼'),
-                    onTap: _syncToDivingFishWithButton,
+                    onTap: _routeOf(SyncPlatform.divingFish) ==
+                            SyncRouteStore.routeAwmc
+                        ? _syncToDivingFishViaAwmc
+                        : _syncToDivingFishWithButton,
                     loading: _syncingDivingFish,
                     loadingText: _syncText,
+                    // 线路切换 + 统计：与首页「收藏的功能」区共用同一份状态
+                    footer: SyncRouteFooter(
+                      platform: SyncPlatform.divingFish,
+                      enabled: !_anyBusy,
+                    ),
                   ),
                   HubActionTile(
                     title: '同步成绩到落雪',
@@ -752,9 +880,16 @@ class _SystemHubPageState extends State<SystemHubPage> {
                     icon: Icons.cloud_sync_outlined,
                     isFavorited: _isFavorited('同步成绩到落雪'),
                     onToggleFavorite: () => _toggleFavorite('同步成绩到落雪'),
-                    onTap: _syncToLuoXueWithButton,
+                    onTap: _routeOf(SyncPlatform.luoXue) ==
+                            SyncRouteStore.routeAwmc
+                        ? _syncToLuoXueViaAwmc
+                        : _syncToLuoXueWithButton,
                     loading: _syncingLuoXue,
                     loadingText: _luoXueText,
+                    footer: SyncRouteFooter(
+                      platform: SyncPlatform.luoXue,
+                      enabled: !_anyBusy,
+                    ),
                   ),
                   HubActionTile(
                     title: '账号管理',
@@ -804,6 +939,17 @@ class _SystemHubPageState extends State<SystemHubPage> {
                     loading: _refreshingMaidata,
                     loadingText: _maidataText,
                   ),
+                  // 「AWMC 网关」入口：默认隐藏（FeatureFlags.awmcGateway），
+                  // 代码一行没删；要启用时改那个开关即可。
+                  if (FeatureFlags.awmcGateway)
+                    HubActionTile(
+                      title: 'AWMC 网关',
+                      subtitle: '查询/写入机台账号数据（敏感操作）',
+                      icon: Icons.shield_outlined,
+                      isFavorited: _isFavorited('AWMC 网关'),
+                      onToggleFavorite: () => _toggleFavorite('AWMC 网关'),
+                      onTap: () => _open(context, const AwmcConsolePage()),
+                    ),
                 ],
               ),
               const SizedBox(height: 24),

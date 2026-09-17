@@ -17,6 +17,7 @@ import '../../utils/AppTheme.dart';
 import '../../widgets/B50GameCardWidget.dart';
 import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
+import '../../widgets/PageTopBar.dart';
 
 class DiffBest50Page extends StatefulWidget {
   const DiffBest50Page({super.key});
@@ -147,48 +148,26 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
           Column(
             children: [
               // 标题栏（始终显示）
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '拟合Best50查询',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 模式切换按钮（始终显示）
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.surface,
-                        foregroundColor: Theme.of(context).colorScheme.onSurface,
-                        minimumSize: Size(100 * 0.9, 36 * 0.9),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8.0),
-                        ),
-                      ),
-                      onPressed: _toggleMode,
-                      child: Text(
-                        '模式${['A', 'B', 'C'][_currentMode]}',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
+              PageTopBar(
+                title: '拟合Best50查询',
+                actions: [
+                // 模式切换按钮（始终显示）
+                ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                foregroundColor: Theme.of(context).colorScheme.onSurface,
+                minimumSize: Size(100 * 0.9, 36 * 0.9),
+                shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8.0),
                 ),
+                ),
+                onPressed: _toggleMode,
+                child: Text(
+                '模式${['A', 'B', 'C'][_currentMode]}',
+                style: TextStyle(fontSize: 12),
+                ),
+                ),
+                ],
               ),
 
               // 内容区域

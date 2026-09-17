@@ -20,6 +20,7 @@ import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import '../../widgets/B50GameCardWidget.dart';
+import '../../widgets/PageTopBar.dart';
 
 class PersonalizedBest50Page extends StatefulWidget {
   const PersonalizedBest50Page({super.key});
@@ -68,6 +69,9 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     {'value': 'difficulty_50', 'label': '难度50'},
     {'value': 'best_n', 'label': 'Best N'},
     {'value': 'all_50', 'label': 'ALL50'},
+    // 游玩次数最高的 50 张谱面；次数来自「同步成绩」的线路2（AWMC 网关）——
+    // 详见 PersonalizedBest50Service.getPC50Data
+    {'value': 'pc_50', 'label': 'PC50'},
   ];
 
   // 星数选项
@@ -359,6 +363,9 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
         case 'all_50':
           data = await service.getAll50Data();
           break;
+        case 'pc_50':
+          data = await service.getPC50Data();
+          break;
       }
 
       if (data != null) {
@@ -614,34 +621,8 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
           Column(
             children: [
               // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '个性化Best50',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: MediaQuery.of(context).size.width * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 占位，保持标题居中
-                    SizedBox(width: 48),
-                  ],
-                ),
+              PageTopBar(
+                title: '个性化Best50',
               ),
 
               // 主内容区域
@@ -1551,7 +1532,10 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
             ),
             SizedBox(height: 8),
             Text(
-              '请返回首页点击"刷新数据"按钮获取',
+              // PC50 的次数只有线路2（AWMC 网关）会拉，缺数据时不能只说「刷新数据」
+              _selectedType == 'pc_50'
+                  ? '游玩次数来自「同步成绩」的线路2 · AWMC 网关，\n请先在那里同步一次成绩'
+                  : '请返回首页点击"刷新数据"按钮获取',
               style: TextStyle(
                 fontSize: 14,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1627,6 +1611,30 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
       bool dxMode = type == 'DX';
       bool isUtage = songId.toString().length == 6; // 6位数ID为UTAGE
 
+    final card = _buildGameCard(
+      cardColor: cardColor,
+      songName: title,
+      achievementRate: achievementRate,
+      difficulty: difficulty,
+      dxMode: dxMode,
+      isUtage: isUtage,
+      score: score,
+      maxScore: maxScore,
+      rating: rating,
+      stars: stars,
+      fc: fc,
+      fs: fs,
+      rate: rate,
+      songId: songId,
+      starsColor: starsColor,
+      maxIdLength: maxIdLength,
+    );
+
+    // PC50：卡片上挂一枚游玩次数角标 —— 这个模式的排序依据就是它，
+    // 不显示的话列表看起来和 ALL50 只差一个顺序。
+    final int? playCount = (songData['playCount'] as num?)?.toInt();
+    final double scale = _cardScale;
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -1640,25 +1648,21 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
           ),
         );
       },
-      child: _buildGameCard(
-        cardColor: cardColor,
-        songName: title,
-        achievementRate: achievementRate,
-        difficulty: difficulty,
-        dxMode: dxMode,
-        isUtage: isUtage,
-        score: score,
-        maxScore: maxScore,
-        rating: rating,
-        stars: stars,
-        fc: fc,
-        fs: fs,
-        rate: rate,
-        songId: songId,
-        starsColor: starsColor,
-        maxIdLength: maxIdLength,
-      ),
+      child: _selectedType == 'pc_50' && playCount != null
+          ? B50GameCardWidget.withBadgeOverlay(
+              card: card,
+              text: 'PC $playCount',
+              scale: scale,
+            )
+          : card,
     );
+  }
+
+  /// 单卡缩放系数 = 单卡实际宽度 / 设计稿宽度（335）。
+  /// `_buildGameCard` 与 PC50 的次数徽标都用它，避免两处各算一遍。
+  double get _cardScale {
+    final screenW = MediaQuery.of(context).size.width;
+    return ((screenW - screenW * 0.02) / 2) / 335.0;
   }
 
   // 构建游戏卡片（委托至通用 widget B50GameCardWidget，
@@ -1681,10 +1685,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     Color starsColor = Colors.white,
     int maxIdLength = 5,
   }) {
-    final screenW = MediaQuery.of(context).size.width;
-    const double refCardWidth = 335.0;
-    final double cardW = (screenW - screenW * 0.02) / 2;
-    final double scale = cardW / refCardWidth;
+    final double scale = _cardScale;
     final int id = songId ?? 0;
 
     return B50GameCardWidget(

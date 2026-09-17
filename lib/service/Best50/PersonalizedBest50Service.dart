@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
+import 'package:my_first_flutter_app/service/AWMC/AwmcPlayCountStore.dart';
 import 'package:my_first_flutter_app/utils/SongFilterUtil.dart';
 
 class PersonalizedBest50Service {
@@ -1448,7 +1449,76 @@ class PersonalizedBest50Service {
     }
   }
 
-  // ===== 新增：随机50 / 越级50 / 难度50 / UTAGE 50 =====
+  // ===== 新增：随机50 / 越级50 / 难度50 / UTAGE 50 / PC50 =====
+
+  /// PC50：游玩次数（`playCount`）最高的 50 张**谱面**（一张谱面 = 曲目 + 难度）。
+  ///
+  /// `playCount` 是机台真实数据，App 里只有一个来源：**同步成绩的线路2
+  /// （AWMC 网关）** —— 它会先调 `/v1/user/music` 把 `(musicId, level) → playCount`
+  /// 落进 [AwmcPlayCountStore]。所以这里是「用户成绩记录 × 游玩次数缓存」的连接：
+  ///
+  ///   * **以成绩记录为基准**：卡片要显示达成率 / RA / 星级，没有成绩的谱面没法展示
+  ///     （游玩次数缓存里那些「有次数但本地没成绩」的谱面因此不会出现）；
+  ///   * **只保留查得到 playCount 的记录**：没同步过线路2 就是空；
+  ///   * extra（宴会场 / maidata 追加 / union 独有）不参与，与其它模式口径一致；
+  ///   * 按 `playCount` 降序取前 50，并把 `playCount` 写回记录供卡片显示。
+  Future<Map<String, dynamic>?> getPC50Data() async {
+    try {
+      await AwmcPlayCountStore.ensureLoaded();
+      if (!AwmcPlayCountStore.hasData) {
+        debugPrint('PC50：还没有游玩次数缓存（需要先用线路2 · AWMC 网关同步一次成绩）');
+        return null;
+      }
+
+      final userPlayData = await UserPlayDataManager().getCachedUserPlayData();
+      if (userPlayData == null) return null;
+      final records = userPlayData['records'];
+      if (records is! List) return null;
+
+      final allSongs = await MaimaiMusicDataManager().getCachedSongs();
+      if (allSongs == null) return null;
+      final songMap = { for (var song in allSongs) song.id: song };
+
+      final pool = <Map<String, dynamic>>[];
+      for (final record in records) {
+        if (record is! Map<String, dynamic>) continue;
+        final song = songMap[record['song_id']?.toString()];
+        if (song == null) continue;
+        if (SongFilterUtil.isExtra(song)) continue;
+
+        final musicId = int.tryParse('${record['song_id']}') ?? 0;
+        if (musicId <= 0) continue;
+        final levelIndex = (record['level_index'] as num?)?.toInt() ?? 0;
+        final playCount = AwmcPlayCountStore.playCountOfDiffIndex(
+          musicId,
+          levelIndex,
+        );
+        // null = 这条成绩在机台游玩次数缓存里没有对应条目（缓存未覆盖该谱面）
+        if (playCount == null || playCount <= 0) continue;
+
+        pool.add({...record, 'playCount': playCount});
+      }
+      if (pool.isEmpty) return null;
+
+      // 按游玩次数降序；次数相同的按 ra 降序，保证顺序稳定（同次数不会每次刷新乱跳）
+      pool.sort((a, b) {
+        final byCount = ((b['playCount'] ?? 0) as int)
+            .compareTo((a['playCount'] ?? 0) as int);
+        if (byCount != 0) return byCount;
+        return ((b['ra'] ?? 0) as int).compareTo((a['ra'] ?? 0) as int);
+      });
+
+      final top50 = pool.take(50).toList();
+      return {
+        'records': top50,
+        'total': top50.length,
+        'type': 'pc_50',
+      };
+    } catch (e) {
+      debugPrint('获取PC50数据时出错: $e');
+      return null;
+    }
+  }
 
   /// 随机 50：从用户全量游玩记录里随机抽 50 条，按 ra 降序展示。
   /// 每次调用都重新洗牌，因此「再抽一次」按钮只需重跑此方法即可。

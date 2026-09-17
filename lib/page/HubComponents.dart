@@ -5,6 +5,66 @@ import '../utils/AppDesignTokens.dart';
 /// Hub 页面通用组件库：Section、ActionTile、Scaffold。
 /// UI 设计原则：留白克制、卡片浮起感、主题色仅作点缀。
 
+/// 「快捷入口」那种方形小按钮（图标 + 标题 + 副标题）。
+///
+/// ⚠️ 底色与描边**必须**画在自己这层 [Material] 上，不能用 [Ink]：
+/// [Ink] 的 decoration 是交给**最近的 Material**（滚动页里通常是 Scaffold 那层）
+/// 的 ink 层去画的，而那一层在 ListView/Scrollable 的滚动（以及 Android 的
+/// 拉伸回弹 `StretchingOverscrollIndicator`）变换之外 —— 表现就是
+/// 「上下滑动时只有文字被拉伸、按钮不动」。自带一层 Material 后，
+/// 底色、描边、水波纹都在列表内部绘制，跟文字一起动。
+class HubQuickAction extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const HubQuickAction({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surfaceContainerLow,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 15, 10, 13),
+          child: Column(children: [
+            Icon(icon, color: scheme.primary, size: 25),
+            const SizedBox(height: 9),
+            Text(title,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 12)),
+            const SizedBox(height: 3),
+            // 副标题统一是四个字（窄屏每格只有 40dp 左右可用宽度，
+            // 「Rating 构成」这种会直接变成省略号），省略号只作为兜底
+            Text(subtitle,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
 class HubSection extends StatelessWidget {
   final String title;
   final String? subtitle;
@@ -153,6 +213,10 @@ class HubActionTile extends StatelessWidget {
   final int? progressCurrent;
   final int? progressTotal;
 
+  /// 可选：贴在 tile 下方的附加内容（例如「同步成绩」的线路切换器）。
+  /// 它是独立的一行，点击不会触发本 tile 的 [onTap]。
+  final Widget? footer;
+
   const HubActionTile({
     super.key,
     required this.title,
@@ -169,6 +233,7 @@ class HubActionTile extends StatelessWidget {
     this.awaitingConfirm = false,
     this.progressCurrent,
     this.progressTotal,
+    this.footer,
   });
 
   bool get _showStar => isFavorited != null && onToggleFavorite != null;
@@ -184,7 +249,7 @@ class HubActionTile extends StatelessWidget {
     // 用 LinearProgressIndicator + 计数替代默认 spinner/loadingText。
     final bool _hasProgress =
         loading && (progressTotal ?? 0) > 0 && progressCurrent != null;
-    return ListTile(
+    final tile = ListTile(
       contentPadding: EdgeInsets.symmetric(
         horizontal: 14,
         vertical: dense ? 0 : 8,
@@ -289,6 +354,19 @@ class HubActionTile extends StatelessWidget {
                   size: 20,
                 ),
       onTap: _isInactive ? null : onTap,
+    );
+
+    if (footer == null) return tile;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        tile,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+          child: footer!,
+        ),
+      ],
     );
   }
 }

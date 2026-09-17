@@ -7,22 +7,63 @@ class StringUtil {
   // 版本格式化 — 私有辅助
   // ═══════════════════════════════════════════════════════════════
 
-  /// 处理 isExtra / maimai DX 前缀 → 返回短名称。
-  /// 未命中返回 null，由调用方继续常规 lookup。
-  static String? _tryExtraOrDx(String version, bool isExtra) {
-    if (isExtra || version.startsWith('maimai DX ')) {
-      version = version.replaceFirst('maimai でらっくす ', '');
-      version = version.replaceFirst('maimai DX ', '');
-      version = version.replaceFirst(' PLUS', '+');
-      return version;
+  /// 版本名归一化：把各数据源的写法统一成「maimai でらっくす X」。
+  ///
+  /// 需要处理的三种写法（都是实测遇到的）：
+  ///   * `maimaiでらっくす`（无空格）——dxrating 的 `songs[].version` 就是这种；
+  ///   * `maimai DX X`——历史报文里出现过的英文前缀；
+  ///   * 首尾空白。
+  ///
+  /// **必须先归一化再查表**，否则四个公开函数的粒度会不一致：
+  /// 以前 `formatVersion2('maimai DX PRiSM')` 返回短名 `PRiSM`，
+  /// 而 `formatVersion2('maimai でらっくす PRiSM')` 返回 `DX 2025 鏡`。
+  static String _normalizeVersion(String version) {
+    var v = version.trim();
+    if (v.isEmpty) return v;
+    v = v.replaceFirst('maimaiでらっくす', 'maimai でらっくす');
+    if (v == 'maimai DX') return 'maimai でらっくす';
+    if (v.startsWith('maimai DX ')) {
+      v = 'maimai でらっくす ${v.substring('maimai DX '.length)}';
     }
-    return null;
+    // 拼写别名：官方写法是 MAGiCAL（SEGA 9/17 稼働公告），MEGiCAL 按笔误处理。
+    // 放在归一化里而不是查表里，保证 extra 路径（只去前缀、不查表）也一致。
+    v = v.replaceAll('MEGiCAL', 'MAGiCAL');
+    return v;
+  }
+
+  /// extra 曲目 / 英文 DX 前缀：把版本名缩成「去前缀 + PLUS→+」。
+  ///
+  /// 返回 null 表示「这条输入不该走缩写路径」，交给常规查表。设计要点：
+  ///   * 先做 ` PLUS`→`+`：`maimai PLUS` 要靠前导空格才能变成 `maimai+`；
+  ///   * 再去前缀：`maimai ` → `でらっくす `，于是
+  ///     `maimai でらっくす` → `でらっくす`、
+  ///     `maimai でらっくす PLUS` → `でらっくす+`、
+  ///     `maimai でらっくす Splash` → `Splash`、
+  ///     `maimai GreeN` → `GreeN`（旧代也一视同仁地去掉前缀，与 DX 代保持一致）。
+  ///
+  /// 以前这里先剥 `maimai でらっくす `（带空格），于是
+  /// `maimai でらっくす PLUS` 会剩下光秃秃的 `PLUS`、`maimai GreeN` 又原样保留，
+  /// 同一条规则下两种结果，属于本次修掉的问题。
+  static String? _tryExtraOrDx(String version, bool isExtra) {
+    if (!isExtra && !version.startsWith('maimai DX ')) return null;
+    var s = version;
+    s = s.replaceFirst(' PLUS', '+');
+    s = s.replaceFirst('maimai でらっくす ', '');
+    s = s.replaceFirst('maimai DX ', '');
+    s = s.replaceFirst('maimai ', '');
+    s = s.replaceFirst('でらっくす ', '');
+    if (s.isEmpty) return null;
+    return s;
   }
 
   /// 旧代版本 → 短名称
   static const Map<String, String> _oldSimple = {
     'maimai': 'maimai',
     'maimai PLUS': 'maimai+',
+    // 水鱼写 'MiLK PLUS'（无前缀），union 写 'maimai MiLK PLUS'（有前缀），
+    // 两种都要收——否则 union 那 55 首在详名路径会原样吐出原文。
+    'MiLK PLUS': 'MiLK+',
+    'maimai MiLK PLUS': 'MiLK+',
   };
 
   /// 旧代版本 → 详细名称（带 超/檄 等）
@@ -39,29 +80,106 @@ class StringUtil {
     'maimai MURASAKi PLUS': 'MURASAKi+ 菫',
     'maimai MiLK': 'MiLK 白',
     'MiLK PLUS': 'MiLK+ 雪',
+    'maimai MiLK PLUS': 'MiLK+ 雪', // union 的写法（与上一行同一个版本）
     'maimai FiNALE': 'FiNALE 輝',
   };
 
-  /// DX 代（日文格式）后缀 → 短名称
-  static const Map<String, String> _dxSimple = {
-    '': 'DX 2020',
-    'Splash': 'DX 2021',
-    'UNiVERSE': 'DX 2022',
-    'FESTiVAL': 'DX 2023',
-    'BUDDiES': 'DX 2024',
-    'PRiSM': 'DX 2025',
-    'PRiSM PLUS': 'DX 2026',
+  /// extra 曲目专用的 DX 世代显示。
+  ///
+  /// 口径（用户指定）：
+  ///   * **短名**：去前缀的世代名，不带年号 —— `DX`、`DX+`、`Splash`、`BUDDiES+`…
+  ///     （带年号的 `DX 2020` / `DX 2020 熊/華` 是 **extra=false 专属**）；
+  ///   * **详名**：短名 + 该世代的「一文字」—— `DX 熊`、`Splash 爽`、`CiRCLE+ 廻`…
+  ///     即 extra 与 extra=false 的详名只差年号，汉字口径完全一致。
+  ///
+  /// ⚠️ `MAGiCAL` 的一文字暂无可靠来源（SEGA 只公布了版本名），
+  /// 暂按原名输出，等确认后补一行即可。
+  static const Map<String, String> _dxExtraSimple = {
+    '': 'DX',
+    'PLUS': 'DX+',
+    'Splash': 'Splash',
+    'Splash PLUS': 'Splash+',
+    'UNiVERSE': 'UNiVERSE',
+    'UNiVERSE PLUS': 'UNiVERSE+',
+    'FESTiVAL': 'FESTiVAL',
+    'FESTiVAL PLUS': 'FESTiVAL+',
+    'BUDDiES': 'BUDDiES',
+    'BUDDiES PLUS': 'BUDDiES+',
+    'PRiSM': 'PRiSM',
+    'PRiSM PLUS': 'PRiSM+',
+    'CiRCLE': 'CiRCLE',
+    'CiRCLE PLUS': 'CiRCLE+',
+    'MAGiCAL': 'MAGiCAL',
   };
 
-  /// DX 代（日文格式）后缀 → 详细名称（带 熊/華 等）
+  /// extra 曲目专用的 DX 世代详名（短名 + 一文字）。
+  static const Map<String, String> _dxExtraDetailed = {
+    '': 'DX 熊',
+    'PLUS': 'DX+ 華',
+    'Splash': 'Splash 爽',
+    'Splash PLUS': 'Splash+ 煌',
+    'UNiVERSE': 'UNiVERSE 宙',
+    'UNiVERSE PLUS': 'UNiVERSE+ 星',
+    'FESTiVAL': 'FESTiVAL 祭',
+    'FESTiVAL PLUS': 'FESTiVAL+ 祝',
+    'BUDDiES': 'BUDDiES 双',
+    'BUDDiES PLUS': 'BUDDiES+ 宴',
+    'PRiSM': 'PRiSM 鏡',
+    'PRiSM PLUS': 'PRiSM+ 彩',
+    'CiRCLE': 'CiRCLE 丸',
+    'CiRCLE PLUS': 'CiRCLE+ 廻',
+    // MAGiCAL：一文字待确认，先与短名一致
+    'MAGiCAL': 'MAGiCAL',
+  };
+
+  /// DX 代（日文格式）后缀 → 短名称。
+  ///
+  /// 命名口径（与国服世代对齐，这也是详名里出现「熊/華」这种一对汉字的原因）：
+  ///   * 国服把「世代 + 它的 PLUS」算作同一年度版本，所以
+  ///     `Splash` 与 `Splash PLUS` 都属 `DX 2021`；但**显示上仍然区分**，
+  ///     PLUS 用 `Splash+`（定数历史表里两个版本会是两列，不能合并成同名）；
+  ///   * `PRiSM PLUS` 是例外：国服把它单独立为 `舞萌DX 2026`，所以它有自己的年号；
+  ///   * `CiRCLE` 起国服还没上线，没有年号，直接用世代名（`CiRCLE` / `CiRCLE+` /
+  ///     `MAGiCAL`）。
+  static const Map<String, String> _dxSimple = {
+    '': 'DX 2020',
+    'PLUS': 'でらっくす+',
+    'Splash': 'DX 2021',
+    'Splash PLUS': 'Splash+',
+    'UNiVERSE': 'DX 2022',
+    'UNiVERSE PLUS': 'UNiVERSE+',
+    'FESTiVAL': 'DX 2023',
+    'FESTiVAL PLUS': 'FESTiVAL+',
+    'BUDDiES': 'DX 2024',
+    'BUDDiES PLUS': 'BUDDiES+',
+    'PRiSM': 'DX 2025',
+    'PRiSM PLUS': 'DX 2026',
+    // 国服尚未上线（水鱼数据里还没有）：没有年号，直接用世代名
+    'CiRCLE': 'CiRCLE',
+    'CiRCLE PLUS': 'CiRCLE+',
+    'MAGiCAL': 'MAGiCAL',
+  };
+
+  /// DX 代（日文格式）后缀 → 详细名称（带 熊/華 等）。
+  ///
+  /// 与 [_dxSimple] 同一口径；PLUS 世代给「短名 + 自己的汉字」，
+  /// 保持与基础世代可区分（基础世代的 `DX 20xx X/Y` 里的 Y 是 PLUS 的汉字）。
   static const Map<String, String> _dxDetailed = {
     '': 'DX 2020 熊/華',
+    'PLUS': 'でらっくす+ 華',
     'Splash': 'DX 2021 爽/煌',
+    'Splash PLUS': 'Splash+ 煌',
     'UNiVERSE': 'DX 2022 宙/星',
+    'UNiVERSE PLUS': 'UNiVERSE+ 星',
     'FESTiVAL': 'DX 2023 祭/祝',
+    'FESTiVAL PLUS': 'FESTiVAL+ 祝',
     'BUDDiES': 'DX 2024 双/宴',
+    'BUDDiES PLUS': 'BUDDiES+ 宴',
     'PRiSM': 'DX 2025 鏡',
     'PRiSM PLUS': 'DX 2026 彩',
+    'CiRCLE': 'CiRCLE 丸',
+    'CiRCLE PLUS': 'CiRCLE+',
+    'MAGiCAL': 'MAGiCAL',
   };
 
   /// 日文 DX 代 lookup（含 PLUS 变体，用于 -WithFlag 系列）
@@ -119,18 +237,17 @@ class StringUtil {
   // ═══════════════════════════════════════════════════════════════
 
   static String formatVersion(String version) {
+    version = _normalizeVersion(version);
     final r = _tryExtraOrDx(version, false);
     if (r != null) return r;
     if (_oldSimple.containsKey(version)) return _oldSimple[version]!;
     final dx = _lookupDxExact(version, _dxSimple);
     if (dx != null) return dx;
-    // dxrating 数据无空格前缀：maimaiでらっくす( PLUS) → DX(+)
-    if (version == 'maimaiでらっくす') return 'DX';
-    if (version == 'maimaiでらっくす PLUS') return 'DX+';
     return _genericFallback(version);
   }
 
   static String formatVersion2(String version) {
+    version = _normalizeVersion(version);
     final r = _tryExtraOrDx(version, false);
     if (r != null) return r;
     if (_oldDetailed.containsKey(version)) return _oldDetailed[version]!;
@@ -140,6 +257,12 @@ class StringUtil {
   }
 
   static String formatVersionWithFlag(String version, bool isExtra) {
+    version = _normalizeVersion(version);
+    // extra 曲目的 DX 基础两代：DX / DX+（不带年号，年号是 extra=false 专属）
+    if (isExtra) {
+      final dxBase = _lookupDxExact(version, _dxExtraSimple);
+      if (dxBase != null) return dxBase;
+    }
     final r = _tryExtraOrDx(version, isExtra);
     if (r != null) return r;
     if (_oldSimple.containsKey(version)) return _oldSimple[version]!;
@@ -149,18 +272,19 @@ class StringUtil {
   }
 
   static String formatVersion2WithFlag(String version, bool isExtra) {
+    version = _normalizeVersion(version);
+    // extra 曲目的详名：短名 + 一文字（不带年号，年号是 extra=false 专属）。
+    // 旧代没有年号，详名与 extra=false 完全一致，所以先查旧代表。
+    if (isExtra) {
+      final dxExtra = _lookupDxExact(version, _dxExtraDetailed);
+      if (dxExtra != null) return dxExtra;
+      if (_oldDetailed.containsKey(version)) return _oldDetailed[version]!;
+    }
     final r = _tryExtraOrDx(version, isExtra);
     if (r != null) return r;
     if (_oldDetailed.containsKey(version)) return _oldDetailed[version]!;
     final dx = _lookupDxWithPlus(version, _dxDetailed);
     if (dx != null) return dx;
-    // 日文 CiRCLE（仅 API 数据有，无 "maimai DX" 前缀）
-    const prefix = 'maimai でらっくす ';
-    if (version.startsWith(prefix)) {
-      final s = version.substring(prefix.length);
-      if (s == 'CiRCLE') return 'CiRCLE';
-      if (s == 'CiRCLE PLUS') return 'CiRCLE+';
-    }
     return version;
   }
 

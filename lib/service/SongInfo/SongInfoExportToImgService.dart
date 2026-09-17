@@ -29,6 +29,8 @@ class SongInfoExportToImgService {
     required Map<int, List<int>> maidataNoteCounts,
     required Map<int, List<int>> maidataBreakCounts,
     required bool maidataDecodedSuccessfully,
+    /// 该曲是否 extra（宴会场 / maidata 追加 / union 独有）：只影响「版本」一栏的显示
+    bool isExtra = false,
     int? jpegQuality,
   }) async {
     OverlayEntry? overlayEntry;
@@ -57,6 +59,7 @@ class SongInfoExportToImgService {
           maidataNoteCounts: maidataNoteCounts,
           maidataBreakCounts: maidataBreakCounts,
           maidataDecodedSuccessfully: maidataDecodedSuccessfully,
+          isExtra: isExtra,
         ),
       );
 
@@ -156,6 +159,7 @@ class SongInfoExportToImgService {
     required Map<int, List<int>> maidataNoteCounts,
     required Map<int, List<int>> maidataBreakCounts,
     required bool maidataDecodedSuccessfully,
+    bool isExtra = false,
   }) {
     final bool isUtage = songId.length == 6;
     final String songTitle = basicInfo['title'] ?? '';
@@ -268,7 +272,7 @@ class SongInfoExportToImgService {
                 _buildStatDivider(),
                 _buildStatItem('曲师', artist.split('/').last),
                 _buildStatDivider(),
-                _buildStatItem('版本', StringUtil.formatVersion2(from)),
+                _buildStatItem('版本', StringUtil.formatVersion2WithFlag(from, isExtra)),
               ],
             ),
           ),

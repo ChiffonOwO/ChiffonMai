@@ -465,52 +465,42 @@ class _ThemeAwareBgWidget extends StatelessWidget {
 }
 
 /// 主题感知的 chiffon 装饰组件（StatelessWidget）
-/// 性能：用 Stack + 半透明覆层代替 ColorFiltered + BlendMode.darken，避免 saveLayer
 /// - 浅色/深色模式：使用 ThemeManager.chiffonOpacity 控制装饰图透明度
 /// - 纯黑模式：完全隐藏装饰层
+///
+/// ⚠️ 这里**不再**往装饰图上铺那层 `(10,10,25)` 的矩形覆层，原因同
+/// `ThemeAwareBackground._ChiffonImage`：装饰图是透明底的整屏图，覆层却是
+/// 一块实心矩形 —— 它跟装饰图自己的透明度无关（装饰图默认 0，覆层照样满屏画），
+/// 于是「什么都没开」时整页也会被多压暗一层；`BoxFit.cover` 下更是铺满全屏。
+/// 装饰图的浓淡只由它自己的滑杆控制。
 class _ThemeAwareChiffonWidget extends StatelessWidget {
   const _ThemeAwareChiffonWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // 用 ListenableBuilder 包裹两个信号：覆层透明度 + chiffon 透明度
-    return ListenableBuilder(
-      listenable: Listenable.merge([
-        ThemeManager().lightOverlayNotifier,
-        ThemeManager().chiffonOpacityNotifier,
-      ]),
-      builder: (context, _) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        final isPureBlack = isDark && ThemeManager().pureBlackEnabled;
-        final opacity = ThemeManager().lightOverlayOpacity;
-        final overlayAlpha = (opacity * 255).round().clamp(0, 255);
-        final darkOverlay = Color.fromARGB(overlayAlpha, 10, 10, 25);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isPureBlack = isDark && ThemeManager().pureBlackEnabled;
 
-        // 纯黑模式：不显示装饰图
-        if (isPureBlack) {
-          return const SizedBox.shrink();
-        }
+    // 纯黑模式：不显示装饰图
+    if (isPureBlack) {
+      return const SizedBox.shrink();
+    }
+
+    return ListenableBuilder(
+      listenable: ThemeManager().chiffonOpacityNotifier,
+      builder: (context, _) {
+        final opacity = ThemeManager().chiffonOpacity;
+        // 隐藏时直接不占位：省掉一张全屏图的布局/解码，也不会留下任何覆层
+        if (opacity <= 0) return const SizedBox.shrink();
 
         return Center(
           child: Transform.translate(
             offset: Offset(0, -MediaQuery.of(context).size.height * 0.03),
-            child: Transform.scale(
-              scale: 1,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Image.asset(
-                    'assets/chiffon2.png',
-                    fit: BoxFit.cover,
-                    gaplessPlayback: true,
-                    opacity: AlwaysStoppedAnimation(
-                      ThemeManager().chiffonOpacity,
-                    ),
-                  ),
-                  if (isDark)
-                    Positioned.fill(child: ColoredBox(color: darkOverlay)),
-                ],
-              ),
+            child: Image.asset(
+              'assets/chiffon2.png',
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              opacity: AlwaysStoppedAnimation(opacity),
             ),
           ),
         );

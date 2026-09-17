@@ -23,6 +23,7 @@ import '../../utils/TextStyleUtil.dart';
 import '../../entity/DivingFish/RecordItem.dart';
 import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
+import '../../widgets/PageTopBar.dart';
 
 class B50Page extends StatefulWidget {
   final Map<String, dynamic>? b50Data;
@@ -489,8 +490,6 @@ class _B50PageState extends State<B50Page> {
     if (_b50Data == null || (_dxSongs.isEmpty && _sdSongs.isEmpty)) {
       // 空状态：与 DiffBest50Page 风格完全一致
       // （common bg widget + 同样的顶部栏 + 同样的居中提示）
-      final emptyStateTextColor = Theme.of(context).colorScheme.onSurface;
-      final emptyStateWidth = MediaQuery.of(context).size.width;
       return Scaffold(
         backgroundColor: Colors.transparent,
         resizeToAvoidBottomInset: false,
@@ -501,31 +500,8 @@ class _B50PageState extends State<B50Page> {
             Column(
               children: [
                 // 顶部栏：与 DiffBest50Page 同款（左侧返回按钮 + 居中标题）
-                Container(
-                  padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.arrow_back,
-                            color: emptyStateTextColor),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                      Expanded(
-                        child: Center(
-                          child: Text(
-                            'Best50 查询',
-                            style: TextStyle(
-                              color: emptyStateTextColor,
-                              fontSize: emptyStateWidth * 0.06,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      // 右侧占位，保持标题居中（与 DiffBest50Page 右侧模式按钮位置对齐）
-                      const SizedBox(width: 48),
-                    ],
-                  ),
+                PageTopBar(
+                  title: 'Best50 查询',
                 ),
                 Expanded(
                   child: Center(
@@ -579,31 +555,9 @@ class _B50PageState extends State<B50Page> {
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
           Column(
             children: [
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    Expanded(
-                child: Center(
-                  child: Text(
-                    _isTheoreticalMode ? '理论Rating Best50' : 'Best50查询',
-                    style: TextStyle(
-                      color: textPrimaryColor,
-                      fontSize: MediaQuery.of(context).size.width * 0.06,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-                    SizedBox(width: 48),
-                  ],
-                ),
+              // 顶部栏统一走公共组件（标题是三元表达式，直接传进去）
+              PageTopBar(
+                title: _isTheoreticalMode ? '理论Rating Best50' : 'Best50查询',
               ),
               Expanded(
                 child: Container(

@@ -9,7 +9,7 @@
 //
 // 注意：flutter_test 里同一个文件内多次 pumpWidget 建房页时，第二次起
 // `_loadSongData` 的资产加载不会再返回（测试环境特性），页面会停在加载态、
-// 渲染不出下拉框。所以三档模式的断言放在**同一个**页面实例里顺序切换。
+// 渲染不出模式按钮。所以三档模式的断言放在**同一个**页面实例里顺序切换。
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,14 +18,13 @@ import 'package:my_first_flutter_app/entity/Multiplayer/GameType.dart';
 import 'package:my_first_flutter_app/page/Multiplayer/RoomCreatePage.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartCommonSettingsService.dart';
 
+/// 模式选择已从下拉框改成**平铺按钮**：点按钮上的文字即选中该模式。
 Future<void> _switchMode(WidgetTester tester, String label) async {
-  final dropdown = find.byType(DropdownButton<GameType>);
-  expect(dropdown, findsOneWidget, reason: '建房页应渲染出模式下拉框');
-  await tester.ensureVisible(dropdown);
+  final option = find.text(label);
+  expect(option, findsWidgets, reason: '建房页应把「$label」平铺成按钮');
+  await tester.ensureVisible(option.first);
   await tester.pumpAndSettle();
-  await tester.tap(dropdown);
-  await tester.pumpAndSettle();
-  await tester.tap(find.text(label).last);
+  await tester.tap(option.first);
   await tester.pumpAndSettle();
 }
 
@@ -49,9 +48,17 @@ void main() {
     );
 
     await tester.pumpWidget(const MaterialApp(home: RoomCreatePage()));
-    final dropdown = find.byType(DropdownButton<GameType>);
-    for (var i = 0; i < 60 && !tester.any(dropdown); i++) {
+    // 等资产加载完、模式按钮出现（页面加载态没有按钮）
+    final anyMode = find.text(GameType.info.name);
+    for (var i = 0; i < 60 && !tester.any(anyMode); i++) {
       await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    // 九个模式都平铺出来了（不再有下拉框）
+    expect(find.byType(DropdownButton<GameType>), findsNothing,
+        reason: '模式选择应平铺展开，不再是下拉框');
+    for (final type in GameType.values) {
+      expect(find.text(type.name), findsWidgets, reason: '缺模式按钮「${type.name}」');
     }
 
     // 曲绘拼图：切块数 / 揭示间隔

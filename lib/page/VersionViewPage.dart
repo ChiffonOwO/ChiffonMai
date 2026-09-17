@@ -9,6 +9,7 @@ import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/AppConstants.dart';
+import '../widgets/PageTopBar.dart';
 
 // 版本数据模型
 class VersionData {
@@ -268,14 +269,12 @@ class _VersionViewState extends State<VersionView> {
     final screenWidth = MediaQuery.of(context).size.width;
     final safeBottom = MediaQuery.of(context).padding.bottom;
     
-    final titleFontSize = screenWidth * 0.06;
     final tableHeaderFontSize = screenWidth * 0.035;
     final tableContentFontSize = screenWidth * 0.03;
     
     final imageContainerSize = screenWidth * 0.15;
     final imageSize = screenWidth * 0.12;
     
-    final textPrimaryColor = Theme.of(context).colorScheme.onSurface;
     final cardBgColor = Theme.of(context).colorScheme.surface.withOpacity(0.9);
     final defaultShadow = AppConstants.defaultShadow(brightness);
     final double borderRadiusSmall = 8.0;
@@ -289,46 +288,26 @@ class _VersionViewState extends State<VersionView> {
 
           Column(
             children: [
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    Expanded(
-                      child: Center(
+              PageTopBar(
+                title: 'maimai版本对照表',
+                actions: [
+  ElevatedButton(
+                        onPressed: _toggleVersion,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _isJapaneseVersion ? AppColors.linkBlue(brightness) : AppColors.successGreen(brightness),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
                         child: Text(
-                          'maimai版本对照表',
-                          style: TextStyle(
-                            color: textPrimaryColor,
-                            fontSize: titleFontSize,
+                          _isJapaneseVersion ? '日服' : '国服',
+                          style: const TextStyle(
+                            color: Colors.white,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                    ),
-                    ElevatedButton(
-                      onPressed: _toggleVersion,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _isJapaneseVersion ? AppColors.linkBlue(brightness) : AppColors.successGreen(brightness),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: Text(
-                        _isJapaneseVersion ? '日服' : '国服',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+],
               ),
 
               Expanded(

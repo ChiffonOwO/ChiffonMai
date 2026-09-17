@@ -154,33 +154,11 @@ class GuessChartByBlurredCoverService {
     }
   }
 
-  // 生成fallback的cover_id
-  static String generateCoverId(String songId) {
-    if (songId.length == 6) {
-      // 对于6位数的曲绘，只去除第一位，保留后续的0
-      return songId.substring(1);
-    } else if (songId.length >= 5) {
-      // 如果长度大于等于5，万位补1
-      int songIdInt = int.parse(songId);
-      int tenThousandPlace = (songIdInt ~/ 10000) + 1;
-      int remaining = songIdInt % 10000;
-      return '${tenThousandPlace}${remaining.toString().padLeft(4, '0')}';
-    } else {
-      // 如果长度小于5，补1在万位，其余补0
-      return '1${songId.padLeft(4, '0')}';
-    }
-  }
-
-  // 获取曲绘路径
-  static String getCoverPath(String songId) {
-    return 'assets/cover/${songId}.webp';
-  }
-
-  // 获取网络曲绘URL
-  static String getNetworkCoverUrl(String songId) {
-    String coverId = generateCoverId(songId);
-    return 'https://www.diving-fish.com/covers/$coverId.png';
-  }
+  // 曲绘路径/URL 一律走 CoverUtil（`buildCoverWidget` / `getLocalCoverPath`）：
+  // 5、6 位 songId 的资源名要按剔除规则换算（如 11312 → 1312.webp），
+  // 直拼 `assets/cover/{songId}.webp` 会拿到不存在的路径 —— 曲绘识别页就踩过这个坑
+  // （识别结果与 Top10 里部分曲绘显示不出来）。原先这里那几个 self-made 的
+  // generateCoverId / getCoverPath / getNetworkCoverUrl 没人调用，已删除。
 
   // 为本局猜测的对象构建所需实体
   static Future<GuessSong> buildGuessSongEntity(Song song) async {

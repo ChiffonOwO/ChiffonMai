@@ -80,6 +80,13 @@ class RoomEntity {
   /// 谱面片段难度随机池（inote 编号 '2'..'6'），用于 chartPeek 模式
   final List<String> peekDifficulties;
 
+  /// 模式专属设置的默认值（与构造参数默认值同一份，供 [withModeSettingsFallback] 判断）。
+  static const int defaultFlashDurationMs = 300;
+  static const int defaultTileCount = 1000;
+  static const int defaultTileRevealIntervalMs = 1500;
+  static const int defaultPeekDurationSeconds = 8;
+  static const List<String> defaultPeekDifficulties = ['4'];
+
   RoomEntity({
     required this.roomId,
     String roomCode = '',
@@ -101,13 +108,43 @@ class RoomEntity {
     this.playDuration = 5,
     this.songCount = 3,
     this.nonEnglishCharThreshold = 50,
-    this.flashDurationMs = 300,
-    this.tileCount = 1000,
-    this.tileRevealIntervalMs = 1500,
-    this.peekDurationSeconds = 8,
-    this.peekDifficulties = const ['4'],
+    this.flashDurationMs = defaultFlashDurationMs,
+    this.tileCount = defaultTileCount,
+    this.tileRevealIntervalMs = defaultTileRevealIntervalMs,
+    this.peekDurationSeconds = defaultPeekDurationSeconds,
+    this.peekDifficulties = defaultPeekDifficulties,
   }) : _roomCode = roomCode,
        lastActivityAt = lastActivityAt ?? createdAt;
+
+  /// 用 [fallback] 兜住「服务端这次没下发」的模式专属设置。
+  ///
+  /// 为什么需要：模式设置（切块数 / 揭示间隔 / 快闪时长 / 片段时长 / 难度池）
+  /// **在房间创建后不可修改**，所以同一房间内本地已经拿到的值永远有效。
+  /// 而 `fromJson` 对缺失字段只能退回默认值，一旦某条房间事件（老服务端 /
+  /// 精简过的 getState）没带这些字段，界面就会从「2500 块」掉回「1000 块」——
+  /// 这正是「自定义切块数量进游戏后失效」那类问题的成因之一。
+  ///
+  /// 判定方式：本实体里仍是**默认值**、而 [fallback] 里是**非默认值**时，
+  /// 采用 fallback 的值。房主真的用默认值建房时两边都是默认值，不受影响。
+  RoomEntity withModeSettingsFallback(RoomEntity? fallback) {
+    if (fallback == null) return this;
+    return copyWith(
+      flashDurationMs: flashDurationMs == defaultFlashDurationMs
+          ? fallback.flashDurationMs
+          : flashDurationMs,
+      tileCount: tileCount == defaultTileCount ? fallback.tileCount : tileCount,
+      tileRevealIntervalMs: tileRevealIntervalMs == defaultTileRevealIntervalMs
+          ? fallback.tileRevealIntervalMs
+          : tileRevealIntervalMs,
+      peekDurationSeconds: peekDurationSeconds == defaultPeekDurationSeconds
+          ? fallback.peekDurationSeconds
+          : peekDurationSeconds,
+      peekDifficulties: peekDifficulties.length == 1 &&
+              peekDifficulties.first == defaultPeekDifficulties.first
+          ? fallback.peekDifficulties
+          : peekDifficulties,
+    );
+  }
 
   /// 从JSON解析（支持 snake_case、camelCase 和后端字段）
   factory RoomEntity.fromJson(Map<String, dynamic> json) {

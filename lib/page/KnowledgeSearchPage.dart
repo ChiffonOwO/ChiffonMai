@@ -5,6 +5,7 @@ import '../utils/AppTheme.dart';
 import '../utils/AppConstants.dart';
 import '../utils/CommonWidgetUtil.dart';
 import 'KnowledgeInfoPage.dart';
+import '../widgets/PageTopBar.dart';
 
 class KnowledgeSearchPage extends StatefulWidget {
   const KnowledgeSearchPage({Key? key}) : super(key: key);
@@ -101,7 +102,6 @@ class _KnowledgeSearchPageState extends State<KnowledgeSearchPage> {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    final screenWidth = MediaQuery.of(context).size.width;
     final safeBottom = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
@@ -120,38 +120,16 @@ class _KnowledgeSearchPageState extends State<KnowledgeSearchPage> {
           Column(
             children: [
               // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '舞萌百科',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 刷新按钮
-                    IconButton(
-                      icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: _clearCacheAndReload,
-                      tooltip: '清除缓存并刷新数据',
-                    ),
-                  ],
+              PageTopBar(
+                title: '舞萌百科',
+                actions: [
+                // 刷新按钮
+                IconButton(
+                icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.onSurface),
+                onPressed: _clearCacheAndReload,
+                tooltip: '清除缓存并刷新数据',
                 ),
+                ],
               ),
 
               // 主内容区域

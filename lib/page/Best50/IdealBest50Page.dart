@@ -16,6 +16,7 @@ import '../../utils/ImageEncodeUtil.dart';
 import '../../utils/StringUtil.dart';
 import '../../widgets/B50GameCardWidget.dart';
 import '../SongInfoPage.dart';
+import '../../widgets/PageTopBar.dart';
 
 /// 理想 Best50：把全部游玩记录里非 SSS+ 的成绩升一档（100.4 → 100.5），
 /// 重算 RA 后重新取 B35 + B15，并列出相对原榜的新进榜歌曲。
@@ -239,30 +240,8 @@ class _IdealBest50PageState extends State<IdealBest50Page> {
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
           Column(
             children: [
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back,
-                          color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '理想 Best50',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: MediaQuery.of(context).size.width * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 48),
-                  ],
-                ),
+              PageTopBar(
+                title: '理想 Best50',
               ),
               Expanded(
                 child: Container(

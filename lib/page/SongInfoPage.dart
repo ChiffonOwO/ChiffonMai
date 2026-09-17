@@ -44,7 +44,10 @@ import 'package:my_first_flutter_app/manager/DivingFish/UnionManager.dart';
 import 'package:my_first_flutter_app/entity/DXRating/DXDataEntity.dart';
 import 'package:my_first_flutter_app/manager/DXDataManager.dart';
 import 'package:my_first_flutter_app/page/CalculatorPage.dart';
+import 'package:my_first_flutter_app/service/AWMC/AwmcPlayCountStore.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/SongFilterUtil.dart';
+import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
 
 class SongInfoPage extends StatefulWidget {
   final String songId;
@@ -199,7 +202,27 @@ class _SongInfoPageState extends State<SongInfoPage> {
     _commentInputController.addListener(_onCommentInputChanged);
     _loadData();
     _loadDxData();
+    _loadAwmcPlayCounts();
   }
+
+  /// 游玩次数缓存（AWMC 网关 `/v1/user/music` 拉到的 playCount）。
+  ///
+  /// 缓存是懒加载的：这里读一次 prefs，读到就重建页面把「游玩次数」显示出来；
+  /// 没有缓存就不显示这一行（而不是显示 0——没记录和打了 0 次是两回事）。
+  Future<void> _loadAwmcPlayCounts() async {
+    if (AwmcPlayCountStore.isLoaded) {
+      if (mounted) setState(() {});
+      return;
+    }
+    await AwmcPlayCountStore.ensureLoaded();
+    if (mounted) setState(() {});
+  }
+
+  /// 当前谱面的游玩次数；无缓存记录时返回 null。
+  int? get _currentPlayCount => AwmcPlayCountStore.playCountOfDiffIndex(
+        int.tryParse(widget.songId) ?? 0,
+        _currentDiffIndex,
+      );
 
   @override
   void dispose() {
@@ -2144,7 +2167,6 @@ class _SongInfoPageState extends State<SongInfoPage> {
     final accentColor = _getAccentColor(_currentDiffIndex, brightness);
 
     // 自定义常量
-    final Color textPrimaryColor = Theme.of(context).colorScheme.onSurface;
     final double borderRadiusSmall = 8.0;
     final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
     final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
@@ -2163,45 +2185,23 @@ class _SongInfoPageState extends State<SongInfoPage> {
           // 页面内容
           Column(
             children: [
-              // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '歌曲详情',
-                          style: TextStyle(
-                            color: textPrimaryColor,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 导出歌曲信息按钮
-                    IconButton(
-                      icon: Icon(Icons.image_outlined, color: textPrimaryColor),
-                      tooltip: '导出歌曲信息',
-                      onPressed: _exportSongInfoToImage,
-                    ),
-                    // 计算工具按钮（打开独立的 CalculatorPage）
-                    IconButton(
-                      icon: Icon(Icons.calculate_outlined, color: textPrimaryColor),
-                      tooltip: '计算工具',
-                      onPressed: _openCalculator,
-                    ),
-                  ],
+              // 标题栏统一走公共组件（右侧两个真按钮走 actions 槽）
+              PageTopBar(
+                title: '歌曲详情',
+                fontSize: 24,
+                actions: [
+                IconButton(
+                icon: const Icon(Icons.image_outlined),
+                tooltip: '导出歌曲信息',
+                onPressed: _exportSongInfoToImage,
                 ),
+                // 计算工具按钮（打开独立的 CalculatorPage）
+                IconButton(
+                icon: const Icon(Icons.calculate_outlined),
+                tooltip: '计算工具',
+                onPressed: _openCalculator,
+                ),
+                ],
               ),
 
               // 主内容区域
@@ -2694,7 +2694,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                   _buildStatItem(
                                       '版本',
                                       StringUtil.formatVersion2WithFlag(
-                                          basicInfo['from'], _songData?['is_extra'] == true)),
+                                          basicInfo['from'],
+                                          _isExtraSong)),
                                   _buildStatItem(
                                       '谱师', currentChart['charter']),
                                 ],
@@ -2996,6 +2997,27 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                                                 ),
                                               ),
+                                              // 游玩次数（来自 AWMC 网关 /v1/user/music
+                                              // 的 (musicId, level, playCount) 缓存）：
+                                              // 单起一行放在 Rating 下面，没有该难度的
+                                              // 记录时整行不显示
+                                              if (userRecord != null &&
+                                                  _currentPlayCount != null) ...[
+                                                const SizedBox(height: 8),
+                                                Text(
+                                                  '游玩次数: ${_currentPlayCount!}',
+                                                  style: TextStyle(
+                                                    fontSize:
+                                                        MediaQuery.of(context)
+                                                                .size
+                                                                .width *
+                                                            0.042,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
+                                                  ),
+                                                ),
+                                              ],
                                               const SizedBox(height: 8),
                                               if (userRecord != null) ...[
                                                 RichText(
@@ -4212,7 +4234,6 @@ class _SongInfoPageState extends State<SongInfoPage> {
       if (c > maxCount) maxCount = c;
     }
 
-    final brightness = Theme.of(context).brightness;
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
@@ -6682,6 +6703,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
         maidataNoteCounts: _maidataNoteCounts,
         maidataBreakCounts: _maidataBreakCounts,
         maidataDecodedSuccessfully: _maidataDecodedSuccessfully,
+        isExtra: _isExtraSong,
         jpegQuality: quality.jpegQuality,
       );
 
@@ -8034,7 +8056,6 @@ class _SongInfoPageState extends State<SongInfoPage> {
         showDialog(
           context: context,
           builder: (BuildContext context) {
-            final brightness = Theme.of(context).brightness;
             return AlertDialog(
               title: Text('${songTitle}的别名'),
               content: SingleChildScrollView(
@@ -8181,6 +8202,18 @@ class _SongInfoPageState extends State<SongInfoPage> {
     );
   }
 
+  /// 本曲是否 extra（宴会场 / maidata 追加 / union 独有）。
+  ///
+  /// 直接用 [SongFilterUtil.isExtraRaw] 的规则，避免这里手写 if 链与它走偏：
+  /// extra 曲目没有国服世代年号，漏判会让「版本」显示成 `DX 2026 彩`。
+  bool get _isExtraSong => SongFilterUtil.isExtraRaw(
+        songId: widget.songId,
+        isExtraFlag: _songData?['is_extra'] == true,
+        cids: _songData?['cids'] is List
+            ? (_songData!['cids'] as List).cast<dynamic>()
+            : null,
+      );
+
   void _viewAchievementRanking() {
     if (_songData == null) return;
 
@@ -8210,6 +8243,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
           artist: artist,
           genre: '',
           from: from,
+          isExtra: _isExtraSong,
           difficultyDs: difficultyDs,
         ),
       ),
@@ -8245,6 +8279,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
           artist: artist,
           genre: '',
           from: from,
+          isExtra: _isExtraSong,
           difficultyDs: difficultyDs,
         ),
       ),

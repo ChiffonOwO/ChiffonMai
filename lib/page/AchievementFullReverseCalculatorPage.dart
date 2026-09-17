@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/AppConstants.dart';
+import '../widgets/PageTopBar.dart';
 
 class AchievementFullReverseCalculator extends StatefulWidget {
   const AchievementFullReverseCalculator({super.key});
@@ -169,34 +170,8 @@ class _AchievementFullReverseCalculatorState
           Column(
             children: [
               // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '达成率反推',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 占位，保持标题居中
-                    SizedBox(width: 48),
-                  ],
-                ),
+              PageTopBar(
+                title: '达成率反推',
               ),
 
               // 主内容区域
@@ -281,7 +256,6 @@ class _AchievementFullReverseCalculatorState
   // 构建计算按钮
   Widget _buildCalculateButton() {
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
     
     return ElevatedButton(
@@ -547,7 +521,6 @@ class _AchievementFullReverseCalculatorState
   // 构建区域标题
   Widget _buildSectionTitle(String title) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     
     return Text(
       title,
@@ -714,7 +687,6 @@ class _AchievementFullReverseCalculatorState
   // 构建表格单元格：显式高度（screenHeight × 0.04）让背景填色撑满格子
   // 不要用 SizedBox.expand，会让 Table.intrinsicRowHeight 测到 0 导致整行消失
   Widget _buildTableCell(String text, {Color? color, double fontSize = 12.0}) {
-    final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
@@ -791,7 +763,6 @@ class _AchievementFullReverseCalculatorState
   // 构建达成率输入框
   Widget _buildAchievementRateInput() {
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,

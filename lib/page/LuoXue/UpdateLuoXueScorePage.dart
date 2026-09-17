@@ -1,15 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../manager/DivingFishProbeManager.dart';
 import '../../utils/AppTheme.dart';
 import '../../constant/CacheKeyConstant.dart';
 import '../../constant/LoadingTipsConstant.dart';
+import '../../service/SyncStatsService.dart';
+import '../../utils/SyncRouteNotifier.dart';
+import '../../widgets/QrQuickFillButtons.dart';
 
 /// 同步成绩到落雪（对话框形式，与"同步成绩到水鱼"一致）
 ///
@@ -46,6 +46,9 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
   bool _tokenChecked = false;
   String _currentTip = '';
   StreamSubscription<String>? _tipSub;
+
+  /// 本次同步的耗时（用于上报到 Redis 的同步统计）。
+  final Stopwatch _syncStopwatch = Stopwatch();
 
   @override
   void initState() {
@@ -135,6 +138,9 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
       if (mounted) setState(() => _currentTip = tip);
     });
 
+    _syncStopwatch
+      ..reset()
+      ..start();
     final result = await DivingFishProbeManager().syncByCabinetQrToLxns(
       qrCode,
       lxnsImportToken: lxnsToken,
@@ -152,6 +158,21 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
 
     LoadingTipsConstant.stopAutoSwitch();
     _tipSub?.cancel();
+
+    // 记录本次同步耗时 / 成败（Redis，尽力而为）。
+    // 用户主动取消不算样本——把它算成失败会拉低成功率，误导后面看统计的人。
+    _syncStopwatch.stop();
+    final userCancelled = result.errorMessage == '用户取消同步';
+    if (!userCancelled) {
+      unawaited(SyncStatsService.record(
+        line: SyncLine.scoreHub,
+        platform: SyncPlatform.luoXue,
+        durationMs: _syncStopwatch.elapsedMilliseconds,
+        ok: result.isSuccess,
+      ));
+      // 等 Redis 写入落地再刷新，让首页 / hub 的统计行立刻反映这一次
+      SyncRouteNotifier.instance.refreshStatsSoon();
+    }
 
     if (result.isSuccess) {
       // 同步成功后标记落雪 token 已保存
@@ -221,109 +242,6 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // QR 码导入按钮
-  // ---------------------------------------------------------------------------
-
-  Widget _buildClipboardButton() {
-    return OutlinedButton.icon(
-      icon: const Icon(Icons.paste, size: 16),
-      label: const Text('读取剪贴板', style: TextStyle(fontSize: 13)),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      ),
-      onPressed: () async {
-        final data = await Clipboard.getData(Clipboard.kTextPlain);
-        final text = data?.text ?? '';
-        if (text.trim().startsWith('SGWCMAID')) {
-          setState(() => _qrController.text = text.trim());
-          Fluttertoast.showToast(msg: '已识别到有效二维码字符串，已自动填入');
-        } else if (text.isNotEmpty) {
-          if (!mounted) return;
-          final confirmed = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('提示'),
-              content: const Text('剪贴板内容不是有效的登入二维码，仍要填入吗？'),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('取消')),
-                TextButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('填入')),
-              ],
-            ),
-          );
-          if (confirmed == true) {
-            setState(() => _qrController.text = text.trim());
-          }
-        }
-      },
-    );
-  }
-
-  Widget _buildGalleryQrButton() {
-    return OutlinedButton.icon(
-      icon: const Icon(Icons.photo_library, size: 16),
-      label: const Text('从相册识别', style: TextStyle(fontSize: 13)),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      ),
-      onPressed: () async {
-        try {
-          final picker = ImagePicker();
-          final pickedFile = await picker.pickImage(
-              source: ImageSource.gallery, imageQuality: 100);
-          if (pickedFile == null) return;
-
-          final controller = MobileScannerController();
-          try {
-            final barcodes = await controller.analyzeImage(pickedFile.path);
-            if (barcodes != null && barcodes.barcodes.isNotEmpty) {
-              final qrText = barcodes.barcodes.first.rawValue ?? '';
-              if (qrText.isNotEmpty) {
-                setState(() => _qrController.text = qrText);
-                Fluttertoast.showToast(msg: '已识别到二维码，已自动填入');
-              } else {
-                Fluttertoast.showToast(msg: '未能从图片中识别到二维码内容');
-              }
-            } else {
-              Fluttertoast.showToast(msg: '未在图片中检测到二维码');
-            }
-          } finally {
-            controller.dispose();
-          }
-        } catch (e) {
-          Fluttertoast.showToast(msg: '识别失败: $e');
-        }
-      },
-    );
-  }
-
-  Widget _buildCameraScanButton() {
-    return OutlinedButton.icon(
-      icon: const Icon(Icons.qr_code_scanner, size: 16),
-      label: const Text('扫描二维码', style: TextStyle(fontSize: 13)),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      ),
-      onPressed: () async {
-        try {
-          final result = await Navigator.of(context).push<String>(
-            MaterialPageRoute(builder: (_) => const _QrScannerPage()),
-          );
-          if (result != null && result.isNotEmpty) {
-            setState(() => _qrController.text = result);
-            Fluttertoast.showToast(msg: '已扫描到二维码，已自动填入');
-          }
-        } catch (e) {
-          Fluttertoast.showToast(msg: '扫码失败: $e');
-        }
-      },
-    );
-  }
-
   Widget _buildStageIcon(SyncStage? stage, Brightness brightness) {
     if (stage == null) return const SizedBox.shrink();
     switch (stage) {
@@ -373,15 +291,7 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
                       fontSize: 13, color: AppColors.greyHint(brightness)),
                 ),
                 const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildClipboardButton(),
-                    _buildGalleryQrButton(),
-                    _buildCameraScanButton(),
-                  ],
-                ),
+                QrQuickFillButtons(controller: _qrController),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _qrController,
@@ -674,63 +584,6 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
               child: Text(_countdown > 0 ? '确定 ($_countdown)' : '确定'),
             ),
         ],
-      ),
-    );
-  }
-}
-
-// =============================================================================
-// 摄像头扫二维码页面
-// =============================================================================
-
-class _QrScannerPage extends StatefulWidget {
-  const _QrScannerPage();
-
-  @override
-  State<_QrScannerPage> createState() => _QrScannerPageState();
-}
-
-class _QrScannerPageState extends State<_QrScannerPage> {
-  bool _hasPopped = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('扫描二维码'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: MobileScanner(
-        onDetect: (BarcodeCapture capture) {
-          if (_hasPopped) return;
-          final barcode = capture.barcodes.firstOrNull;
-          if (barcode != null &&
-              barcode.rawValue != null &&
-              barcode.rawValue!.isNotEmpty) {
-            _hasPopped = true;
-            Navigator.pop(context, barcode.rawValue);
-          }
-        },
-        errorBuilder: (context, error) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                const SizedBox(height: 16),
-                Text('摄像头错误: $error'),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('返回'),
-                ),
-              ],
-            ),
-          );
-        },
       ),
     );
   }

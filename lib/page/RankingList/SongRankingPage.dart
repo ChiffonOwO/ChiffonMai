@@ -7,6 +7,7 @@ import 'package:my_first_flutter_app/service/RankingList/SongRankingService.dart
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/service/SongInfoService.dart';
+import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
 
 class SongRankingPage extends StatefulWidget {
   final String songId;
@@ -18,6 +19,12 @@ class SongRankingPage extends StatefulWidget {
   final String artist;
   final String genre;
   final String from;
+
+  /// 该曲是否 extra（宴会场 / maidata 追加 / union 独有）。
+  ///
+  /// 版本显示必须带上它：extra 曲目没有国服世代年号，
+  /// 漏判就会显示成 `DX 2026 彩` 这种官方世代名（详见 StringUtil 的 extra 口径）。
+  final bool isExtra;
   final double difficultyDs;
 
   const SongRankingPage({
@@ -31,6 +38,7 @@ class SongRankingPage extends StatefulWidget {
     required this.artist,
     required this.genre,
     required this.from,
+    this.isExtra = false,
     required this.difficultyDs,
   });
 
@@ -353,6 +361,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                           artist: widget.artist,
                           genre: widget.genre,
                           from: widget.from,
+                          isExtra: widget.isExtra,
                         ),
                       ),
                     );
@@ -793,35 +802,16 @@ class _SongRankingPageState extends State<SongRankingPage> {
           
           Column(
             children: [
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 4),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          title,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 免责声明按钮
-                    IconButton(
-                      icon: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: _showDisclaimer,
-                    ),
-                  ],
-                ),
+              // 顶部栏统一走公共组件（标题是变量）
+              PageTopBar(
+                title: title,
+                actions: [
+                  // 免责声明按钮
+                  IconButton(
+                    icon: const Icon(Icons.info_outline),
+                    onPressed: _showDisclaimer,
+                  ),
+                ],
               ),
               
               // 歌曲信息区域 - 固定宽高，左侧曲绘，右侧信息
@@ -874,9 +864,10 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                 ],
                               ),
                               
-                              // 第二行：版本
+                              // 第二行：版本（extra 曲目走不带年号的口径）
                               Text(
-                                StringUtil.formatVersion2(widget.from),
+                                StringUtil.formatVersion2WithFlag(
+                                    widget.from, widget.isExtra),
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: AppColors.greyHint(brightness),

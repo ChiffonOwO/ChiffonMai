@@ -190,6 +190,21 @@ class CacheKeyConstant {
   // 首页个人信息展示风格（true=卡片式，false=经典式）
   static const String profileCardStyle = 'profile_card_style';
 
+  // ===== AWMC 网关（api.wmc.pub）相关 =====
+  // 用户本机保存的网关令牌（gw_...）；空表示未设置。
+  // 注意：机台 qrcode **不落盘**，只在一次会话的内存里保存。
+  static const String awmcToken = 'awmc_token';
+  // AWMC 调用审计日志（JSON 数组，不含 qrcode / 令牌 / 请求体）
+  static const String awmcAuditLog = 'awmc_audit_log';
+  // 游玩次数缓存（/v1/user/music 的 (musicId, level, playCount)）：
+  // 属于可重新拉取的缓存，且与具体账号绑定，不进备份
+  static const String awmcPlayCounts = 'awmc_play_counts_v1';
+
+  // ===== 同步成绩的线路选择 =====
+  // 0（或缺失）= 线路1 maimai Score Hub（原有 scorehub 流程），1 = 线路2 AWMC 网关
+  static const String syncRouteDivingFish = 'sync_route_diving_fish';
+  static const String syncRouteLuoXue = 'sync_route_luoxue';
+
   // Maimai Score Hub 探针同步相关
   static const String probeAuthToken = 'probe_auth_token';
   static const String probeFriendCode = 'probe_friend_code';

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/AppConstants.dart';
+import '../widgets/PageTopBar.dart';
 
 class AchievementRateCalculator extends StatefulWidget {
   const AchievementRateCalculator({super.key});
@@ -289,34 +290,8 @@ class _AchievementRateCalculatorState
           Column(
             children: [
               // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '达成率计算器',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 占位，保持标题居中
-                    SizedBox(width: 48),
-                  ],
-                ),
+              PageTopBar(
+                title: '达成率计算器',
               ),
 
               // 主内容区域
@@ -387,7 +362,6 @@ class _AchievementRateCalculatorState
   // 构建区域标题
   Widget _buildSectionTitle(String title) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     
     return Text(
       title,
@@ -492,7 +466,6 @@ class _AchievementRateCalculatorState
   // 构建BREAK音符区域
   Widget _buildBreakNoteSection() {
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
     
     return Column(
@@ -588,7 +561,6 @@ class _AchievementRateCalculatorState
   // 构建表格单元格
   Widget _buildTableCell(String text, {Color? color, double fontSize = 12.0}) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
@@ -610,7 +582,6 @@ class _AchievementRateCalculatorState
   // 构建数字输入单元格
   Widget _buildNumberInputCell(int value, Function(int) onChanged, TextEditingController controller, {Color? color}) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
@@ -665,7 +636,6 @@ class _AchievementRateCalculatorState
   Widget _buildBreakRow(String label, int value, Function(int) onChanged, TextEditingController controller,
       {Color? color, Color? textColor = Colors.orange}) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
     
     return Row(

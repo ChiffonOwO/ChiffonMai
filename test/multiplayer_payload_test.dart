@@ -398,5 +398,74 @@ void main() {
       expect(RoomEntity.fromJson({'id': 'r', 'game_type': '谱面片段'}).gameType,
           GameType.chartPeek);
     });
+
+    test('copyWith 必须原样保留模式设置', () {
+      // 回归：GameRoomPage 收到房间更新时，原来是逐字段 new 一个 RoomEntity，
+      // 结果新模式设置没被带上 → 自定义切块数量/揭示间隔一进游戏就变回默认。
+      // 现在统一用 copyWith()，这条测试盯住它别再漏字段。
+      final room = RoomEntity.fromJson({
+        'id': 'r1',
+        'game_type': 'tileReveal',
+        'players': <dynamic>[],
+        'tileCount': 2500,
+        'tileRevealIntervalMs': 700,
+        'flashDurationMs': 900,
+        'peekDurationSeconds': 15,
+        'peekDifficulties': ['3', '4'],
+      });
+
+      final copy = room.copyWith(players: const []);
+
+      expect(copy.tileCount, 2500);
+      expect(copy.tileRevealIntervalMs, 700);
+      expect(copy.flashDurationMs, 900);
+      expect(copy.peekDurationSeconds, 15);
+      expect(copy.peekDifficulties, ['3', '4']);
+      expect(copy.gameType, GameType.tileReveal);
+    });
+
+    test('服务端漏发模式设置时，用本机已知值兜住（不再掉回默认）', () {
+      final created = RoomEntity.fromJson({
+        'id': 'r1',
+        'game_type': 'tileReveal',
+        'players': <dynamic>[],
+        'tileCount': 2500,
+        'tileRevealIntervalMs': 700,
+      });
+      // 某条房间更新（老服务端 / 精简 getState）没带这些字段
+      final thin = RoomEntity.fromJson({
+        'id': 'r1',
+        'game_type': 'tileReveal',
+        'players': <dynamic>[],
+      });
+      expect(thin.tileCount, RoomEntity.defaultTileCount);
+
+      final merged = thin.withModeSettingsFallback(created);
+      expect(merged.tileCount, 2500);
+      expect(merged.tileRevealIntervalMs, 700);
+    });
+
+    test('房主真的用默认值建房时，兜底不会把默认值改掉', () {
+      final created = RoomEntity.fromJson({
+        'id': 'r2',
+        'game_type': 'tileReveal',
+        'players': <dynamic>[],
+      });
+      final merged = created.withModeSettingsFallback(created);
+      expect(merged.tileCount, RoomEntity.defaultTileCount);
+      expect(merged.tileRevealIntervalMs, RoomEntity.defaultTileRevealIntervalMs);
+      expect(merged.peekDifficulties, RoomEntity.defaultPeekDifficulties);
+    });
+
+    test('每个模式都有非空显示名与描述（平铺按钮直接显示它们）', () {
+      // 创建房间页把九个模式平铺成一格一个按钮，按钮上就是 name、
+      // 下方展示 description；缺了就只剩一个空白格子。
+      for (final type in GameType.values) {
+        expect(type.name.trim(), isNotEmpty, reason: '${type.apiKey} 缺显示名');
+        expect(type.description.trim(), isNotEmpty,
+            reason: '${type.apiKey} 缺描述');
+      }
+      expect(GameType.values.length, 9);
+    });
   });
 }

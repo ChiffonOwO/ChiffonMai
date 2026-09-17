@@ -10,6 +10,7 @@ import '../utils/AppConstants.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
+import '../widgets/PageTopBar.dart';
 
 /// 评分记录数据模型
 class RatingRecordItem {
@@ -398,32 +399,14 @@ class _RecentRatingsPageState extends State<RecentRatingsPage> {
 
           Column(
             children: [
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '最近评分',
-                          style: TextStyle(
-                            color: textPrimaryColor,
-                            fontSize: screenWidth * 0.055,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+              PageTopBar(
+                title: '最近评分',
+                actions: [
+  IconButton(
+                        icon: Icon(Icons.refresh, color: textPrimaryColor),
+                        onPressed: _isLoading ? null : _refresh,
                       ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.refresh, color: textPrimaryColor),
-                      onPressed: _isLoading ? null : _refresh,
-                    ),
-                  ],
-                ),
+],
               ),
 
               Expanded(

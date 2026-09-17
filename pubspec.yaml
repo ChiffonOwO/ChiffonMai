@@ -18,7 +18,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # of the product and file versions while build-number is used as the build suffix.
 
 # version: 1.12.2+35
-version: 2.0.0+37
+version: 2.1.0+38
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -127,6 +127,10 @@ flutter:
     - assets/userinfobg2.png
     - assets/chiffon2.png
     - assets/icon.png   # 关于页展示的 App 图标（原来是只给 flutter_launcher_icons 用的构建期素材，未打包）
+    # dxrating 曲绘兜底的「songId → imageName」基线索引（构建期由 dxdata 生成，
+    # 见 tool/gen_dxrating_cover_index.cjs）。dxdata 有 4MB、实测下载 200s+，
+    # 所以必须随包带一份基线，运行时只在必要时尝试更新。
+    - assets/dxrating_cover_index.json
     - assets/cover_manifest.json
     - assets/res/
     - assets/grade/

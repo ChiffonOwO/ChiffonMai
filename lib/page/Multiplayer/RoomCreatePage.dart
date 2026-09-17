@@ -3,11 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/GameType.dart';
 import 'package:my_first_flutter_app/manager/MultiplayerManager.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
-import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/AppConstants.dart';
+import 'package:my_first_flutter_app/utils/SongFilterUtil.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartByInfoService.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartCommonSettingsService.dart';
-import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
 
 class RoomCreatePage extends StatefulWidget {
   const RoomCreatePage({super.key});
@@ -108,32 +107,15 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
     try {
       final allSongs = await GuessChartByInfoService.loadAllSongs();
       if (allSongs != null) {
-        Set<String> versions = {};
-        Set<String> genres = {};
-
-        // 过滤掉从maidata追加的歌曲和union独有的歌曲
-        final validSongs = allSongs.where((song) =>
-          song.cids.isNotEmpty && !song.cids.every((cid) => cid == 0) && !song.isExtra
-        ).toList();
-
-        for (var song in validSongs) {
-          versions.add(song.basicInfo.from);
-          genres.add(song.basicInfo.genre);
-        }
-
-        // 过滤只保留标准版本
-        versions = versions.where((v) => VersionListConstant.standardVersions.contains(v)).toSet();
-
-        // 按发布顺序排序版本
-        _allVersions = versions.toList()..sort((a, b) {
-          int orderA = VersionListConstant.versionOrderMap[a] ?? 999;
-          int orderB = VersionListConstant.versionOrderMap[b] ?? 999;
-          return orderA.compareTo(orderB);
-        });
-
-        // 移除宴会场选项
-        genres.remove('宴会场');
-        _allGenres = genres.toList();
+        // 可选版本 / 可选流派统一走 SongFilterUtil.selectableFilters：
+        // 它先剔除非正曲（SongFilterUtil.isExtra：宴会场 / maidata 追加 /
+        // union 独有），再单独挡掉「宴会场」流派，最后把版本过一遍官方世代
+        // 白名单并按世代排序。口径与抽曲池一致，否则列表里会出现
+        // 勾了也永远抽不到的版本 / 流派（表现为「没有找到符合条件的乐曲」）。
+        final SongFilterOptions filterOptions =
+            SongFilterUtil.selectableFilters(allSongs);
+        _allVersions = filterOptions.versions;
+        _allGenres = filterOptions.genres;
       }
     } catch (e) {
       debugPrint('[ERROR][RoomCreatePage] 加载歌曲数据失败: $e');
@@ -210,6 +192,59 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
            _gameType == GameType.flash ||
            _gameType == GameType.tileReveal ||
            _gameType == GameType.chartPeek;
+  }
+
+  /// 单个游戏模式按钮（平铺展开用，见「游戏模式」区域）。
+  ///
+  /// 选中的用主题色实心 + 勾号，未选中的用描边卡片；整块可点，点一下就切换模式。
+  Widget _buildGameTypeButton(GameType type, double scaleFactor) {
+    final scheme = Theme.of(context).colorScheme;
+    final bool selected = type == _gameType;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() => _gameType = type),
+        borderRadius: BorderRadius.circular(10 * scaleFactor),
+        child: Ink(
+          padding: EdgeInsets.symmetric(
+            horizontal: 10 * scaleFactor,
+            vertical: 12 * scaleFactor,
+          ),
+          decoration: BoxDecoration(
+            color: selected
+                ? scheme.primary
+                : scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(10 * scaleFactor),
+            border: Border.all(
+              color: selected ? scheme.primary : scheme.outlineVariant,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  type.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14 * scaleFactor,
+                    fontWeight:
+                        selected ? FontWeight.bold : FontWeight.w500,
+                    color:
+                        selected ? scheme.onPrimary : scheme.onSurface,
+                  ),
+                ),
+              ),
+              if (selected)
+                Icon(Icons.check_circle,
+                    size: 16 * scaleFactor, color: scheme.onPrimary),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// 构建模式专属设置区域
@@ -507,59 +542,30 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                                 ),
                               ),
                               SizedBox(height: paddingM),
-                              // 模式选择下拉框
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: paddingM, vertical: paddingS),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  borderRadius:
-                                      BorderRadius.circular(borderRadiusSmall),
-                                ),
-                                child: DropdownButton<GameType>(
-                                  value: _gameType,
-                                  isExpanded: true,
-                                  dropdownColor: Theme.of(context).colorScheme.surface,
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onPrimary,
-                                    fontSize: 18 * scaleFactor,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  iconEnabledColor: Theme.of(context).colorScheme.onPrimary,
-                                  underline: const SizedBox(),
-                                  items: GameType.values.map((type) {
-                                    return DropdownMenuItem(
-                                      value: type,
-                                      child: Text(
-                                        type.name,
-                                        style: TextStyle(
-                                          fontSize: 16 * scaleFactor,
-                                          color: Theme.of(context).colorScheme.onSurface,
+                              // 模式平铺展开：每个模式一个按钮，点一下就选中
+                              // （原来是下拉框，要先点开再看列表，选项多时容易漏看）
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  // 两个一行；窄屏自动退成一列
+                                  const double gap = 8;
+                                  final bool twoColumns =
+                                      constraints.maxWidth >= 320;
+                                  final double itemWidth = twoColumns
+                                      ? (constraints.maxWidth - gap) / 2
+                                      : constraints.maxWidth;
+                                  return Wrap(
+                                    spacing: gap,
+                                    runSpacing: gap,
+                                    children: [
+                                      for (final type in GameType.values)
+                                        SizedBox(
+                                          width: itemWidth,
+                                          child: _buildGameTypeButton(
+                                              type, scaleFactor),
                                         ),
-                                      ),
-                                    );
-                                  }).toList(),
-                                  selectedItemBuilder: (context) {
-                                    return GameType.values.map((type) {
-                                      return Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: Text(
-                                          type.name,
-                                          style: TextStyle(
-                                            fontSize: 18 * scaleFactor,
-                                            fontWeight: FontWeight.bold,
-                                            color: Theme.of(context).colorScheme.onPrimary,
-                                          ),
-                                        ),
-                                      );
-                                    }).toList();
-                                  },
-                                  onChanged: (value) {
-                                    if (value != null) {
-                                      setState(() => _gameType = value);
-                                    }
-                                  },
-                                ),
+                                    ],
+                                  );
+                                },
                               ),
                               // 模式描述
                               Padding(

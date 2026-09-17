@@ -11,6 +11,7 @@ import 'package:my_first_flutter_app/utils/MaidataDecodeUtil.dart';
 import 'package:my_first_flutter_app/service/ChartPackageHistoryStore.dart';
 import 'package:path_provider/path_provider.dart';
 import 'ChartPlayPage.dart';
+import '../widgets/PageTopBar.dart';
 
 // ─────────────────────────────────────────────────────────
 // 谱面包导入（.adx / .zip）
@@ -789,7 +790,6 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    final textColor = AppColors.primaryText(brightness);
     final safeBottom = MediaQuery.of(context).padding.bottom;
     return Scaffold(
       // 不要用 backgroundColor: AppColors.scaffoldBackground(brightness)：
@@ -807,29 +807,8 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
           Column(
             children: [
               // 标题栏（与 DataBackupPage / SongMaidataPage 同款写法）
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: textColor),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '自定义谱面播放',
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 48),
-                  ],
-                ),
+              PageTopBar(
+                title: '自定义谱面播放',
               ),
 
               // 主内容

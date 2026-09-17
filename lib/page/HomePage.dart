@@ -65,6 +65,8 @@ import 'FriendLinksPage.dart';
 import 'CoverRecognitionPage.dart';
 import 'ScoreOcrPage.dart';
 import 'DataBackupPage.dart';
+import 'Awmc/AwmcConsolePage.dart';
+import 'Awmc/AwmcSyncFlow.dart';
 import 'DailyRecommendPage.dart';
 import '../widgets/RefreshDataDialog.dart'
     show
@@ -85,13 +87,17 @@ import 'LuoXue/UpdateLuoXueScorePage.dart';
 import '../manager/DivingFishProbeManager.dart';
 import '../manager/DivingFish/DivingFishOAuthManager.dart';
 import 'package:my_first_flutter_app/utils/FavoriteFeaturesNotifier.dart';
+import 'package:my_first_flutter_app/utils/FeatureFlags.dart';
 import 'package:my_first_flutter_app/utils/LoginStateNotifier.dart';
 import 'package:my_first_flutter_app/utils/UserProfileNotifier.dart';
 import '../service/AccountSwitchService.dart';
 import '../widgets/AccountSwitchSheet.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
+import '../widgets/QrQuickFillButtons.dart';
+import '../service/SyncRouteStore.dart';
+import '../service/SyncStatsService.dart';
+import '../utils/SyncRouteNotifier.dart';
+import '../widgets/SyncRouteFooter.dart';
 
 // ds值与歌曲对应关系数据类已随 _calculateRatingLimits 一起抽离到
 // lib/widgets/RefreshDataDialog.dart，不再需要此处的定义。
@@ -164,6 +170,9 @@ class HomePageState extends State<HomePage> {
     // 防止冷却期间别名丢失（详见：冷却逻辑在_initializeDataInBackground内）
     SongAliasManager.instance.init();
     _initializeDataInBackground();
+    // 同步入口的线路 + 统计（与「系统」hub 页共享同一份状态；重复调用幂等）
+    SyncRouteNotifier.instance.addListener(_onSyncRouteChanged);
+    SyncRouteNotifier.instance.ensureLoaded();
 
     // 在第一帧渲染完成后触发字体加载
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -327,8 +336,14 @@ class HomePageState extends State<HomePage> {
   @override
   void dispose() {
     UserProfileNotifier.instance.removeListener(_onUserProfileChanged);
+    SyncRouteNotifier.instance.removeListener(_onSyncRouteChanged);
     _loginStateNotifier.dispose();
     super.dispose();
+  }
+
+  /// 线路 / 统计变化时重建首页（收藏区那一行要立刻反映）。
+  void _onSyncRouteChanged() {
+    if (mounted) setState(() {});
   }
 
   /// 渲染用的 Rating：值为 0 时回落为 "-"，避免暴露 15049/10670/4379 这类硬编码占位。
@@ -648,7 +663,7 @@ class HomePageState extends State<HomePage> {
       const SizedBox(width: 12),
       Expanded(
           child: _homeAction(context, Icons.leaderboard_outlined, 'Best50',
-              'Rating 构成', 'Best50')),
+              '评分构成', 'Best50')),
       const SizedBox(width: 12),
       Expanded(child: _homeAction(context, Icons.search, '查歌曲', '曲库搜索', '查歌曲')),
       const SizedBox(width: 12),
@@ -670,31 +685,11 @@ class HomePageState extends State<HomePage> {
 
   Widget _homeAction(BuildContext context, IconData icon, String title,
       String subtitle, String featureTitle) {
-    final scheme = Theme.of(context).colorScheme;
-    return InkWell(
+    return HubQuickAction(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
       onTap: () => _tapFeatureTitle(featureTitle),
-      borderRadius: BorderRadius.circular(16),
-      child: Ink(
-        padding: const EdgeInsets.fromLTRB(10, 15, 10, 13),
-        decoration: BoxDecoration(
-            color: scheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: scheme.outlineVariant)),
-        child: Column(children: [
-          Icon(icon, color: scheme.primary, size: 25),
-          const SizedBox(height: 9),
-          Text(title,
-              textAlign: TextAlign.center,
-              style:
-                  const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-          const SizedBox(height: 3),
-          Text(subtitle,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 10)),
-        ]),
-      ),
     );
   }
 
@@ -797,6 +792,40 @@ class HomePageState extends State<HomePage> {
           await _checkDivingFishLoginStatus();
         },
       );
+
+  /// 线路2：通过 AWMC 网关同步（与「系统」hub 页共用 [AwmcSyncFlow]）。
+  ///
+  /// 首页没有按钮进度条，用顶部提示代替；两条线路的行为与 hub 页完全一致。
+  Future<void> _syncToDivingFishViaAwmc() async {
+    if (!mounted) return;
+    final outcome = await AwmcSyncFlow.run(
+      context,
+      target: AwmcSyncTarget.divingFish,
+    );
+    if (!mounted || outcome.cancelled) return;
+    Fluttertoast.showToast(
+      msg: outcome.ok
+          ? AwmcSyncFlow.successToast(AwmcSyncTarget.divingFish, outcome)
+          : (outcome.message ?? '同步失败'),
+    );
+    SyncRouteNotifier.instance.refreshStatsSoon();
+  }
+
+  /// 线路2：通过 AWMC 网关同步到落雪（同上）。
+  Future<void> _syncToLuoXueViaAwmc() async {
+    if (!mounted) return;
+    final outcome = await AwmcSyncFlow.run(
+      context,
+      target: AwmcSyncTarget.luoXue,
+    );
+    if (!mounted || outcome.cancelled) return;
+    Fluttertoast.showToast(
+      msg: outcome.ok
+          ? AwmcSyncFlow.successToast(AwmcSyncTarget.luoXue, outcome)
+          : (outcome.message ?? '同步失败'),
+    );
+    SyncRouteNotifier.instance.refreshStatsSoon();
+  }
 
   Future<void> _syncToDivingFish() async {
     final prefs = await SharedPreferences.getInstance();
@@ -994,17 +1023,8 @@ class HomePageState extends State<HomePage> {
                               color: AppColors.greyHint(brightness)),
                         ),
                         const SizedBox(height: 12),
-                        // 多方式导入按钮
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _buildClipboardButton(setState, qrController),
-                            _buildGalleryQrButton(setState, qrController),
-                            _buildCameraScanButton(
-                                setState, qrController, dialogContext),
-                          ],
-                        ),
+                        // 多方式导入按钮（剪贴板 / 相册 / 扫码，公共组件）
+                        QrQuickFillButtons(controller: qrController),
                         const SizedBox(height: 12),
                         TextField(
                           controller: qrController,
@@ -2817,7 +2837,13 @@ class HomePageState extends State<HomePage> {
       }
     }
     if (item.title == '同步成绩到水鱼') {
-      await _syncToDivingFish();
+      // 与「系统」hub 页同一套线路记忆：线路2 走 AWMC 网关，线路1 走原有流程
+      if (SyncRouteNotifier.instance.routeOf(SyncPlatform.divingFish) ==
+          SyncRouteStore.routeAwmc) {
+        await _syncToDivingFishViaAwmc();
+      } else {
+        await _syncToDivingFish();
+      }
     }
     if (item.title == '账号管理') {
       _showAccountManageDialog(context);
@@ -2972,7 +2998,12 @@ class HomePageState extends State<HomePage> {
       );
     }
     if (item.title == '同步成绩到落雪') {
-      UpdateLuoXueScorePage.show(context);
+      if (SyncRouteNotifier.instance.routeOf(SyncPlatform.luoXue) ==
+          SyncRouteStore.routeAwmc) {
+        await _syncToLuoXueViaAwmc();
+      } else {
+        UpdateLuoXueScorePage.show(context);
+      }
     }
     if (item.title == '每日推荐') {
       Navigator.push(
@@ -3023,6 +3054,14 @@ class HomePageState extends State<HomePage> {
         MaterialPageRoute(builder: (context) => const DataBackupPage()),
       );
     }
+    // 「AWMC 网关」入口默认隐藏（FeatureFlags.awmcGateway），这里跟着开关走：
+    // 入口不显示时根本点不到，留着分支是为了开关一开就立刻可用。
+    if (item.title == 'AWMC 网关' && FeatureFlags.awmcGateway) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const AwmcConsolePage()),
+      );
+    }
     if (item.title == '查看友情链接') {
       Navigator.push(
         context,
@@ -3068,9 +3107,23 @@ class HomePageState extends State<HomePage> {
               isFavorited: true,
               onToggleFavorite: () => _toggleFavorite(item.title),
               onTap: () => _handleFeatureTap(item),
+              // 两个同步入口在收藏区也带上线路切换 + 近 100 次统计，
+              // 与「系统」hub 页共享同一份状态（SyncRouteNotifier）
+              footer: _syncFooterFor(item.title),
             ),
       ],
     );
+  }
+
+  /// 收藏区里「同步成绩」入口的附加区；其它功能返回 null（不占位置）。
+  Widget? _syncFooterFor(String title) {
+    if (title == '同步成绩到水鱼') {
+      return const SyncRouteFooter(platform: SyncPlatform.divingFish);
+    }
+    if (title == '同步成绩到落雪') {
+      return const SyncRouteFooter(platform: SyncPlatform.luoXue);
+    }
+    return null;
   }
 
   // 构建大类导航卡片按钮
@@ -3179,130 +3232,4 @@ class HomePageState extends State<HomePage> {
     );
   }
 
-  // ===== 水鱼导入辅助方法 =====
-
-  /// 读取剪贴板按钮
-  Widget _buildClipboardButton(
-      StateSetter setState, TextEditingController qrCtrl) {
-    return OutlinedButton.icon(
-      icon: const Icon(Icons.paste, size: 16),
-      label: const Text('读取剪贴板', style: TextStyle(fontSize: 13)),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      ),
-      onPressed: () async {
-        final data = await Clipboard.getData(Clipboard.kTextPlain);
-        final text = data?.text ?? '';
-        if (text.trim().startsWith('SGWCMAID')) {
-          setState(() {
-            qrCtrl.text = text.trim();
-          });
-          Fluttertoast.showToast(msg: '已识别到有效二维码字符串，已自动填入');
-        } else if (text.isNotEmpty) {
-          // 未检测到有效前缀，提示用户
-          final confirmed = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('提示'),
-              content: const Text('剪贴板内容不是有效的登入二维码，仍要填入吗？'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('取消'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('填入'),
-                ),
-              ],
-            ),
-          );
-          if (confirmed == true) {
-            setState(() {
-              qrCtrl.text = text.trim();
-            });
-          }
-        } else {
-          Fluttertoast.showToast(msg: '剪贴板为空');
-        }
-      },
-    );
-  }
-
-  /// 从相册识别二维码按钮
-  Widget _buildGalleryQrButton(
-      StateSetter setState, TextEditingController qrCtrl) {
-    return OutlinedButton.icon(
-      icon: const Icon(Icons.photo_library, size: 16),
-      label: const Text('从相册识别', style: TextStyle(fontSize: 13)),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      ),
-      onPressed: () async {
-        try {
-          final picker = ImagePicker();
-          final pickedFile = await picker.pickImage(
-            source: ImageSource.gallery,
-            imageQuality: 100,
-          );
-          if (pickedFile == null) return;
-
-          // 使用 mobile_scanner 解析图片中的二维码
-          final controller = MobileScannerController();
-          try {
-            final barcodes = await controller.analyzeImage(pickedFile.path);
-
-            if (barcodes != null && barcodes.barcodes.isNotEmpty) {
-              final qrText = barcodes.barcodes.first.rawValue ?? '';
-              if (qrText.isNotEmpty) {
-                setState(() {
-                  qrCtrl.text = qrText;
-                });
-                Fluttertoast.showToast(msg: '已识别到二维码，已自动填入');
-              } else {
-                Fluttertoast.showToast(msg: '未能从图片中识别到二维码内容');
-              }
-            } else {
-              Fluttertoast.showToast(msg: '未在图片中检测到二维码');
-            }
-          } finally {
-            controller.dispose();
-          }
-        } catch (e) {
-          debugPrint('从相册识别二维码失败: $e');
-          Fluttertoast.showToast(msg: '识别失败: $e');
-        }
-      },
-    );
-  }
-
-  /// 摄像头扫码按钮
-  Widget _buildCameraScanButton(StateSetter setState,
-      TextEditingController qrCtrl, BuildContext dialogContext) {
-    return OutlinedButton.icon(
-      icon: const Icon(Icons.qr_code_scanner, size: 16),
-      label: const Text('扫描二维码', style: TextStyle(fontSize: 13)),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      ),
-      onPressed: () async {
-        try {
-          final result = await Navigator.of(dialogContext).push<String>(
-            MaterialPageRoute(
-              builder: (_) => const QrScannerPage(),
-            ),
-          );
-          if (result != null && result.isNotEmpty) {
-            setState(() {
-              qrCtrl.text = result;
-            });
-            Fluttertoast.showToast(msg: '已扫描到二维码，已自动填入');
-          }
-        } catch (e) {
-          debugPrint('摄像头扫码失败: $e');
-          Fluttertoast.showToast(msg: '扫码失败: $e');
-        }
-      },
-    );
-  }
 }

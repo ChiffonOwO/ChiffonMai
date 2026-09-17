@@ -12,6 +12,7 @@ import '../utils/AppTheme.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/ExportSettings.dart';
 import '../utils/ThemeManager.dart';
+import '../widgets/PageTopBar.dart';
 
 /// 设置页（独立页面，从首页主题弹窗"更多设置"进入）
 ///
@@ -318,25 +319,9 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildTitleBar(double sw, Color c) => Container(
-        padding: const EdgeInsets.fromLTRB(16, 48, 16, 8),
-        child: Row(children: [
-          IconButton(
-            icon: Icon(Icons.arrow_back, color: c),
-            onPressed: () => Navigator.pop(context),
-          ),
-          Expanded(
-            child: Center(
-              child: Text(
-                '设置',
-                style: TextStyle(
-                    color: c, fontSize: sw * 0.06, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-          const SizedBox(width: 48),
-        ]),
-      );
+  // 顶部栏统一走公共组件（标题样式对齐 Rating 排行榜页的 AppBar）
+  Widget _buildTitleBar(double sw, Color c) =>
+      const PageTopBar(title: '设置');
 
   Widget _buildSectionTitle(String title, Color c) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),

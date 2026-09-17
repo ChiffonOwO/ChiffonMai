@@ -146,10 +146,10 @@ class _MyAppState extends State<MyApp> {
 
   ThemeData _buildThemeWithFonts(ThemeData base) {
     if (!_fontsLoaded) return base;
-    return base.copyWith(
-      textTheme: GoogleFonts.notoSansScTextTheme(base.textTheme),
-      primaryTextTheme: GoogleFonts.notoSansScTextTheme(base.primaryTextTheme),
-    );
+    // 统一走 AppTheme.withGlobalFonts：除了 textTheme，它还会给
+    // appBarTheme.titleTextStyle 补上字体族 —— 否则标准 AppBar 的标题会被
+    // AppBar 自己那层 DefaultTextStyle 顶回系统字体。详见 AppTheme.font 注释。
+    return AppTheme.withGlobalFonts(base);
   }
 
   @override
@@ -203,7 +203,7 @@ class _MyAppState extends State<MyApp> {
                   data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
                   child: DefaultTextStyle(
                     style: _fontsLoaded
-                        ? GoogleFonts.notoSansSc()
+                        ? AppTheme.font()
                         : const TextStyle(),
                     child: child!,
                   ),

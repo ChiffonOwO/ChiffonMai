@@ -4,6 +4,7 @@ import 'package:my_first_flutter_app/service/DataBackupService.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/AppConstants.dart';
+import '../widgets/PageTopBar.dart';
 
 class DataBackupPage extends StatefulWidget {
   const DataBackupPage({super.key});
@@ -22,7 +23,6 @@ class _DataBackupPageState extends State<DataBackupPage> {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    final textPrimaryColor = Theme.of(context).colorScheme.onSurface;
     final safeBottom = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
@@ -35,29 +35,8 @@ class _DataBackupPageState extends State<DataBackupPage> {
           Column(
             children: [
               // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '数据备份',
-                          style: TextStyle(
-                            color: textPrimaryColor,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 48),
-                  ],
-                ),
+              PageTopBar(
+                title: '数据备份',
               ),
 
               // 主内容

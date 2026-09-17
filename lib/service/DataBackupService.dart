@@ -57,6 +57,9 @@ class DataBackupService {
     CacheKeyConstant.avgRankingsCacheTimestamp,
     CacheKeyConstant.coverHashCache,
     CacheKeyConstant.coverHashCacheTimestamp,
+    // AWMC 游玩次数缓存：能从 /v1/user/music 重新拉，而且与具体账号绑定，
+    // 跟着备份跑到别的账号上会显示别人的游玩次数
+    CacheKeyConstant.awmcPlayCounts,
   };
 
   /// 前缀匹配的缓存键（这些键按歌曲 / 模式 / 难度拼接，数量不固定）
@@ -70,6 +73,24 @@ class DataBackupService {
     // 身份存档 account_archive_identity_* 与 account_store 属于用户数据，保留在备份里
     CacheKeyConstant.accountArchivePlayPrefix, // account_archive_play_<source>
   ];
+
+  /// **绝不进备份**的本地敏感状态。
+  ///
+  /// 这类键既不是「可重新拉取的缓存」，也不该跟着备份文件走：
+  /// 备份是**明文 JSON**，用户会随手放到网盘/群里，而 AWMC 网关令牌
+  /// 等同于账户操作权限与余额（能改机台数据、能花钱），一旦随备份流出
+  /// 后果不可逆。因此导出与导入两端都跳过它。
+  ///
+  /// 注意这与 `probeDivingFishToken` 等登录凭据的取舍不同：那些是
+  /// 「恢复后省一次登录」的便利性凭据，用户自己决定要不要备份；
+  /// AWMC 令牌是可直接扣费的凭据，默认不给导出。
+  static const Set<String> _neverBackupKeys = {
+    CacheKeyConstant.awmcToken,
+    CacheKeyConstant.awmcAuditLog,
+  };
+
+  /// 该键是否属于「绝不备份」的敏感状态。
+  static bool isNeverBackupKey(String key) => _neverBackupKeys.contains(key);
 
   /// 是否是「可重新拉取的缓存」——这类键不写进备份
   static bool isCacheKey(String key) {
@@ -95,8 +116,14 @@ class DataBackupService {
       final keys = prefs.getKeys();
       final data = <String, dynamic>{};
       var skipped = 0;
+      var secretSkipped = 0;
 
       for (final key in keys) {
+        // 敏感凭据（AWMC 网关令牌等）永远不进备份文件
+        if (isNeverBackupKey(key)) {
+          secretSkipped++;
+          continue;
+        }
         if (isCacheKey(key)) {
           skipped++;
           continue;
@@ -116,7 +143,8 @@ class DataBackupService {
       }
 
       debugPrint(
-          'DataBackup: 导出 ${data.length} 个用户数据键，跳过 $skipped 个缓存键');
+          'DataBackup: 导出 ${data.length} 个用户数据键，跳过 $skipped 个缓存键、'
+          '$secretSkipped 个敏感凭据键');
 
       // 2. 构建备份元数据
       final backup = {
@@ -126,6 +154,7 @@ class DataBackupService {
         'exportedAtTimestamp': DateTime.now().millisecondsSinceEpoch,
         'keyCount': data.length,
         'skippedCacheKeys': skipped,
+        'skippedSecretKeys': secretSkipped,
         'data': data,
       };
 
@@ -265,6 +294,8 @@ class DataBackupService {
   /// 2. 若备份里不含登录凭据，恢复后需要重新登录对应账号。
   ///    本项目的凭据键（probeDivingFishToken / probeLxnsImportToken /
   ///    luoxue_* 等）都**不在** [_cacheExactKeys] 里，会被正常备份与还原。
+  /// 3. [_neverBackupKeys]（AWMC 网关令牌与调用日志）**既不导出也不还原**，
+  ///    恢复后需要在「系统 → AWMC 网关」里重新设置令牌。
   ///
   /// 返回成功恢复的键数量。
   Future<int> restoreData(
@@ -285,6 +316,12 @@ class DataBackupService {
       for (final entry in data.entries) {
         final key = entry.key;
         final value = entry.value;
+
+        // 敏感凭据不允许由备份写入（防止别人分享的备份里塞一个令牌进来）
+        if (isNeverBackupKey(key)) {
+          debugPrint('DataBackup: 跳过敏感键 $key（不随备份恢复）');
+          continue;
+        }
 
         if (value is Map<String, dynamic> && value.containsKey('type')) {
           final type = value['type'] as String;

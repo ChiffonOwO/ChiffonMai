@@ -17,8 +17,10 @@ import '../../utils/CommonWidgetUtil.dart';
 import '../../utils/CoverUtil.dart';
 import '../../utils/ExportQualitySelector.dart';
 import '../../utils/ImageEncodeUtil.dart';
+import '../../utils/SongFilterUtil.dart';
 import '../../utils/StringUtil.dart';
 import '../../widgets/B50GameCardWidget.dart';
+import '../../widgets/PageTopBar.dart';
 
 /// 自定义 Best50 的一键排序方式。
 enum _SortMode { raDesc, raAsc, dsDesc, dsAsc }
@@ -280,7 +282,9 @@ class _CustomBest50PageState extends State<CustomBest50Page> {
         ],
       ),
       subtitle: Text(
-        '${song.basicInfo.artist} · ${StringUtil.formatVersion2(song.basicInfo.from)}',
+        // extra 曲目（宴会场 / maidata 追加 / union 独有）没有国服世代年号
+        '${song.basicInfo.artist} · '
+        '${StringUtil.formatVersion2WithFlag(song.basicInfo.from, SongFilterUtil.isExtra(song))}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
@@ -940,30 +944,8 @@ class _CustomBest50PageState extends State<CustomBest50Page> {
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
           Column(
             children: [
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back,
-                          color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '自定义 Best50',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: MediaQuery.of(context).size.width * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 48),
-                  ],
-                ),
+              PageTopBar(
+                title: '自定义 Best50',
               ),
               Expanded(
                 child: Container(

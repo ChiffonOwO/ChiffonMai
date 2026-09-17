@@ -4,6 +4,7 @@ import 'package:my_first_flutter_app/entity/AWMC/MaimaiServerStatusModel.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import '../widgets/PageTopBar.dart';
 
 // 服务器状态页面
 class MaimaiServerStatusPage extends StatefulWidget {
@@ -71,7 +72,6 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
     final safeBottom = MediaQuery.of(context).padding.bottom;
     
     // 字体大小
-    final titleFontSize = screenWidth * 0.06;
     
     // 自定义常量
     final double borderRadiusSmall = 8.0;
@@ -89,34 +89,8 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
           Column(
             children: [
               // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '服务器状态',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: titleFontSize,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 占位，保持标题居中
-                    SizedBox(width: 48),
-                  ],
-                ),
+              PageTopBar(
+                title: '服务器状态',
               ),
 
               // 主内容区域
@@ -160,7 +134,6 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
   // 构建图例卡片
   Widget _buildLegendCard() {
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     final smallFontSize = screenWidth * 0.03;
     
     return Card(
@@ -298,7 +271,6 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
   // 构建服务器卡片
   Widget _buildServerCard(String serverId, HeartbeatItem? heartbeat) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     final contentFontSize = screenWidth * 0.04;
     final smallFontSize = screenWidth * 0.03;
 

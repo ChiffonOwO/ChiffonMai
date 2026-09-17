@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/AppTheme.dart';
+import '../widgets/PageTopBar.dart';
 
 /// 关于本APP页面
 ///
@@ -148,34 +149,8 @@ class _AboutAppPageState extends State<AboutAppPage> {
 
           Column(
             children: [
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '关于本APP',
-                          style: TextStyle(
-                            color: textPrimaryColor,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back,
-                          color: Colors.transparent),
-                      onPressed: null,
-                    ),
-                  ],
-                ),
-              ),
+              // 标题栏统一走公共组件（原来这里抄了一份 25 行的 Row）
+              const PageTopBar(title: '关于本APP'),
 
               Expanded(
                 child: Container(

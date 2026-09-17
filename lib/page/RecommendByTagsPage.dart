@@ -13,6 +13,7 @@ import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constant/CacheKeyConstant.dart';
 import '../constant/LoadingTipsConstant.dart';
+import '../widgets/PageTopBar.dart';
 
 class RecommendByTags extends StatefulWidget {
   const RecommendByTags({super.key});
@@ -227,34 +228,8 @@ class _RecommendByTagsState extends State<RecommendByTags> {
           Column(
             children: [
               // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '根据标签推荐',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 占位，保持标题居中
-                    SizedBox(width: 48),
-                  ],
-                ),
+              PageTopBar(
+                title: '根据标签推荐',
               ),
 
               // 主内容区域
@@ -416,7 +391,6 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   // 构建推荐内容
   Widget _buildRecommendationContent(Brightness brightness) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     List<RecommendationResult> results = _recommendations[_currentTab] ?? [];
     int totalItems = results.length;
     int startIndex = (_currentPage - 1) * _pageSize;
@@ -595,7 +569,6 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   // 构建分页组件
   Widget _buildPagination() {
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     
     List<RecommendationResult> results = _recommendations[_currentTab] ?? [];
     int totalItems = results.length;

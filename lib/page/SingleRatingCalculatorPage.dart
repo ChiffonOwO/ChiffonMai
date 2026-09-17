@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import '../widgets/PageTopBar.dart';
 
 class SingleRatingCalculator extends StatefulWidget {
   const SingleRatingCalculator({super.key});
@@ -212,7 +213,6 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
     final borderRadius = screenWidth * 0.02; // 边框圆角为屏幕宽度的2%
     
     // 字体大小
-    final titleFontSize = screenWidth * 0.06; // 标题字体大小为屏幕宽度的6%
     final subtitleFontSize = screenWidth * 0.045; // 副标题字体大小为屏幕宽度的4.5%
     final bodyFontSize = screenWidth * 0.04; // 正文字体大小为屏幕宽度的4%
     final smallFontSize = screenWidth * 0.035; // 小字体大小为屏幕宽度的3.5%
@@ -239,34 +239,8 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
             Column(
               children: [
                 // 标题栏
-                Container(
-                  padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                  child: Row(
-                    children: [
-                      // 返回按钮
-                      IconButton(
-                        icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                      ),
-                      // 标题
-                      Expanded(
-                        child: Center(
-                          child: Text(
-                            '单曲Rating计算',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontSize: titleFontSize,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      // 占位，保持标题居中
-                      SizedBox(width: 48),
-                    ],
-                  ),
+                PageTopBar(
+                  title: '单曲Rating计算',
                 ),
 
                 // 主内容区域

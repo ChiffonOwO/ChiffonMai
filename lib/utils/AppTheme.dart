@@ -1,7 +1,89 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// 集中式主题定义：提供浅色和暗色 ThemeData，以及主题感知的颜色访问器
 class AppTheme {
+  // ========== 字体 ==========
+
+  /// 全 App 的字体：思源黑体（`google_fonts` 运行时从网络获取）。
+  ///
+  /// **凡是被组件自己套了 `DefaultTextStyle` 的样式，都必须走这里。**
+  /// 全局字体的注入方式是「替换 `textTheme` + 根部 `DefaultTextStyle`」，
+  /// 而组件自带的 `DefaultTextStyle` 会把这层顶掉 —— `AppBar` 就是典型：它用
+  /// `appBarTheme.titleTextStyle` 给标题另套了一层样式，只要那份 `TextStyle`
+  /// 不带 `fontFamily`，标题就会退回系统默认字体（Roboto），于是出现
+  /// 「同一个页面里标题和正文不是同一套字」。
+  ///
+  /// ⚠️ google_fonts 的族名是**按字重分文件**的（`NotoSansSC_regular` /
+  /// `NotoSansSC_700` …），所以字重必须一起传进来 ——
+  /// 先取到族名再 `copyWith(fontWeight:)` 会拿到错的字重文件。
+  ///
+  /// ⚠️ **只能在 `build` 里调用**：它内部会走 `rootBundle`，
+  /// 需要 `ServicesBinding` 已经初始化（`main()` 顶层、`test` 顶层调用会抛
+  /// 「Binding has not yet been initialized」）。所以主题构造（[lightTheme] 等）
+  /// 一律用裸 `TextStyle`，字体族由 [withGlobalFonts] 在运行时补上。
+  static TextStyle font({
+    double? fontSize,
+    FontWeight? fontWeight,
+    Color? color,
+    double? height,
+    double? letterSpacing,
+  }) {
+    // 测试/探针旁路：测试环境没有网络、也没有 `NotoSansSC_*` 这些族，
+    // 真去联网会失败，而 google_fonts 的失败挂在内部 future 上、外部接不住
+    // （实测会把 golden 探针判失败）。旁路只换族名，字重映射规则与 google_fonts
+    // 一致（w400 → `_regular`，其余 → 数字），所以出图效果与真机同口径。
+    if (debugLocalFontFamily) {
+      final weight = (fontWeight ?? FontWeight.w400).value;
+      return TextStyle(
+        fontFamily: weight == 400 ? 'NotoSansSC_regular' : 'NotoSansSC_$weight',
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color,
+        height: height,
+        letterSpacing: letterSpacing,
+      );
+    }
+    return GoogleFonts.notoSansSc(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      height: height,
+      letterSpacing: letterSpacing,
+    );
+  }
+
+  /// 测试/探针专用：让 [font] 返回本地已注册的 `NotoSansSC_*` 族，不联网。
+  /// 真机（debug/release）永远是 false。
+  @visibleForTesting
+  static bool debugLocalFontFamily = false;
+
+  /// 把全局网络字体注入主题（与 [font] 同一个来源）。
+  ///
+  /// `textTheme` / `primaryTextTheme` 覆盖掉正文，`appBarTheme.titleTextStyle`
+  /// 单独补族名 —— 否则**标准 `AppBar`（`Scaffold.appBar`）的标题**会被它自己那层
+  /// `DefaultTextStyle` 顶回系统字体（`PageTopBar` 不依赖这里，它自己调 [font]）。
+  ///
+  /// 运行时调用（`build` 里），不要在主题构造期调用。
+  static ThemeData withGlobalFonts(ThemeData base) {
+    final baseTitle = base.appBarTheme.titleTextStyle;
+    return base.copyWith(
+      textTheme: GoogleFonts.notoSansScTextTheme(base.textTheme),
+      primaryTextTheme: GoogleFonts.notoSansScTextTheme(base.primaryTextTheme),
+      appBarTheme: baseTitle == null
+          ? base.appBarTheme
+          : base.appBarTheme.copyWith(
+              titleTextStyle: font(
+                fontSize: baseTitle.fontSize,
+                fontWeight: baseTitle.fontWeight,
+                color: baseTitle.color,
+                height: baseTitle.height,
+                letterSpacing: baseTitle.letterSpacing,
+              ),
+            ),
+    );
+  }
+
   // ========== 默认 seed 色（用户未自定义时使用） ==========
   static const Color defaultLightSeed = Color(0xFF546161);
   static const Color defaultDarkSeed = Color(0xFFB0C4C4);
@@ -70,6 +152,8 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(color: scheme.primary),
+        // 这里刻意用裸 TextStyle：主题构造期不能碰 google_fonts（需要 ServicesBinding）。
+        // 字体族由 AppTheme.withGlobalFonts 在运行时补上（见那里的注释）。
         titleTextStyle: TextStyle(
           color: scheme.primary,
           fontSize: 20,
@@ -141,6 +225,8 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(color: scheme.primary),
+        // 这里刻意用裸 TextStyle：主题构造期不能碰 google_fonts（需要 ServicesBinding）。
+        // 字体族由 AppTheme.withGlobalFonts 在运行时补上（见那里的注释）。
         titleTextStyle: TextStyle(
           color: scheme.primary,
           fontSize: 20,
@@ -212,6 +298,8 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(color: scheme.primary),
+        // 这里刻意用裸 TextStyle：主题构造期不能碰 google_fonts（需要 ServicesBinding）。
+        // 字体族由 AppTheme.withGlobalFonts 在运行时补上（见那里的注释）。
         titleTextStyle: TextStyle(
           color: scheme.primary,
           fontSize: 20,

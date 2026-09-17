@@ -10,6 +10,7 @@ import '../utils/AppTheme.dart';
 import '../utils/CoverUtil.dart';
 import '../utils/StringUtil.dart';
 import 'SongInfoPage.dart';
+import '../widgets/PageTopBar.dart';
 
 /// 谱面定数分布柱状图页面
 class DifficultyDistributionPage extends StatefulWidget {
@@ -91,26 +92,8 @@ class _DifficultyDistributionPageState
           Column(
             children: [
               // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: textColor),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text('定数分布',
-                            style: TextStyle(
-                                color: textColor,
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                    const SizedBox(width: 48),
-                  ],
-                ),
+              PageTopBar(
+                title: '定数分布',
               ),
               // 难度分段控件
               Padding(
@@ -414,8 +397,6 @@ class _DifficultyDistributionPageState
                       final entry = entries[i];
                       final song = entry.song;
                       final dsIdx = entry.dsIdx;
-                      final isPlayed = bucket.playedSongs.any(
-                          (s) => s.id == song.id);
                       return ListTile(
                         leading: CoverUtil.buildCoverWidgetWithContextRRect(ctx, song.id, 40),
                         title: Text(song.basicInfo.title,

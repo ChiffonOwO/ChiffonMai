@@ -552,7 +552,7 @@ class PersonalizedB50ConvertToImg {
     bool dxMode = type == 'DX';
     bool isUtage = songId.toString().length == 6;
 
-    return B50GameCardWidget(
+    final card = B50GameCardWidget(
       cardColor: cardColor,
       songName: title,
       achievementRate: achievementRate,
@@ -569,6 +569,15 @@ class PersonalizedB50ConvertToImg {
       songId: songId,
       starsColor: starsColor,
       maxIdLength: maxIdLength,
+      scale: 1.0,
+    );
+
+    // PC50：导出的图片也带上游玩次数（叠层，不影响卡片本身布局）
+    final playCount = (songData['playCount'] as num?)?.toInt();
+    if (playCount == null) return card;
+    return B50GameCardWidget.withBadgeOverlay(
+      card: card,
+      text: 'PC $playCount',
       scale: 1.0,
     );
   }

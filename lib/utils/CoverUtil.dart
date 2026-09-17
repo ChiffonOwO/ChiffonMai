@@ -9,17 +9,37 @@
  *           例: 11312 → 1312, 10125 → 125, 10025 → 25
  *   - 6 位：剔除前两位及其后面连续的 '0'，直到遇到第一个非 '0' 数字
  *           例: 121634 → 1634, 110234 → 234, 100034 → 34
+ *
+ * 网络 fallback（本地资源全都找不到时）：
+ *   1. diving-fish：`https://www.diving-fish.com/covers/{coverId}.png`
+ *   2. dxrating（shama）：`songId → dxdata.imageName → /images/cover/v2/{imageName}.jpg`
+ *      带磁盘缓存，见 [DxRatingCoverImage] / `DxRatingCoverService`
+ *   3. `assets/cover/0.webp`（默认曲绘）
+ *
+ * ⚠️ 第 2 条是 2026-09 新增的兜底：水鱼的 DX 条目 id 是 `10000 + 基础 id`
+ * （如 `10030`），第 1 条的 URL 规则会拼成 `10030.png` → **404**，
+ * 必须靠第 2 条（它按基础 id 归一化后再查 imageName）才出得来图。
  */
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+
+import '../service/DxRatingCoverService.dart';
+import '../widgets/DxRatingCoverImage.dart';
 
 class CoverUtil {
   // ===========================================================================
   // 基础路径构建
   // ===========================================================================
 
-  /// 构建曲绘 assets 路径（最基础方法）
+  /// 构建曲绘 assets 路径（最基础方法，**不做 id 剔除**）
   /// [coverId] 曲绘 ID，为 null 时使用 '0'
+  ///
+  /// ⚠️ 这个方法是给「拼候选路径 / 探测资源」用的，**不要拿来直接显示**：
+  /// 5、6 位 songId 的资源名是剔除后的 id（11312 → `1312.webp`、121634 → `1634.webp`），
+  /// 直读原始 id 必然失败。显示请用 [buildCoverWidget] / [buildCoverWidgetWithContext]
+  /// （多级 fallback），要真实存在的本地路径用 [getLocalCoverPath]。
+  /// 曲绘识别页的「匹配曲绘 / Top10 缩略图」就是因为直读这个路径而显示空白。
   static String buildCoverPath(String? coverId) =>
       'assets/cover/${coverId ?? '0'}.webp';
 
@@ -153,10 +173,18 @@ class CoverUtil {
   // ===========================================================================
 
   /// 解析曲绘的 [ImageProvider]，采用与 [buildCoverWidget] 一致的多级 fallback：
-  /// 原始 songId → 本地主路径 → 备用路径1 → 备用路径2 → 网络曲绘。
+  /// 原始 songId → 本地主路径 → 备用路径1 → 备用路径2 → dxrating / 网络曲绘。
   ///
   /// 本地路径通过 [rootBundle.load] 实际探测是否存在，命中即返回 [AssetImage]；
   /// 否则回退到网络曲绘（[NetworkImage]），与歌曲详情页的行为一致。
+  ///
+  /// 网络这一段只能选一个 provider（拿不到加载失败的信息），所以优先用 dxrating：
+  /// 曲绘索引里有映射时它几乎必定命中（实测覆盖 99.8%），图还小得多
+  /// （14~32 KB vs diving-fish 的 240~300 KB）且走磁盘缓存。
+  /// 索引没就绪 / 没这首歌 → 回落到原来的 diving-fish，行为与改动前一致。
+  ///
+  /// ⚠️ 这里**不 await** 索引加载：dxdata 有 4MB，首次拉取可能很慢，
+  /// 不能拖住调用方（如 ChartPlayPage 的页面初始化 / 猜歌翻牌）。
   static Future<ImageProvider> resolveCoverProvider(String songId) async {
     final localCandidates = <String>[
       buildCoverPath(songId),
@@ -172,13 +200,59 @@ class CoverUtil {
         // 本地资源不存在，继续尝试下一条候选路径
       }
     }
-    // 本地无真实曲绘，回退到网络曲绘（与 buildCoverWidget 的网络兜底一致）
+    // 网络兜底：先在后台把索引补齐（不阻塞本次），这一轮能命中就先用 dxrating
+    DxRatingCoverService.instance.ensureLoaded();
+    final dxUrl = DxRatingCoverService.instance.coverUrlFor(songId);
+    if (dxUrl != null) {
+      return CachedNetworkImageProvider(
+        dxUrl,
+        cacheManager: dxRatingCoverCacheManager,
+      );
+    }
     return NetworkImage(getNetworkCoverUrl(songId));
   }
 
   // ===========================================================================
   // 曲绘 Widget（带多级 fallback）
   // ===========================================================================
+
+  /// 多级 fallback 链（两个公开方法共用一份，别再各抄一份嵌套 errorBuilder）。
+  ///
+  /// 顺序：原始路径 → 主路径 → 备用1 → 备用2 → diving-fish → dxrating → 默认曲绘。
+  static Widget _buildFallbackChain(String songId) {
+    return Image.asset(
+      buildCoverPath(songId),
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return Image.asset(
+          getLocalCoverPath(songId),
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Image.asset(
+              getLocalCoverPathRetry1(songId),
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Image.asset(
+                  getLocalCoverPathRetry2(songId),
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Image.network(
+                      getNetworkCoverUrl(songId),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        // 新增：dxrating 兜底（自带磁盘缓存 + 默认曲绘兜底）
+                        return DxRatingCoverImage(songId: songId);
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
 
   /// 构建曲绘 Widget
   ///
@@ -187,47 +261,15 @@ class CoverUtil {
   /// 2. 本地主路径
   /// 3. 本地备用路径1
   /// 4. 本地备用路径2
-  /// 5. 网络加载
-  /// 6. 默认曲绘 0.webp
+  /// 5. 网络加载（diving-fish）
+  /// 6. dxrating（shama，带磁盘缓存）
+  /// 7. 默认曲绘 0.webp
   static Widget buildCoverWidget(String songId, double size) {
     return Container(
       width: size,
       height: size,
       decoration: const BoxDecoration(color: Colors.white),
-      child: Image.asset(
-        buildCoverPath(songId),
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return Image.asset(
-            getLocalCoverPath(songId),
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return Image.asset(
-                getLocalCoverPathRetry1(songId),
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Image.asset(
-                    getLocalCoverPathRetry2(songId),
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Image.network(
-                        getNetworkCoverUrl(songId),
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Image.asset(
-                            buildCoverPath('0'),
-                            fit: BoxFit.cover,
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              );
-            },
-          );
-        },
-      ),
+      child: _buildFallbackChain(songId),
     );
   }
 
@@ -240,40 +282,7 @@ class CoverUtil {
       width: size,
       height: size,
       decoration: const BoxDecoration(color: Colors.white),
-      child: Image.asset(
-        buildCoverPath(songId),
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return Image.asset(
-            getLocalCoverPath(songId),
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return Image.asset(
-                getLocalCoverPathRetry1(songId),
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Image.asset(
-                    getLocalCoverPathRetry2(songId),
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Image.network(
-                        getNetworkCoverUrl(songId),
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Image.asset(
-                            buildCoverPath('0'),
-                            fit: BoxFit.cover,
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              );
-            },
-          );
-        },
-      ),
+      child: _buildFallbackChain(songId),
     );
   }
 
