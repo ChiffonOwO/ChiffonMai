@@ -11,7 +11,6 @@ class CacheTimestampConstant {
       refreshDataCacheDays * 24 * 60 * 60 * 1000;
 
   // 单位：天
-  static const int knowledgeCacheDays = 7;
   static const int maidataFullCacheDays = 7;
   static const int maidataAddedSongsCacheDays = 15;
   static const int luoxueSongCacheDays = 30;
@@ -22,8 +21,6 @@ class CacheTimestampConstant {
   static const int maimaiServerStatusCacheMinutes = 5;
 
   // 单位：毫秒
-  static const int knowledgeCacheMillis =
-      knowledgeCacheDays * 24 * 60 * 60 * 1000;
   static const int maidataFullCacheMillis =
       maidataFullCacheDays * 24 * 60 * 60 * 1000;
   static const int maidataAddedSongsCacheMillis =

@@ -48,6 +48,7 @@ import 'package:my_first_flutter_app/service/AWMC/AwmcPlayCountStore.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/SongFilterUtil.dart';
 import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/ChartHistorySection.dart';
 
 class SongInfoPage extends StatefulWidget {
   final String songId;
@@ -408,6 +409,39 @@ class _SongInfoPageState extends State<SongInfoPage> {
       ..sort((a, b) =>
           (versionOrder[a.key] ?? 999).compareTo(versionOrder[b.key] ?? 999));
     return entries.map((e) => (version: e.key, value: e.value)).toList();
+  }
+
+  /// 成绩趋势（达成率 / DX 分曲线）板块。
+  ///
+  /// **它是一块独立于「玩家最佳成绩」的卡片**，排在后者下方 —— 以前这条曲线
+  /// 是嵌在「玩家最佳成绩」容器内部的一段，看起来像是成绩卡的一部分，
+  /// 而它其实是"这张谱面的历史成绩"，粒度是谱面而不是这一次成绩。
+  ///
+  /// 卡片自身不给内边距：没有历史时 [ChartHistorySection] 返回 `SizedBox.shrink()`，
+  /// 外壳也必须跟着收缩成 0 高度，所以 padding 只能按**渲染形态**分三档给
+  /// （空 / 一行文字 / 完整曲线），否则会在页面上凭空留一块空白。
+  Widget _buildChartHistoryCard() {
+    final songId = int.tryParse(widget.songId) ?? 0;
+    // ⚠️ 卡片**不做外层 padding**：`ChartHistorySection` 在没有历史时返回
+    // `SizedBox.shrink()`，外面再垫一个 SizedBox 就会在页面上留一块空白。
+    // 「与上方成绩卡的空隙」由 section 自己的 `chartPadding.top` 提供
+    // （只有真正画出曲线时才存在）。见那里的参数说明。
+    return ChartHistorySection(
+      songId: songId,
+      levelIndex: _currentDiffIndex,
+      maxDxScore: _calculateMaxDxScore(songId, _currentDiffIndex),
+      // 有曲线时的卡片样式（垫一层 surface 底 + 圆角）
+      cardStyle: true,
+      // 完全没有历史 → 整块高度 0，不占位、不留白
+      emptyPadding: EdgeInsets.zero,
+      // 有基线/单条记录（只有一行文字）→ 基本水平内边距
+      textPadding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+      // 有曲线 → 完整卡片内边距。
+      // ⚠️ top 保持小值：**卡片之间的间距由 build 里那个 `SizedBox(height: 10)` 提供**，
+      // 因为那个间隔在所有形态下都存在；只在这里加大 top 的话，
+      // "只有一行历史文字"的形态又会贴住上面的卡片。
+      chartPadding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+    );
   }
 
   // 定数历史表格（横向滑动，2行：版本列表 + 对应定数）
@@ -2186,9 +2220,13 @@ class _SongInfoPageState extends State<SongInfoPage> {
           Column(
             children: [
               // 标题栏统一走公共组件（右侧两个真按钮走 actions 槽）
+              //
+              // 这里不再传 `fontSize: 24`：全 App 的 AppBar 标题现在是同一套
+              // 规格（思源黑体 20 / bold / colorScheme.primary / 居中），
+              // 见 AppTheme.font + PageTopBar；单独放大到 24 会让这一页的
+              // 标题比别人粗一圈，与「统一标题字体」的目标相悖。
               PageTopBar(
                 title: '歌曲详情',
-                fontSize: 24,
                 actions: [
                 IconButton(
                 icon: const Icon(Icons.image_outlined),
@@ -3018,8 +3056,17 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                   ),
                                                 ),
                                               ],
-                                              const SizedBox(height: 8),
+                                              // 成绩趋势曲线不在这里 —— 它已经
+                                              // 移到「玩家最佳成绩」卡片**下方**，
+                                              // 作为独立板块（见 _buildChartHistoryCard）。
                                               if (userRecord != null) ...[
+                                                // ⚠️ 这里的 8dp 间距必须和上面
+                                                // Rating / 游玩次数 两行保持一致：
+                                                // 「玩家最佳成绩」四行（Rating、
+                                                // 游玩次数、DX分数、DX分数达成率）
+                                                // 的行间距统一是 8dp，缺一处就会
+                                                // 看起来某两行贴得特别近。
+                                                const SizedBox(height: 8),
                                                 RichText(
                                                   text: TextSpan(
                                                     children: [
@@ -3153,6 +3200,14 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                   ],
                                 ),
                               ),
+
+                              // 成绩趋势：**独立于「玩家最佳成绩」卡片之外的板块**。
+                              // 没有历史时它整块高度为 0（见 _buildChartHistoryCard），
+                              // 所以这个 10dp 间隔**只服务于"有曲线"的情形** ——
+                              // 没有历史时它就是"卡片 → 按钮行"的正常间距，
+                              // 不会凭空多留一块空白。
+                              const SizedBox(height: 10),
+                              _buildChartHistoryCard(),
 
                               SizedBox(height: 12),
 

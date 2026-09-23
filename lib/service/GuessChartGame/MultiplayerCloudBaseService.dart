@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../Multiplayer/WebSocketBroadcastService.dart';
 import 'MultiplayerGameService.dart';
@@ -30,6 +31,47 @@ class MultiplayerCloudBaseService {
   String? currentNickname;
   String? currentRoomId;
   String? _envId;
+
+  /// 本机保存的玩家 ID（prefs）。切后台/掉线重连时带着它，服务端才能把
+  /// 断线宽限期内的座位还给我们 —— 见 [WebSocketBroadcastService.sendInitialize]。
+  static const String _kSavedPlayerIdKey = 'multiplayer_player_id';
+
+  /// 本机保存的「上次所在房间」。只有它也在时才会带 resumePlayerId：
+  /// 没有房间就没有座位可复位，硬带一个陌生 ID 只会变成幽灵座位。
+  static const String _kSavedRoomIdKey = 'multiplayer_last_room_id';
+
+  /// 本次连接是否由服务端「接回原座位」（`initialized.resumed == true`）。
+  bool _resumedThisSession = false;
+
+  Future<String?> _loadPref(String key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final v = prefs.getString(key);
+      return (v == null || v.isEmpty) ? null : v;
+    } catch (e) {
+      debugPrint('[DEBUG][CloudService] 读取本机身份失败（忽略）: $e');
+      return null;
+    }
+  }
+
+  Future<void> _savePref(String key, String? value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (value == null || value.isEmpty) {
+        await prefs.remove(key);
+      } else {
+        await prefs.setString(key, value);
+      }
+    } catch (e) {
+      debugPrint('[DEBUG][CloudService] 保存本机身份失败（忽略）: $e');
+    }
+  }
+
+  /// 记下「我在这个房间里」：切后台回来时靠它判断值不值得做身份复位。
+  Future<void> _rememberRoom(String? roomId) => _savePref(_kSavedRoomIdKey, roomId);
+
+  /// 主动退房 / 被服务端移除：清掉房间记忆，下次不再尝试复位。
+  Future<void> _forgetRoom() => _savePref(_kSavedRoomIdKey, null);
 
   Stream<MultiplayerEvent> get events => _controller.stream;
 
@@ -83,8 +125,17 @@ class MultiplayerCloudBaseService {
       debugPrint('[DEBUG][CloudService] WebSocket 连接成功');
       
       // 发送初始化消息获取玩家ID
+      // 带上本机保存的 playerId：如果是「切后台把 socket 掐了」这种情况，
+      // 服务端会认出我们并把这条连接接回原座位（断线宽限期 120s）。
+      // 只有「上次确实在某个房间里」才带 —— 否则没有座位可复位。
       debugPrint('[DEBUG][CloudService] 发送初始化消息获取玩家ID...');
-      await _wsBroadcast.sendInitialize(finalNickname);
+      _resumedThisSession = false;
+      final savedPlayerId = await _loadPref(_kSavedPlayerIdKey);
+      final savedRoomId = await _loadPref(_kSavedRoomIdKey);
+      await _wsBroadcast.sendInitialize(
+        finalNickname,
+        resumePlayerId: savedRoomId == null ? null : savedPlayerId,
+      );
       
       if (waitForResponse) {
         debugPrint('[DEBUG][CloudService] 等待初始化响应...');
@@ -238,8 +289,12 @@ class MultiplayerCloudBaseService {
   void _handleInitialized(Map<String, dynamic> payload) {
     currentPlayerId = payload['playerId'];
     currentNickname = payload['nickname'] ?? currentNickname;
+    _resumedThisSession = payload['resumed'] == true;
+    // 本机记住这个身份：下次断线/切后台重连时带回去，服务端据此把座位还给我们
+    _savePref(_kSavedPlayerIdKey, currentPlayerId);
     
-    debugPrint('[DEBUG][CloudService] 初始化完成，玩家ID: $currentPlayerId');
+    debugPrint('[DEBUG][CloudService] 初始化完成，玩家ID: $currentPlayerId'
+        '${_resumedThisSession ? '（已接回原座位）' : ''}');
     debugPrint('[DEBUG][CloudService] 当前玩家昵称: $currentNickname');
     
     _controller.add(MultiplayerEvent.initialized());
@@ -254,6 +309,8 @@ class MultiplayerCloudBaseService {
     RoomEntity room = RoomEntity.fromJson(roomData);
     String? previousRoomId = currentRoomId;
     currentRoomId = room.roomId;
+    // 记下「我在这个房间里」：切后台回来时服务端才能把座位还给我们
+    _rememberRoom(currentRoomId);
 
     debugPrint('[DEBUG][CloudService] ====== 房间创建 ======');
     debugPrint('[DEBUG][CloudService] 房间ID: ${room.roomId}');
@@ -350,6 +407,9 @@ class MultiplayerCloudBaseService {
     PlayerEntity player = PlayerEntity.fromJson(payload['player']);
     String? previousRoomId = currentRoomId;
     currentRoomId = room.roomId;
+    // 记下「我在这个房间里」：切后台回来时服务端才能把座位还给我们
+    // （断线复位时服务端也会补发 room_joined，这里顺带把记忆刷新一遍）
+    _rememberRoom(currentRoomId);
     
     debugPrint('[DEBUG][CloudService] ====== 加入房间 ======');
     debugPrint('[DEBUG][CloudService] 房间ID: ${room.roomId}');
@@ -456,6 +516,8 @@ class MultiplayerCloudBaseService {
 
   void _handleLeftRoom(Map<String, dynamic> payload) {
     currentRoomId = null;
+    // 已经不在房间里了：别再尝试身份复位（否则会变成幽灵座位）
+    _forgetRoom();
     _controller.add(MultiplayerEvent.leftRoom());
   }
 
@@ -603,6 +665,8 @@ class MultiplayerCloudBaseService {
       // 清除房间相关状态，但保留玩家ID以便后续使用
       _rooms.remove(currentRoomId);
       currentRoomId = null;
+      // 主动退房：座位已经交了，别再记着这个房间
+      await _forgetRoom();
       // 保留玩家ID，不清除，以便重连后保持身份
       // currentPlayerId 会在重连时由服务器重新分配
       
@@ -614,7 +678,16 @@ class MultiplayerCloudBaseService {
   // 重连后恢复状态
   Future<void> restoreStateAfterReconnect() async {
     debugPrint('[DEBUG][CloudService] 重连后尝试恢复状态');
-    
+
+    // 服务端已经把我们接回原座位（initialize 带了 resumePlayerId 且命中宽限期）：
+    // 房间与对局状态由服务端补发（room_joined + game_state_updated），
+    // 这里**不能**再 joinRoom —— 那会撞上「您已在房间中」，还会把状态搅乱。
+    if (_resumedThisSession || _wsBroadcast.lastInitResumed) {
+      _resumedThisSession = true;
+      debugPrint('[DEBUG][CloudService] 服务端已接回原座位，跳过重新加入房间');
+      return;
+    }
+
     if (currentRoomId != null && _rooms.containsKey(currentRoomId)) {
       String roomId = currentRoomId!;
       debugPrint('[DEBUG][CloudService] 尝试重新加入房间: $roomId');

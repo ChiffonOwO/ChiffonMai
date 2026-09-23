@@ -21,6 +21,7 @@ class FeatureRegistry {
     ButtonCategory(name: 'Best50与排行榜', items: [
       const ButtonItem(icon: Icons.leaderboard, title: 'Best50', subtitle: '查看当前 Best35 与 Best15'),
       const ButtonItem(icon: Icons.analytics, title: '拟合 Best50', subtitle: '分析潜在 Rating 上限'),
+      const ButtonItem(icon: Icons.timeline_rounded, title: 'Rating 历史', subtitle: '看 Rating 随时间的变化'),
       const ButtonItem(icon: Icons.person_search_outlined, title: '个性化 Best50', subtitle: '按标签筛选 Best50'),
       const ButtonItem(icon: Icons.analytics_outlined, title: '个性化拟合 Best50', subtitle: '按标签查看拟合 Rating 上限'),
       const ButtonItem(icon: Icons.leaderboard, title: 'Rating 排行榜', subtitle: '查看玩家 Rating 排行'),
@@ -39,6 +40,7 @@ class FeatureRegistry {
       const ButtonItem(icon: Icons.gamepad, title: '多人猜歌游戏', subtitle: '和朋友一起猜舞萌曲库'),
     ]),
     ButtonCategory(name: '实用工具', icon: Icons.work, items: [
+      const ButtonItem(icon: Icons.headphones, title: '随身听', subtitle: '后台播放舞萌曲库，带通知栏播放器'),
       const ButtonItem(icon: Icons.arrow_circle_up, title: '段位表', subtitle: '挑战你的下一段位'),
       const ButtonItem(icon: Icons.label, title: '基于标签推荐', subtitle: '基于你的游玩谱面标签推荐曲目'),
       const ButtonItem(icon: Icons.trending_up, title: '基于目标 Rating 推荐', subtitle: '寻找适合上分的谱面'),
@@ -58,7 +60,6 @@ class FeatureRegistry {
       const ButtonItem(icon: Icons.people, title: '好友对比', subtitle: '看看你和好友的成绩差异'),
       const ButtonItem(icon: Icons.map, title: '全国音游地图', subtitle: '看看哪里有你想玩的机台'),
       const ButtonItem(icon: Icons.public, title: '全球音游街机地图', subtitle: '查看 NearCade 全球街机店铺'),
-      const ButtonItem(icon: Icons.bookmark_add, title: '舞萌百科', subtitle: '查阅舞萌相关知识'),
     ]),
     ButtonCategory(name: '友情链接', icon: Icons.handshake_outlined, items: [
       const ButtonItem(

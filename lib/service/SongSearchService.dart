@@ -5,6 +5,7 @@ import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
+import 'package:my_first_flutter_app/utils/SongQueryMatcher.dart';
 
 // 搜索服务
 class SongSearchService {
@@ -44,44 +45,15 @@ class SongSearchService {
           .toList();
     }
 
-    return allSongs!.where((song) {
-      // 检查歌曲ID（精确匹配）
-      if (song.id.toString() == query) {
-        return true;
-      }
-      // 检查标题
-      if (song.basicInfo.title.toLowerCase().contains(lowerQuery)) {
-        return true;
-      }
-      // 检查艺术家
-      if (song.basicInfo.artist.toLowerCase().contains(lowerQuery)) {
-        return true;
-      }
-      // 检查BPM
-      if (song.basicInfo.bpm.toString() == lowerQuery) {
-        return true;
-      }
-      // 检查谱师
-      for (var chart in song.charts) {
-        if (chart.charter.toLowerCase().contains(lowerQuery)) {
-          return true;
-        }
-      }
-      // 检查流派
-      if (song.basicInfo.genre.toLowerCase().contains(lowerQuery)) {
-        return true;
-      }
-      // 检查版本
-      if (song.basicInfo.from.toLowerCase().contains(lowerQuery)) {
-        return true;
-      }
-      // 检查别名
-      final aliases = SongAliasManager.instance.aliases[song.title] ?? [];
-      if (aliases.any((alias) => alias.toLowerCase().contains(lowerQuery))) {
-        return true;
-      }
-      return false;
-    }).toList();
+    // 匹配规则已抽到 `utils/SongQueryMatcher.dart`：随身听的搜索要求「照搬这一页的
+    // 逻辑」，两份各写一份迟早漂移。这里只是把别名取出来喂给共享的纯函数。
+    return allSongs!
+        .where((song) => matchesDivingFishSongQuery(
+              song,
+              lowerQuery,
+              aliases: SongAliasManager.instance.aliases[song.title] ?? const [],
+            ))
+        .toList();
   }
 
   // 获取所有谱师列表（去重，按名称排序）

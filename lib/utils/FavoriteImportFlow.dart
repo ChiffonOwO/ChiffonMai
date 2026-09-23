@@ -188,7 +188,10 @@ Future<void> _showMessageDialog(
   );
 }
 
-/// 导入按钮的文字提示，带上当前自定义后缀，让用户知道要选什么文件。
+/// 导入按钮的文字提示，带上固定的收藏夹后缀，让用户知道要选什么文件。
+///
+/// 提示里只认 `.cmf`，但**文件选择器不过滤后缀**（导入按内容识别），
+/// 所以用户以前用自定义后缀导出的备份也照样能选、能导进来。
 String favoriteImportHint() =>
     '支持 ${ExportSettings.favoriteExtensionWithDot} 等 ChiffonMai 收藏夹文件';
 

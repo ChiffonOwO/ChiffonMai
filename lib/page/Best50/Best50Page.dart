@@ -584,7 +584,7 @@ class _B50PageState extends State<B50Page> {
                             height: MediaQuery.of(context).size.height * 0.015),
                         _buildDataCardGrid(
                           _isTheoreticalMode ? _theoreticalSdSongs : _sdSongs, 
-                          1.75,
+                          B50GameCardWidget.designAspectRatio,
                           remainingInfo: _isTheoreticalMode ? _remainingSdSongsInfo : null,
                         ),
                         SizedBox(height: MediaQuery.of(context).size.height * 0.02),
@@ -592,7 +592,7 @@ class _B50PageState extends State<B50Page> {
                         SizedBox(height: 12.0),
                         _buildDataCardGrid(
                           _isTheoreticalMode ? _theoreticalDxSongs : _dxSongs, 
-                          1.75,
+                          B50GameCardWidget.designAspectRatio,
                           remainingInfo: _isTheoreticalMode ? _remainingDxSongsInfo : null,
                         ),
                       ],
@@ -1411,14 +1411,6 @@ class _B50PageState extends State<B50Page> {
     int maxIdLength = 5,
     bool isFitDiff = false,
   }) {
-    // 容器宽度基准（以屏幕宽度为参照）
-    final screenWidth = MediaQuery.of(context).size.width;
-    final cardW = (screenWidth - screenWidth * 0.01) / 2; // 单卡片宽度（2 列布局）
-    // 导出图片基准卡片宽度：1700 / 5 列 - 间距 ≈ 335
-    const double refCardWidth = 335.0;
-    // 将字号按比例从 refCardWidth → cardW 缩放
-    final scale = cardW / refCardWidth;
-
     return B50GameCardWidget(
       cardColor: cardColor,
       songName: songName,
@@ -1436,7 +1428,9 @@ class _B50PageState extends State<B50Page> {
       songId: songId ?? 0,
       starsColor: starsColor,
       maxIdLength: maxIdLength,
-      scale: scale,
+      // 字号按卡片**实际**宽度自适应（别拿屏幕宽度估：容器 padding / 网格间距
+      // 都会从宽度里扣掉，估出来的值和真实格子差好几个百分点）。
+      scale: B50GameCardWidget.autoScale,
       isFitDiff: isFitDiff,
     );
   }

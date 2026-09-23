@@ -75,5 +75,15 @@
 	<array>
 		<string>bilibili</string>
 	</array>
+
+	<!--
+	  随身听的后台播放（audio_service / just_audio_background）。
+	  没有 audio 这个后台模式，iOS 会在 App 退到后台后立刻暂停音频。
+	  ⚠️ 本项在 iOS 上**从未验证过**（开发环境只有 Android）。
+	-->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 </dict>
 </plist>

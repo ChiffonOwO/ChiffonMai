@@ -78,11 +78,9 @@ class ApiUrls {
   static const String DivingFishUpdateRecordsApi =
       'https://www.diving-fish.com/api/maimaidxprober/player/update_records';
 
-  // ── 更新检查 / 知识库（自家后端，直连） ───────────────────────────────
+  // ── 更新检查（自家后端，直连） ────────────────────────────────────────
   static const String checkUpdateApi =
       'https://chiffonmai.cloud/app_version.json';
-  static const String knowledgeApi =
-      'http://chiffonmai.cloud:3000/api/knowledge';
 
   // 多人游戏服务器地址
   static const String MultiplayerServerUrl = 'ws://chiffonmai.cloud:3000';

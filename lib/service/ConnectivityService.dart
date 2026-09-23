@@ -24,7 +24,6 @@ class ConnectivityService {
     'musicData': 'maidata_full_cache_timestamp',
     'diffData': 'diff_music_data_last_update',
     'userData': 'user_play_data_timestamp',
-    'knowledgeData': 'knowledge_timestamp',
     'tagsData': 'mai_tags_cache_timestamp',
   };
 

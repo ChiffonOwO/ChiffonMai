@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api/ApiUrls.dart';
+import '../service/AWMC/AwmcPlayCountStore.dart';
 import '../constant/CacheKeyConstant.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
@@ -600,6 +601,11 @@ class DivingFishProbeManager {
       _log('⚠ 拒绝：同步已在进行中');
       return SyncResult.failure('同步已在进行中，请稍后重试');
     }
+
+    // 与线路2 一样顺手刷新一次游玩次数（AWMC `/v1/user/music`）。
+    // **尽力而为、绝不 await**：没令牌/超时/报错都忽略，下面的原有同步流程照走。
+    // 详见 AwmcPlayCountStore.refreshQuietly。
+    AwmcPlayCountStore.refreshQuietly(qrCode);
 
     // 恢复或检查认证 token；若无则直接用 QR 码登录 Hub
     final hasToken = await _ensureAuthToken();
@@ -1867,6 +1873,11 @@ class DivingFishProbeManager {
       _log('⚠ 拒绝：同步已在进行中');
       return SyncResult.failure('同步已在进行中，请稍后重试');
     }
+
+    // 与线路2 一样顺手刷新一次游玩次数（AWMC `/v1/user/music`）。
+    // **尽力而为、绝不 await**：没令牌/超时/报错都忽略，下面的原有同步流程照走。
+    // 详见 AwmcPlayCountStore.refreshQuietly。
+    AwmcPlayCountStore.refreshQuietly(qrCode);
 
     _isSyncing = true;
     _cancelled = false;

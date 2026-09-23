@@ -1,15 +1,27 @@
+/*
+ * 歌曲详情页的「播放音乐」页 —— **已经接管到随身听**。
+ *
+ * 历史：这里原本自己 new 一个 `audioplayers` 的 `AudioPlayer`，在 `dispose()` 里
+ * `stop + dispose`，所以「退出这个页面 = 音乐停」，也不会有通知栏控制。
+ *
+ * 现在这一页只做三件事：
+ *   1. 把水鱼 songId 解析成随身听条目（[PortableSongLibrary.findSong]）；
+ *   2. 交给全局的 [PortablePlayerController] 播放（不持有播放器所有权）；
+ *   3. 渲染随身听的全屏播放界面。
+ *
+ * 因此退出这一页**不会**中断音乐，悬浮球和通知栏也照常工作。
+ *
+ * 保留原来的构造签名（songId / songTitle / songType），这样 `SongInfoPage`
+ * 等调用点的改动最小。
+ */
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/utils/CoverUtil.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
-import 'package:my_first_flutter_app/utils/AppTheme.dart';
-import 'package:my_first_flutter_app/service/SongPlayService.dart';
-import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
-import 'package:flutter/services.dart';
-import 'dart:async';
-import 'dart:io';
-import 'package:audioplayers/audioplayers.dart';
-import 'package:path_provider/path_provider.dart';
+
+import '../entity/Portable/PortableSong.dart';
+import '../service/Portable/PortablePlayerController.dart';
+import '../service/Portable/PortableSongLibrary.dart';
+import '../utils/CommonWidgetUtil.dart';
 import '../widgets/PageTopBar.dart';
+import 'Portable/PortableNowPlayingPage.dart';
 
 class SongPlayPage extends StatefulWidget {
   final String songId;
@@ -28,501 +40,109 @@ class SongPlayPage extends StatefulWidget {
 }
 
 class _SongPlayPageState extends State<SongPlayPage> {
-  // 播放状态
-  bool _isPlaying = false;
-  bool _wasCompleted = false;
-  // 播放进度
-  double _progress = 0.0;
-  // 总时长（秒）
-  int _totalDuration = 180; // 默认3分钟
-  // 当前时长（秒）
-  int _currentDuration = 0;
-  // 落雪歌曲ID
-  String? _luoXueSongId;
-  // 加载状态
-  bool _isLoading = true;
-  // 播放器
-  AudioPlayer? _audioPlayer;
-  // 定时器
-  Timer? _timer;
-  // 音频URL
-  String? _audioUrl;
-  // 缓存文件路径
-  String? _cachedFilePath;
-  // 曲师信息
-  String _artist = '';
+  final PortableSongLibrary _library = PortableSongLibrary();
+  final PortablePlayerController _player = PortablePlayerController();
+
+  /// 是否已经把播放权交给全局播放器。
+  ///
+  /// 这一页可能在音乐已经在放的时候被打开（比如从随身听列表再点进来），
+  /// 那种情况下不该打断当前播放去重播这首歌 —— 只有当这首**不是**当前曲目时
+  /// 才真的切过去。
+  bool _handedOff = false;
+  String? _message;
+  PortableSong? _resolved;
 
   @override
   void initState() {
     super.initState();
-    _audioPlayer = AudioPlayer();
-    _loadLuoXueSongId();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _resolveAndPlay());
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _audioPlayer?.stop();
-    _audioPlayer?.dispose();
-    _audioPlayer = null;
-    super.dispose();
-  }
-
-  // 加载落雪歌曲ID
-  Future<void> _loadLuoXueSongId() async {
+  Future<void> _resolveAndPlay() async {
     try {
-      // 加载曲师信息
-      await _loadArtistInfo();
-
-      final songPlayService = SongPlayService();
-
-      // 宴会场歌曲（6 位数 songId）：曲绘实际用的是 cover id，
-      // 落雪那边的歌曲 ID 与曲绘 ID 一致，所以用 cover id 就能找到对应的落雪歌曲。
-      // 例如: songId=100018 -> coverId=18 -> 落雪歌曲 id=18
-      if (widget.songId.length == 6) {
-        final coverId = CoverUtil.extractCoverId(widget.songId);
-        if (coverId.isNotEmpty && coverId != '0') {
-          _luoXueSongId =
-              await songPlayService.findLuoXueSongIdByCoverId(coverId);
-        }
-      }
-
-      // 兜底：通过 title 和 type 查找（非宴会场歌曲，或宴会场 cover id 查不到时）
-      _luoXueSongId ??= await songPlayService.findLuoXueSongId(
-        widget.songTitle,
-        widget.songType,
+      // 曲库可能还没构建过（用户没进过随身听页），先确保加载
+      await _library.load();
+      final song = _library.findSong(
+        songId: widget.songId,
+        title: widget.songTitle,
+        type: widget.songType,
       );
+      if (!mounted) return;
 
-      // 如果找到落雪歌曲ID，构建音频URL
-      if (_luoXueSongId != null) {
-        _audioUrl =
-            'https://assets2.lxns.net/maimai/music/${_luoXueSongId}.mp3';
-        // 检查是否有缓存文件
-        _cachedFilePath = await _getCachedFilePath(_luoXueSongId!);
-        // 尝试获取音频时长
-        _loadAudioDuration();
-      }
-    } catch (e) {
-      debugPrint('加载落雪歌曲ID失败: $e');
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  // 加载曲师信息
-  Future<void> _loadArtistInfo() async {
-    try {
-      final musicManager = MaimaiMusicDataManager();
-      if (await musicManager.hasCachedData()) {
-        final songs = await musicManager.getCachedSongs();
-        if (songs != null) {
-          final match = songs.where((s) => s.id == widget.songId);
-          if (match.isNotEmpty && mounted) {
-            setState(() {
-              _artist = match.first.basicInfo.artist;
-            });
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('加载曲师信息失败: $e');
-    }
-  }
-
-  // 获取缓存文件路径
-  Future<String> _getCachedFilePath(String songId) async {
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final cacheDir = Directory('${directory.path}/music_cache');
-      if (!cacheDir.existsSync()) {
-        cacheDir.createSync(recursive: true);
-      }
-      return '${cacheDir.path}/${songId}.mp3';
-    } catch (e) {
-      debugPrint('获取缓存目录失败: $e');
-      return '';
-    }
-  }
-
-  // 检查缓存是否存在
-  Future<bool> _isCached(String songId) async {
-    try {
-      final filePath = await _getCachedFilePath(songId);
-      return File(filePath).existsSync();
-    } catch (e) {
-      debugPrint('检查缓存失败: $e');
-      return false;
-    }
-  }
-
-  // 下载并缓存音频文件
-  Future<void> _downloadAndCacheAudio() async {
-    if (_luoXueSongId == null || _audioUrl == null) return;
-
-    try {
-      // 检查是否已缓存
-      bool isCached = await _isCached(_luoXueSongId!);
-      if (isCached) {
-        debugPrint('音频已缓存，使用缓存文件');
-        _cachedFilePath = await _getCachedFilePath(_luoXueSongId!);
+      if (song == null) {
+        setState(() {
+          _message = '这首歌暂时没有可用的音源（水鱼/落雪曲库里没找到对应条目）';
+        });
         return;
       }
+      setState(() => _resolved = song);
 
-      debugPrint('开始下载并缓存音频: $_audioUrl');
-      // 下载音频文件
-      final httpClient = HttpClient();
-      final request = await httpClient.getUrl(Uri.parse(_audioUrl!));
-      final response = await request.close();
-
-      if (response.statusCode == HttpStatus.ok) {
-        final filePath = await _getCachedFilePath(_luoXueSongId!);
-        final file = File(filePath);
-        final sink = file.openWrite();
-        await sink.addStream(response);
-        await sink.close();
-        _cachedFilePath = filePath;
-        debugPrint('音频缓存成功: $filePath');
-      } else {
-        debugPrint('下载音频失败: ${response.statusCode}');
+      final current = _player.currentSong;
+      if (current != null && current.lxnsId == song.lxnsId) {
+        // 已经就是当前曲目：不动播放状态，只把界面换过来
+        _handedOff = true;
+        return;
       }
+      _handedOff = true;
+      await _player.playSong(song);
     } catch (e) {
-      debugPrint('缓存音频失败: $e');
+      if (!mounted) return;
+      setState(() => _message = '打开播放器失败：$e');
     }
-  }
-
-  // 加载音频时长
-  Future<void> _loadAudioDuration() async {
-    if (_audioUrl == null || _audioPlayer == null) return;
-
-    try {
-      // 检查并下载缓存
-      await _downloadAndCacheAudio();
-
-      // 确定使用的音频源
-      String audioSource =
-          _cachedFilePath != null && _cachedFilePath!.isNotEmpty
-              ? _cachedFilePath!
-              : _audioUrl!;
-
-      debugPrint('开始加载音频时长: $audioSource');
-      // 预加载音频以获取时长
-      if (_cachedFilePath != null && _cachedFilePath!.isNotEmpty) {
-        await _audioPlayer!.setSource(DeviceFileSource(_cachedFilePath!));
-      } else {
-        await _audioPlayer!.setSourceUrl(_audioUrl!);
-      }
-
-      // 主动获取时长
-      Duration? duration = await _audioPlayer!.getDuration();
-      if (duration != null) {
-        debugPrint('主动获取到音频时长: ${duration.inSeconds}秒');
-        setState(() {
-          _totalDuration = duration.inSeconds;
-        });
-      }
-
-      // 监听时长变化
-      _audioPlayer!.onDurationChanged.listen((Duration duration) {
-        debugPrint('获取到音频时长: ${duration.inSeconds}秒');
-        setState(() {
-          _totalDuration = duration.inSeconds;
-        });
-      });
-      // 监听播放完成
-      _audioPlayer!.onPlayerComplete.listen((_) {
-        setState(() {
-          _isPlaying = false;
-          _wasCompleted = true;
-          _currentDuration = _totalDuration;
-          _progress = 1.0;
-        });
-        _timer?.cancel();
-      });
-      // 监听播放器状态变化
-      _audioPlayer!.onPlayerStateChanged.listen((PlayerState state) {
-        debugPrint('播放器状态变化: $state');
-      });
-    } catch (e) {
-      debugPrint('加载音频时长失败: $e');
-    }
-  }
-
-  // 播放/暂停音乐
-  void _togglePlayPause() async {
-    if (_audioUrl == null || _audioPlayer == null) return;
-
-    try {
-      if (_isPlaying) {
-        // 暂停
-        await _audioPlayer!.pause();
-        _timer?.cancel();
-      } else {
-        // 播放
-        final playerState = _audioPlayer!.state;
-        if (_wasCompleted || _currentDuration == 0 ||
-            playerState == PlayerState.completed ||
-            playerState == PlayerState.stopped) {
-          // 播放完毕/首次播放/播放器已停止：重新 play()（resume 在 completed/stopped 状态无效）
-          if (_cachedFilePath != null && _cachedFilePath!.isNotEmpty) {
-            await _audioPlayer!.play(DeviceFileSource(_cachedFilePath!));
-          } else {
-            await _audioPlayer!.play(UrlSource(_audioUrl!));
-          }
-          _wasCompleted = false;
-        } else {
-          // 继续播放
-          await _audioPlayer!.resume();
-        }
-        _startPlayback();
-      }
-
-      setState(() {
-        _isPlaying = !_isPlaying;
-      });
-    } catch (e) {
-      debugPrint('播放控制失败: $e');
-    }
-  }
-
-  // 开始播放
-  void _startPlayback() {
-    _timer?.cancel();
-    _timer = Timer.periodic(Duration(milliseconds: 500), (timer) {
-      if (_audioPlayer != null) {
-        _audioPlayer!.getCurrentPosition().then((Duration? position) {
-          if (position != null) {
-            setState(() {
-              _currentDuration = position.inSeconds;
-              _progress =
-                  _totalDuration > 0 ? _currentDuration / _totalDuration : 0;
-            });
-          }
-        });
-        // 定期检查并更新时长
-        _audioPlayer!.getDuration().then((Duration? duration) {
-          if (duration != null && duration.inSeconds > 0) {
-            setState(() {
-              _totalDuration = duration.inSeconds;
-            });
-          }
-        });
-      }
-    });
-  }
-
-  // 停止播放并返回
-  void _stopAndPop() {
-    _timer?.cancel();
-    _audioPlayer?.stop();
-    _audioPlayer?.dispose();
-    _audioPlayer = null;
-    if (mounted) Navigator.of(context).pop();
-  }
-
-  // 格式化时间
-  String _formatDuration(int seconds) {
-    int minutes = seconds ~/ 60;
-    int remainingSeconds = seconds % 60;
-    return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    final Color textPrimaryColor = Theme.of(context).colorScheme.onSurface;
-    final Color cardBgColor = Theme.of(context).colorScheme.surface.withOpacity(0.9);
-    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
-    final double borderRadiusSmall = 8.0;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
+    // 解析成功就直接用随身听的全屏播放页（同一套 UI，不维护两份）
+    if (_resolved != null && _handedOff) {
+      return const PortableNowPlayingPage();
+    }
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _stopAndPop();
-      },
-      child: Scaffold(
+    final scheme = Theme.of(context).colorScheme;
+    return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          // 背景
           CommonWidgetUtil.buildCommonBgWidget(),
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
           Column(
             children: [
-              // 标题栏统一走公共组件（返回前要先停掉播放，所以自定义 onBack）
-              PageTopBar(title: '播放音乐', onBack: _stopAndPop),
-
-              // 主内容区域
+              const PageTopBar(title: '播放音乐'),
               Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: cardBgColor,
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
-                  ),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // 加载状态
-                        if (_isLoading) ...[
-                          Center(
-                            child: CircularProgressIndicator(),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_message == null) ...[
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 16),
+                        Text(
+                          '正在准备音源…',
+                          style: TextStyle(color: scheme.onSurfaceVariant),
+                        ),
+                      ] else ...[
+                        Icon(
+                          Icons.music_off,
+                          size: 64,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          child: Text(
+                            _message!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: scheme.onSurfaceVariant),
                           ),
-                          SizedBox(height: 20),
-                          Center(
-                            child: Text('正在加载音乐...'),
-                          ),
-                        ] else if (_luoXueSongId == null) ...[
-                          Center(
-                            child: Icon(
-                              Icons.music_off,
-                              size: 100,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          SizedBox(height: 20),
-                          Center(
-                            child: Text('该歌曲暂无音乐资源'),
-                          ),
-                        ] else ...[
-                          // 曲绘
-                          Center(
-                            child: Container(
-                              width: MediaQuery.of(context).size.width * 0.7,
-                              height: MediaQuery.of(context).size.width * 0.7,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: brightness == Brightness.dark ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.2),
-                                    blurRadius: 8,
-                                    offset: Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: CoverUtil.buildCoverWidgetWithContext(
-                                  context,
-                                  widget.songId,
-                                  300,
-                                ),
-                              ),
-                            ),
-                          ),
-                          SizedBox(height: 32),
-
-                          // 歌曲名
-                          Center(
-                            child: Text(
-                              widget.songTitle,
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: textPrimaryColor,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-
-                          // 曲师信息
-                          Center(
-                            child: Text(
-                              _artist.isNotEmpty ? _artist : '未知曲师',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                          SizedBox(height: 48),
-
-                          // 进度条
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 32),
-                            child: Column(
-                              children: [
-                                // 进度条
-                                Slider(
-                                  value: _progress,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _progress = value;
-                                      _currentDuration =
-                                          (_totalDuration * value).round();
-                                      _wasCompleted = false;
-                                    });
-                                  },
-                                  onChangeEnd: (value) async {
-                                    // 拖动结束后跳转到指定位置
-                                    if (_audioPlayer != null) {
-                                      int seekPosition =
-                                          (_totalDuration * value).round() *
-                                              1000; // 转换为毫秒
-                                      await _audioPlayer!.seek(
-                                          Duration(milliseconds: seekPosition));
-                                    }
-                                  },
-                                  activeColor: AppColors.linkBlue(brightness),
-                                  inactiveColor: AppColors.greyHint(brightness),
-                                ),
-                                // 时间显示
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(_formatDuration(_currentDuration)),
-                                    Text(_formatDuration(_totalDuration)),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(height: 48),
-
-                          // 播放控制按钮
-                          Center(
-                            child: ElevatedButton.icon(
-                              onPressed: _togglePlayPause,
-                              icon: Icon(
-                                _isPlaying ? Icons.pause : Icons.play_arrow,
-                                size: 32,
-                              ),
-                              label: Text(
-                                _isPlaying ? '暂停' : '播放',
-                                style: TextStyle(fontSize: 18),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.linkBlue(brightness),
-                                foregroundColor: Colors.white,
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 48,
-                                  vertical: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
               ),
             ],
           ),
         ],
-      ),
       ),
     );
   }

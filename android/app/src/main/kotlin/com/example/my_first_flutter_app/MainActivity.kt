@@ -13,13 +13,24 @@ import android.view.Surface
 import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
-import io.flutter.embedding.android.FlutterActivity
+import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.OutputStream
 
-class MainActivity : FlutterActivity() {
+/**
+ * 主 Activity。
+ *
+ * ⚠️ 必须继承 [AudioServiceActivity]（它是 `FlutterActivity` 的子类），
+ * **不能改回 `FlutterActivity`**：随身听的后台播放/通知栏走 audio_service，
+ * 它要求承载的 Activity 是 AudioServiceActivity，否则 MediaSession 不会被正确
+ * 关联，表现为「前台能播、切后台就没通知栏」。改了这里记得同步看
+ * `AndroidManifest.xml` 里有没有 `com.ryanheise.audioservice.AudioService` 服务。
+ *
+ * 其余逻辑（三个 MethodChannel 与 intent 处理）与原来一致。
+ */
+class MainActivity : AudioServiceActivity() {
     private val CHANNEL = "com.example.app/media_store"
 
     /** 收藏夹「一键导入」通道：把文件管理器/分享进来的文件路径交给 Dart。 */
@@ -34,7 +45,20 @@ class MainActivity : FlutterActivity() {
      */
     private val DISPLAY_CHANNEL = "com.example.app/display"
 
+    /**
+     * 随身听自定义通知栏通道。
+     *
+     * 为什么需要它：audio_service 的通知布局由系统 `MediaStyle` 决定，做不出
+     * 「曲绘占左侧整高 + 右侧三行」的排版，所以通知改由
+     * [PortableNotificationService] 用 RemoteViews 自绘（并用相同的通知 ID 顶掉
+     * audio_service 那条）。Dart 侧负责把元数据、曲绘本地路径与播放状态推过来。
+     */
+    private val PORTABLE_NOTIFICATION_CHANNEL = "com.example.app/portable_notification"
+
     private var importChannel: MethodChannel? = null
+
+    /** 随身听通知栏通道的引用：通知栏按钮被点时要用它 invokeMethod 回 Dart。 */
+    private var portableNotificationChannel: MethodChannel? = null
 
     /** 进入播放页前的窗口 displayModeId，退出时原样还回去。 */
     private var savedDisplayModeId: Int? = null
@@ -60,6 +84,47 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // 随身听通知栏：Dart → 原生
+        val notificationChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            PORTABLE_NOTIFICATION_CHANNEL
+        )
+        portableNotificationChannel = notificationChannel
+        notificationChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "update" -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val args = call.arguments as? Map<String, Any?> ?: emptyMap()
+                    PortableNotificationService.update(
+                        applicationContext,
+                        PortableNotificationState(
+                            title = args["title"] as? String ?: "",
+                            artist = args["artist"] as? String ?: "",
+                            artPath = args["artPath"] as? String,
+                            isPlaying = args["isPlaying"] as? Boolean ?: false,
+                            hasNext = args["hasNext"] as? Boolean ?: false,
+                            hasPrevious = args["hasPrevious"] as? Boolean ?: false
+                        )
+                    )
+                    result.success(true)
+                }
+                "hide" -> {
+                    PortableNotificationService.hide(applicationContext)
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        // 通知栏按钮点击 → 原生 → Dart。走和 App 内按钮同一条路径（都由
+        // PortablePlayerController 执行），状态不会分叉。
+        PortableNotificationBridge.dispatch = { action ->
+            runOnUiThread {
+                portableNotificationChannel?.invokeMethod("onMediaAction", action)
+            }
+        }
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "saveImage") {
                 val imageBytes = call.argument<ByteArray>("imageBytes")

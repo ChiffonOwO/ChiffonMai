@@ -749,7 +749,7 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
         crossAxisCount: 2,
         crossAxisSpacing: screenWidth * 0.01,
         mainAxisSpacing: screenWidth * 0.01,
-        childAspectRatio: 1.75,
+        childAspectRatio: B50GameCardWidget.designAspectRatio,
       ),
       itemCount: _diffSongs.length,
       itemBuilder: (context, index) {
@@ -826,7 +826,7 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
   }
 
   // 构建游戏卡片（委托至通用 widget B50GameCardWidget，
-  // 内部按 refCardWidth=335 缩放，scale 取当前屏幕上单卡实际可见宽度 / 335）。
+  // 字号按卡片**实际**宽度自适应（`scale: autoScale`）。
   // 注：原 useOfficialDiff（黄星标记）已废弃，统一不在卡片中显示。
   Widget _buildGameCard({
     required Color cardColor,
@@ -846,10 +846,6 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
     Color starsColor = Colors.white,
     int maxIdLength = 5,
   }) {
-    final screenW = MediaQuery.of(context).size.width;
-    const double refCardWidth = 335.0;
-    final double cardW = (screenW - screenW * 0.02) / 2;
-    final double scale = cardW / refCardWidth;
     final int id = songId ?? 0;
 
     return B50GameCardWidget(
@@ -869,7 +865,9 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
       songId: id,
       starsColor: starsColor,
       maxIdLength: maxIdLength,
-      scale: scale,
+      // 字号按卡片**实际**宽度自适应：别拿屏幕宽度估（容器 padding /
+      // 网格间距都会从可用宽里扣掉）。
+      scale: B50GameCardWidget.autoScale,
     );
   }
 

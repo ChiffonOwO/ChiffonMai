@@ -1142,7 +1142,7 @@ class _CustomBest50PageState extends State<CustomBest50Page> {
         crossAxisCount: 2,
         crossAxisSpacing: MediaQuery.of(context).size.width * 0.01,
         mainAxisSpacing: MediaQuery.of(context).size.width * 0.01,
-        childAspectRatio: 1.75,
+        childAspectRatio: B50GameCardWidget.designAspectRatio,
       ),
       itemCount: CustomBest50Store.slotCount,
       itemBuilder: (context, index) {
@@ -1195,11 +1195,6 @@ class _CustomBest50PageState extends State<CustomBest50Page> {
     final starsColor = ColorUtil.getStarsColor(stars);
     final isIllegal = _isIllegal(entry);
 
-    final screenW = MediaQuery.of(context).size.width;
-    const double refCardWidth = 335.0;
-    final cardW = (screenW - screenW * 0.02) / 2;
-    final scale = cardW / refCardWidth;
-
     final card = B50GameCardWidget(
       cardColor: cardColor,
       songName: _effectiveTitle(entry),
@@ -1217,7 +1212,9 @@ class _CustomBest50PageState extends State<CustomBest50Page> {
       songId: songId,
       starsColor: starsColor,
       maxIdLength: maxIdLength,
-      scale: scale,
+      // 字号按卡片**实际**宽度自适应：别拿屏幕宽度估（容器 padding /
+      // 网格间距都会从可用宽里扣掉）。
+      scale: B50GameCardWidget.autoScale,
     );
 
     if (!isIllegal) return card;

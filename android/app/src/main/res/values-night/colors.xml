@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      随身听通知栏用色 —— **深色通知卡片**。名字与 values/colors.xml 一一对应，
+      改一边记得改另一边（那边有详细说明）。
+
+      强调色这里是 AppTheme 的**暗色 seed**（#B0C4C4），比亮色 seed 更亮，
+      在深卡片上才够显眼；on_accent 用深色，保证圆里的播放/暂停图标看得清。
+    -->
+    <color name="portable_title">#E6FFFFFF</color>
+    <color name="portable_subtitle">#99FFFFFF</color>
+    <color name="portable_icon">#B3FFFFFF</color>
+    <color name="portable_icon_dim">#40FFFFFF</color>
+    <color name="portable_accent">#FFB0C4C4</color>
+    <color name="portable_on_accent">#FF15211F</color>
+</resources>

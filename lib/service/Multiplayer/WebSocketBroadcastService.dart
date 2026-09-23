@@ -31,12 +31,24 @@ class WebSocketBroadcastService {
   static const int _heartbeatInterval = 30; // 心跳间隔（秒）- 增加到30秒
   static const int _heartbeatTimeout = 90; // 心跳超时时间（秒）- 增加到90秒
   int _reconnectAttempts = 0;
-  static const int _maxReconnectAttempts = 5;
+  // 退避 2/4/8/16/30/30/30/30 ≈ 150s。**必须覆盖服务端的断线宽限期（120s）**：
+  // 原来只有 5 次（≈62s），切后台超过一分钟就彻底放弃重连，
+  // 座位还在宽限期里等着也没人来坐，等于白留。
+  static const int _maxReconnectAttempts = 8;
   
   // 保存连接信息用于重连
   String? _host;
   String? _appkey;
   String? _username;
+
+  /// 本机上一位玩家的 ID：重连时重放给服务端，用来接回原座位。
+  String? _resumePlayerId;
+
+  /// 最近一次 `initialized` 是否是服务端把我们**接回原座位**（`resumed: true`）。
+  /// true 时房间/对局状态由服务端补发，客户端不该再 joinRoom。
+  bool _lastInitResumed = false;
+
+  bool get lastInitResumed => _lastInitResumed;
 
   // 获取当前玩家ID
   String? get currentPlayerId => _currentPlayerId;
@@ -204,7 +216,13 @@ class WebSocketBroadcastService {
           username: _username,
         );
         debugPrint('[WebSocket] 重连成功');
-        
+
+        // 重连后必须**重放一次 initialize**：服务端要靠 resumePlayerId 才能把这条
+        // 新 socket 接回原座位。少了这一步，服务端只看到一个陌生连接，
+        // 而原座位还在断线宽限期里等着 —— 玩家就真的被挤出去了。
+        _lastInitResumed = false;
+        await sendInitialize(_username, resumePlayerId: _resumePlayerId);
+
         // 调用重连成功回调
         if (onReconnected != null) {
           debugPrint('[WebSocket] 触发重连成功回调');
@@ -220,7 +238,17 @@ class WebSocketBroadcastService {
   }
   
   // 发送初始化消息
-  Future<void> sendInitialize(String? nickname) async {
+  //
+  // [resumePlayerId]：**上一次的玩家 ID**。切后台/掉线重连时带上它，
+  // 服务端在断线宽限期（120s）内会把这条 socket 接回原座位 —— 分数、房主身份、
+  // 房间都还在，客户端不用重新 join（对局中途本来也 join 不进去）。
+  // 服务端不认识这个 ID（宽限期已过 / 旧版服务端）时会当成新玩家，行为与从前一致。
+  Future<void> sendInitialize(String? nickname, {String? resumePlayerId}) async {
+    // 记住身份与昵称：重连时自动重放（见 _reconnect）
+    if (nickname != null && nickname.isNotEmpty) _username = nickname;
+    if (resumePlayerId != null && resumePlayerId.isNotEmpty) {
+      _resumePlayerId = resumePlayerId;
+    }
     if (!_isConnected || _channel == null) {
       debugPrint('[WebSocket] 未连接，无法发送消息');
       return;
@@ -231,6 +259,7 @@ class WebSocketBroadcastService {
         'action': 'initialize',
         'payload': {
           'nickname': nickname,
+          if (_resumePlayerId != null) 'resumePlayerId': _resumePlayerId,
         },
       });
       debugPrint('[WebSocket] 准备发送初始化消息: $data');
@@ -550,7 +579,9 @@ class WebSocketBroadcastService {
       // 如果是初始化响应，保存玩家ID
       if (action == 'initialized') {
         _currentPlayerId = data['payload']?['playerId'];
-        debugPrint('[WebSocket] 收到初始化响应，playerId: $_currentPlayerId');
+        _lastInitResumed = data['payload']?['resumed'] == true;
+        debugPrint('[WebSocket] 收到初始化响应，playerId: $_currentPlayerId'
+            '${_lastInitResumed ? '（服务端已把我们接回原座位）' : ''}');
         debugPrint('[WebSocket] 响应 payload: ${data['payload']}');
       }
       

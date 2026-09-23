@@ -31,6 +31,9 @@ class LuoXueSongUtil {
   /// 在播放页表现为「静默无声」。
   ///
   /// 非法 id 返回 0，调用方应据此跳过播放（而不是拿 0 去请求）。
+  ///
+  /// ⚠ 注意与 `LuoXueScoreUploadService.toLxnsSongId`（成绩 API）的差别：
+  /// 那个对 6 位宴会场 id **原样保留**，这个**一律取余**。两套规则不能混用。
   static int toLxnsMusicId(String? divingFishSongId) {
     final id = int.tryParse('${divingFishSongId ?? ''}'.trim());
     if (id == null || id <= 0) return 0;

@@ -1,4 +1,4 @@
-import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'dart:convert';
 import '../../api/ApiUrls.dart';
 import '../../constant/CacheKeyConstant.dart';
@@ -9,6 +9,33 @@ import 'package:my_first_flutter_app/utils/ApiClient.dart';
 class RatingRankListService {
   // 缓存有效期：从常量文件读取（分钟转秒）
   static int get _cacheExpirySeconds => CacheTimestampConstant.rankingsCacheMinutes * 60;
+
+  /// 测试专用：把排行榜请求打桩掉。
+  ///
+  /// 这几个接口都是**不读缓存**的（`rankingsCacheMinutes = -1`，见那个常量的注释），
+  /// 所以 widget 测试里如果不打桩，页面永远停在"暂无排行数据"，
+  /// 首行间距这类**几何**问题就完全量不出来（踩过一次）。
+  /// 真机（debug/release）永远是 null。
+  @visibleForTesting
+  static Future<List<RankItem>> Function()? debugRankingsLoader;
+
+  /// 未打桩时走真实网络。
+  static Future<List<RankItem>> _fetch(String url) async {
+    final stub = debugRankingsLoader;
+    if (stub != null) return stub();
+    final response = await ApiClient.get(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+    );
+    if (response.statusCode == 200) {
+      final result = json.decode(response.body);
+      if (result['success'] == true) {
+        return _parseRankItems(result['data']);
+      }
+    }
+    return <RankItem>[];
+  }
+
   // 获取总排行榜
   static Future<List<RankItem>> getTotalRankings({int? limit}) async {
     // 先检查缓存
@@ -25,24 +52,16 @@ class RatingRankListService {
       if (limit != null) {
         url += '?limit=$limit';
       }
-      final response = await ApiClient.get(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-      );
-      
-      if (response.statusCode == 200) {
-        final result = json.decode(response.body);
-        if (result['success'] == true) {
-          final items = _parseRankItems(result['data']);
-          // 保存到缓存
-          await _cacheRankings(
-            items,
-            CacheKeyConstant.totalRankingsCache,
-            CacheKeyConstant.totalRankingsCacheTimestamp,
-          );
-          return items;
-        }
+      final items = await _fetch(url);
+      if (items.isNotEmpty) {
+        // 保存到缓存
+        await _cacheRankings(
+          items,
+          CacheKeyConstant.totalRankingsCache,
+          CacheKeyConstant.totalRankingsCacheTimestamp,
+        );
       }
+      return items;
     } catch (e) {
       print('获取总排行榜失败: $e');
     }
@@ -65,24 +84,16 @@ class RatingRankListService {
       if (limit != null) {
         url += '?limit=$limit';
       }
-      final response = await ApiClient.get(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-      );
-      
-      if (response.statusCode == 200) {
-        final result = json.decode(response.body);
-        if (result['success'] == true) {
-          final items = _parseRankItems(result['data']);
-          // 保存到缓存
-          await _cacheRankings(
-            items,
-            CacheKeyConstant.shuiyuRankingsCache,
-            CacheKeyConstant.shuiyuRankingsCacheTimestamp,
-          );
-          return items;
-        }
+      final items = await _fetch(url);
+      if (items.isNotEmpty) {
+        // 保存到缓存
+        await _cacheRankings(
+          items,
+          CacheKeyConstant.shuiyuRankingsCache,
+          CacheKeyConstant.shuiyuRankingsCacheTimestamp,
+        );
       }
+      return items;
     } catch (e) {
       print('获取水鱼排行榜失败: $e');
     }
@@ -105,24 +116,16 @@ class RatingRankListService {
       if (limit != null) {
         url += '?limit=$limit';
       }
-      final response = await ApiClient.get(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-      );
-      
-      if (response.statusCode == 200) {
-        final result = json.decode(response.body);
-        if (result['success'] == true) {
-          final items = _parseRankItems(result['data']);
-          // 保存到缓存
-          await _cacheRankings(
-            items,
-            CacheKeyConstant.luoxueRankingsCache,
-            CacheKeyConstant.luoxueRankingsCacheTimestamp,
-          );
-          return items;
-        }
+      final items = await _fetch(url);
+      if (items.isNotEmpty) {
+        // 保存到缓存
+        await _cacheRankings(
+          items,
+          CacheKeyConstant.luoxueRankingsCache,
+          CacheKeyConstant.luoxueRankingsCacheTimestamp,
+        );
       }
+      return items;
     } catch (e) {
       print('获取落雪排行榜失败: $e');
     }

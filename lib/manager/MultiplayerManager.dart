@@ -32,6 +32,27 @@ class MultiplayerManager {
   Stream<GameStateEntity?> get gameStateStream => _gameStateController.stream;
   Stream<List<RoomEntity>> get roomListStream => _roomListController.stream;
   Stream<String> get errorMessageStream => _errorMessageController.stream;
+
+  /// 当前所在房间（不在房间时为 null）。
+  ///
+  /// 用它可以做到「冷启动后回到房间」：进程被杀后重开时，只要服务端的
+  /// 断线宽限期还没过，initialize 就会把我们接回原座位并发回 room_joined，
+  /// 于是这里会有值 —— 大厅据此显示「你还在房间 XXXXXX 里，点击返回」。
+  RoomEntity? get currentRoom => _currentRoom;
+
+  String? get currentRoomId => _currentRoomId;
+
+  /// 测试用：把服务端地址换成本机假服务端（默认 [ApiUrls.MultiplayerServerUrl]）。
+  @visibleForTesting
+  static String? debugServerUrlOverride;
+
+  /// 测试用：直接注入「当前房间」（正常路径由 room_joined 事件写入）。
+  @visibleForTesting
+  void debugSetCurrentRoom(RoomEntity? room) {
+    _currentRoom = room;
+    _currentRoomId = room?.roomId;
+    _roomController.add(room);
+  }
   
   String? get currentPlayerId => _cloudService.currentPlayerId;
 
@@ -41,7 +62,7 @@ class MultiplayerManager {
     
     try {
       await _cloudService.initialize(
-        envId: ApiUrls.MultiplayerServerUrl,
+        envId: debugServerUrlOverride ?? ApiUrls.MultiplayerServerUrl,
         nickname: nickname,
       );
       debugPrint('[DEBUG][Manager] CloudService 初始化完成');

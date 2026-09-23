@@ -30,6 +30,7 @@ import '../service/RecommendByTagsService.dart';
 import '../service/SyncRouteStore.dart';
 import '../service/SyncStatsService.dart';
 import '../utils/SyncRouteNotifier.dart';
+import '../utils/UpdateNotifier.dart';
 import '../widgets/SyncRouteFooter.dart';
 import '../widgets/SyncScoreDialogs.dart'
     show
@@ -967,13 +968,36 @@ class _SystemHubPageState extends State<SystemHubPage> {
                     onToggleFavorite: () => _toggleFavorite('主题与背景'),
                     onTap: () => _open(context, const SettingsPage()),
                   ),
-                  HubActionTile(
-                    title: '检查更新',
-                    subtitle: '检查应用是否有新版本',
-                    icon: Icons.system_update_alt_outlined,
-                    isFavorited: _isFavorited('检查更新'),
-                    onToggleFavorite: () => _toggleFavorite('检查更新'),
-                    onTap: _checkUpdate,
+                  // 「检查更新」在检测到新版本时会变成「发现新版本」+
+                  // 绿色圆环箭头（见 UpdateAvailableIcon）。
+                  // 点击逻辑两者完全一致，都是 _checkUpdate。
+                  ValueListenableBuilder<UpdateAvailability?>(
+                    valueListenable: UpdateNotifier.available,
+                    builder: (context, update, _) {
+                      if (update == null) {
+                        return HubActionTile(
+                          title: UpdateNotifier.idleTitle,
+                          subtitle: UpdateNotifier.idleSubtitle,
+                          icon: Icons.system_update_alt_outlined,
+                          isFavorited: _isFavorited(UpdateNotifier.idleTitle),
+                          onToggleFavorite: () =>
+                              _toggleFavorite(UpdateNotifier.idleTitle),
+                          onTap: _checkUpdate,
+                        );
+                      }
+                      return HubActionTile(
+                        title: UpdateNotifier.titleFor(update),
+                        subtitle: UpdateNotifier.subtitleFor(
+                            update, UpdateNotifier.idleSubtitle),
+                        icon: Icons.arrow_upward_rounded,
+                        titleColor: UpdateAvailableIcon.green,
+                        leading: const UpdateAvailableIcon(),
+                        isFavorited: _isFavorited(UpdateNotifier.idleTitle),
+                        onToggleFavorite: () =>
+                            _toggleFavorite(UpdateNotifier.idleTitle),
+                        onTap: _checkUpdate,
+                      );
+                    },
                   ),
                   HubActionTile(
                     title: '服务器状态',

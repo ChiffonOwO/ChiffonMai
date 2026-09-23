@@ -217,6 +217,15 @@ class HubActionTile extends StatelessWidget {
   /// 它是独立的一行，点击不会触发本 tile 的 [onTap]。
   final Widget? footer;
 
+  /// 可选：完全替换左侧的图标容器。
+  ///
+  /// 默认左侧是「圆角方块 + [icon]」；给「发现新版本」这类需要在图标上做额外
+  /// 装饰（绿色圆环箭头）的场景用。传了它之后 [icon] 只作为语义占位，不再渲染。
+  final Widget? leading;
+
+  /// 可选：标题颜色。默认跟随主题（未禁用时用 `onSurface`）。
+  final Color? titleColor;
+
   const HubActionTile({
     super.key,
     required this.title,
@@ -234,6 +243,8 @@ class HubActionTile extends StatelessWidget {
     this.progressCurrent,
     this.progressTotal,
     this.footer,
+    this.leading,
+    this.titleColor,
   });
 
   bool get _showStar => isFavorited != null && onToggleFavorite != null;
@@ -256,20 +267,21 @@ class HubActionTile extends StatelessWidget {
       ),
       minVerticalPadding: dense ? 4 : 8,
       visualDensity: dense ? VisualDensity.compact : VisualDensity.standard,
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: activeTint.withValues(alpha: _isInactive ? 0.06 : 0.12),
-          borderRadius: BorderRadius.circular(11),
-        ),
-        alignment: Alignment.center,
-        child: Icon(icon,
-            color: _isInactive
-                ? activeTint.withValues(alpha: 0.5)
-                : activeTint,
-            size: 20),
-      ),
+      leading: leading ??
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: activeTint.withValues(alpha: _isInactive ? 0.06 : 0.12),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon,
+                color: _isInactive
+                    ? activeTint.withValues(alpha: 0.5)
+                    : activeTint,
+                size: 20),
+          ),
       title: Text(
         title,
         maxLines: 1,
@@ -279,7 +291,7 @@ class HubActionTile extends StatelessWidget {
           fontSize: 14.5,
           color: _isInactive
               ? scheme.onSurface.withValues(alpha: 0.6)
-              : (awaitingConfirm ? scheme.error : null),
+              : (awaitingConfirm ? scheme.error : titleColor),
         ),
       ),
       subtitle: _hasProgress
@@ -371,9 +383,58 @@ class HubActionTile extends StatelessWidget {
   }
 }
 
+/// 「发现新版本」用的图标：一枚**绿色圆环包着的向上箭头**。
+///
+/// 直接用 [Icon] 没有「箭头 + 圆环」这个组合（`Icons.arrow_circle_up` 的圆环是
+/// 实心填充的，和需求要的「被圆环包起来」不是一个观感），所以自绘：
+/// 外层一个描边圆环，内层一个向上箭头，两者同色。
+///
+/// 绿色**刻意写死**而不是取主题色：它表达的是「有新东西可用」这个状态色，
+/// 如果跟随用户的主题色（比如用户把主题设成红色），这个提示就不再是「绿的」了。
+/// 数值取 Material 的绿色 600/700，深浅色主题下都够醒目（对浅底对比度 3.4:1，
+/// 对深底 6.3:1）。
+class UpdateAvailableIcon extends StatelessWidget {
+  /// 图标整体尺寸（与默认 leading 的 40×40 对齐）。
+  final double size;
+
+  /// 圆环描边宽度。
+  final double ringWidth;
+
+  const UpdateAvailableIcon({
+    super.key,
+    this.size = 40,
+    this.ringWidth = 2,
+  });
+
+  /// 提示色（绿色）。深浅色主题共用一套。
+  static const Color green = Color(0xFF1B9E4B);
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: green.withValues(alpha: 0.10),
+          border: Border.all(color: green, width: ringWidth),
+        ),
+        child: Center(
+          // 箭头比圆环小一圈，保证四周留白均匀
+          child: Icon(
+            Icons.arrow_upward_rounded,
+            size: size * 0.5,
+            color: green,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// 星标按钮：仅 UI，点击行为由父组件通过 onTap 控制
-class _StarToggleButton extends StatelessWidget {
-  final bool isFavorited;
+class _StarToggleButton extends StatelessWidget {  final bool isFavorited;
   final VoidCallback onTap;
 
   const _StarToggleButton({

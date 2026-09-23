@@ -17,11 +17,15 @@ class SyncStatsView {
   /// 注意**必须够短**：这一行放在 tile footer 里，左边有图标、右边有箭头，
   /// 窄屏（360dp）可用宽度只有 300dp 左右。早先用「·」分隔 + 全角文字会顶出边界，
   /// 所以这里统一用 `/` 分隔并把「近 100 次」压成「近100次」。
+  ///
+  /// [tooltip] 是长按/悬停才显示的补充信息（例如「12 秒前更新」）——
+  /// 统计是定时刷新的，用户需要一个不占地方的办法确认"这数字是刚拉的"。
   static Widget summaryLine(
     BuildContext context, {
     required SyncStats? stats,
     required VoidCallback onTap,
     bool loading = false,
+    String? tooltip,
   }) {
     final scheme = Theme.of(context).colorScheme;
     final String text;
@@ -36,7 +40,7 @@ class SyncStatsView {
           '成功${stats.successRateText}';
     }
 
-    return InkWell(
+    final line = InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Padding(
@@ -59,6 +63,8 @@ class SyncStatsView {
         ),
       ),
     );
+    if (tooltip == null || tooltip.isEmpty) return line;
+    return Tooltip(message: tooltip, child: line);
   }
 
   /// 详情弹窗：4 个组合的耗时与成功率。

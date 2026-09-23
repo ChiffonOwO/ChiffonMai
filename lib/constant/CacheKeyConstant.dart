@@ -21,12 +21,15 @@ class CacheKeyConstant {
   static const String unionCache = 'union_cache';
   static const String unionCacheTimestamp = 'union_cache_timestamp';
 
-  // 知识数据相关
-  static const String knowledgeData = 'knowledge_data';
-  static const String knowledgeTimestamp = 'knowledge_timestamp';
-
   // 落雪歌曲相关
   static const String luoxueSongsCache = 'luoxue_songs_cache';
+
+  // ===== 随身听相关 =====
+  // 悬浮球位置（可拖动，记住用户摆的地方）
+  static const String portableBallOffset = 'portable_ball_offset';
+  // 是否已经申请过通知权限（首次进随身听页申请一次，不要每次进都弹）
+  static const String portableNotificationAsked =
+      'portable_notification_asked';
 
   // 落雪OAuth相关
   static const String luoxueAccessToken = 'luoxue_access_token';

@@ -7,11 +7,25 @@ import 'LibraryHubPage.dart';
 import 'GuessHubPage.dart';
 import 'ToolsHubPage.dart';
 import 'SystemHubPage.dart';
+import 'Portable/PortablePlayerPage.dart';
 
 class AppShell extends StatefulWidget {
   final VoidCallback? onFirstFrameRendered;
 
   const AppShell({super.key, this.onFirstFrameRendered});
+
+  /// 打开随身听曲库页（悬浮球的「播放列表」按钮用）。
+  ///
+  /// 只做一件事：push 曲库页。**没有**用来控制悬浮球显隐 ——
+  /// 球本体挂在 `main.dart` 的 `MaterialApp.builder` 上（在所有路由之上；
+  /// 放 AppShell 的 body 里会被 push 出来的功能页整个盖住，表现就是
+  /// 「进了功能页只听到声音、看不到球」），显隐由 `PortablePlayerScope`
+  /// 加上球自己判断。
+  static Future<void> openPortablePlayerPage(BuildContext context) {
+    return Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => const PortablePlayerPage()),
+    );
+  }
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -95,6 +109,8 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
+      // 随身听悬浮球**不在这里** —— 它挂在 main.dart 的 MaterialApp.builder 上，
+      // 这样才盖得住 push 出来的各个功能页（详见那边的注释）。
       body: ThemeAwareBackground(
         showDecorativeImage: _index == 0,
         child: Center(

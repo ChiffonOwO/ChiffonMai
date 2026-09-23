@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,6 +23,7 @@ import '../manager/LuoXue/CollectionsManager.dart';
 import '../manager/LuoXue/LuoXueUserPlayDataManager.dart';
 import '../manager/MaiTagsManager.dart';
 import '../manager/SongAliasManager.dart';
+import '../service/History/ChartHistoryStore.dart';
 import '../service/AccountSwitchService.dart';
 import '../service/ConnectivityService.dart';
 import '../service/PaiziProgressService.dart';
@@ -695,6 +697,14 @@ Future<void> _saveUserData({
     best35TotalRA: best35TotalRA,
     best15TotalRA: best15TotalRA,
     cachedQQ: cachedQQ,
+  ));
+
+  // 顺手记一个 Rating 历史点（曲线用的就是界面显示的这一份，口径天然一致）。
+  // 不 await：采集失败绝不影响刷新流程；同一天重复刷新只会替换当天那个点。
+  unawaited(ChartHistoryStore.instance.recordRating(
+    rating: best35TotalRA + best15TotalRA,
+    best35: best35TotalRA,
+    best15: best15TotalRA,
   ));
 }
 

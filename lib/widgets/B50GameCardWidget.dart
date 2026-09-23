@@ -5,11 +5,106 @@ import '../utils/CoverUtil.dart';
 /// 采用两段式布局：上方 70% 卡色背景（曲绘 + 歌名 + 达成率 + 定数→RA | 分数/满分），
 /// 下方 30% 白底（谱面 ID + 类型 chip + 评级 + FC + FS + 星数）。
 ///
-/// 字号基于 `refCardWidth = 335` 的「导出图片单卡实际可见宽度」计算，
+/// 字号常量的标定基准是「导出图片单卡实际可见宽度」[refCardWidth] = 335，
 /// 通过 [scale] 适配不同使用场景：
-///   * 导出图片时 `scale = 1.0`；
-///   * 页面显示时 `scale = cardW / 335`，其中 `cardW` 为屏幕上单卡的实际宽度。
+///   * 导出图片时 `scale = 1.0`（335 就是照它标定的）；
+///   * 页面显示时**默认 [autoScale]**：字号按卡片**渲染时的实际宽度**换算，
+///     基准是 [screenRefCardWidth] —— 屏幕口径**故意**比导出基准大约 8.8%
+///     （统一口径前页面拿屏幕宽度估格子宽，比真实格子大 ~9%，见常量注释）。
 class B50GameCardWidget extends StatelessWidget {
+  /// 字号换算的基准卡宽（与导出图片同源）。
+  ///
+  /// 这个数**不能改**：所有字号常量（[_kSongName] 等）都是照着它标定的。
+  static const double refCardWidth = 335.0;
+
+  /// **屏幕口径**的字号换算基准宽度：`335 / 1.088 ≈ 308`。
+  ///
+  /// 比导出基准 [refCardWidth] 小 8.8% —— 分母越小，字号 / 曲绘 / 角标越大，
+  /// 这是**故意**的：卡片若按「真实格子宽 / 335」换算，会比用户熟悉的版本
+  /// 整体小一圈（反馈："卡片里的曲绘、评级连击同步图片和文本字号都变小了"）。
+  ///
+  /// 那 8.8% 正是「统一口径」**之前估宽的水分**：页面按 `screenW` 估格子宽
+  /// （`(screenW - screenW * 0.0x) / 2`），没扣容器 padding / 网格间距 ——
+  /// 360 屏估 178.2、真实格子 163.4（1.09 倍）。换成真实宽度后卡片内容
+  /// 整体小了 ~9%，这里在**屏幕口径**上把这一截还回来。
+  ///
+  /// 旧尺寸**装得下**（上半区 7:3 + 现有内边距实测还有 ~4% 余量）：
+  /// `test/b50_card_scale_test.dart` 按格子宽 145~335 × dpr 2.75/3.0 逐个核对
+  /// 「上半区装得下 + 后代不出卡片」；320~480 屏的「真实格子 / 旧估算」实测
+  /// 落在 1.082~1.097，取中值 1.088。
+  ///
+  /// ⚠️ **导出图片（`scale: 1.0` 的离屏渲染）不走这里**，仍按 [refCardWidth]
+  /// 标定；反过来说，页面口径下也别再把 [refCardWidth] 当分母。
+  static const double screenRefCardWidth = 308.0;
+
+  /// [scale] 的哨兵值：**按卡片渲染时真实拿到的宽度自适应**。
+  ///
+  /// 页面显示一律用这个（默认值）。网格格子给卡片的是**紧约束**，卡片根部的
+  /// `LayoutBuilder` 拿到的 `maxWidth` 就是它最终的可见宽度，因此
+  /// `scale = maxWidth / [screenRefCardWidth]` 永远和实际渲染一致。
+  ///
+  /// ⚠️ 页面里**别再手算** `((screenW - screenW * 0.0x) / 2) / 335`：容器
+  /// padding / 边距 / 网格间距都没算进去，和真实格子对不上。
+  ///
+  /// 导出图片时显式传 `1.0`（基准宽度 [refCardWidth] 就是照它标定的）。
+  static const double autoScale = 0.0;
+
+  /// 把 [scale] 换算成真正生效的缩放值。
+  ///
+  /// * `scale > 0`：[scale] 本身（导出图片传 1.0）；
+  /// * `scale <= 0`（[autoScale]）：`[boxWidth] / [screenRefCardWidth]`，
+  ///   其中 [boxWidth] 是卡片渲染时**真实拿到的宽度**。
+  ///
+  /// ⚠️ [boxWidth] 只能是**渲染时**拿到的宽度（`LayoutBuilder` 的 `maxWidth`）：
+  /// 拿屏幕宽度 / 网格外层宽度「估」出来的值都会偏大（统一口径前偏大 ~9%）。
+  static double resolveScale(double scale, double boxWidth) {
+    if (scale > 0) return scale;
+    return (boxWidth.isFinite && boxWidth > 0)
+        ? boxWidth / screenRefCardWidth
+        : 1.0;
+  }
+
+  /// 卡片的设计宽高比（由"上下 7:3 定高"决定）。
+  ///
+  /// 页面摆放时**高度要按这个比例跟着宽度走**：卡片内部是定高分区 + 按宽度
+  /// 缩放的字号，高度给错了会挤到溢出。
+  static const double designAspectRatio = 1.75;
+
+  /// 单卡宽度：`可用宽` 里放 [columns] 张、扣掉 [columnGap] 间隙。
+  static double cardWidthFor(
+    double availableWidth, {
+    int columns = 2,
+    double columnGap = 0,
+  }) {
+    final cols = columns < 1 ? 1 : columns;
+    final w = (availableWidth - columnGap) / cols;
+    return w <= 0 ? 1 : w;
+  }
+
+  /// 字号缩放比例：`单卡宽 / [screenRefCardWidth]`（屏幕口径）。
+  ///
+  /// 用于**拿不到卡片渲染宽度**的场景（比如按网格外层的宽度估算）。网格
+  /// `itemBuilder` 里有紧约束，优先用 [autoScale]（卡片自己量）。
+  /// 两种情况都别自己抄 `格子宽 / 335` 或 `格子宽 / 308` —— 抄错不报错，
+  /// 只会让字号悄悄不对。
+  static double scaleForWidth(
+    double availableWidth, {
+    int columns = 2,
+    double columnGap = 0,
+  }) =>
+      cardWidthFor(availableWidth, columns: columns, columnGap: columnGap) /
+      screenRefCardWidth;
+
+  /// 这个宽度下卡片应该有多高（网格的 `mainAxisExtent` 直接用）。
+  static double heightForWidth(
+    double availableWidth, {
+    int columns = 2,
+    double columnGap = 0,
+    double aspectRatio = designAspectRatio,
+  }) =>
+      cardWidthFor(availableWidth, columns: columns, columnGap: columnGap) /
+      aspectRatio;
+
   final Color cardColor;
   final String songName;
   final double achievementRate;
@@ -26,6 +121,9 @@ class B50GameCardWidget extends StatelessWidget {
   final int songId;
   final Color starsColor;
   final int maxIdLength;
+
+  /// 字号缩放。`> 0`：按给定值（导出图片传 `1.0`）；[autoScale]（默认）：
+  /// 按卡片**渲染时的实际宽度**自适应。
   final double scale;
   final bool isFitDiff;
 
@@ -47,7 +145,7 @@ class B50GameCardWidget extends StatelessWidget {
     required this.songId,
     required this.starsColor,
     required this.maxIdLength,
-    this.scale = 1.0,
+    this.scale = autoScale,
     this.isFitDiff = false,
   });
 
@@ -71,38 +169,124 @@ class B50GameCardWidget extends StatelessWidget {
   static Widget withBadgeOverlay({
     required Widget card,
     required String text,
-    required double scale,
+    double scale = autoScale,
   }) {
-    return Stack(
-      children: [
-        card,
-        Positioned(
-          left: _kSpacing * scale,
-          top: (_kSpacing + _kCover + 2.8) * scale,
-          child: Container(
-            padding:
-                EdgeInsets.symmetric(horizontal: 6 * scale, vertical: 2 * scale),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.62),
-              borderRadius: BorderRadius.circular(6 * scale),
-            ),
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 12 * scale,
-                height: 1.1,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+    // 角标位置必须和卡片用**同一个** scale：给卡片一个值、给角标另一个值，
+    // PC50 角标就会跟曲绘对不上（历史 bug）。
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double resolved = resolveScale(scale, constraints.maxWidth);
+        return Stack(
+          children: [
+            card,
+            Positioned(
+              left: _kSpacing * resolved,
+              top: (_kSpacing + _kCover + 2.8) * resolved,
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                    horizontal: 6 * resolved, vertical: 2 * resolved),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.62),
+                  borderRadius: BorderRadius.circular(6 * resolved),
+                ),
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 12 * resolved,
+                    height: 1.1,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// 达成率的「整数段 + 小数段」。
+  ///
+  /// 两段字号不同（`_kDecimalMain` / `_kDecimalSmall`），**必须画在同一个段落里**
+  /// （一个 `Text.rich` + 两个 span）——不要让它们各自成为一句 `Text`。
+  ///
+  /// ⚠️ **"两句 `Text` + `Row(crossAxisAlignment: baseline)`"就是"有的页面看起来齐、
+  /// 有的页面小数偏高"的根源**（6 个 Best50 卡片里恰好只有 2 个是对的）：
+  ///
+  /// * `Row` 的 baseline 对齐只保证**布局**上基线重合（亚像素级精确）；可两句
+  ///   `Text` 是两个 `RenderParagraph`，**各自光栅化、各自吸附像素格**，两段字形
+  ///   游程落到不同相位，墨迹底相差 0~3 物理像素。
+  /// * 差多少取决于字号落在哪一格：真字体（Google Fonts 的 Noto Sans SC Bold，
+  ///   dpr 3.0，按字形墨迹底扫描）实测 `101.0000%`：
+  ///
+  ///   | 主 / 次字号（dp） | 两段墨迹底之差 |
+  ///   |---|---|
+  ///   | 18.09 / 13.56 | 0（"齐平"） |
+  ///   | 17.90 / 13.43 | −2（小数肉眼可见偏高） |
+  ///
+  ///   前者正是 `cardW=(W−0.01W)/2` 的 Best50 / 拟合 Best50，后者是另外 4 个页面。
+  ///
+  /// 换成单个段落（`Text.rich`）后只有一个基线、两段在同一次排版里定位：同一字体
+  /// 实测 W=360~430、dpr 2.75 / 3.0、两种卡宽系数、多种亚像素相位下之差**恒为 0**。
+  ///
+  /// ⚠️ **不要再给小数段叠 `Transform.translate` 做"补偿"**（历史实现就是
+  /// 这么写的，那正是"小数严重偏下"的根源）：
+  ///
+  /// * `RenderTransform` 会把 translate 记进自己的 baseline（`child.getDistanceToBaseline() + offset.dy`），
+  ///   但 `RenderFlex` 的 baseline 对齐**实测并不会因此反补偿**——真字体
+  ///   （`NotoSansSC_700`，dpr 3.0，按字形墨迹底扫描）测得：`dy` 每变 1 逻辑像素，
+  ///   墨迹就跟着平移 1 逻辑像素（1:1，不是 2:1）。
+  /// * 于是那笔"补偿"变成了**纯额外的下推量**，得多少就压下去多少
+  ///   （scale 1.0 时 +7 物理像素，scale 0.53 时 +3）。
+  static Widget _buildAchievement({
+    required double achievementRate,
+    required double mainFontSize,
+    required double subFontSize,
+  }) {
+    final text = achievementRate.toStringAsFixed(4);
+    final parts = text.split('.');
+    final intPart = parts[0];
+    final decPart = parts.length > 1 ? '.${parts[1]}%' : '%';
+
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: intPart,
+            style: TextStyle(
+              fontSize: mainFontSize,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
-        ),
-      ],
+          TextSpan(
+            text: decPart,
+            style: TextStyle(
+              fontSize: subFontSize,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (scale > 0) return _buildCard(context, scale);
+    // 默认（[autoScale]）：字号按卡片**渲染时的实际宽度**换算。
+    // 网格格子给卡片的是紧约束，`maxWidth` 就是卡片的可见宽度；
+    // 页面自己拿屏幕宽度估的值差好几个百分点，会挤出去或留白。
+    return LayoutBuilder(
+      builder: (context, constraints) =>
+          _buildCard(context, resolveScale(scale, constraints.maxWidth)),
+    );
+  }
+
+  /// [scale] 是**已经解析过**的缩放值（见 [resolveScale]）。
+  Widget _buildCard(BuildContext context, double scale) {
     final double songNameFontSize = _kSongName * scale;
     final double decimalMainFontSize = _kDecimalMain * scale;
     final double decimalSmallFontSize = _kDecimalSmall * scale;
@@ -206,33 +390,10 @@ class B50GameCardWidget extends StatelessWidget {
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
                               alignment: Alignment.centerLeft,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                // 整数与小数共用基线：数字都坐在基线上，底边自然齐平。
-                                // 不要用 CrossAxisAlignment.end（盒底对齐），
-                                // 盒底比字形底边低一个 descent，小数会沉到整数底边之下。
-                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphabetic,
-                                children: [
-                                  Text(
-                                    achievementRate
-                                        .toStringAsFixed(4)
-                                        .split('.')[0],
-                                    style: TextStyle(
-                                      fontSize: decimalMainFontSize,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  Text(
-                                    '.${achievementRate.toStringAsFixed(4).split('.')[1]}%',
-                                    style: TextStyle(
-                                      fontSize: decimalSmallFontSize,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
+                              child: _buildAchievement(
+                                achievementRate: achievementRate,
+                                mainFontSize: decimalMainFontSize,
+                                subFontSize: decimalSmallFontSize,
                               ),
                             ),
                           ),

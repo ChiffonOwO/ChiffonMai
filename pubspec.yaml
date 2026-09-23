@@ -18,7 +18,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # of the product and file versions while build-number is used as the build suffix.
 
 # version: 1.12.2+35
-version: 2.1.0+38
+version: 2.2.0+39
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -59,7 +59,13 @@ dependencies:
   cached_network_image: ^3.3.1  
   flutter_cache_manager: ^3.3.1  
   # 音频播放
-  just_audio: ^0.9.34  
+  just_audio: ^0.9.34
+  # 随身听的后台播放 + 通知栏/锁屏控制。
+  # 它内部就是 audio_service，负责 MediaSession、前台服务与通知栏按钮；
+  # 它要求 Android 侧 Activity 继承 AudioServiceActivity（见 MainActivity.kt），
+  # 并声明 com.ryanheise.audioservice.AudioService 服务（见 AndroidManifest.xml），
+  # 三处缺一都会「能播但没有通知栏」。
+  just_audio_background: ^0.0.1-beta.17
   audioplayers: ^6.5.1
   package_info_plus: ^9.0.1
   crypto: ^3.0.7
@@ -87,7 +93,9 @@ dependencies:
   geocoding: ^5.0.0
   charset: ^2.0.1
   font_awesome_flutter: ^10.7.0  # 友链页 GitHub 图标
-  flutter_colorpicker: ^1.1.0  # 设置页自定义主题色
+  # flutter_colorpicker 已移除：它的取色区宽度写死 300，在手机 AlertDialog
+  # 里溢出、取不到色，设置页改成自绘的自适应取色器（见 SettingsPage 里的
+  # _ColorPickerDialog / _ColorPickerArea）。
   http_parser: ^4.0.2  # multipart/form-data 媒体类型（ApiClient + OcrService）
   path: ^1.9.0  # 文件路径处理（SettingsPage 后台图片）
 
@@ -101,6 +109,9 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  # 测试里 fake just_audio 的平台实现（见 test/portable_ball_interaction_test.dart）：
+  # 悬浮球/迷你卡片要真的能起播才测得动，而真机以外没有原生插件
+  just_audio_platform_interface: ^4.6.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

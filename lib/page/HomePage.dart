@@ -35,6 +35,7 @@ import 'Best50/Best50Page.dart';
 import 'Best50/DiffBest50Page.dart';
 import 'Best50/PersonalizedBest50Page.dart';
 import 'Best50/PersonalizedDiffBest50Page.dart';
+import 'History/RatingHistoryPage.dart';
 import 'GlobalArcadeMapPage.dart';
 import 'Collection/CollectionSearchPage.dart';
 import 'GuessChartGame/GuessChartByAliaPage.dart';
@@ -44,12 +45,12 @@ import 'GuessChartGame/GuessChartByInfoPage.dart';
 import 'GuessChartGame/GuessChartBySongExcerptPage.dart';
 import 'GuessChartGame/GuessSongByOpenLettersPage.dart';
 import 'KaleidXScope/KaleidXScopeSelectPage.dart';
-import 'KnowledgeSearchPage.dart';
 import 'FavoriteFolderPage.dart';
 import 'MaimaiServerStatusPage.dart';
 import 'Multiplayer/MultiplayerLobbyPage.dart';
 import 'PaiziProgressPage.dart';
 import 'PersonalizedChartPlayConfigure.dart';
+import 'Portable/PortablePlayerPage.dart';
 import 'PersonalizedScorePage.dart';
 import 'RankTable/RankTablePage.dart';
 import 'RandomChartPage.dart';
@@ -97,6 +98,7 @@ import '../widgets/QrQuickFillButtons.dart';
 import '../service/SyncRouteStore.dart';
 import '../service/SyncStatsService.dart';
 import '../utils/SyncRouteNotifier.dart';
+import '../utils/UpdateNotifier.dart';
 import '../widgets/SyncRouteFooter.dart';
 
 // ds值与歌曲对应关系数据类已随 _calculateRatingLimits 一起抽离到
@@ -2762,16 +2764,16 @@ class HomePageState extends State<HomePage> {
         MaterialPageRoute(builder: (context) => PersonalizedBest50Page()),
       );
     }
+    if (item.title == 'Rating 历史') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const RatingHistoryPage()),
+      );
+    }
     if (item.title == '个性化拟合 Best50') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => PersonalizedDiffBest50Page()),
-      );
-    }
-    if (item.title == '舞萌百科') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => KnowledgeSearchPage()),
       );
     }
     if (item.title == 'KALEIDXSCOPE') {
@@ -2802,6 +2804,12 @@ class HomePageState extends State<HomePage> {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => PersonalizedScorePage()),
+      );
+    }
+    if (item.title == '随身听') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const PortablePlayerPage()),
       );
     }
     if (item.title == '自定义谱面播放') {
@@ -3100,16 +3108,32 @@ class HomePageState extends State<HomePage> {
           )
         else
           for (final item in items)
-            HubActionTile(
-              title: item.title,
-              subtitle: item.subtitle,
-              icon: item.icon,
-              isFavorited: true,
-              onToggleFavorite: () => _toggleFavorite(item.title),
-              onTap: () => _handleFeatureTap(item),
-              // 两个同步入口在收藏区也带上线路切换 + 近 100 次统计，
-              // 与「系统」hub 页共享同一份状态（SyncRouteNotifier）
-              footer: _syncFooterFor(item.title),
+            // 「检查更新」在收藏区也要跟着变成「发现新版本」+ 绿色圆环箭头，
+            // 否则同一个功能在两处长得不一样。形态统一由 UpdateNotifier 给。
+            ValueListenableBuilder<UpdateAvailability?>(
+              valueListenable: UpdateNotifier.available,
+              builder: (context, update, _) {
+                final isUpdate = UpdateNotifier.isUpdateEntry(item.title);
+                final effective =
+                    isUpdate && update != null ? update : null;
+                return HubActionTile(
+                  title: UpdateNotifier.titleFor(effective),
+                  subtitle: UpdateNotifier.subtitleFor(
+                      effective, item.subtitle),
+                  icon: isUpdate ? Icons.arrow_upward_rounded : item.icon,
+                  titleColor:
+                      effective == null ? null : UpdateAvailableIcon.green,
+                  leading: effective == null
+                      ? null
+                      : const UpdateAvailableIcon(),
+                  isFavorited: true,
+                  onToggleFavorite: () => _toggleFavorite(item.title),
+                  onTap: () => _handleFeatureTap(item),
+                  // 两个同步入口在收藏区也带上线路切换 + 近 100 次统计，
+                  // 与「系统」hub 页共享同一份状态（SyncRouteNotifier）
+                  footer: _syncFooterFor(item.title),
+                );
+              },
             ),
       ],
     );

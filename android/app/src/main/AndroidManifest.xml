@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 <!-- 必须添加：允许网络访问 -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- 可选：允许访问网络状态（判断是否联网） -->
@@ -20,6 +21,14 @@
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!--
+      随身听的后台播放（audio_service / just_audio_background）：
+        - WAKE_LOCK：息屏后继续放，不被 Doze 掐掉；
+        - FOREGROUND_SERVICE_MEDIA_PLAYBACK：targetSdk 34+ 起，启动前台服务
+          必须声明具体类型，否则 startForeground 直接抛异常（播放会立刻断）。
+    -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <application
         android:enableOnBackInvokedCallback="true"
         android:usesCleartextTraffic="true"
@@ -92,6 +101,51 @@
                 <data android:mimeType="*/*"/>
             </intent-filter>
         </activity>
+
+        <!--
+          随身听的后台播放服务与媒体按键接收器（audio_service / just_audio_background）。
+
+          三处缺一都会「能播但没有通知栏/锁屏控制」，排查时按顺序看：
+            1. 这里有没有声明 AudioService；
+            2. MainActivity 是不是继承了 AudioServiceActivity；
+            3. 有没有 FOREGROUND_SERVICE_MEDIA_PLAYBACK 权限。
+          通知栏**不显示**时还要确认 POST_NOTIFICATIONS 是否被用户拒绝。
+        -->
+        <service
+            android:name="com.ryanheise.audioservice.AudioService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="true"
+            tools:ignore="Instantiatable">
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name="com.ryanheise.audioservice.MediaButtonReceiver"
+            android:exported="true"
+            tools:ignore="Instantiatable">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+          随身听的自定义通知栏（曲绘占左侧整高 + 右侧三行）。
+
+          `foregroundServiceType="mediaPlayback"` 是必须的：Android 14+ 起启动
+          前台服务要声明具体类型，否则直接抛异常（表现是通知栏不出现）。
+
+          ⚠️ 它与上面 audio_service 的 AudioService **并存**：
+          AudioService 负责播放/锁屏/耳机按键，本服务只负责画通知栏，
+          并且**故意使用与 AudioService 相同的通知 ID（1124）**去顶掉它的通知，
+          这样用户只看得到一条。详见 PortableNotificationService 的类注释。
+        -->
+        <service
+            android:name=".PortableNotificationService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

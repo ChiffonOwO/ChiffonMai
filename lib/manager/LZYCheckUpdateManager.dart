@@ -8,6 +8,7 @@ import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:my_first_flutter_app/utils/UpdateNotifier.dart';
 
 class LZYCheckUpdateManager {
   static final LZYCheckUpdateManager _instance = LZYCheckUpdateManager._internal();
@@ -60,7 +61,49 @@ class LZYCheckUpdateManager {
   }
 
   /// 检查更新
-  Future<Map<String, dynamic>> checkUpdate() async {
+  ///
+  /// 带**请求去重**：App 启动时（`main.dart` 为了点亮「发现新版本」按钮）和首页
+  /// 加载时（`HomePage._autoCheckUpdate`）都会调到这里，不去重就会白打两次网络。
+  /// 同一次检查结果在 [checkUpdateCooldown] 内复用。
+  Future<Map<String, dynamic>> checkUpdate({bool force = false}) async {
+    if (!force) {
+      final cached = _cachedResult;
+      final at = _cachedAt;
+      if (cached != null &&
+          at != null &&
+          DateTime.now().difference(at) < checkUpdateCooldown) {
+        debugPrint("检查更新：命中缓存，跳过网络请求");
+        return cached;
+      }
+      final inFlight = _inFlight;
+      if (inFlight != null) {
+        debugPrint("检查更新：已有请求在飞，复用同一个 Future");
+        return inFlight;
+      }
+    }
+    final future = _checkUpdateOnce();
+    _inFlight = future;
+    try {
+      final result = await future;
+      _cachedResult = result;
+      _cachedAt = DateTime.now();
+      return result;
+    } finally {
+      _inFlight = null;
+    }
+  }
+
+  /// 同一次检查结果的复用时长。
+  ///
+  /// 取值只需覆盖「启动到首页 initState」这段窗口（几百毫秒），
+  /// 用户手动点「检查更新」时走 `force: true` 强制走网络，所以这个值不影响手动检查。
+  static const Duration checkUpdateCooldown = Duration(minutes: 5);
+
+  Map<String, dynamic>? _cachedResult;
+  DateTime? _cachedAt;
+  Future<Map<String, dynamic>>? _inFlight;
+
+  Future<Map<String, dynamic>> _checkUpdateOnce() async {
     debugPrint("开始检查更新...");
     try {
       PackageInfo packageInfo = await PackageInfo.fromPlatform();
@@ -167,7 +210,16 @@ class LZYCheckUpdateManager {
   Future<void> showUpdateDialog(BuildContext context, {bool force = false}) async {
     if (!force && !await shouldShowUpdateDialog()) return;
 
-    var info = await checkUpdate();
+    // force=true（用户点了「检查更新」/「发现新版本」）时强制走网络，
+    // 否则会命中启动时那次检查的 5 分钟缓存，用户会觉得「点了没反应」。
+    var info = await checkUpdate(force: force);
+
+    // 顺手刷新「发现新版本」按钮的状态：用户手动点过之后，按钮形态必须和刚查到
+    // 的结果一致（比如已经更新到最新了，按钮要变回「检查更新」）。
+    // 网络失败时不覆盖：一次断网不该把已确认的「有新版本」提示抹掉。
+    if (info["networkError"] != true) {
+      UpdateNotifier.setResult(info);
+    }
     
     // 如果上下文已销毁，直接返回
     if (!context.mounted) return;

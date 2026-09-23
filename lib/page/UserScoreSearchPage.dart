@@ -1763,7 +1763,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
         crossAxisCount: 2,
         crossAxisSpacing: MediaQuery.of(context).size.width * 0.01,
         mainAxisSpacing: MediaQuery.of(context).size.width * 0.01,
-        childAspectRatio: 1.75,
+        childAspectRatio: B50GameCardWidget.designAspectRatio,
       ),
       itemCount: _pagedSongs.length,
       itemBuilder: (context, index) {
@@ -1776,7 +1776,6 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   // 仍保留 GestureDetector 以便点击跳转到 SongInfoPage。
   // [maxIdLength] 由 _buildListGrid 在整个分页里统一计算，保证同页所有卡 ID 严格对齐。
   Widget _buildListCard(Map<String, dynamic> song, {required int maxIdLength}) {
-    final double screenWidth = MediaQuery.of(context).size.width;
     final int songId = int.tryParse(song['song_id']?.toString() ?? '0') ?? 0;
     final int levelIndex = song['level_index'] ?? 0;
     final String type = song['type']?.toString() ?? '';
@@ -1814,11 +1813,6 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
     // 取 maxScore（notes * 3），直接复用 service 已有的同步方法
     final int maxScore = _service.calculateMaxScoreSync(song);
 
-    // 单卡片宽度（2 列布局，与 _buildListGrid 的 crossAxisCount=2 对应）
-    final double cardW = (screenWidth - screenWidth * 0.01) / 2;
-    // 导出图片基准卡片宽度：1700 / 5 列 - 间距 ≈ 335
-    const double refCardWidth = 335.0;
-    final double scale = cardW / refCardWidth;
 
     return GestureDetector(
       onTap: () {
@@ -1850,7 +1844,9 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
         songId: songId,
         starsColor: starsColor,
         maxIdLength: maxIdLength,
-        scale: scale,
+        // 字号按卡片**实际**宽度自适应（别拿屏幕宽度估：容器 padding / 网格间距
+        // 都会从宽度里扣掉，估出来的值和真实格子差好几个百分点）。
+        scale: B50GameCardWidget.autoScale,
       ),
     );
   }

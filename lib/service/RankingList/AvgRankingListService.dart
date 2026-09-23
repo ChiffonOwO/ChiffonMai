@@ -86,6 +86,10 @@ class AvgRankingListService {
   static int get _cacheExpirySeconds =>
       CacheTimestampConstant.rankingsCacheMinutes * 60;
 
+  /// 测试专用：把排行榜请求打桩掉（见 [getAverages] 里的用法）。真机永远是 null。
+  @visibleForTesting
+  static Future<List<AvgRankItem>> Function()? debugRankingsLoader;
+
   // 获取所有玩家的平均值数据（原始、未排序），可读缓存
   static Future<List<AvgRankItem>> getAverages({bool refresh = false}) async {
     if (!refresh) {
@@ -94,6 +98,12 @@ class AvgRankingListService {
         return cachedData;
       }
     }
+
+    // 测试专用打桩：这几个排行榜接口都不读缓存（rankingsCacheMinutes = -1），
+    // widget 测试里不打桩页面永远停在空状态，几何/间距问题就量不出来。
+    // 真机（debug/release）永远是 null。
+    final stub = debugRankingsLoader;
+    if (stub != null) return stub();
 
     try {
       final url =

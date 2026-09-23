@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -5,6 +6,7 @@ import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../constant/CacheKeyConstant.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
+import '../../service/History/ChartHistoryStore.dart';
 import 'ProberException.dart';
 
 class UserPlayDataManager {
@@ -46,6 +48,14 @@ class UserPlayDataManager {
 
         // 保存到缓存
         await _saveToCache(data);
+
+        // 顺手把这次拿到的成绩记进本机历史（Rating / 单谱达成率 / DX 分曲线）。
+        // 说明：**不 await、失败也不影响这里**——采集是纯本地 diff + 落盘，
+        // 而且是"能记就赚、记不上就少一条"，绝不能拖慢或打断刷新成绩。
+        // 好友对比会借用同一个方法拉好友的成绩，那段用
+        // ChartHistoryStore.runWithoutRecording 包住了（见 FriendCompareService）。
+        unawaited(ChartHistoryStore.instance
+            .recordChartSnapshot(data, reason: 'fetchUserPlayData'));
 
         debugPrint('成功从 API 获取用户游玩数据');
         return data;

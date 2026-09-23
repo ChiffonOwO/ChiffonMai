@@ -83,4 +83,50 @@ void main() {
     expect(text, '近100次 / 100样本 / 平均1m15s / 成功100%');
     expect(tester.takeException(), isNull);
   });
+
+  // 统计现在会定时刷新，用户需要一个不占地方的办法确认"这数字是刚拉的"：
+  // 那行字本身宽度吃紧，所以新鲜度放在 tooltip 里（长按/悬停才出现）。
+  testWidgets('tooltip 里带数据新鲜度，且不改变那一行的文字', (tester) async {
+    tester.view.physicalSize = const Size(960, 1920);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => SyncStatsView.summaryLine(
+            context,
+            stats: stats,
+            tooltip: '12 秒前更新',
+            onTap: () {},
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // 那行文字一个字都没变
+    expect(tester.widget<Text>(find.byType(Text)).data,
+        '近100次 / 87样本 / 平均12.3s / 成功97%');
+    // tooltip 平时不显示，长按才出现
+    expect(find.text('12 秒前更新'), findsNothing);
+    await tester.longPress(find.byType(InkWell));
+    await tester.pumpAndSettle();
+    expect(find.text('12 秒前更新'), findsOneWidget);
+  });
+
+  testWidgets('不给 tooltip 时不套那一层（老调用方不受影响）', (tester) async {
+    tester.view.physicalSize = const Size(960, 1920);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (context) =>
+              SyncStatsView.summaryLine(context, stats: stats, onTap: () {}),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.byType(Tooltip), findsNothing);
+  });
 }

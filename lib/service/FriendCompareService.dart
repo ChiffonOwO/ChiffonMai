@@ -5,6 +5,7 @@ import '../manager/DivingFish/UserPlayDataManager.dart';
 import '../manager/DivingFish/DivingFishOAuthManager.dart';
 import '../manager/DivingFish/ProberException.dart';
 import '../entity/FriendComparisonResult.dart';
+import 'History/ChartHistoryStore.dart';
 
 /// 好友战绩对比服务
 /// 拉取当前用户和好友的游玩数据，进行谱面对比
@@ -45,9 +46,15 @@ class FriendCompareService {
     final myRating = (myData['rating'] as num?)?.toInt() ?? 0;
 
     // 2. 获取好友的游玩数据（会覆盖缓存，下面会恢复）
+    //
+    // ⚠️ 这一段必须用 runWithoutRecording 包住：`fetchUserPlayData` 里顺手做成绩历史
+    // 采集（达成率/DX 曲线），而这里拉的是**好友**的成绩、还带一次缓存覆盖+恢复 ——
+    // 不挡住的话，好友的成绩会被记进你自己的历史曲线里。
     Map<String, dynamic>? friendData;
     try {
-      friendData = await userPlayDataManager.fetchUserPlayData(friendQQ);
+      friendData = await ChartHistoryStore.instance.runWithoutRecording(
+        () => userPlayDataManager.fetchUserPlayData(friendQQ),
+      );
     } on ProberException catch (e) {
       // 恢复本地缓存
       if (cachedBackup != null) {

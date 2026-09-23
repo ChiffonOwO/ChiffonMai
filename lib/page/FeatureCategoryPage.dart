@@ -4,9 +4,12 @@ import '../utils/CommonWidgetUtil.dart';
 import '../utils/AppTheme.dart';
 import '../utils/AppConstants.dart';
 import '../utils/FavoriteFeaturesNotifier.dart';
+import '../utils/UpdateNotifier.dart';
 import '../widgets/FeatureButton.dart';
 import '../widgets/PageTopBar.dart';
 import '../widgets/QuickSearchBar.dart';
+// UpdateAvailableIcon 是「发现新版本」的绿色圆环箭头，定义在 Hub 组件库里
+import 'HubComponents.dart' show UpdateAvailableIcon;
 
 /// 大类子功能页面：显示某个分类下的所有功能按钮
 class FeatureCategoryPage extends StatefulWidget {
@@ -99,11 +102,32 @@ class _FeatureCategoryPageState extends State<FeatureCategoryPage> {
         itemCount: items.length,
         itemBuilder: (context, index) {
           final item = items[index];
-          return FeatureButton(
-            item: item,
-            onTap: () => widget.onFeatureTap(item),
-            isFavorited: _isFavorited(item.title),
-            onToggleFavorite: () => _toggleFavorite(item.title),
+          return ValueListenableBuilder<UpdateAvailability?>(
+            valueListenable: UpdateNotifier.available,
+            builder: (context, update, _) {
+              // 「检查更新」在检测到新版本时变成「发现新版本」+ 绿色向上箭头，
+              // 与「系统」Hub 页 / 首页收藏区保持一致（形态统一由 UpdateNotifier 给）
+              final isUpdate = UpdateNotifier.isUpdateEntry(item.title);
+              final effective = isUpdate && update != null ? update : null;
+              return FeatureButton(
+                item: item,
+                onTap: () => widget.onFeatureTap(item),
+                isFavorited: _isFavorited(item.title),
+                onToggleFavorite: () => _toggleFavorite(item.title),
+                titleOverride: isUpdate
+                    ? UpdateNotifier.titleFor(effective)
+                    : null,
+                titleColor:
+                    effective == null ? null : UpdateAvailableIcon.green,
+                iconOverride: effective == null
+                    ? null
+                    : Icon(
+                        Icons.arrow_upward_rounded,
+                        color: UpdateAvailableIcon.green,
+                        size: MediaQuery.of(context).size.width * 0.05,
+                      ),
+              );
+            },
           );
         },
       );

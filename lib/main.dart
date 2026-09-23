@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:just_audio_background/just_audio_background.dart';
+import 'package:my_first_flutter_app/manager/LZYCheckUpdateManager.dart';
 import 'package:my_first_flutter_app/page/AppShell.dart';
 import 'package:my_first_flutter_app/page/SplashPage.dart';
+import 'package:my_first_flutter_app/service/Portable/PortablePlayerController.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/ExportSettings.dart';
 import 'package:my_first_flutter_app/utils/FavoriteFeaturesNotifier.dart';
@@ -10,12 +15,43 @@ import 'package:my_first_flutter_app/utils/FavoriteImportFlow.dart';
 import 'package:my_first_flutter_app/utils/LoginStateNotifier.dart';
 import 'package:my_first_flutter_app/utils/PlayerThemeScope.dart';
 import 'package:my_first_flutter_app/utils/ThemeManager.dart';
+import 'package:my_first_flutter_app/utils/UpdateNotifier.dart';
 import 'package:my_first_flutter_app/utils/UserProfileNotifier.dart';
 import 'package:my_first_flutter_app/service/ConnectivityService.dart';
-
-void main() {
+import 'package:my_first_flutter_app/widgets/PortablePlayerBadge.dart';
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await _initBackgroundAudio();
   GoogleFonts.config.allowRuntimeFetching = true;
   runApp(MyApp());
+}
+
+/// 初始化随身听的后台播放（通知栏 / 锁屏 / 耳机按键控制）。
+///
+/// 必须在 `runApp` 之前完成：它要在 Android 侧注册 MediaSession 与前台服务，
+/// 晚于第一个 `AudioPlayer` 创建就会「能播但没有通知栏」。
+///
+/// 依赖三处 Android 配置同时到位，缺一都会静默降级：
+///   1. `AndroidManifest.xml` 声明 `com.ryanheise.audioservice.AudioService`
+///      与 `MediaButtonReceiver`；
+///   2. `MainActivity` 继承 `AudioServiceActivity`；
+///   3. `FOREGROUND_SERVICE` / `FOREGROUND_SERVICE_MEDIA_PLAYBACK` / `WAKE_LOCK` 权限。
+Future<void> _initBackgroundAudio() async {
+  try {
+    await JustAudioBackground.init(
+      androidNotificationChannelId:
+          'com.example.my_first_flutter_app.channel.portable_audio',
+      androidNotificationChannelName: '随身听播放',
+      androidNotificationChannelDescription: '显示正在播放的曲目与播放控制',
+      // 常驻通知：符合 QQ音乐那类播放器的行为，也避免被系统随手清掉
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: true,
+    );
+  } catch (e) {
+    // 初始化失败不该拖垮整个 App：随身听退化成「只能前台播放」。
+    debugPrint('[Portable] 后台播放初始化失败，退化为前台播放: $e');
+  }
+  PortablePlayerController().init();
 }
 
 /// 应用根组件：有状态组件，配置MaterialApp基础属性并管理初始化
@@ -52,6 +88,26 @@ class _MyAppState extends State<MyApp> {
     // 导出相关偏好（收藏夹自定义后缀）
     ExportSettings.load();
     _initFileOpenHandling();
+    _checkUpdateForBadge();
+  }
+
+  /// App 进入时检查一次更新，把结果写进 [UpdateNotifier]。
+  ///
+  /// 作用只是**点亮「发现新版本」按钮**（系统 Hub 页的「检查更新」会变成绿色圆环
+  /// 箭头），不弹窗 —— 弹窗仍由 `HomePage._autoCheckUpdate` 按「3 天内不提示」
+  /// 的规则决定；两处共用同一次网络请求（`checkUpdate()` 内部做了去重）。
+  ///
+  /// 刻意**不 await**：检查要联网，不能拖慢启动。
+  void _checkUpdateForBadge() {
+    unawaited(() async {
+      try {
+        final info = await LZYCheckUpdateManager().checkUpdate();
+        UpdateNotifier.setResult(info);
+      } catch (e) {
+        debugPrint('[Update] 启动检查更新失败（忽略）: $e');
+        UpdateNotifier.setResult(null);
+      }
+    }());
   }
 
   /// 注册「文件管理器点开收藏夹文件」的处理。
@@ -205,7 +261,40 @@ class _MyAppState extends State<MyApp> {
                     style: _fontsLoaded
                         ? AppTheme.font()
                         : const TextStyle(),
-                    child: child!,
+                    // 随身听悬浮球挂在**这里**（MaterialApp.builder），而不是
+                    // AppShell 的 body 里 —— 这是关键：
+                    //   MaterialApp.builder 包住的是 Navigator，所以悬浮球在**所有
+                    //   路由之上**，任何 push 出来的功能页（乐曲查询、Best50、随身听…）
+                    //   都能看到它。
+                    //   之前放在 AppShell.body 里，功能页是 push 到 AppShell 之上的
+                    //   新路由，球会被完全盖住 —— 表现就是「进具体功能页只听到声音、
+                    //   看不到球」。
+                    child: Stack(
+                      children: [
+                        if (child != null) child,
+                        // 随身听悬浮球：自己判断该不该显示（没在放歌、
+                        // 或随身听页面正开着时都返回空盒子）。
+                        Positioned.fill(
+                          child: PortablePlayerBall(
+                            // 这里的 context（builder 的）在 Navigator **之上**，
+                            // 弹层/跳转都得用 Navigator 自己的 overlay context，
+                            // 否则 `Navigator.of` 会抛「does not include a
+                            // Navigator」—— 表现就是「点球没反应」。
+                            navigatorKey: _navigatorKey,
+                            onOpenLibrary: () {
+                              final navigatorContext =
+                                  _navigatorKey.currentState?.overlay?.context;
+                              if (navigatorContext == null) {
+                                return Future<void>.value();
+                              }
+                              return AppShell.openPortablePlayerPage(
+                                navigatorContext,
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },

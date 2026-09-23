@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  通知栏「播放」按钮：强调色圆底 + 其上的实心三角。
+  圆和三角放在**同一个** VectorDrawable 里 —— RemoteViews 只能给 ImageView 贴一张图，
+  靠 FrameLayout 叠两层反而更难维护，一层解决。
+  颜色全走 @color/portable_accent 与 @color/portable_on_accent，深浅色都够对比度
+  （见 res/values*/colors.xml）。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp"
+    android:height="30dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+
+    <path
+        android:pathData="M3.2,16 a12.8,12.8 0 1,0 25.6,0 a12.8,12.8 0 1,0 -25.6,0 z"
+        android:fillColor="@color/portable_accent" />
+
+    <!-- 同色描边 + strokeLineJoin=round：三角的三个角是圆的，比系统三角柔和 -->
+    <path
+        android:pathData="M12.4,10.2 L23.4,16 L12.4,21.8 Z"
+        android:fillColor="@color/portable_on_accent"
+        android:strokeColor="@color/portable_on_accent"
+        android:strokeWidth="1.6"
+        android:strokeLineJoin="round" />
+</vector>

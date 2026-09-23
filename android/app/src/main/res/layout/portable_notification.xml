@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  随身听的自定义通知栏布局。
+
+  需求原话：曲绘占左侧 3 行的空间，右侧 3 行从上到下分别是曲名、艺术家、
+  播放控制的 3 个组件。
+
+  视觉约定（都是踩过坑之后定下的）：
+    * 颜色**一律**走 @color（res/values/colors.xml + res/values-night/colors.xml）。
+      在布局里写死 #FF000000，深色通知卡片上就是「黑字贴深灰底」，什么都看不见。
+    * 图标用 res/drawable/portable_ic_*.xml（自绘矢量）。系统那套
+      @android:drawable/ic_media_* 是细白线，在浅色卡片上又细又淡（就是「丑」的根源）。
+    * 「播放/暂停」自带强调色圆底（portable_ic_play/pause 内部画圆），
+      左/右两个是纯字形，靠颜色区分主次。
+
+  ⚠️ 修改此文件时注意 RemoteViews 的限制：
+    * 只能用 RemoteViews 支持的控件（LinearLayout/FrameLayout/RelativeLayout/
+      TextView/ImageView/Button/ProgressBar/Chronometer），**不能**用 ConstraintLayout；
+    * 不能用自定义 View、不能写 style 引用里的部分属性；
+    * 根布局用 wrap_content + minHeight：系统在「通知中心」里给的位置比 64dp 高，
+      内容高度写死 64dp 反而会把三行压扁（改高度时注意曲名/艺术家都还是要完整可见）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/portable_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="64dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="6dp"
+    android:paddingEnd="10dp">
+
+    <!-- 左：曲绘。56dp 见方、圆角已在 Kotlin 侧裁好（PortableNotificationService.roundToSquare），
+         改尺寸要同步改那边的 ART_SIZE_DP。 -->
+    <ImageView
+        android:id="@+id/portable_art"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_marginEnd="12dp"
+        android:scaleType="centerCrop"
+        android:contentDescription="@null" />
+
+    <!-- 右：3 行，从上到下 = 曲名 / 艺术家 / 播放控制 -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/portable_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="15sp"
+            android:fontFamily="sans-serif-medium"
+            android:includeFontPadding="false"
+            android:textColor="@color/portable_title" />
+
+        <TextView
+            android:id="@+id/portable_artist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="12sp"
+            android:includeFontPadding="false"
+            android:textColor="@color/portable_subtitle" />
+
+        <!-- 第 3 行：上一首 / 播放暂停 / 下一首 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:id="@+id/portable_prev"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:padding="4dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/portable_ic_prev"
+                android:contentDescription="上一首" />
+
+            <ImageView
+                android:id="@+id/portable_play"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginStart="10dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/portable_ic_play"
+                android:contentDescription="播放/暂停" />
+
+            <ImageView
+                android:id="@+id/portable_next"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginStart="10dp"
+                android:padding="4dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/portable_ic_next"
+                android:contentDescription="下一首" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

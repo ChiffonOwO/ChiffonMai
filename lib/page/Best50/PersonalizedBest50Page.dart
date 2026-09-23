@@ -1561,7 +1561,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
         crossAxisCount: 2,
         crossAxisSpacing: MediaQuery.of(context).size.width * 0.01,
         mainAxisSpacing: MediaQuery.of(context).size.width * 0.01,
-        childAspectRatio: 1.75,
+        childAspectRatio: B50GameCardWidget.designAspectRatio,
       ),
       itemCount: _personalizedSongs.length,
       itemBuilder: (context, index) {
@@ -1633,7 +1633,6 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     // PC50：卡片上挂一枚游玩次数角标 —— 这个模式的排序依据就是它，
     // 不显示的话列表看起来和 ALL50 只差一个顺序。
     final int? playCount = (songData['playCount'] as num?)?.toInt();
-    final double scale = _cardScale;
 
     return GestureDetector(
       onTap: () {
@@ -1652,21 +1651,15 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
           ? B50GameCardWidget.withBadgeOverlay(
               card: card,
               text: 'PC $playCount',
-              scale: scale,
+              scale: B50GameCardWidget.autoScale,
             )
           : card,
     );
   }
 
-  /// 单卡缩放系数 = 单卡实际宽度 / 设计稿宽度（335）。
-  /// `_buildGameCard` 与 PC50 的次数徽标都用它，避免两处各算一遍。
-  double get _cardScale {
-    final screenW = MediaQuery.of(context).size.width;
-    return ((screenW - screenW * 0.02) / 2) / 335.0;
-  }
 
   // 构建游戏卡片（委托至通用 widget B50GameCardWidget，
-  // 内部按 refCardWidth=335 缩放，scale 取当前屏幕上单卡实际可见宽度 / 335）。
+  // 字号按卡片**实际**宽度自适应（`scale: autoScale`）。
   Widget _buildGameCard({
     required Color cardColor,
     String songName = '未知歌曲',
@@ -1685,7 +1678,6 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     Color starsColor = Colors.white,
     int maxIdLength = 5,
   }) {
-    final double scale = _cardScale;
     final int id = songId ?? 0;
 
     return B50GameCardWidget(
@@ -1705,7 +1697,9 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
       songId: id,
       starsColor: starsColor,
       maxIdLength: maxIdLength,
-      scale: scale,
+      // 字号按卡片**实际**宽度自适应（别拿屏幕宽度估：容器 padding / 网格间距
+      // 都会从宽度里扣掉，估出来的值和真实格子差好几个百分点）。
+      scale: B50GameCardWidget.autoScale,
     );
   }
 

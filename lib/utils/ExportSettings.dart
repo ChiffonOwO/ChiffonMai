@@ -1,74 +1,46 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// 导出相关的用户偏好（目前只有收藏夹自定义后缀）。
+/// 导出相关的常量。
 ///
-/// 用 [ValueNotifier] 暴露，方便设置页做完修改后直接驱动 UI 刷新。
+/// **收藏夹导出后缀是固定的 `.cmf`，不提供用户自定义。**
+///
+/// 历史：早期版本允许用户在设置页把它改成任意后缀（`export_favorite_extension`）。
+/// 这个口子的问题很严重 —— 用户一旦把后缀改成 `.json` / `.zip` / `.png` / `.txt`
+/// 这类**常见后缀**，系统就会把「用本 App 打开该类型文件」记成默认/首要备选，
+/// 等于**劫持了这些后缀的打开方式**：之后在文件管理器里点任何一个 `.json`，
+/// 弹出来的首选都是 ChiffonMai，别的 App 反而要点「更多」才找得到。
+/// 而 `.cmf` 是本应用专有后缀，不会与任何常见格式冲突，所以固定下来。
+///
+/// 注意：**导入不受影响**。导入按文件内容（JSON 里的 `format` 字段）识别，
+/// 既不校验后缀也不用后缀过滤文件选择器，所以用户以前用自定义后缀导出的
+/// 备份文件依然能原样导回来。
 class ExportSettings {
   ExportSettings._();
 
-  static const String _keyFavoriteExtension = 'export_favorite_extension';
+  /// 旧版本存放自定义后缀的 key，**只用于启动时清理**（见 [load]）。
+  static const String _legacyKeyFavoriteExtension = 'export_favorite_extension';
 
-  /// 默认后缀：ChiffonMai Favorite。
-  static const String defaultFavoriteExtension = 'cmf';
+  /// 收藏夹导出后缀（不含前导点）：ChiffonMai Favorite。
+  static const String favoriteExtension = 'cmf';
 
-  /// 后缀长度上限（不含前导点）。
-  static const int maxExtensionLength = 12;
+  /// 后缀的「带点」形式，例如 `.cmf`。
+  static const String favoriteExtensionWithDot = '.$favoriteExtension';
 
-  /// 当前收藏夹导出后缀（不含前导点，例如 `cmf`）。
-  static final ValueNotifier<String> favoriteExtension =
-      ValueNotifier<String>(defaultFavoriteExtension);
-
-  static bool _loaded = false;
-
-  /// 从本地读取设置。应用启动时调用一次即可。
-  static Future<void> load() async {
-    if (_loaded) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_keyFavoriteExtension);
-      favoriteExtension.value = normalize(raw) ?? defaultFavoriteExtension;
-    } catch (e) {
-      debugPrint('[ExportSettings] 读取导出设置失败: $e');
-      favoriteExtension.value = defaultFavoriteExtension;
-    }
-    _loaded = true;
-  }
-
-  /// 保存后缀。传入非法值时返回 false 且不落盘。
-  static Future<bool> setFavoriteExtension(String raw) async {
-    final normalized = normalize(raw);
-    if (normalized == null) return false;
-    favoriteExtension.value = normalized;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_keyFavoriteExtension, normalized);
-      return true;
-    } catch (e) {
-      debugPrint('[ExportSettings] 保存导出设置失败: $e');
-      return false;
-    }
-  }
-
-  /// 当前后缀的「带点」形式，例如 `.cmf`。
-  static String get favoriteExtensionWithDot => '.${favoriteExtension.value}';
-
-  /// 规范化用户输入的后缀；非法时返回 null。
+  /// 应用启动时调用一次：把历史版本残留的自定义后缀设置擦掉。
   ///
-  /// 规则：去掉前导点与空白 → 小写 → 只允许 `a-z0-9_-` → 长度 1..12。
-  /// 这样能挡掉 `../../etc/passwd`、`a/b`、`*` 之类的输入被拼进文件名。
-  static String? normalize(String? raw) {
-    if (raw == null) return null;
-    var value = raw.trim();
-    while (value.startsWith('.')) {
-      value = value.substring(1);
+  /// 后缀现在由代码写死，这个 key 已经没有任何读取方；留着只会让
+  /// 「用户设过什么」变成一份永远不生效的幽灵配置，所以启动时顺手删除。
+  /// 失败不影响任何功能（读写 SharedPreferences 失败都已经吞掉）。
+  static Future<void> load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.containsKey(_legacyKeyFavoriteExtension)) {
+        await prefs.remove(_legacyKeyFavoriteExtension);
+        debugPrint('[ExportSettings] 已清理历史遗留的自定义后缀设置');
+      }
+    } catch (e) {
+      debugPrint('[ExportSettings] 清理历史导出设置失败（忽略）: $e');
     }
-    value = value.toLowerCase();
-    if (value.isEmpty || value.length > maxExtensionLength) return null;
-    if (!RegExp(r'^[a-z0-9_-]+$').hasMatch(value)) return null;
-    return value;
   }
-
-  /// 后缀是否合法（供设置页做输入校验提示）。
-  static bool isValid(String? raw) => normalize(raw) != null;
 }

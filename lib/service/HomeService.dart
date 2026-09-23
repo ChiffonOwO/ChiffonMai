@@ -5,7 +5,6 @@ import 'package:my_first_flutter_app/manager/DivingFish/DiffMusicDataManager.dar
 import 'package:my_first_flutter_app/manager/LZYCheckUpdateManager.dart';
 import 'package:my_first_flutter_app/manager/LuoXue/CollectionsManager.dart';
 import 'package:my_first_flutter_app/manager/LuoXue/LuoXueSongsManager.dart';
-import 'package:my_first_flutter_app/manager/KnowledgeManager.dart';
 import 'package:my_first_flutter_app/manager/MaidataManager.dart';
 import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/UnionManager.dart';
@@ -99,7 +98,6 @@ class HomeService {
         collectionsManager.fetchFramesCollections(),
         RecommendByTagsService.initializeTags(),
         luoXueSongsManager.getLuoXueSongs(),
-        KnowledgeManager().getKnowledgeData(),
         UnionManager().fetchAndCache(),
       ]);
       

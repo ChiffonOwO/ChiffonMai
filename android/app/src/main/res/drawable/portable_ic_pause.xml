@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 通知栏「暂停」按钮：与 portable_ic_play 同款圆底，里面换成两条圆角竖条。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp"
+    android:height="30dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+
+    <path
+        android:pathData="M3.2,16 a12.8,12.8 0 1,0 25.6,0 a12.8,12.8 0 1,0 -25.6,0 z"
+        android:fillColor="@color/portable_accent" />
+
+    <path
+        android:pathData="M12.6,10.4 h2.6 v11.2 h-2.6 z"
+        android:fillColor="@color/portable_on_accent"
+        android:strokeColor="@color/portable_on_accent"
+        android:strokeWidth="1.2"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M16.8,10.4 h2.6 v11.2 h-2.6 z"
+        android:fillColor="@color/portable_on_accent"
+        android:strokeColor="@color/portable_on_accent"
+        android:strokeWidth="1.2"
+        android:strokeLineJoin="round" />
+</vector>

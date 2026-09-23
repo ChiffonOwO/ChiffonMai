@@ -11,12 +11,27 @@ class FeatureButton extends StatelessWidget {
   /// 收藏切换回调
   final VoidCallback? onToggleFavorite;
 
+  /// 可选：替换标题（「检查更新」在检测到新版本时显示为「发现新版本」）。
+  final String? titleOverride;
+
+  /// 可选：替换标题颜色。
+  final Color? titleColor;
+
+  /// 可选：替换中间那枚图标。
+  ///
+  /// 只换图标本身，不动它外面那层白色圆形底 —— 所以「绿色向上箭头」会落在白圆里，
+  /// 而不是又套一个圆环（那会变成双环）。
+  final Widget? iconOverride;
+
   const FeatureButton({
     super.key,
     required this.item,
     required this.onTap,
     this.isFavorited,
     this.onToggleFavorite,
+    this.titleOverride,
+    this.titleColor,
+    this.iconOverride,
   });
 
   bool get _showStar => isFavorited != null && onToggleFavorite != null;
@@ -64,11 +79,12 @@ class FeatureButton extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                     child: Center(
-                      child: Icon(
-                        item.icon,
-                        color: scheme.primary,
-                        size: screenWidth * 0.05,
-                      ),
+                      child: iconOverride ??
+                          Icon(
+                            item.icon,
+                            color: scheme.primary,
+                            size: screenWidth * 0.05,
+                          ),
                     ),
                   ),
                 ),
@@ -89,9 +105,9 @@ class FeatureButton extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        item.title,
+                        titleOverride ?? item.title,
                         style: TextStyle(
-                          color: scheme.onSurface,
+                          color: titleColor ?? scheme.onSurface,
                           fontSize: screenWidth * 0.035,
                           fontWeight: FontWeight.bold,
                           fontStyle: FontStyle.normal,

@@ -1,4 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#FFFFFF</color>
+
+    <!--
+      随身听通知栏用色（RemoteViews 布局里以 @color 引用）。
+      本文件 = **浅色通知卡片**（系统浅色下通知卡是浅灰底）；深色卡片见
+      values-night/colors.xml。
+
+      ⚠️ 两边的名字必须成对出现。通知卡片的底色由**系统主题**决定（跟随系统
+      深浅色），只改一侧就会出现「黑字贴在深灰底上」这种看不见的文案。
+      也别把颜色写回布局：布局里写死的 #FF000000 就是深色模式下看不清的根因。
+    -->
+    <color name="portable_title">#E6000000</color>
+    <color name="portable_subtitle">#8A000000</color>
+    <color name="portable_icon">#B3000000</color>
+    <color name="portable_icon_dim">#4D000000</color>
+    <color name="portable_accent">#FF546161</color>
+    <color name="portable_on_accent">#FFFFFFFF</color>
 </resources>

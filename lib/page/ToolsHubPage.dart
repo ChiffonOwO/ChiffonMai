@@ -20,9 +20,9 @@ import 'ScoreOcrPage.dart';
 import 'DifficultyDistributionPage.dart';
 import 'FriendComparePage.dart';
 import 'GlobalArcadeMapPage.dart';
-import 'KnowledgeSearchPage.dart';
 import 'KaleidXScope/KaleidXScopeSelectPage.dart';
 import 'PersonalizedChartPlayConfigure.dart';
+import 'Portable/PortablePlayerPage.dart';
 
 class ToolsHubPage extends StatefulWidget {
   const ToolsHubPage({super.key});
@@ -34,6 +34,19 @@ class ToolsHubPage extends StatefulWidget {
 class _ToolsHubPageState extends State<ToolsHubPage> {
   void _open(BuildContext context, Widget page) =>
       Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+
+  /// 打开随身听。
+  ///
+  /// 单独写一个方法而不是塞进 `_open`：随身听页面要感知「自己是不是在最上层」，
+  /// 好让 [PortablePlayerBall] 让位（`AppShell` 里靠 push 的 Future 判断）。
+  /// 从首页进来时由 `AppShell._openPortablePlayer` 走同一条路，
+  /// 这里从 Hub 页进来时用 `await` 只是为了让导航栈语义一致。
+  Future<void> _openPortablePlayer(BuildContext context) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PortablePlayerPage()),
+    );
+  }
 
   // ===== 曲绘索引构建状态 =====
   bool _coverIndexReady = false;
@@ -280,9 +293,17 @@ class _ToolsHubPageState extends State<ToolsHubPage> {
           HubSection(
             title: '玩法与社区',
             icon: Icons.public_outlined,
-            subtitle: '自定义谱面 · KALEIDXSCOPE · 好友 · 地图',
-            badgeCount: 5,
+            subtitle: '随身听 · 自定义谱面 · KALEIDXSCOPE · 好友 · 地图',
+            badgeCount: 6,
             children: [
+              HubActionTile(
+                title: '随身听',
+                subtitle: '后台播放舞萌曲库，带通知栏播放器',
+                icon: Icons.headphones_rounded,
+                isFavorited: _isFavorited('随身听'),
+                onToggleFavorite: () => _toggleFavorite('随身听'),
+                onTap: () => _openPortablePlayer(context),
+              ),
               HubActionTile(
                 title: '自定义谱面播放',
                 subtitle: '播放本地自定义谱面',
@@ -323,23 +344,6 @@ class _ToolsHubPageState extends State<ToolsHubPage> {
                 isFavorited: _isFavorited('全球音游街机地图'),
                 onToggleFavorite: () => _toggleFavorite('全球音游街机地图'),
                 onTap: () => _open(context, const GlobalArcadeMapPage()),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          HubSection(
-            title: '资料与百科',
-            icon: Icons.menu_book_outlined,
-            subtitle: '舞萌术语与知识条目',
-            badgeCount: 1,
-            children: [
-              HubActionTile(
-                title: '舞萌百科',
-                subtitle: '查阅舞萌相关知识',
-                icon: Icons.menu_book_outlined,
-                isFavorited: _isFavorited('舞萌百科'),
-                onToggleFavorite: () => _toggleFavorite('舞萌百科'),
-                onTap: () => _open(context, const KnowledgeSearchPage()),
               ),
             ],
           ),

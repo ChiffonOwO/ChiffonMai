@@ -43,8 +43,9 @@ class FavoriteImportBundle {
 /// }
 /// ```
 ///
-/// 后缀由 [ExportSettings] 决定（默认 `.cmf`，用户可在设置页改）。
-/// 导入按「内容」校验而非按后缀校验，因此无论用户把后缀改成什么都能导回来。
+/// 后缀固定为 [ExportSettings.favoriteExtensionWithDot]（`.cmf`，见那里的注释：
+/// 早期允许自定义后缀会劫持常见后缀的默认打开方式，已废弃）。
+/// 导入按「内容」校验而非按后缀校验，所以用户以前用别的后缀导出的备份照样能导回来。
 class FavoriteTransferService {
   static final FavoriteTransferService _instance =
       FavoriteTransferService._internal();
@@ -100,7 +101,6 @@ class FavoriteTransferService {
     }
 
     final content = await buildPayload(folders);
-    final ext = ExportSettings.favoriteExtension.value;
     final base = ExportPathUtil.sanitizeFileName(
       fileBaseName ??
           'favorites_${DateTime.now().millisecondsSinceEpoch.toString()}',
@@ -108,7 +108,7 @@ class FavoriteTransferService {
     );
 
     return ExportPathUtil.writeExportTextFile(
-      fileName: '$base.$ext',
+      fileName: '$base${ExportSettings.favoriteExtensionWithDot}',
       content: content,
       subDir: '收藏夹',
       onFallback: onFallback,
@@ -127,7 +127,7 @@ class FavoriteTransferService {
     try {
       result = await FilePicker.pickFiles(
         dialogTitle: '选择 ChiffonMai 收藏夹文件',
-        // 自定义后缀无法映射成 MIME，用 any 才能保证任何后缀都选得中
+        // 不按后缀过滤：后缀固定为 .cmf，但用户以前的自定义后缀备份也应当能选中
         type: FileType.any,
         allowMultiple: false,
         withData: false,

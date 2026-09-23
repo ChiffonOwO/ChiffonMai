@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  通知栏「上一首」：实心左三角 + 竖条（镜像是 portable_ic_next）。
+  24dp 网格、图形占约 65%，比系统的 @android:drawable/ic_media_previous
+  饱满得多（后者的细白线在浅色通知卡上几乎看不见）。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:pathData="M19.1,4.9 L7.4,12 L19.1,19.1 Z"
+        android:fillColor="@color/portable_icon"
+        android:strokeColor="@color/portable_icon"
+        android:strokeWidth="1.4"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M5.4,5 h1.6 v14 h-1.6 z"
+        android:fillColor="@color/portable_icon"
+        android:strokeColor="@color/portable_icon"
+        android:strokeWidth="1.2"
+        android:strokeLineJoin="round" />
+</vector>

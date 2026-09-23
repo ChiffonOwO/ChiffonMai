@@ -4,6 +4,8 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import 'PageTopBar.dart';
+
 /// 二维码「快速填入」三件套：读取剪贴板 / 从相册识别 / 扫描二维码。
 ///
 /// 为什么要有这个组件：这套代码原来在 `SyncScoreDialogs`、`HomePage`、
@@ -185,12 +187,15 @@ class _QrScannerPageState extends State<QrScannerPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('扫描二维码'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      // 顶部栏统一走公共组件（标题 = 思源黑体 20 / bold / primary / 居中），
+      // 避免 `Scaffold.appBar` 里裸 `Text` 被顶回系统 Roboto。
+      // 这里是相机页，所以 bar 必须留在 `appBar` 槽里 —— 它和相机预览之间
+      // 不能有别的 widget（PageTopBar 放 body 的 Column 里也一样是 AppBar，
+      // 只是相机预览要拿 `Expanded` 撑满剩余空间）。
+      appBar: PageTopBar(
+        title: '扫描二维码',
+        barBackground: Theme.of(context).colorScheme.surface,
       ),
       body: MobileScanner(
         onDetect: (BarcodeCapture capture) {

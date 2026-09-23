@@ -96,6 +96,10 @@ class FittedRatingRankingListService {
   static int get _cacheExpirySeconds =>
       CacheTimestampConstant.rankingsCacheMinutes * 60;
 
+  /// 测试专用：把排行榜请求打桩掉（见 [getRankings] 里的用法）。真机永远是 null。
+  @visibleForTesting
+  static Future<List<FittedRankItem>> Function()? debugRankingsLoader;
+
   // 按模式拼接缓存 key
   static String _cacheKey(String mode) =>
       '${CacheKeyConstant.fittedRankingsCachePrefix}$mode';
@@ -114,6 +118,12 @@ class FittedRatingRankingListService {
         return cachedData;
       }
     }
+
+    // 测试专用打桩：这几个排行榜接口都不读缓存（rankingsCacheMinutes = -1），
+    // widget 测试里不打桩页面永远停在空状态，几何/间距问题就量不出来。
+    // 真机（debug/release）永远是 null。
+    final stub = debugRankingsLoader;
+    if (stub != null) return stub();
 
     try {
       var url = Uri.parse(

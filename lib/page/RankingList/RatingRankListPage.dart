@@ -4,6 +4,7 @@ import '../../service/RankingList/RatingRankListService.dart';
 import '../../constant/CacheKeyConstant.dart';
 import '../../utils/AppTheme.dart';
 import '../../utils/ColorUtil.dart';
+import '../../widgets/PageTopBar.dart';
 
 class RatingRankListPage extends StatefulWidget {
   const RatingRankListPage({super.key});
@@ -401,28 +402,37 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
     final brightness = Theme.of(context).brightness;
     return Scaffold(
       backgroundColor: AppColors.cardBackground(brightness),
-      appBar: AppBar(
-        title: const Text('Rating 排行榜'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: _isLoading
-                ? CircularProgressIndicator(color: AppColors.primaryText(brightness), strokeWidth: 2)
-                : Icon(Icons.refresh, color: AppColors.primaryText(brightness)),
-            onPressed: (_isLoading || _isButtonDisabled) ? null : _onRefresh,
-            tooltip: '刷新',
-          ),
-          // 快速定位到当前用户的按钮
-          if (_currentUserRankItem != null)
-            IconButton(
-              icon: Icon(Icons.location_searching, color: AppColors.primaryText(brightness)),
-              onPressed: _scrollToCurrentUser,
-              tooltip: '跳转到我的排名',
-            ),
-        ],
-      ),
       body: Column(
         children: [
+          // 顶部栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
+          // 与 Best50 页、其余 50 多个页面同款。
+          //
+          // 这里原来直接用 `Scaffold.appBar: AppBar(title: Text(...))`：标题那层
+          // `Text` 不带 fontFamily，会被 AppBar 自己的 `DefaultTextStyle`
+          // （`appBarTheme.titleTextStyle`）接管，标题就退化成系统 Roboto，
+          // 于是出现「同一个 App 里排行榜页的标题字体和别人不一样」。
+          PageTopBar(
+            title: 'Rating 排行榜',
+            actions: [
+              IconButton(
+                icon: _isLoading
+                    ? CircularProgressIndicator(
+                        color: AppColors.primaryText(brightness), strokeWidth: 2)
+                    : Icon(Icons.refresh,
+                        color: AppColors.primaryText(brightness)),
+                onPressed: (_isLoading || _isButtonDisabled) ? null : _onRefresh,
+                tooltip: '刷新',
+              ),
+              // 快速定位到当前用户的按钮
+              if (_currentUserRankItem != null)
+                IconButton(
+                  icon: Icon(Icons.location_searching,
+                      color: AppColors.primaryText(brightness)),
+                  onPressed: _scrollToCurrentUser,
+                  tooltip: '跳转到我的排名',
+                ),
+            ],
+          ),
           // 免责声明
           Container(
             width: double.infinity,
@@ -513,6 +523,11 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
                     ? _buildEmptyState(brightness)
                     : ListView.builder(
                         controller: _scrollController,
+                        // 必须显式清零：`Scaffold` 在没有 `appBar:` 时不会消耗顶部安全区，
+                        // 于是 `ListView` 会把 `MediaQuery.padding.top`（状态栏 24dp）
+                        // 当成内边距垫在**列表最上面** —— 而状态栏已经被 `PageTopBar`
+                        // 占掉了，结果就是「第一名那一行上方多出一块空白」（实测 24dp）。
+                        padding: EdgeInsets.zero,
                         itemCount: _rankList.length,
                         itemBuilder: (context, index) {
                           final item = _rankList[index];

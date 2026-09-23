@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 通知栏「下一首」：实心右三角 + 竖条（portable_ic_prev 的镜像）。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:pathData="M4.9,4.9 L16.6,12 L4.9,19.1 Z"
+        android:fillColor="@color/portable_icon"
+        android:strokeColor="@color/portable_icon"
+        android:strokeWidth="1.4"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M17,5 h1.6 v14 h-1.6 z"
+        android:fillColor="@color/portable_icon"
+        android:strokeColor="@color/portable_icon"
+        android:strokeWidth="1.2"
+        android:strokeLineJoin="round" />
+</vector>

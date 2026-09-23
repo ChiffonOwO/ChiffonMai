@@ -50,6 +50,10 @@ class SyncRouteFooter extends StatelessWidget {
               context,
               stats: notifier.statsFor(platform),
               loading: notifier.statsLoading,
+              // 长按/悬停看数据新鲜度（那行字本身必须够短，塞不下）
+              tooltip: notifier.statsRefreshFailed
+                  ? '${notifier.statsAgeText} · 上次刷新失败，显示的是旧数据'
+                  : notifier.statsAgeText,
               onTap: () => SyncStatsView.showDetail(context),
             ),
           ],

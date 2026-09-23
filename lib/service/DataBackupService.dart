@@ -34,8 +34,6 @@ class DataBackupService {
     CacheKeyConstant.unionExtraSongIds,
     CacheKeyConstant.unionCache,
     CacheKeyConstant.unionCacheTimestamp,
-    CacheKeyConstant.knowledgeData,
-    CacheKeyConstant.knowledgeTimestamp,
     CacheKeyConstant.luoxueSongsCache,
     CacheKeyConstant.trophiesCollectionsCacheData,
     CacheKeyConstant.iconsCollectionsCacheData,

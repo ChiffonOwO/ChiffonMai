@@ -11,6 +11,7 @@ import 'RankingList/AvgScoreRankingListPage.dart';
 import 'RankingList/FittedRatingRankingListPage.dart';
 import 'RankingList/RatingRankListPage.dart';
 import 'RankingList/SpecialRankingListPage.dart';
+import 'History/RatingHistoryPage.dart';
 import '../service/RankingList/AvgRankingListService.dart';
 
 class Best50HubPage extends StatefulWidget {
@@ -43,7 +44,7 @@ class _Best50HubPageState extends State<Best50HubPage> {
             title: 'Best50 分析',
             icon: Icons.leaderboard_outlined,
             subtitle: '多维度 Best50 综合分析',
-            badgeCount: 6,
+            badgeCount: 7,
             children: [
               HubActionTile(
                 title: 'Best50',
@@ -60,6 +61,14 @@ class _Best50HubPageState extends State<Best50HubPage> {
                 isFavorited: _isFavorited('拟合 Best50'),
                 onToggleFavorite: () => _toggleFavorite('拟合 Best50'),
                 onTap: () => _open(context, const DiffBest50Page()),
+              ),
+              HubActionTile(
+                title: 'Rating 历史',
+                subtitle: '看 Rating 随时间的变化',
+                icon: Icons.timeline_rounded,
+                isFavorited: _isFavorited('Rating 历史'),
+                onToggleFavorite: () => _toggleFavorite('Rating 历史'),
+                onTap: () => _open(context, const RatingHistoryPage()),
               ),
               HubActionTile(
                 title: '个性化 Best50',

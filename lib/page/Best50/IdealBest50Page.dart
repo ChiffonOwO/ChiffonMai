@@ -496,7 +496,7 @@ class _IdealBest50PageState extends State<IdealBest50Page> {
         crossAxisCount: 2,
         crossAxisSpacing: MediaQuery.of(context).size.width * 0.01,
         mainAxisSpacing: MediaQuery.of(context).size.width * 0.01,
-        childAspectRatio: 1.75,
+        childAspectRatio: B50GameCardWidget.designAspectRatio,
       ),
       itemCount: songs.length,
       itemBuilder: (context, index) =>
@@ -569,10 +569,6 @@ class _IdealBest50PageState extends State<IdealBest50Page> {
     Color starsColor = Colors.white,
     int maxIdLength = 5,
   }) {
-    final screenW = MediaQuery.of(context).size.width;
-    const double refCardWidth = 335.0;
-    final cardW = (screenW - screenW * 0.02) / 2;
-    final scale = cardW / refCardWidth;
 
     return B50GameCardWidget(
       cardColor: cardColor,
@@ -591,7 +587,9 @@ class _IdealBest50PageState extends State<IdealBest50Page> {
       songId: songId ?? 0,
       starsColor: starsColor,
       maxIdLength: maxIdLength,
-      scale: scale,
+      // 字号按卡片**实际**宽度自适应：别拿屏幕宽度估（容器 padding /
+      // 网格间距都会从可用宽里扣掉）。
+      scale: B50GameCardWidget.autoScale,
     );
   }
 }
