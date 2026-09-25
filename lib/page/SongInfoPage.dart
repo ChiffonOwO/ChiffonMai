@@ -755,68 +755,6 @@ class _SongInfoPageState extends State<SongInfoPage> {
     }
   }
 
-  /// 将解析后的MaidataData应用到状态中（提取物量统计和绝赞统计）
-  void _applyMaidataParseResults(MaidataData maidata) {
-    Map<int, List<int>> newNoteCounts = {};
-    Map<int, List<int>> newBreakCounts = {};
-    for (ChartData chart in maidata.charts) {
-      int index = chart.difficultyIndex - 2; // 转换为0-4
-
-      if (index >= 0 && index <= 5 && chart.stats != null) {
-        NoteStats stats = chart.stats!;
-        newNoteCounts[index] = [
-          stats.tap,
-          stats.hold,
-          stats.slide,
-          stats.touch,
-          stats.breakNote,
-        ];
-        // 特殊处理6位数ID的UTAGE歌曲：只有一个难度(index=0)，但maidata中是index=5
-        if (widget.songId.length == 6 && index == 5) {
-          newNoteCounts[0] = [
-            stats.tap,
-            stats.hold,
-            stats.slide,
-            stats.touch,
-            stats.breakNote,
-          ];
-        }
-      }
-      if (index >= 0 && index <= 5 && chart.breakStats != null) {
-        BreakStats breakStats = chart.breakStats!;
-        newBreakCounts[index] = [
-          breakStats.trueZettaiTap,
-          breakStats.trueZettaiHold,
-          breakStats.protectedZettai,
-          breakStats.star,
-        ];
-        // 特殊处理6位数ID的UTAGE歌曲：只有一个难度(index=0)，但maidata中是index=5
-        if (widget.songId.length == 6 && index == 5) {
-          newBreakCounts[0] = [
-            breakStats.trueZettaiTap,
-            breakStats.trueZettaiHold,
-            breakStats.protectedZettai,
-            breakStats.star,
-          ];
-        }
-      }
-    }
-
-    // 更新状态并刷新界面
-    if (newNoteCounts.isNotEmpty) {
-      setState(() {
-        _maidataNoteCounts = newNoteCounts;
-        _maidataDecodedSuccessfully = true;
-      });
-    }
-    if (newBreakCounts.isNotEmpty) {
-      setState(() {
-        _maidataBreakCounts = newBreakCounts;
-        _maidataDecodedSuccessfully = true;
-      });
-    }
-  }
-
   // 加载参考时长（从落雪音频获取）
   Future<void> _loadReferenceDuration() async {
     if (_referenceDurationLoading) return;
@@ -8208,7 +8146,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
     double? fitDiffValue;
     final diffEntry = _diffData != null ? _diffData![_currentDiffIndex] : null;
     if (diffEntry is DiffData) {
-      fitDiffValue = diffEntry.fitDiff?.toDouble();
+      fitDiffValue = diffEntry.fitDiff.toDouble();
     } else if (diffEntry is Map) {
       final raw = diffEntry['fit_diff'];
       fitDiffValue = raw is num ? raw.toDouble() : null;

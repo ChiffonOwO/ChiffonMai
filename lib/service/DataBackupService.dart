@@ -42,6 +42,11 @@ class DataBackupService {
     CacheKeyConstant.maiTagsCache,
     CacheKeyConstant.maiTagsCacheTimestamp,
     CacheKeyConstant.userPlayData,
+    CacheKeyConstant.accountRotationPending,
+    'account_history_identity_migrated_v1',
+    'account_history_owners_v1',
+    'user_play_data_last_update',
+    'awmc_net_user_play_data_last_update',
     CacheKeyConstant.diffMusicData,
     CacheKeyConstant.diffMusicDataTimestamp,
     CacheKeyConstant.recommendationResults,
@@ -51,13 +56,16 @@ class DataBackupService {
     CacheKeyConstant.shuiyuRankingsCacheTimestamp,
     CacheKeyConstant.luoxueRankingsCache,
     CacheKeyConstant.luoxueRankingsCacheTimestamp,
+    CacheKeyConstant.awmcRankingsCache,
+    CacheKeyConstant.awmcRankingsCacheTimestamp,
     CacheKeyConstant.avgRankingsCache,
     CacheKeyConstant.avgRankingsCacheTimestamp,
     CacheKeyConstant.coverHashCache,
     CacheKeyConstant.coverHashCacheTimestamp,
     // AWMC 游玩次数缓存：能从 /v1/user/music 重新拉，而且与具体账号绑定，
-    // 跟着备份跑到别的账号上会显示别人的游玩次数
-    CacheKeyConstant.awmcPlayCounts,
+    // 跟着备份跑到别的账号上会显示别人的游玩次数。
+    // 旧版是单个共享键（Legacy），现在按源分开存（Prefix），两个都要排除。
+    CacheKeyConstant.awmcPlayCountsLegacy,
   };
 
   /// 前缀匹配的缓存键（这些键按歌曲 / 模式 / 难度拼接，数量不固定）
@@ -67,6 +75,8 @@ class DataBackupService {
     CacheKeyConstant.fittedRankingsCacheTimestampPrefix,
     CacheKeyConstant.songCommentsCachePrefix, // song_comments_cache_<songId>
     CacheKeyConstant.songCommentsCacheTimestampPrefix,
+    // 游玩次数缓存按数据源分键：awmc_play_counts_v1_<source>
+    CacheKeyConstant.awmcPlayCountsPrefix,
     // 双账号：成绩存档（可重新拉取）不进备份；
     // 身份存档 account_archive_identity_* 与 account_store 属于用户数据，保留在备份里
     CacheKeyConstant.accountArchivePlayPrefix, // account_archive_play_<source>

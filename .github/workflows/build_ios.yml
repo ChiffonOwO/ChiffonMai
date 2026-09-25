@@ -41,6 +41,9 @@ jobs:
             // 落雪 OAuth Client Secret
             static const String LuoXueClientSecret = '${{ secrets.LUOXUE_CLIENT_SECRET }}';
 
+            // AWMC NET.（https://net.wmc.pub）查分器开发者密钥（只读查分用）
+            static const String AwmcNetDeveloperKey = '${{ secrets.AWMC_NET_DEVELOPER_KEY }}';
+
             // MySQL数据库配置
             static const String MySQLHost = '${{ secrets.MYSQL_HOST }}';
             static const int MySQLPort = ${{ secrets.MYSQL_PORT }};
@@ -56,7 +59,7 @@ jobs:
           }
           EOF
           echo "Debug: DeveloperToken.dart 生成结果如下（密钥部分已打码以便核对格式）:"
-          sed -E "s|('.*SecretKey' *= *').*|\1***|; s|('.*Password' *= *').*|\1***|" lib/api/DeveloperToken.dart
+          sed -E "s|('.*(SecretKey|Password|DeveloperKey)' *= *').*|\1***|" lib/api/DeveloperToken.dart
 
       # ---- 构建未签名 App ----
       # flutter build ipa --no-codesign：可成功归档，但工具链会因未配置

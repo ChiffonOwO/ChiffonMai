@@ -104,21 +104,10 @@ class PaiziProgressConvertToImg {
 
       debugPrint('Starting image capture...');
       
-      // 动态计算 pixelRatio，避免超过 GPU 最大纹理尺寸限制（16384）
-      final double maxTextureSize = 16000.0;
-      final double widgetWidth = boundary.size.width;
-      final double widgetHeight = boundary.size.height;
+      // 动态计算 pixelRatio：超过 GPU 最大纹理尺寸就是黑图（见 helper 注释）
+      final double pixelRatio = ImageEncodeUtil.safeCapturePixelRatio(boundary.size.width, boundary.size.height);
       
-      double pixelRatio = 3.0;
-      if (widgetWidth * pixelRatio > maxTextureSize) {
-        pixelRatio = maxTextureSize / widgetWidth;
-      }
-      if (widgetHeight * pixelRatio > maxTextureSize) {
-        pixelRatio = maxTextureSize / widgetHeight;
-      }
-      pixelRatio = pixelRatio.clamp(1.0, 3.0);
-      
-      debugPrint('Widget size: ${widgetWidth}x$widgetHeight, calculated pixelRatio: $pixelRatio');
+      debugPrint('Widget size: ${boundary.size.width}x${boundary.size.height}, calculated pixelRatio: $pixelRatio');
 
       ui.Image image;
       try {
@@ -141,19 +130,24 @@ class PaiziProgressConvertToImg {
       debugPrint('ByteData conversion successful');
 
       Uint8List pngBytes = byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes);
+      // 立刻释放 ui.Image：它本身也是上百 MB 的原生位图，而下面的 JPEG
+      // 转码还要再分配上百 MB（decodePng + copyResize）。等转码完再释放，
+      // 峰值内存会白白多一份 —— 低内存机就是这样被 OOM 掉的。
+      // 转码只用得到 pngBytes，用不到这个 image。
+      image.dispose();
 
       // 根据质量参数决定最终格式
       Uint8List finalBytes;
       String extension;
       if (jpegQuality != null) {
-        finalBytes = ImageEncodeUtil.pngToJpeg(pngBytes, quality: jpegQuality);
+        finalBytes = await ImageEncodeUtil.pngToJpegAsync(pngBytes, quality: jpegQuality);
         extension = 'jpg';
       } else {
         finalBytes = pngBytes;
         extension = 'png';
       }
 
-      image.dispose();
+
 
       overlayEntry.remove();
 

@@ -13,25 +13,23 @@ import 'RecentCommentsPage.dart';
 import 'RecentRatingsPage.dart';
 import 'AboutAppPage.dart';
 import 'Awmc/AwmcConsolePage.dart';
+import 'AwmcNet/AwmcNetSyncFlow.dart';
 import 'Awmc/AwmcSyncFlow.dart';
 import 'SupportDeveloperPage.dart';
 import 'FriendLinksPage.dart';
 import '../manager/LZYCheckUpdateManager.dart';
 import '../manager/MaidataManager.dart';
-import '../manager/DivingFish/DivingFishOAuthManager.dart';
 import '../manager/DivingFish/ProberException.dart';
-import '../manager/DivingFish/UserPlayDataManager.dart';
-import '../manager/DivingFish/MaimaiMusicDataManager.dart';
-import '../manager/DivingFish/DiffMusicDataManager.dart';
 import '../manager/LuoXue/CollectionsManager.dart';
 import '../entity/LuoXue/Collection.dart';
 import '../service/ConnectivityService.dart';
-import '../service/RecommendByTagsService.dart';
 import '../service/SyncRouteStore.dart';
 import '../service/SyncStatsService.dart';
 import '../utils/SyncRouteNotifier.dart';
+import '../utils/RefreshErrorPresenter.dart';
 import '../utils/UpdateNotifier.dart';
 import '../widgets/SyncRouteFooter.dart';
+import '../widgets/SyncStatsFooter.dart';
 import '../widgets/SyncScoreDialogs.dart'
     show
         SyncScoreDialogs,
@@ -42,16 +40,17 @@ import '../widgets/SyncScoreDialogs.dart'
         showLuoXueSyncInputDialog,
         executeLuoXueSync;
 import '../widgets/CollectionPickerSheet.dart';
+import '../service/AccountStore.dart';
 import '../widgets/RefreshDataDialog.dart'
     show
         showRefreshDataDialog,
         executeRefreshData,
+        refreshBest50DataWithProgress,
         executeAdvancedRefreshData,
-        CurrentDataSourceNotifier,
-        RefreshDataSource;
-import '../service/AccountSwitchService.dart';
+        launchUrlFallback;
 import '../widgets/AdvancedRefreshDataDialog.dart' show showAdvancedRefreshDataDialog;
 import '../constant/CacheKeyConstant.dart';
+import '../constant/AppLinks.dart';
 import '../utils/FavoriteFeaturesNotifier.dart';
 import '../utils/FeatureFlags.dart';
 import '../utils/LoginStateNotifier.dart';
@@ -68,7 +67,6 @@ class SystemHubPage extends StatefulWidget {
 
 class _SystemHubPageState extends State<SystemHubPage> {
   // ===== 账号 / 用户信息（昵称 / QQ 来自 UserProfileNotifier） =====
-  String _cachedQQ = '';
   String _userNickname = '';
 
   // 同步成绩的线路与统计都由 SyncRouteNotifier 统一持有：
@@ -95,6 +93,8 @@ class _SystemHubPageState extends State<SystemHubPage> {
   String _syncText = '';
   bool _syncingLuoXue = false;
   String _luoXueText = '';
+  bool _syncingAwmcNet = false;
+  String _awmcNetText = '';
   bool _refreshingMaidata = false;
   String _maidataText = '';
 
@@ -104,6 +104,7 @@ class _SystemHubPageState extends State<SystemHubPage> {
       _refreshingAdvanced ||
       _syncingDivingFish ||
       _syncingLuoXue ||
+      _syncingAwmcNet ||
       _refreshingMaidata;
 
   @override
@@ -142,7 +143,6 @@ class _SystemHubPageState extends State<SystemHubPage> {
     if (!mounted) return;
     final p = UserProfileNotifier.instance.value;
     setState(() {
-      _cachedQQ = p.cachedQQ;
       _userNickname = p.nickname;
     });
   }
@@ -155,25 +155,7 @@ class _SystemHubPageState extends State<SystemHubPage> {
   Future<void> _toggleFavorite(String title) =>
       FavoriteFeaturesNotifier.toggle(title);
 
-  Future<void> _loadProfile() async {
-    final prefs = await SharedPreferences.getInstance();
-    final cachedQQ = prefs.getString(CacheKeyConstant.probeDivingFishBindQQ) ??
-        prefs.getString('cachedQQ') ??
-        '';
-    final nickname =
-        prefs.getString('userNickname') ?? UserProfile.defaults.nickname;
-    // 主动刷新共享 notifier —— 触发首页 / 我的页等监听者重建 UI
-    UserProfileNotifier.replace(UserProfile(
-      nickname: nickname,
-      best50TotalRA:
-          prefs.getInt('best50TotalRA') ?? UserProfile.defaults.best50TotalRA,
-      best35TotalRA:
-          prefs.getInt('best35TotalRA') ?? UserProfile.defaults.best35TotalRA,
-      best15TotalRA:
-          prefs.getInt('best15TotalRA') ?? UserProfile.defaults.best15TotalRA,
-      cachedQQ: cachedQQ,
-    ));
-  }
+  Future<void> _loadProfile() => UserProfileNotifier.load();
 
   // ===== 头像 / 姓名框读写 =====
 
@@ -281,24 +263,34 @@ class _SystemHubPageState extends State<SystemHubPage> {
       Navigator.push(context, MaterialPageRoute(builder: (_) => page))
           .then((_) => _loadProfile());
 
+  /// 打开外链；**打不开就把内容复制到剪贴板并提示**（不会静默失败）。
+  ///
+  /// [copyText] 默认复制 [url]。加群链接那种「复制链接没用」的情况要显式换成群号；
+  /// [failMessage] 用来说明复制到的是什么、接下来怎么办。两个都不给时用通用文案。
   Future<void> _launchExternal(
-      BuildContext context, String url, String fallbackHint) async {
+    BuildContext context,
+    String url,
+    String label, {
+    String? copyText,
+    String? failMessage,
+  }) async {
     final uri = Uri.parse(url);
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('无法打开链接：$fallbackHint')),
-        );
+        return;
       }
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('打开失败：$e')),
-        );
-      }
+      debugPrint('打开 $url 失败: $e');
     }
+    if (!context.mounted) return;
+    // 统一走公共兜底：复制剪贴板 + SnackBar（各写一遍很容易漏掉复制那一步）
+    launchUrlFallback(
+      url,
+      context,
+      copyText: copyText,
+      message: failMessage ?? '无法打开浏览器，$label已复制到剪贴板，请手动粘贴打开',
+    );
   }
 
   /// 刷新数据：对话框只收集输入，进度显示在「刷新数据」这个按钮上。
@@ -319,24 +311,11 @@ class _SystemHubPageState extends State<SystemHubPage> {
       if (!mounted) return;
       Fluttertoast.showToast(msg: '数据刷新成功!');
     } on ProberException catch (e) {
-      if (e.code == 'CONSENT_REQUIRED') {
-        final qq = request.qq.trim();
-        if (qq.isNotEmpty) {
-          final ok = await DivingFishOAuthManager().openBindingLink(qq);
-          if (mounted) {
-            Fluttertoast.showToast(
-                msg: ok
-                    ? '已打开授权链接，请在浏览器中完成授权后重新刷新'
-                    : '该 QQ 尚未授权本应用，请稍后在「账号管理」中完成授权');
-          }
-        } else if (mounted) {
-          Fluttertoast.showToast(msg: e.message);
-        }
-      } else if (mounted) {
-        Fluttertoast.showToast(msg: '刷新数据失败：${e.message}');
-      }
+      // 未授权 → 直接拉起授权页；其余按统一文案提示。
+      // 与首页刷新入口共用 presentRefreshError，避免两边行为不一致。
+      if (mounted) await presentRefreshError(e, qq: request.qq.trim());
     } catch (e) {
-      if (mounted) Fluttertoast.showToast(msg: '刷新数据失败：$e');
+      if (mounted) await presentRefreshError(e, qq: request.qq.trim());
     } finally {
       if (mounted) {
         setState(() {
@@ -369,24 +348,11 @@ class _SystemHubPageState extends State<SystemHubPage> {
       if (!mounted) return;
       Fluttertoast.showToast(msg: '数据刷新成功!');
     } on ProberException catch (e) {
-      if (e.code == 'CONSENT_REQUIRED') {
-        final qq = request.qq.trim();
-        if (qq.isNotEmpty) {
-          final ok = await DivingFishOAuthManager().openBindingLink(qq);
-          if (mounted) {
-            Fluttertoast.showToast(
-                msg: ok
-                    ? '已打开授权链接，请在浏览器中完成授权后重新刷新'
-                    : '该 QQ 尚未授权本应用，请稍后在「账号管理」中完成授权');
-          }
-        } else if (mounted) {
-          Fluttertoast.showToast(msg: e.message);
-        }
-      } else if (mounted) {
-        Fluttertoast.showToast(msg: '刷新数据失败：${e.message}');
-      }
+      // 未授权 → 直接拉起授权页；其余按统一文案提示。
+      // 与首页刷新入口共用 presentRefreshError，避免两边行为不一致。
+      if (mounted) await presentRefreshError(e, qq: request.qq.trim());
     } catch (e) {
-      if (mounted) Fluttertoast.showToast(msg: '刷新数据失败：$e');
+      if (mounted) await presentRefreshError(e, qq: request.qq.trim());
     } finally {
       if (mounted) {
         setState(() {
@@ -464,16 +430,9 @@ class _SystemHubPageState extends State<SystemHubPage> {
   // ===== 同步成绩 =====
 
   SyncCallbacks get _syncCallbacks => SyncCallbacks(
-        cachedQQ: _cachedQQ,
         onSaveQQ: (qq) async {
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('cachedQQ', qq);
           await prefs.setString(CacheKeyConstant.probeDivingFishBindQQ, qq);
-          if (mounted) setState(() => _cachedQQ = qq);
-        },
-        onSaveLastDataSource: (source) async {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString(CacheKeyConstant.lastDataSource, source);
         },
         onRefreshAfterSync: _refreshAfterSync,
         onLoginStateChanged: () async {
@@ -491,48 +450,10 @@ class _SystemHubPageState extends State<SystemHubPage> {
     required bool participateRankings,
     required bool showNickname,
   }) async {
-    try {
-      onProgress(0.70, '正在清除缓存...');
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove(CacheKeyConstant.recommendationResults);
-      } catch (_) {}
-
-      onProgress(0.72, '正在并行刷新数据...');
-      int completed = 0;
-      const total = 5;
-      void tick(String msg) {
-        completed++;
-        final p = 0.72 + ((completed / total) * 0.28).clamp(0.0, 0.28);
-        onProgress(p, msg);
-      }
-
-      final musicFuture =
-          MaimaiMusicDataManager().refreshDataWithSmartMaidata();
-      final diffFuture = DiffMusicDataManager().fetchAndUpdateDiffData();
-      final tagsFuture = RecommendByTagsService.initializeTags();
-      final userFuture = UserPlayDataManager().fetchUserPlayData(qq);
-      final collectionsFuture = CollectionsManager().refreshAllCollections();
-      musicFuture.then((_) => tick('歌曲数据已刷新'));
-      diffFuture.then((_) => tick('难度数据已刷新'));
-      tagsFuture.then((_) => tick('标签数据已刷新'));
-      userFuture.then((_) => tick('用户数据已获取'));
-      collectionsFuture.then((_) => tick('收藏品数据已刷新'));
-
-      await Future.wait([
-        musicFuture,
-        diffFuture,
-        tagsFuture,
-        userFuture,
-        collectionsFuture,
-      ]);
-      // 同步成功后可能更新了昵称
-      await _loadProfile();
-      onProgress(1.0, '本地数据刷新完成');
-    } catch (e) {
-      debugPrint('刷新本地数据失败: $e');
-      onProgress(1.0, '本地数据刷新失败：$e');
-    }
+    await refreshBest50DataWithProgress(qq,
+        (p, text) => onProgress(0.70 + p / 100 * 0.30, text),
+        participateRankings: participateRankings, showNickname: showNickname);
+    await _loadProfile();
   }
 
   /// 同步成绩到水鱼：输入（二维码 / 排行榜选项）在对话框完成，
@@ -576,7 +497,7 @@ class _SystemHubPageState extends State<SystemHubPage> {
 
     final bindQQ =
         prefs.getString(CacheKeyConstant.probeDivingFishBindQQ) ?? '';
-    final cachedQQ = _cachedQQ.isNotEmpty ? _cachedQQ : null;
+    final cachedQQ = (await AccountStore.loadAll())['shuiyu']?.id;
     if (bindQQ.isNotEmpty && cachedQQ != null && bindQQ != cachedQQ) {
       if (!mounted) return;
       await showDialog<void>(
@@ -703,6 +624,31 @@ class _SystemHubPageState extends State<SystemHubPage> {
     }
   }
 
+  /// 同步成绩到 AWMC NET：**输入在对话框完成，等待进度显示在按钮上**
+  /// ——与上面两个同步入口完全一致（早先是对话框里转圈等 30 多秒）。
+  Future<void> _syncToAwmcNetWithButton() async {
+    if (_anyBusy) return;
+    final outcome = await AwmcNetSyncFlow.run(
+      context,
+      onBusy: (label) {
+        if (!mounted) return;
+        setState(() {
+          _syncingAwmcNet = true;
+          _awmcNetText = label;
+        });
+      },
+      onIdle: () {
+        if (!mounted) return;
+        setState(() {
+          _syncingAwmcNet = false;
+          _awmcNetText = '';
+        });
+      },
+    );
+    if (!mounted || outcome.cancelled) return;
+    Fluttertoast.showToast(msg: AwmcNetSyncFlow.toastFor(outcome));
+  }
+
   void _loginDivingFish() {
     SyncScoreDialogs.showDivingFishLoginDialog(context, _syncCallbacks);
   }
@@ -796,8 +742,6 @@ class _SystemHubPageState extends State<SystemHubPage> {
     });
     try {
       await UserProfileNotifier.clearShuiyuAccountCache();
-      // 双账号：清掉水鱼账号存档；若当前正是水鱼则回落到落雪（有缓存时）
-      await AccountSwitchService.onAccountLoggedOut(RefreshDataSource.shuiyu);
       if (!mounted) return;
       LoginStateNotifier.setLoggedIn(false);
       Fluttertoast.showToast(msg: '已登出水鱼账号');
@@ -838,8 +782,8 @@ class _SystemHubPageState extends State<SystemHubPage> {
                 title: '数据与账号',
                 icon: Icons.sync_rounded,
                 subtitle: '登录水鱼 · 同步账号 · 数据备份 · 刷新缓存',
-                // 9 个入口里「AWMC 网关」默认隐藏（FeatureFlags.awmcGateway）
-                badgeCount: 8 + (FeatureFlags.awmcGateway ? 1 : 0),
+                // 10 个入口里「AWMC 网关」默认隐藏（FeatureFlags.awmcGateway）
+                badgeCount: 9 + (FeatureFlags.awmcGateway ? 1 : 0),
                 children: [
                   HubActionTile(
                     title: loggedIn ? '登出水鱼账号' : '登录水鱼',
@@ -890,6 +834,26 @@ class _SystemHubPageState extends State<SystemHubPage> {
                     footer: SyncRouteFooter(
                       platform: SyncPlatform.luoXue,
                       enabled: !_anyBusy,
+                    ),
+                  ),
+                  HubActionTile(
+                    title: '同步成绩到 AWMC NET',
+                    subtitle: '用机台二维码导入成绩到 AWMC NET',
+                    icon: Icons.cloud_upload_outlined,
+                    isFavorited: _isFavorited('同步成绩到 AWMC NET'),
+                    onToggleFavorite: () => _toggleFavorite('同步成绩到 AWMC NET'),
+                    // AWMC NET 只有「机台二维码」这一条写入路径（读成绩的 AWMC 数据源
+                    // 不需要登录），所以**没有线路切换器**，只有一行近 100 次统计
+                    // —— 也就是 SyncStatsFooter 而不是 SyncRouteFooter。
+                    // 等待进度与另外两个同步入口一样显示在这个按钮上。
+                    onTap: _syncToAwmcNetWithButton,
+                    loading: _syncingAwmcNet,
+                    loadingText: _awmcNetText,
+                    // 统计行上提一点贴紧按钮：tile 底部本来就空着约 23px，
+                    // 一行小字挂在那里会显得离按钮太远（见 SyncStatsFooter.footerLift）
+                    footerLift: SyncStatsFooter.footerLift,
+                    footer: const SyncStatsFooter(
+                      slot: (SyncLine.direct, SyncPlatform.awmc),
                     ),
                   ),
                   HubActionTile(
@@ -1029,9 +993,39 @@ class _SystemHubPageState extends State<SystemHubPage> {
               HubSection(
                 title: '关于 ChiffonMai',
                 icon: Icons.info_outline_rounded,
-                subtitle: '应用信息 · 开发者 · 友情链接 · 问卷',
-                badgeCount: 4,
+                subtitle: '官网/交流群/应用信息/开发者/友情链接/问卷',
+                badgeCount: 6,
                 children: [
+                  HubActionTile(
+                    title: '访问官方网站',
+                    subtitle: '前往 chiffonmai.cloud 查看项目主页',
+                    icon: Icons.public,
+                    isFavorited: _isFavorited('访问官方网站'),
+                    onToggleFavorite: () => _toggleFavorite('访问官方网站'),
+                    onTap: () => _launchExternal(
+                      context,
+                      AppLinks.officialSite,
+                      '官网链接',
+                      failMessage: '无法打开浏览器，官网链接已复制到剪贴板，'
+                          '请粘贴到浏览器访问 ${AppLinks.officialSite}',
+                    ),
+                  ),
+                  HubActionTile(
+                    title: '加入 QQ 群',
+                    subtitle: '一键跳转官方交流群（${AppLinks.qqGroupNumber}）',
+                    icon: Icons.groups_outlined,
+                    isFavorited: _isFavorited('加入 QQ 群'),
+                    onToggleFavorite: () => _toggleFavorite('加入 QQ 群'),
+                    onTap: () => _launchExternal(
+                      context,
+                      AppLinks.qqGroupJoinUrl,
+                      '群号',
+                      // 加群链接在浏览器里只是个空壳中转页，所以要复制**群号**
+                      copyText: AppLinks.qqGroupNumber,
+                      failMessage: '没能跳转到 QQ，群号 ${AppLinks.qqGroupNumber} '
+                          '已复制到剪贴板，可在 QQ 里搜索加入',
+                    ),
+                  ),
                   HubActionTile(
                     title: '关于 APP',
                     subtitle: '了解项目与版本信息',
@@ -1063,7 +1057,7 @@ class _SystemHubPageState extends State<SystemHubPage> {
                     isFavorited: _isFavorited('问卷调查'),
                     onToggleFavorite: () => _toggleFavorite('问卷调查'),
                     onTap: () => _launchExternal(
-                        context, 'https://wj.qq.com/s2/26540572/7828/', '问卷调查'),
+                        context, AppLinks.surveyUrl, '问卷链接'),
                   ),
                 ],
               ),

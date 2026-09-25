@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/constant/CacheKeyConstant.dart';
 import 'package:my_first_flutter_app/service/AWMC/AwmcPlayCountStore.dart';
 import 'package:my_first_flutter_app/service/Best50/PersonalizedBest50Service.dart';
+import 'package:my_first_flutter_app/utils/CurrentDataSourceNotifier.dart';
 
 Map<String, dynamic> song(String id, String title, {List<int>? cids}) => {
       'id': id,
@@ -52,12 +53,15 @@ void seed({
   Map<String, int>? counts,
 }) {
   AwmcPlayCountStore.debugResetForTest();
+  // 游玩次数按账号分开存：这里写的是「当前活动账号」那一份（默认水鱼）
+  CurrentDataSourceNotifier.instance.value = RefreshDataSource.shuiyu;
   SharedPreferences.setMockInitialValues({
     CacheKeyConstant.cachedSongs: json.encode(songs),
     CacheKeyConstant.userPlayData:
         json.encode({'records': records, 'additional_rating': 0}),
     if (counts != null)
-      CacheKeyConstant.awmcPlayCounts: json.encode({
+      '${CacheKeyConstant.awmcPlayCountsPrefix}${RefreshDataSource.shuiyu.key}':
+          json.encode({
         'version': 1,
         'updatedAt': DateTime.now().millisecondsSinceEpoch,
         'userId': 1,

@@ -1,4 +1,4 @@
-﻿// 谱面片段猜歌（ChartPeek）的定数范围回归测试。
+// 谱面片段猜歌（ChartPeek）的定数范围回归测试。
 //
 // 背景：这一页是按「难度随机池」抽谱的，但设置里的定数范围原先
 // **完全没参与筛选**（曲池只看 版本∩流派∩难度池内存在谱面），
@@ -6,14 +6,9 @@
 //
 // 修复后：定数范围作用于池内各难度自己的定数，ds 下标 = inote - 2。
 // 这里通过页面暴露的静态判定函数直接验证映射与筛选口径。
-import 'dart:convert';
-
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:my_first_flutter_app/constant/CacheKeyConstant.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
-import 'package:my_first_flutter_app/manager/MaidataManager.dart';
 import 'package:my_first_flutter_app/page/GuessChartGame/GuessChartByChartPeekPage.dart';
 
 /// 造一首歌：ds 下标 0..4 依次对应 inote 2..6。

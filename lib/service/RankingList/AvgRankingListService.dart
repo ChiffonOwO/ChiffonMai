@@ -5,6 +5,7 @@ import '../../constant/CacheKeyConstant.dart';
 import '../../constant/CacheTimestampConstant.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
+import 'SongRankingService.dart' show parseDataSource;
 
 /// 平均值排行榜的衡量指标
 enum AvgMetric {
@@ -74,12 +75,12 @@ class AvgRankItem {
   }
 }
 
-/// 根据 playerId 前缀推断数据源（与 SongRankingService.parseDataSource 一致）
-String _parseDataSource(String playerId) {
-  if (playerId.startsWith('shuiyu:')) return 'shuiyu';
-  if (playerId.startsWith('luoxue:')) return 'luoxue';
-  return 'luoxue';
-}
+/// 根据 playerId 前缀推断数据源。
+///
+/// 直接用 [SongRankingService] 里那份唯一的实现，不要再抄一遍——
+/// 原来这里和 FittedRatingRankingListService 各有一份 `_parseDataSource`，
+/// 三份都只认 shuiyu / luoxue，加第三个源时必然漏改其中一两份。
+String _parseDataSource(String playerId) => parseDataSource(playerId);
 
 class AvgRankingListService {
   // 缓存有效期：从常量文件读取（分钟转秒）

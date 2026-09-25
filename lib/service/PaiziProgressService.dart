@@ -139,6 +139,7 @@ class PaiziProgressService {
 
   // 缓存的记录Map，用于加速查找
   Map<String, Map<String, dynamic>>? _recordsCache;
+  int _recordsGeneration = 0;
 
   // 初始化记录缓存
   Future<void> _initRecordsCache() async {
@@ -146,7 +147,9 @@ class PaiziProgressService {
       return;
     }
 
+    final generation = _recordsGeneration;
     final playData = await _getUserPlayData();
+    if (generation != _recordsGeneration) return _initRecordsCache();
     if (playData == null) {
       _recordsCache = {};
       return;
@@ -311,6 +314,7 @@ class PaiziProgressService {
 
   // 清空记录缓存，下次访问时重新从SharedPreferences加载
   void clearRecordsCache() {
+    _recordsGeneration++;
     _recordsCache = null;
   }
 

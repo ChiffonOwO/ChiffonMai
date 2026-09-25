@@ -1,3 +1,4 @@
+import 'AccountSwitchService.dart';
 
 // ignore_for_file: slash_for_doc_comments
 
@@ -788,6 +789,7 @@ double calculateMinAchievements(double ds, int targetRa, double currentAchieveme
  * Best15 部分专注于推分
  */
 Future<Map<String, List<RecommendationResult>>> recommendSongs() async {
+  final revision = AccountSwitchService.revision;
   // 定义兜底返回值，确保异常时也能返回规范格式
   final defaultResult = {
     'Best55': <RecommendationResult>[],
@@ -909,6 +911,9 @@ Future<Map<String, List<RecommendationResult>>> recommendSongs() async {
         'Best15': best15Recommendations.map((r) => r.toJson()).toList(),
       };
       final resultJson = json.encode(resultMap);
+      if (AccountSwitchService.isBusy || revision != AccountSwitchService.revision) {
+        return defaultResult;
+      }
       await prefs.setString(CacheKeyConstant.recommendationResults, resultJson);
       debugPrint('推荐结果已保存到缓存');
     } catch (e) {

@@ -17,8 +17,6 @@ import 'package:my_first_flutter_app/widgets/B50GameCardWidget.dart';
 import 'package:my_first_flutter_app/widgets/MetaRowWidget.dart';
 
 class PersonalizedDiffBest50ConvertToImg {
-  static GlobalKey _globalKey = GlobalKey();
-
   // 导出为图片的方法
   static Future<File?> convertToImage(BuildContext context, String title, Map<String, dynamic>? diffBest50Data, List<Map<String, dynamic>> diffSongs, List<dynamic>? maimaiMusicData, {int? jpegQuality}) async {
     OverlayEntry? overlayEntry;
@@ -70,12 +68,12 @@ class PersonalizedDiffBest50ConvertToImg {
       debugPrint('Starting image capture...');
       ui.Image image;
       try {
-        image = await boundary.toImage(pixelRatio: 3.0);
+        image = await boundary.toImage(pixelRatio: ImageEncodeUtil.safeCapturePixelRatio(boundary.size.width, boundary.size.height));
         debugPrint('Image captured successfully');
       } catch (e) {
         debugPrint('First capture failed: $e');
         await Future.delayed(Duration(milliseconds: 200));
-        image = await boundary.toImage(pixelRatio: 3.0);
+        image = await boundary.toImage(pixelRatio: ImageEncodeUtil.safeCapturePixelRatio(boundary.size.width, boundary.size.height));
         debugPrint('Image captured on retry');
       }
 
@@ -89,18 +87,23 @@ class PersonalizedDiffBest50ConvertToImg {
       debugPrint('ByteData conversion successful');
 
       Uint8List pngBytes = byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes);
+      // 立刻释放 ui.Image：它本身也是上百 MB 的原生位图，而下面的 JPEG
+      // 转码还要再分配上百 MB（decodePng + copyResize）。等转码完再释放，
+      // 峰值内存会白白多一份 —— 低内存机就是这样被 OOM 掉的。
+      // 转码只用得到 pngBytes，用不到这个 image。
+      image.dispose();
 
       Uint8List finalBytes;
       String extension;
       if (jpegQuality != null) {
-        finalBytes = ImageEncodeUtil.pngToJpeg(pngBytes, quality: jpegQuality);
+        finalBytes = await ImageEncodeUtil.pngToJpegAsync(pngBytes, quality: jpegQuality);
         extension = 'jpg';
       } else {
         finalBytes = pngBytes;
         extension = 'png';
       }
 
-      image.dispose();
+
 
       overlayEntry.remove();
 

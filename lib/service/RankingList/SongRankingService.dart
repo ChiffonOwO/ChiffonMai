@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
-import '../../constant/CacheKeyConstant.dart';
+import '../../utils/CurrentDataSourceNotifier.dart';
 
 enum RankingType {
   achievementRate,
@@ -46,13 +46,20 @@ class RankingEntry {
   }
 }
 
+/// 从 `'<source>:<id>'` 形式的 playerId 里取出数据源 key。
+///
+/// 三个源都要认（水鱼 / 落雪 / AWMC NET）。原来只判断 shuiyu / luoxue，
+/// 于是 `awmc:` 开头的 id 会被**误判成落雪**，排行榜里挂错标签。
+/// 兜底仍保留 `'luoxue'`，与原行为一致（历史数据里存在不带前缀的 id）。
 String parseDataSource(String playerId) {
-  if (playerId.startsWith('shuiyu:')) {
-    return 'shuiyu';
-  } else if (playerId.startsWith('luoxue:')) {
-    return 'luoxue';
+  final index = playerId.indexOf(':');
+  if (index > 0) {
+    final prefix = playerId.substring(0, index);
+    for (final source in RefreshDataSource.values) {
+      if (source.key == prefix) return source.key;
+    }
   }
-  return 'luoxue';
+  return RefreshDataSource.luoxue.key;
 }
 
 class SongRankingService {
@@ -121,21 +128,23 @@ class SongRankingService {
     return null;
   }
 
+  /// 当前玩家的排行榜 id（`'<source>:<id>'`）。
+  ///
+  /// 优先取**当前活动数据源**的标记键，拿不到再按 enum 顺序兜底。
+  ///
+  /// 原来是无条件「落雪优先」，于是同时缓存过两个账号时，当前是水鱼也会把
+  /// 落雪的 id 认成自己；加了第三个源之后更没有理由固定顺序。
   Future<String> getCurrentPlayerId() async {
     final prefs = await SharedPreferences.getInstance();
-
-    // 优先获取洛雪用户ID
-    String? luoxueUserId = prefs.getString(CacheKeyConstant.luoxueUserId);
-    if (luoxueUserId != null && luoxueUserId.isNotEmpty) {
-      return luoxueUserId;
+    final current = CurrentDataSourceNotifier.instance.value;
+    final ordered = <RefreshDataSource>[
+      current,
+      ...RefreshDataSource.values.where((s) => s != current),
+    ];
+    for (final source in ordered) {
+      final value = prefs.getString(source.userIdCacheKey);
+      if (value != null && value.isNotEmpty) return value;
     }
-
-    // 获取水鱼用户ID
-    String? shuiyuUserId = prefs.getString(CacheKeyConstant.shuiyuUserId);
-    if (shuiyuUserId != null && shuiyuUserId.isNotEmpty) {
-      return shuiyuUserId;
-    }
-
     // 默认返回空字符串
     return '';
   }

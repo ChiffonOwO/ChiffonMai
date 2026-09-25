@@ -8,6 +8,7 @@ import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/service/SongInfoService.dart';
 import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/DataSourceTag.dart';
 
 class SongRankingPage extends StatefulWidget {
   final String songId;
@@ -561,30 +562,10 @@ class _SongRankingPageState extends State<SongRankingPage> {
           Expanded(
             child: Row(
               children: [
-                // 数据源标识
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                  margin: EdgeInsets.only(right: 6),
-                  decoration: BoxDecoration(
-                    color: entry.dataSource == 'shuiyu'
-                        ? AppColors.linkBlue(brightness).withValues(alpha: 0.12)
-                        : (brightness == Brightness.dark
-                            ? Colors.purple.withValues(alpha: 0.2)
-                            : const Color(0xFFE1BEE7)),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Text(
-                    entry.dataSource == 'shuiyu' ? '水鱼' : '落雪',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: entry.dataSource == 'shuiyu'
-                          ? AppColors.linkBlue(brightness)
-                          : (brightness == Brightness.dark
-                              ? const Color(0xFFCE93D8)
-                              : const Color(0xFF7B1FA2)),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                // 数据源标识（配色/取名统一在 DataSourceTag）
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: DataSourceTag(dataSource: entry.dataSource),
                 ),
                 Expanded(
                   child: Text(
@@ -788,7 +769,6 @@ class _SongRankingPageState extends State<SongRankingPage> {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    final screenWidth = MediaQuery.of(context).size.width;
     final title = widget.rankingType == RankingType.achievementRate
         ? '达成率排行榜'
         : 'DX分数排行榜';
@@ -998,30 +978,14 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                         Expanded(
                                           child: Row(
                                             children: [
-                                              // 数据源标识
-                                              Container(
-                                                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                                margin: EdgeInsets.only(right: 6),
-                                                decoration: BoxDecoration(
-                                                  color: _currentUserEntry!.dataSource == 'shuiyu'
-                                                      ? AppColors.linkBlue(brightness).withValues(alpha: 0.12)
-                                                      : (brightness == Brightness.dark
-                                                          ? Colors.purple.withValues(alpha: 0.2)
-                                                          : const Color(0xFFE1BEE7)),
-                                                  borderRadius: BorderRadius.circular(3),
-                                                ),
-                                                child: Text(
-                                                  _currentUserEntry!.dataSource == 'shuiyu' ? '水鱼' : '落雪',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    color: _currentUserEntry!.dataSource == 'shuiyu'
-                                                        ? AppColors.linkBlue(brightness)
-                                                        : (brightness == Brightness.dark
-                                                            ? const Color(0xFFCE93D8)
-                                                            : const Color(0xFF7B1FA2)),
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
+                                              // 数据源标识（配色/取名统一在 DataSourceTag）
+                                              Padding(
+                                                padding:
+                                                    const EdgeInsets.only(right: 6),
+                                                child: DataSourceTag(
+                                                    dataSource:
+                                                        _currentUserEntry!
+                                                            .dataSource),
                                               ),
                                               Expanded(
                                                 child: Text(

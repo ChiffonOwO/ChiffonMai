@@ -5,6 +5,7 @@ import '../../constant/CacheKeyConstant.dart';
 import '../../constant/CacheTimestampConstant.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
+import 'package:my_first_flutter_app/utils/CurrentDataSourceNotifier.dart';
 
 class RatingRankListService {
   // 缓存有效期：从常量文件读取（分钟转秒）
@@ -68,68 +69,64 @@ class RatingRankListService {
     return [];
   }
 
-  // 获取水鱼数据源排行榜
-  static Future<List<RankItem>> getShuiyuRankings({int? limit}) async {
+  // 获取指定数据源的排行榜（水鱼 / 落雪 / AWMC NET.）
+  //
+  // 原来 `getShuiyuRankings` 与 `getLuoxueRankings` 是两段**只差一个字面量与
+  // 两个缓存键**的复制粘贴，加第三个源时必然漏改一处（AWMC 差点就漏了）。
+  // 现在按 [source] 参数化，后端对应 `GET /api/rankings/<source.key>`。
+  //
+  // 注意：**不要**把 `total` 传进来 —— 总榜是跨源的，走 [getTotalRankings]。
+  static Future<List<RankItem>> getSourceRankings(
+    RefreshDataSource source, {
+    int? limit,
+  }) async {
+    final cacheKey = _cacheKeyOf(source);
+    final cacheTimestampKey = _cacheTimestampKeyOf(source);
+
     // 先检查缓存
-    final cachedData = await _getCachedRankings(
-      CacheKeyConstant.shuiyuRankingsCache,
-      CacheKeyConstant.shuiyuRankingsCacheTimestamp,
-    );
+    final cachedData = await _getCachedRankings(cacheKey, cacheTimestampKey);
     if (cachedData != null) {
       return cachedData;
     }
 
     try {
-      String url = '${ApiUrls.RankingsBaseUrl}/shuiyu';
+      String url = '${ApiUrls.RankingsBaseUrl}/${source.key}';
       if (limit != null) {
         url += '?limit=$limit';
       }
       final items = await _fetch(url);
       if (items.isNotEmpty) {
         // 保存到缓存
-        await _cacheRankings(
-          items,
-          CacheKeyConstant.shuiyuRankingsCache,
-          CacheKeyConstant.shuiyuRankingsCacheTimestamp,
-        );
+        await _cacheRankings(items, cacheKey, cacheTimestampKey);
       }
       return items;
     } catch (e) {
-      print('获取水鱼排行榜失败: $e');
+      print('获取${source.displayName}排行榜失败: $e');
     }
     return [];
   }
 
-  // 获取落雪数据源排行榜
-  static Future<List<RankItem>> getLuoxueRankings({int? limit}) async {
-    // 先检查缓存
-    final cachedData = await _getCachedRankings(
-      CacheKeyConstant.luoxueRankingsCache,
-      CacheKeyConstant.luoxueRankingsCacheTimestamp,
-    );
-    if (cachedData != null) {
-      return cachedData;
+  /// 数据源 → 排行榜缓存的键。三个源各一份，不能共用（否则切 Tab 会读到别的榜）。
+  static String _cacheKeyOf(RefreshDataSource source) {
+    switch (source) {
+      case RefreshDataSource.shuiyu:
+        return CacheKeyConstant.shuiyuRankingsCache;
+      case RefreshDataSource.luoxue:
+        return CacheKeyConstant.luoxueRankingsCache;
+      case RefreshDataSource.awmc:
+        return CacheKeyConstant.awmcRankingsCache;
     }
+  }
 
-    try {
-      String url = '${ApiUrls.RankingsBaseUrl}/luoxue';
-      if (limit != null) {
-        url += '?limit=$limit';
-      }
-      final items = await _fetch(url);
-      if (items.isNotEmpty) {
-        // 保存到缓存
-        await _cacheRankings(
-          items,
-          CacheKeyConstant.luoxueRankingsCache,
-          CacheKeyConstant.luoxueRankingsCacheTimestamp,
-        );
-      }
-      return items;
-    } catch (e) {
-      print('获取落雪排行榜失败: $e');
+  static String _cacheTimestampKeyOf(RefreshDataSource source) {
+    switch (source) {
+      case RefreshDataSource.shuiyu:
+        return CacheKeyConstant.shuiyuRankingsCacheTimestamp;
+      case RefreshDataSource.luoxue:
+        return CacheKeyConstant.luoxueRankingsCacheTimestamp;
+      case RefreshDataSource.awmc:
+        return CacheKeyConstant.awmcRankingsCacheTimestamp;
     }
-    return [];
   }
 
   // 获取指定用户排名
@@ -239,14 +236,17 @@ class RatingRankListService {
   }
 
   // 清除排行榜缓存（用于强制刷新）
+  //
+  // 按 [RefreshDataSource.values] 枚举清，不要再逐个手写 ——
+  // 原来只清了 水鱼 / 落雪，加第三个源时必然漏（这次就是靠枚举兜住的）。
   static Future<void> clearRankingsCache() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(CacheKeyConstant.totalRankingsCache);
     await prefs.remove(CacheKeyConstant.totalRankingsCacheTimestamp);
-    await prefs.remove(CacheKeyConstant.shuiyuRankingsCache);
-    await prefs.remove(CacheKeyConstant.shuiyuRankingsCacheTimestamp);
-    await prefs.remove(CacheKeyConstant.luoxueRankingsCache);
-    await prefs.remove(CacheKeyConstant.luoxueRankingsCacheTimestamp);
+    for (final source in RefreshDataSource.values) {
+      await prefs.remove(_cacheKeyOf(source));
+      await prefs.remove(_cacheTimestampKeyOf(source));
+    }
   }
 }
 

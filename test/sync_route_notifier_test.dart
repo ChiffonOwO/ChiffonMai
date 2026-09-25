@@ -14,7 +14,9 @@ import 'package:my_first_flutter_app/widgets/SyncRouteFooter.dart';
 /// 要求**两边显示一致、记忆一致**。这里钉住三件事：
 ///   1. 线路读写走同一套 prefs 键（[SyncRouteStore]）；
 ///   2. 同一个 notifier 的多个 footer（两个页面各一个）自动同步；
-///   3. 统计按「当前线路 + 平台」取，取不到就是 null（UI 显示统计不可用）。
+///   3. 统计按「当前线路 + 平台」取，取不到就是 null（UI 显示统计不可用）；
+///   4. AWMC NET 是**二维码直传、没有线路**：统计固定取 `direct:awmc` 那个槽位，
+///      问它线路会当场抛异常（不许静默当成落雪的线路）。
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -74,7 +76,7 @@ void main() {
           reason: '加载过（哪怕是空结果）也要标记，详情弹窗才能不转圈');
     });
 
-    test('ensureLoaded 一次读 4 个组合，重复调用不重复拉', () async {
+    test('ensureLoaded 一次读全部槽位（含 AWMC NET 二维码直传），重复调用不重复拉', () async {
       var calls = 0;
       List<(SyncLine, SyncPlatform)>? seen;
       SyncRouteNotifier.instance.debugStatsLoader = (queries) async {
@@ -99,7 +101,8 @@ void main() {
       await SyncRouteNotifier.instance.ensureLoaded(); // 幂等
 
       expect(calls, 1, reason: '两个页面各自 ensureLoaded 也只拉一次');
-      expect(seen!.length, 4);
+      expect(seen, SyncStatsService.allSlots,
+          reason: 'AWMC NET 的直传槽位也要一起拉，否则那个页脚永远「暂无记录」');
       final stats = SyncRouteNotifier.instance.statsFor(SyncPlatform.divingFish);
       expect(stats!.count, 3);
       expect(stats.avgText, '2.0s');
@@ -141,6 +144,54 @@ void main() {
           20);
       // 落雪不在这个 map 里 → null
       expect(SyncRouteNotifier.instance.statsFor(SyncPlatform.luoXue), isNull);
+    });
+
+    test('AWMC NET 取的是「二维码直传」那一份，与线路无关', () async {
+      const awmcNet = SyncStats(
+        count: 42,
+        successCount: 40,
+        avgMs: 36000,
+        minMs: 30000,
+        maxMs: 45000,
+        lastMs: 33000,
+        lastOk: true,
+        lastAtMs: 3,
+      );
+      const hub = SyncStats(
+        count: 10,
+        successCount: 9,
+        avgMs: 1000,
+        minMs: 500,
+        maxMs: 2000,
+        lastMs: 800,
+        lastOk: true,
+        lastAtMs: 1,
+      );
+      SyncRouteNotifier.instance.debugSetStats({
+        SyncStatsService.slotOf(SyncLine.direct, SyncPlatform.awmc): awmcNet,
+        SyncStatsService.slotOf(SyncLine.scoreHub, SyncPlatform.divingFish): hub,
+      });
+
+      expect(SyncRouteNotifier.instance.statsFor(SyncPlatform.awmc)!.count, 42);
+      // 用户把水鱼切到线路2 也不该影响 AWMC NET 那一份
+      await SyncRouteNotifier.instance
+          .setRoute(SyncPlatform.divingFish, SyncRouteStore.routeAwmc);
+      expect(SyncRouteNotifier.instance.statsFor(SyncPlatform.awmc)!.count, 42);
+      expect(SyncRouteNotifier.instance.statsFor(SyncPlatform.awmc)!.avgText,
+          '36.0s');
+    });
+
+    test('给 AWMC NET 问线路 / 切线路会当场报错（而不是悄悄当成落雪）', () async {
+      expect(
+        () => SyncRouteNotifier.instance.routeOf(SyncPlatform.awmc),
+        throwsArgumentError,
+        reason: '静默返回一个错线路比抛异常更难查',
+      );
+      await expectLater(
+        SyncRouteNotifier.instance
+            .setRoute(SyncPlatform.awmc, SyncRouteStore.routeAwmc),
+        throwsArgumentError,
+      );
     });
   });
 

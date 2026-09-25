@@ -4,29 +4,16 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import '../AccountStore.dart';
 
 import '../../utils/CurrentDataSourceNotifier.dart';
 import 'ChartHistoryCore.dart';
 
-/// 成绩历史的落盘与读写（Rating 曲线 + 单谱达成率/DX 曲线）。
+/// 成绩历史（Rating / 单谱达成率 / DX）持久化。
 ///
-/// ## 这份数据与 App 里其它缓存的本质区别
-/// 别的缓存（曲库、别名、AWMC 游玩次数…）**都能重新拉**，坏了就坏了；
-/// **历史不能**：水鱼/落雪只给"当前成绩"，没有历史接口，所以一旦丢了就永远补不回来。
-/// 由此定下三条：
-///   1. **按数据源分文件**（水鱼 / 落雪 各一份，文件名 = [RefreshDataSource.key]）——
-///      两个账号的历史绝不能混在一起；将来接进备份时也不会串号。
-///   2. **原子写**：先写 `<file>.tmp` 再 rename，崩在写一半也不会毁掉已有历史。
-///   3. **永不抛异常**：采集一律 `unawaited`，失败只打日志 —— 顺手的记录不能影响
-///      刷新成绩这条主流程。
-///
-/// ## 采集点与"不要污染"
-/// 目前两个入口：
-///   * `UserPlayDataManager.fetchUserPlayData()` 拿到自己的成绩后 → [recordChartSnapshot]；
-///   * `RefreshDataDialog._saveUserData()` 落盘 Rating 后 → [recordRating]。
-/// ⚠️ **好友对比**（`FriendCompareService`）会借用同一个 fetchUserPlayData 拉好友的成绩，
-/// 还会把好友数据临时写进活动缓存 —— 那一段必须用 [runWithoutRecording] 包住，
-/// 否则好友的成绩会被记进你自己的历史。
+/// 按平台 + 账号 ID 分文件。刷新事务验证身份后传入固定身份，查询好友不采集。
+/// 同一文件的写盘串行执行，以临时文件 + rename 保留完整 JSON。
+/// 旧的按源历史在升级时绑定给原账号，并保留原文件备份。
 class ChartHistoryStore {
   ChartHistoryStore._();
 
@@ -74,25 +61,44 @@ class ChartHistoryStore {
 
   final Map<String, _HistoryDoc> _cache = {};
   final Map<String, Future<_HistoryDoc>> _loading = {};
+  final Map<String, Future<void>> _writes = {};
 
   /// 采集抑制深度（好友对比期间 > 0）。
-  int _suppressDepth = 0;
+  static final Object _suppressionKey = Object();
 
-  bool get isRecordingSuppressed => _suppressDepth > 0;
+  bool get isRecordingSuppressed => Zone.current[_suppressionKey] == true;
 
   /// 在 [body] 执行期间**不采集任何历史**（好友对比那种借用缓存的操作专用）。
   Future<T> runWithoutRecording<T>(Future<T> Function() body) async {
-    _suppressDepth++;
-    try {
-      return await body();
-    } finally {
-      _suppressDepth--;
-    }
+    return runZoned(body, zoneValues: {_suppressionKey: true});
   }
 
   /// 当前数据源（水鱼 / 落雪）——历史的隔离键。
   static String currentSourceKey() =>
       CurrentDataSourceNotifier.instance.value.key;
+
+  /// source + 账号身份组成历史命名空间；相同 QQ 在不同平台也互不相干。
+  static Future<String> storageKey({String? sourceKey, String? accountId}) =>
+      AccountStore.accountKey(sourceKey: sourceKey, accountId: accountId);
+
+  /// 升级时只把旧的按源文件绑定给升级前已知的账号；换人后绝不再认领。
+  /// 保留原文件作为备份，不猜测历史中每个点的真实身份。
+  Future<bool> migrateLegacy(String source, String id) async {
+    if (id.isEmpty) return true;
+    try {
+      final original = await _fileFor(source);
+      final targetKey = await storageKey(sourceKey: source, accountId: id);
+      final target = await _fileFor(targetKey);
+      if (await original.exists() && !await target.exists()) {
+        await original.copy(target.path);
+        _cache.remove(targetKey);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('[History] 旧历史保留，迁移未完成: $e');
+      return false;
+    }
+  }
 
   // ==================== 写入 ====================
 
@@ -102,10 +108,11 @@ class ChartHistoryStore {
   Future<void> recordChartSnapshot(
     Map<String, dynamic> userData, {
     String? sourceKey,
+    String? accountId,
     int? nowMs,
     String reason = '',
   }) async {
-    if (_suppressDepth > 0) return;
+    if (isRecordingSuppressed) return;
     try {
       final records = userData['records'];
       final snapshots = snapshotsFromRecords(records);
@@ -114,7 +121,8 @@ class ChartHistoryStore {
         return;
       }
 
-      final source = sourceKey ?? currentSourceKey();
+      final source =
+          await storageKey(sourceKey: sourceKey, accountId: accountId);
       final doc = await _load(source);
       final diff = diffChartSnapshots(
         previousCurrent: doc.current.isEmpty ? null : doc.current,
@@ -124,7 +132,8 @@ class ChartHistoryStore {
 
       doc.current = diff.current;
       diff.events.forEach((key, list) {
-        doc.events[key] = mergeAndPruneEvents(doc.events[key] ?? const [], list);
+        doc.events[key] =
+            mergeAndPruneEvents(doc.events[key] ?? const [], list);
       });
       doc.updatedAtMs = nowMs ?? DateTime.now().millisecondsSinceEpoch;
       doc.recordCount = snapshots.length;
@@ -144,12 +153,14 @@ class ChartHistoryStore {
     int best15 = 0,
     int recordCount = 0,
     String? sourceKey,
+    String? accountId,
     int? nowMs,
   }) async {
-    if (_suppressDepth > 0) return;
+    if (isRecordingSuppressed) return;
     if (rating <= 0) return; // 没登录 / 没数据时不记，免得曲线上出现 0 的坑
     try {
-      final source = sourceKey ?? currentSourceKey();
+      final source =
+          await storageKey(sourceKey: sourceKey, accountId: accountId);
       final doc = await _load(source);
       final t = nowMs ?? DateTime.now().millisecondsSinceEpoch;
       final result = appendRatingPoint(
@@ -174,7 +185,8 @@ class ChartHistoryStore {
       doc.rating = result.series;
       doc.updatedAtMs = t;
       await _persist(source, doc);
-      debugPrint('[History] $source 记录 Rating=$rating（${doc.rating.length} 个点）');
+      debugPrint(
+          '[History] $source 记录 Rating=$rating（${doc.rating.length} 个点）');
     } catch (e) {
       debugPrint('[History] 记录 Rating 失败（忽略）: $e');
     }
@@ -183,10 +195,12 @@ class ChartHistoryStore {
   // ==================== 读取 ====================
 
   /// Rating 曲线（按时间升序）。
-  Future<List<RatingPoint>> ratingSeries({String? sourceKey}) async {
+  Future<List<RatingPoint>> ratingSeries(
+      {String? sourceKey, String? accountId}) async {
     final loader = debugRatingSeriesLoader;
     if (loader != null) return loader();
-    final doc = await _load(sourceKey ?? currentSourceKey());
+    final doc = await _load(
+        await storageKey(sourceKey: sourceKey, accountId: accountId));
     final list = List<RatingPoint>.from(doc.rating)
       ..sort((a, b) => a.tMs.compareTo(b.tMs));
     return list;
@@ -197,10 +211,12 @@ class ChartHistoryStore {
     int songId,
     int levelIndex, {
     String? sourceKey,
+    String? accountId,
   }) async {
     final loader = debugChartEventsLoader;
     if (loader != null) return loader(songId, levelIndex);
-    final doc = await _load(sourceKey ?? currentSourceKey());
+    final doc = await _load(
+        await storageKey(sourceKey: sourceKey, accountId: accountId));
     final raw = doc.events[chartKeyOf(songId, levelIndex)];
     if (raw == null) return const [];
     return sortedEvents(raw);
@@ -214,10 +230,12 @@ class ChartHistoryStore {
     int songId,
     int levelIndex, {
     String? sourceKey,
+    String? accountId,
   }) async {
     final loader = debugChartBaselineLoader;
     if (loader != null) return loader(songId, levelIndex);
-    final doc = await _load(sourceKey ?? currentSourceKey());
+    final doc = await _load(
+        await storageKey(sourceKey: sourceKey, accountId: accountId));
     final raw = doc.current[chartKeyOf(songId, levelIndex)];
     if (raw == null || raw.isEmpty) return null;
     return ChartBaseline(
@@ -228,10 +246,12 @@ class ChartHistoryStore {
   }
 
   /// 概览：记了多少谱面、多少条事件、从什么时候开始、最近一次采集时间。
-  Future<ChartHistorySummary> summary({String? sourceKey}) async {
+  Future<ChartHistorySummary> summary(
+      {String? sourceKey, String? accountId}) async {
     final loader = debugSummaryLoader;
     if (loader != null) return loader();
-    final doc = await _load(sourceKey ?? currentSourceKey());
+    final doc = await _load(
+        await storageKey(sourceKey: sourceKey, accountId: accountId));
     var eventCount = 0;
     int? firstEventMs;
     doc.events.forEach((_, list) {
@@ -269,14 +289,15 @@ class ChartHistoryStore {
   }
 
   /// 某个数据源是否有任何历史（UI 据此决定显示曲线还是"从今天开始记录"）。
-  Future<bool> hasAnyHistory({String? sourceKey}) async {
-    final doc = await _load(sourceKey ?? currentSourceKey());
+  Future<bool> hasAnyHistory({String? sourceKey, String? accountId}) async {
+    final doc = await _load(
+        await storageKey(sourceKey: sourceKey, accountId: accountId));
     return doc.current.isNotEmpty || doc.rating.isNotEmpty;
   }
 
   /// 清空某个数据源的历史（设置里的"清除历史记录"）。
-  Future<void> clear({String? sourceKey}) async {
-    final source = sourceKey ?? currentSourceKey();
+  Future<void> clear({String? sourceKey, String? accountId}) async {
+    final source = await storageKey(sourceKey: sourceKey, accountId: accountId);
     _cache.remove(source);
     _loading.remove(source);
     try {
@@ -293,7 +314,6 @@ class ChartHistoryStore {
   void debugClearCache() {
     _cache.clear();
     _loading.clear();
-    _suppressDepth = 0;
     debugRatingSeriesLoader = null;
     debugSummaryLoader = null;
     debugChartEventsLoader = null;
@@ -345,17 +365,24 @@ class ChartHistoryStore {
     }
   }
 
-  Future<void> _persist(String source, _HistoryDoc doc) async {
+  Future<void> _persist(String source, _HistoryDoc doc) {
     _cache[source] = doc;
-    try {
-      final file = await _fileFor(source);
-      final tmp = File('${file.path}.tmp');
-      await tmp.writeAsString(json.encode(doc.toJson()), flush: true);
-      // rename 在同一文件系统内是原子的
-      await tmp.rename(file.path);
-    } catch (e) {
-      debugPrint('[History] 历史写入失败（内存里仍有，下次再试）: $e');
-    }
+    final payload = json.encode(doc.toJson());
+    final previous = _writes[source] ?? Future<void>.value();
+    final next = previous.then((_) async {
+      try {
+        final file = await _fileFor(source);
+        final tmp = File('${file.path}.tmp');
+        await tmp.writeAsString(payload, flush: true);
+        await tmp.rename(file.path);
+      } catch (e) {
+        debugPrint('[History] 历史写入失败: $e');
+      }
+    });
+    _writes[source] = next;
+    return next.whenComplete(() {
+      if (identical(_writes[source], next)) _writes.remove(source);
+    });
   }
 
   Future<File> _fileFor(String source) async {
@@ -442,7 +469,7 @@ class _HistoryDoc {
       debugPrint('[History] 版本不匹配，忽略旧历史文件');
       return doc;
     }
-    doc.source = raw['source']?.toString() ?? fallbackSource;
+    doc.source = fallbackSource;
     doc.updatedAtMs = (raw['updatedAt'] as num?)?.toInt() ?? 0;
     doc.recordCount = (raw['recordCount'] as num?)?.toInt() ?? 0;
 
@@ -471,10 +498,8 @@ class _HistoryDoc {
 
     final rating = raw['rating'];
     if (rating is List) {
-      doc.rating = rating
-          .map(RatingPoint.fromJson)
-          .whereType<RatingPoint>()
-          .toList();
+      doc.rating =
+          rating.map(RatingPoint.fromJson).whereType<RatingPoint>().toList();
     }
 
     // 防御：异常数据别把内存撑爆

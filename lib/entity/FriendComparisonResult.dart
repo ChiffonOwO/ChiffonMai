@@ -58,6 +58,7 @@ class ChartComparisonItem {
 
 /// 好友对比总结果
 class ComparisonResult {
+  final String myAccountId;
   final List<ChartComparisonItem> commonCharts; // 共同谱面对比详情
   final int myTotalCharts; // 我的总谱面数
   final int friendTotalCharts; // 好友总谱面数
@@ -70,6 +71,7 @@ class ComparisonResult {
   final int myRating; // 我的 Rating
 
   ComparisonResult({
+    this.myAccountId = '',
     required this.commonCharts,
     required this.myTotalCharts,
     required this.friendTotalCharts,

@@ -1,3 +1,4 @@
+import 'dart:async';
 // Rating 历史页（M2）的渲染测试。
 //
 // 三种状态都要能看：没数据（要讲清楚"从今天开始记"）、只有一个点（画不出曲线，
@@ -7,6 +8,7 @@
 // widget 测试跑在 fake async 里，真实文件 I/O 的 await 不会完成（页面会一直转圈，
 // 甚至把整个测试挂死）。真实文件读写由 `test/chart_history_test.dart` 覆盖。
 import 'package:fl_chart/fl_chart.dart';
+import 'package:my_first_flutter_app/utils/CurrentDataSourceNotifier.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,6 +30,7 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    CurrentDataSourceNotifier.instance.value = RefreshDataSource.shuiyu;
     ChartHistoryStore.instance.debugClearCache();
   });
 
@@ -35,15 +38,15 @@ void main() {
     ChartHistoryStore.instance.debugClearCache();
   });
 
-  void seed(List<RatingPoint> series, {int chartCount = 0, int eventCount = 0}) {
+  void seed(List<RatingPoint> series,
+      {int chartCount = 0, int eventCount = 0}) {
     ChartHistoryStore.debugRatingSeriesLoader = () async => series;
     ChartHistoryStore.debugSummaryLoader = () async => ChartHistorySummary(
           sourceKey: 'shuiyu',
           chartCount: chartCount,
           eventCount: eventCount,
           ratingPointCount: series.length,
-          firstRecordedAtMs:
-              series.isEmpty ? 0 : series.first.tMs,
+          firstRecordedAtMs: series.isEmpty ? 0 : series.first.tMs,
           updatedAtMs: series.isEmpty ? 0 : series.last.tMs,
         );
   }
@@ -127,8 +130,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('近 30 天里只剩一个点时，会自动带上范围外最后一个点，曲线才有起点',
-      (tester) async {
+  testWidgets('近 30 天里只剩一个点时，会自动带上范围外最后一个点，曲线才有起点', (tester) async {
     final now = DateTime.now();
     seed([
       point(now.subtract(const Duration(days: 60)), 16000),
@@ -144,5 +146,44 @@ void main() {
     expect(find.byType(LineChart), findsOneWidget);
     expect(find.text('+200'), findsWidgets);
     expect(tester.takeException(), isNull);
+  });
+  testWidgets('账号切换会重载历史，先前账号迟到的读取不能覆盖新页面', (tester) async {
+    final first = Completer<List<RatingPoint>>();
+    var calls = 0;
+    ChartHistoryStore.debugRatingSeriesLoader = () {
+      calls++;
+      if (calls == 1) return first.future;
+      return Future.value([point(DateTime.now(), 12000)]);
+    };
+    ChartHistoryStore.debugSummaryLoader = () async =>
+        const ChartHistorySummary(
+            sourceKey: 'awmc',
+            chartCount: 1,
+            eventCount: 0,
+            ratingPointCount: 1,
+            firstRecordedAtMs: 0,
+            updatedAtMs: 0);
+    await pump(tester);
+    CurrentDataSourceNotifier.instance.value = RefreshDataSource.awmc;
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('12000'), findsWidgets);
+    first.complete([point(DateTime.now(), 17000)]);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('17000'), findsNothing);
+    expect(find.textContaining('当前数据源：AWMC NET'), findsOneWidget);
+  });
+  testWidgets('换账号读取失败时不显示旧账号曲线', (tester) async {
+    seed([point(DateTime.now(), 17000)]);
+    await pump(tester);
+    expect(find.text('17000'), findsWidgets);
+    ChartHistoryStore.debugRatingSeriesLoader =
+        () async => throw StateError('read failed');
+    CurrentDataSourceNotifier.instance.value = RefreshDataSource.luoxue;
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('17000'), findsNothing);
+    expect(find.text('还没有历史数据'), findsOneWidget);
   });
 }

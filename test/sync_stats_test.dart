@@ -190,21 +190,55 @@ void main() {
       );
     });
 
-    test('窗口是最近 100 次，4 个组合互不相同', () {
+    test('窗口是最近 100 次，槽位互不相同', () {
       expect(SyncStatsService.windowSize, 100);
       final keys = <String>{
-        for (final line in SyncLine.values)
-          for (final platform in SyncPlatform.values)
-            SyncStatsService.keyFor(line, platform),
+        for (final (line, platform) in SyncStatsService.allSlots)
+          SyncStatsService.keyFor(line, platform),
       };
-      expect(keys.length, 4);
+      expect(keys.length, SyncStatsService.allSlots.length,
+          reason: '槽位重名 = 两个入口的样本混进同一条平均');
+    });
+
+    test('槽位是显式列表，不是线路 × 平台的叉乘', () {
+      // 叉乘 = 3 线路 × 3 平台 = 9 个，其中 5 个没意义：
+      // AWMC NET 只有机台二维码直传，不该挂在线路1/线路2 下面
+      // （它一次要 30 多秒，混进网关那条会把平均耗时整体拉高）。
+      expect(SyncStatsService.allSlots.length, 5);
+      expect(
+        SyncStatsService.allSlots
+            .where((slot) => slot.$2 == SyncPlatform.awmc)
+            .toList(),
+        [(SyncLine.direct, SyncPlatform.awmc)],
+        reason: 'AWMC NET 只有直传一个槽位',
+      );
+      expect(
+        SyncStatsService.allSlots
+            .where((slot) => slot.$1 == SyncLine.direct)
+            .toList(),
+        [(SyncLine.direct, SyncPlatform.awmc)],
+        reason: '「直传」不是线路，不该挂水鱼/落雪',
+      );
+    });
+
+    test('AWMC NET 二维码直传自成一个键', () {
+      expect(
+        SyncStatsService.keyFor(SyncLine.direct, SyncPlatform.awmc),
+        'chiffonmai:sync_stats:direct:awmc',
+      );
+      expect(
+        SyncStatsService.slotOf(SyncLine.direct, SyncPlatform.awmc),
+        'direct:awmc',
+      );
     });
 
     test('线路与平台的显示名', () {
       expect(SyncLine.scoreHub.label, contains('maimai Score Hub'));
       expect(SyncLine.awmc.label, contains('AWMC'));
+      expect(SyncLine.direct.label, '二维码直传');
       expect(SyncPlatform.divingFish.label, '水鱼');
       expect(SyncPlatform.luoXue.label, '落雪');
+      expect(SyncPlatform.awmc.label, 'AWMC NET');
     });
   });
 }

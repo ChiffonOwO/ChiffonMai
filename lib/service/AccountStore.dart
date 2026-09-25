@@ -8,10 +8,10 @@ import '../utils/CurrentDataSourceNotifier.dart';
 
 /// 单个数据源（账号）的元信息，用于切换面板展示。
 class AccountMeta {
-  final String source; // 'shuiyu' / 'luoxue'
-  final String id; // 水鱼 QQ / 落雪 friendCode
+  final String source; // 'shuiyu' / 'luoxue' / 'awmc'
+  final String id; // 水鱼 QQ / 落雪 friendCode / AWMC NET QQ
   final String nickname;
-  final int rating; // 段位（additional_rating），落雪没有则 0
+  final int rating; // 段位（additional_rating），落雪与 AWMC NET 没有则 0
   final int best50TotalRA;
   final int best35TotalRA;
   final int best15TotalRA;
@@ -80,11 +80,11 @@ class AccountMeta {
   }
 }
 
-/// 双账号系统的存储层。
+/// 多账号（多数据源）系统的存储层。
 ///
 /// 设计：现有那一套「单槽」prefs 键（`user_play_data` / `userNickname` /
 /// `last_used_qq` ...）继续作为**当前账号活动槽**，读取端完全不用改；
-/// 每个数据源另存一份**存档**，切换时把活动槽与存档互相写入。
+/// 每个数据源（水鱼 / 落雪 / AWMC NET）另存一份**存档**，切换时把活动槽与存档互相写入。
 ///
 /// 键分两组：
 ///   * play：成绩 / Best50 / 推荐结果 / 排行榜参与 —— 可重新拉取，不进备份
@@ -95,6 +95,9 @@ class AccountStore {
   /// play 组：活动槽里属于「成绩」的键（不含动态的 `best50_data_{id}`）。
   static const List<String> playKeys = [
     CacheKeyConstant.userPlayData,
+    // 各数据源自己的更新时间也属于成绩活动槽，必须随账号一起搬运。
+    'user_play_data_last_update',
+    'awmc_net_user_play_data_last_update',
     CacheKeyConstant.recommendationResults,
     CacheKeyConstant.participateRankings,
     CacheKeyConstant.showNickname,
@@ -107,6 +110,7 @@ class AccountStore {
     CacheKeyConstant.cachedQQ,
     CacheKeyConstant.shuiyuUserId,
     CacheKeyConstant.luoxueUserId,
+    CacheKeyConstant.awmcUserId,
     CacheKeyConstant.selectedPlateIdCache,
     'best50TotalRA',
     'best35TotalRA',
@@ -169,12 +173,16 @@ class AccountStore {
     await prefs.remove(_playArchiveKey(source));
   }
 
+  static Future<void> _requireWrite(Future<bool> result) async {
+    if (!await result) throw StateError('账号存档写入失败');
+  }
+
   static Future<void> _persistAll(Map<String, AccountMeta> all) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
+    await _requireWrite(prefs.setString(
       CacheKeyConstant.accountStore,
       json.encode(all.map((k, v) => MapEntry(k, v.toJson()))),
-    );
+    ));
   }
 
   // ───────────────────────── 存档读写 ─────────────────────────
@@ -206,37 +214,45 @@ class AccountStore {
         final v = prefs.get(best50Key);
         if (v != null) playMap[best50Key] = v;
       }
-      // 活动槽里没有成绩数据时，不要用空存档覆盖已有存档（避免误删）。
-      final slotHasPlay = playMap[CacheKeyConstant.userPlayData] != null;
-      final archiveExists =
-          prefs.getString(_playArchiveKey(source))?.isNotEmpty ?? false;
-      if (slotHasPlay || !archiveExists) {
-        await prefs.setString(_playArchiveKey(source), json.encode(playMap));
-      }
+      await _requireWrite(
+          prefs.setString(_playArchiveKey(source), json.encode(playMap)));
 
       final identityMap = <String, dynamic>{};
       for (final k in identityKeys) {
+        if (RefreshDataSource.values
+            .any((s) => k == s.userIdCacheKey && s.key != source)) {
+          continue;
+        }
         final v = prefs.get(k);
         if (v != null) identityMap[k] = v;
       }
-      await prefs.setString(
+      await _requireWrite(prefs.setString(
         _identityArchiveKey(source),
         json.encode(identityMap),
-      );
+      ));
     } catch (e) {
       debugPrint('写账号存档失败($source): $e');
+      rethrow;
     }
   }
 
   /// 把 [source] 的存档写回活动槽（覆盖）。
   static Future<void> loadArchiveIntoActiveSlot(String source) async {
     final prefs = await SharedPreferences.getInstance();
-    await _applyArchive(prefs, _identityArchiveKey(source));
-    await _applyArchive(prefs, _playArchiveKey(source));
+    // 先验证两份存档，再清槽；恢复时缺失的键也必须移除。
+    for (final key in [_identityArchiveKey(source), _playArchiveKey(source)]) {
+      final raw = prefs.getString(key);
+      if (raw != null && json.decode(raw) is! Map) {
+        throw const FormatException('账号存档格式无效');
+      }
+    }
+    await clearActiveSlot();
+    await _applyArchive(prefs, _identityArchiveKey(source), source);
+    await _applyArchive(prefs, _playArchiveKey(source), source);
   }
 
   static Future<void> _applyArchive(
-      SharedPreferences prefs, String archiveKey) async {
+      SharedPreferences prefs, String archiveKey, String source) async {
     final raw = prefs.getString(archiveKey);
     if (raw == null || raw.isEmpty) return;
     try {
@@ -245,6 +261,15 @@ class AccountStore {
       final writes = <Future<bool>>[];
       decoded.forEach((k, v) {
         final key = k.toString();
+        if (!playKeys.contains(key) &&
+            !identityKeys.contains(key) &&
+            !key.startsWith('best50_data_')) {
+          return;
+        }
+        if (RefreshDataSource.values
+            .any((s) => key == s.userIdCacheKey && s.key != source)) {
+          return;
+        }
         if (v is String) {
           writes.add(prefs.setString(key, v));
         } else if (v is int) {
@@ -255,9 +280,12 @@ class AccountStore {
           writes.add(prefs.setDouble(key, v));
         }
       });
-      await Future.wait(writes);
+      for (final result in await Future.wait(writes)) {
+        if (!result) throw StateError('账号存档恢复失败');
+      }
     } catch (e) {
       debugPrint('读账号存档失败($archiveKey): $e');
+      rethrow;
     }
   }
 
@@ -271,6 +299,48 @@ class AccountStore {
       if (best50Key != null) best50Key,
     ];
     await Future.wait([for (final k in keys) prefs.remove(k)]);
+  }
+
+  /// 稳定的本地命名空间，平台 + ID。异步任务开始时捕获，结束时不重新取。
+  static Future<String> accountKey(
+      {String? sourceKey, String? accountId}) async {
+    final source = sourceKey ?? CurrentDataSourceNotifier.instance.value.key;
+    if (source.contains('__')) return source;
+    var id = accountId;
+    if (id == null) {
+      final prefs = await SharedPreferences.getInstance();
+      final active = RefreshDataSource.fromKey(
+          prefs.getString(CacheKeyConstant.lastDataSource));
+      if (active.key == source) {
+        final marker = prefs.getString(active.userIdCacheKey);
+        id = marker?.startsWith('$source:') == true
+            ? RefreshDataSource.parseUserIdMarker(marker)
+            : null;
+        id ??= prefs.getString(CacheKeyConstant.cachedQQ);
+      } else {
+        id = (await loadAll())[source]?.id;
+      }
+    }
+    return id == null || id.isEmpty
+        ? source
+        : '${source}__${base64Url.encode(utf8.encode(id)).replaceAll('=', '')}';
+  }
+
+  static Future<Map<String, dynamic>> settingsFor(
+      RefreshDataSource source) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (CurrentDataSourceNotifier.instance.value == source) {
+      return {
+        CacheKeyConstant.participateRankings:
+            prefs.getBool(CacheKeyConstant.participateRankings) ?? false,
+        CacheKeyConstant.showNickname:
+            prefs.getBool(CacheKeyConstant.showNickname) ?? false,
+      };
+    }
+    final raw = prefs.getString(_playArchiveKey(source.key));
+    if (raw == null) return {};
+    final data = json.decode(raw);
+    return data is Map ? Map<String, dynamic>.from(data) : {};
   }
 
   // ───────────────────────── 便捷读取（生成 meta）─────────────────────────
@@ -303,18 +373,16 @@ class AccountStore {
 
   /// 取活动槽里当前源的账号 id。
   ///
-  /// 优先用按源区分的标记键（`shuiyu_user_id` / `luoxue_user_id`，只会被对应源的
-  /// 刷新写入），避免共用的 `cachedQQ` 在异常路径下把另一个源的 QQ/ID 串过来。
+  /// 优先用按源区分的标记键（`shuiyu_user_id` / `luoxue_user_id` / `awmc_user_id`，
+  /// 只会被对应源的刷新写入），避免共用的 `cachedQQ` 在异常路径下把另一个源的
+  /// QQ/ID 串过来。
   static String _resolveActiveId(
       SharedPreferences prefs, RefreshDataSource source) {
-    final markerKey = source == RefreshDataSource.shuiyu
-        ? CacheKeyConstant.shuiyuUserId
-        : CacheKeyConstant.luoxueUserId;
-    final marker = prefs.getString(markerKey);
-    if (marker != null && marker.contains(':')) {
-      final value = marker.substring(marker.indexOf(':') + 1);
-      if (value.isNotEmpty) return value;
-    }
+    final marker = prefs.getString(source.userIdCacheKey);
+    final value = marker?.startsWith('${source.key}:') == true
+        ? RefreshDataSource.parseUserIdMarker(marker)
+        : null;
+    if (value != null) return value;
     // 兜底：只有拿不到按源标记时才用共用的 cachedQQ
     return prefs.getString(CacheKeyConstant.cachedQQ) ?? '';
   }

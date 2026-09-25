@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:mysql1/mysql1.dart';
 import '../api/ApiUrls.dart';
@@ -15,6 +14,7 @@ import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
+import 'package:my_first_flutter_app/utils/CurrentDataSourceNotifier.dart';
 
 // 评论数据模型
 class CommentItem {
@@ -808,30 +808,27 @@ class SongInfoService {
       );
     }
 
-    // 2. 自动从HomePage缓存的用户数据构建（与SongRankingService.getCurrentPlayerId()一致）
-    // 优先落雪，其次水鱼
-    String? luoxueUserId = prefs.getString(CacheKeyConstant.luoxueUserId);
-    if (luoxueUserId != null && luoxueUserId.isNotEmpty) {
-      final parts = luoxueUserId.split(':');
-      if (parts.length >= 2) {
-        return CommentIdentity(
-          dataSource: 'luoxue',
-          originalId: parts.sublist(1).join(':'), // 兼容ID中包含冒号的情况
-          nickname: prefs.getString(CacheKeyConstant.userNickname),
-        );
-      }
-    }
-
-    String? shuiyuUserId = prefs.getString(CacheKeyConstant.shuiyuUserId);
-    if (shuiyuUserId != null && shuiyuUserId.isNotEmpty) {
-      final parts = shuiyuUserId.split(':');
-      if (parts.length >= 2) {
-        return CommentIdentity(
-          dataSource: 'shuiyu',
-          originalId: parts.sublist(1).join(':'),
-          nickname: prefs.getString(CacheKeyConstant.userNickname),
-        );
-      }
+    // 2. 自动从缓存的用户数据构建（与 SongRankingService.getCurrentPlayerId() 对齐）
+    //    优先当前活动数据源，拿不到再按 enum 顺序兜底 —— 三个源都要认，
+    //    原来只试着读 落雪 / 水鱼，AWMC NET 账号永远拿不到评论身份。
+    final current = CurrentDataSourceNotifier.instance.value;
+    final ordered = <RefreshDataSource>[
+      current,
+      ...RefreshDataSource.values.where((s) => s != current),
+    ];
+    for (final source in ordered) {
+      final marker = prefs.getString(source.userIdCacheKey);
+      if (marker == null || marker.isEmpty) continue;
+      // 兼容 id 里本身含冒号的情况：只按**第一个**冒号切
+      final index = marker.indexOf(':');
+      if (index < 0) continue;
+      final originalId = marker.substring(index + 1);
+      if (originalId.isEmpty) continue;
+      return CommentIdentity(
+        dataSource: source.key,
+        originalId: originalId,
+        nickname: prefs.getString(CacheKeyConstant.userNickname),
+      );
     }
 
     return null;

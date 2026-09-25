@@ -474,7 +474,7 @@ class _ThemeAwareBgWidget extends StatelessWidget {
 /// 于是「什么都没开」时整页也会被多压暗一层；`BoxFit.cover` 下更是铺满全屏。
 /// 装饰图的浓淡只由它自己的滑杆控制。
 class _ThemeAwareChiffonWidget extends StatelessWidget {
-  const _ThemeAwareChiffonWidget({super.key});
+  const _ThemeAwareChiffonWidget();
 
   @override
   Widget build(BuildContext context) {
@@ -544,7 +544,7 @@ class _ThemeAwareTitleWidgetState extends State<_ThemeAwareTitleWidget> {
 
 /// 主题感知的返回按钮组件
 class _ThemeAwareBackButtonWidget extends StatefulWidget {
-  const _ThemeAwareBackButtonWidget({super.key});
+  const _ThemeAwareBackButtonWidget();
 
   @override
   State<_ThemeAwareBackButtonWidget> createState() => _ThemeAwareBackButtonWidgetState();

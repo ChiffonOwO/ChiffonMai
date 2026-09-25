@@ -5,12 +5,14 @@ import '../manager/DivingFish/UserPlayDataManager.dart';
 import '../manager/DivingFish/DivingFishOAuthManager.dart';
 import '../manager/DivingFish/ProberException.dart';
 import '../entity/FriendComparisonResult.dart';
-import 'History/ChartHistoryStore.dart';
+import '../constant/CacheKeyConstant.dart';
+import 'AccountStore.dart';
 
 /// 好友战绩对比服务
 /// 拉取当前用户和好友的游玩数据，进行谱面对比
 class FriendCompareService {
-  static final FriendCompareService _instance = FriendCompareService._internal();
+  static final FriendCompareService _instance =
+      FriendCompareService._internal();
   factory FriendCompareService() => _instance;
   FriendCompareService._internal();
 
@@ -18,78 +20,33 @@ class FriendCompareService {
   /// [friendQQ] 好友的 QQ 号
   /// 返回 ComparisonResult
   Future<ComparisonResult> compareWithFriend(String friendQQ) async {
-    // 保存本地缓存数据，防止被好友数据覆盖
-    final userPlayDataManager = UserPlayDataManager();
+    // 两次查询均不写活动槽，也不采集历史，好友请求无需覆盖/恢复自己的数据。
+    final manager = UserPlayDataManager();
     final myQQ = await getCachedQQ();
-    if (myQQ.isEmpty) {
-      throw Exception('当前用户未绑定 QQ，请先在首页刷新数据');
+    if (myQQ.isEmpty) throw Exception('请先登录并绑定水鱼 QQ');
+    final myData = await manager.fetchUserPlayData(myQQ);
+    if (myData == null || myData['records'] is! List) {
+      throw Exception('当前水鱼用户无游玩数据，请先刷新数据');
     }
-
-    // 先备份本地缓存
-    final cachedBackup = await userPlayDataManager.getCachedUserPlayData();
-
-    // 1. 拉取自己的最新数据
-    Map<String, dynamic>? myData;
-    try {
-      myData = await userPlayDataManager.fetchUserPlayData(myQQ);
-    } on ProberException {
-      rethrow; // 未授权/配额等直接透传
-    } catch (e) {
-      debugPrint('获取自己数据失败: $e');
-      throw Exception('获取自己数据失败，请检查网络连接');
-    }
-    if (myData == null || myData['records'] == null) {
-      throw Exception('当前用户无游玩数据，请先在首页刷新数据');
-    }
-
     final myRecords = myData['records'] as List<dynamic>;
     final myRating = (myData['rating'] as num?)?.toInt() ?? 0;
-
-    // 2. 获取好友的游玩数据（会覆盖缓存，下面会恢复）
-    //
-    // ⚠️ 这一段必须用 runWithoutRecording 包住：`fetchUserPlayData` 里顺手做成绩历史
-    // 采集（达成率/DX 曲线），而这里拉的是**好友**的成绩、还带一次缓存覆盖+恢复 ——
-    // 不挡住的话，好友的成绩会被记进你自己的历史曲线里。
     Map<String, dynamic>? friendData;
     try {
-      friendData = await ChartHistoryStore.instance.runWithoutRecording(
-        () => userPlayDataManager.fetchUserPlayData(friendQQ),
-      );
+      friendData = await manager.fetchUserPlayData(friendQQ);
     } on ProberException catch (e) {
-      // 恢复本地缓存
-      if (cachedBackup != null) {
-        await userPlayDataManager.restoreCache(cachedBackup);
-      }
-      // 好友未授权时生成绑定链接，引导好友授权一次
       if (e.code == 'CONSENT_REQUIRED') {
         final link = await DivingFishOAuthManager().startBinding(friendQQ);
-        throw ProberException.consentRequired(bindingUrl: link.isEmpty ? null : link);
+        throw ProberException.consentRequired(
+            bindingUrl: link.isEmpty ? null : link);
       }
       rethrow;
-    } catch (e) {
-      debugPrint('获取好友数据失败: $e');
-      // 恢复本地缓存
-      if (cachedBackup != null) {
-        await userPlayDataManager.restoreCache(cachedBackup);
-      }
-      throw Exception('获取好友数据失败，请检查 QQ 号是否正确');
     }
-
-    if (friendData == null || friendData['records'] == null) {
-      if (cachedBackup != null) {
-        await userPlayDataManager.restoreCache(cachedBackup);
-      }
+    if (friendData == null || friendData['records'] is! List) {
       throw Exception('未找到该好友的游玩数据，请检查 QQ 号是否正确');
     }
-
     final friendRecords = friendData['records'] as List<dynamic>;
     final friendNickname = friendData['nickname'] ?? friendQQ;
     final friendRating = (friendData['rating'] as num?)?.toInt() ?? 0;
-
-    // 3. 恢复本地缓存（好友数据已获取，立即恢复自己的数据到缓存）
-    if (cachedBackup != null) {
-      userPlayDataManager.restoreCache(cachedBackup);
-    }
 
     // 3. 构建查找 Map：key = "songId_levelIndex"
     final myMap = <String, Map<String, dynamic>>{};
@@ -160,6 +117,7 @@ class FriendCompareService {
     commonCharts.sort((a, b) => b.ds.compareTo(a.ds));
 
     return ComparisonResult(
+      myAccountId: myQQ,
       commonCharts: commonCharts,
       myTotalCharts: myRecords.length,
       friendTotalCharts: friendRecords.length,
@@ -177,7 +135,7 @@ class FriendCompareService {
   Future<String> getCachedQQ() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getString('cachedQQ') ?? '';
+      return prefs.getString(CacheKeyConstant.probeDivingFishBindQQ) ?? '';
     } catch (_) {
       return '';
     }
@@ -185,13 +143,19 @@ class FriendCompareService {
 
   // --- 历史记录 ---
 
-  static const String _historyKey = 'friend_compare_history';
+  Future<String> _historyKey({String? accountId}) async {
+    final id = accountId ?? await getCachedQQ();
+    final owner =
+        await AccountStore.accountKey(sourceKey: 'shuiyu', accountId: id);
+    return 'friend_compare_history_$owner';
+  }
 
   /// 保存对比记录
   Future<void> saveHistory(String friendQQ, ComparisonResult result) async {
     try {
+      final key = await _historyKey(accountId: result.myAccountId);
       final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString(_historyKey);
+      final jsonStr = prefs.getString(key);
       final List<dynamic> history = jsonStr != null ? json.decode(jsonStr) : [];
 
       // 移除同一好友的旧记录
@@ -216,7 +180,7 @@ class FriendCompareService {
         history.removeRange(20, history.length);
       }
 
-      await prefs.setString(_historyKey, json.encode(history));
+      await prefs.setString(key, json.encode(history));
     } catch (e) {
       debugPrint('FriendCompare: 保存历史失败: $e');
     }
@@ -226,7 +190,7 @@ class FriendCompareService {
   Future<List<Map<String, dynamic>>> loadHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString(_historyKey);
+      final jsonStr = prefs.getString(await _historyKey());
       if (jsonStr == null || jsonStr.isEmpty) return [];
       final List<dynamic> list = json.decode(jsonStr);
       return list.map((e) => e as Map<String, dynamic>).toList();
@@ -239,11 +203,11 @@ class FriendCompareService {
   Future<void> deleteHistory(String friendQQ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString(_historyKey);
+      final jsonStr = prefs.getString(await _historyKey());
       if (jsonStr == null) return;
       final List<dynamic> history = json.decode(jsonStr);
       history.removeWhere((e) => e['friendQQ'] == friendQQ);
-      await prefs.setString(_historyKey, json.encode(history));
+      await prefs.setString(await _historyKey(), json.encode(history));
     } catch (e) {
       debugPrint('FriendCompare: 删除历史失败: $e');
     }
@@ -252,7 +216,7 @@ class FriendCompareService {
   /// 清空全部历史
   Future<void> clearHistory() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_historyKey);
+    await prefs.remove(await _historyKey());
   }
 
   double _toDouble(dynamic value) {

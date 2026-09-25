@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../constant/CacheKeyConstant.dart';
 import '../manager/DivingFishProbeManager.dart';
 import '../widgets/ThemeAwareBackground.dart';
+import '../utils/UserProfileNotifier.dart';
 import 'HubComponents.dart';
 
 class AccountSyncPage extends StatefulWidget {
@@ -31,7 +32,6 @@ class _AccountSyncPageState extends State<AccountSyncPage> {
       _loggedIn = (prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '')
           .isNotEmpty;
       _cachedQQ = prefs.getString(CacheKeyConstant.probeDivingFishBindQQ) ??
-          prefs.getString('cachedQQ') ??
           '';
       _loading = false;
     });
@@ -76,11 +76,12 @@ class _AccountSyncPageState extends State<AccountSyncPage> {
   }
 
   Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(CacheKeyConstant.probeDivingFishToken);
-    await prefs.remove(CacheKeyConstant.probeDivingFishImportToken);
-    await prefs.remove(CacheKeyConstant.probeDivingFishBindQQ);
-    await prefs.remove('cachedQQ');
+    try {
+      await UserProfileNotifier.clearShuiyuAccountCache();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('登出失败：$e')));
+      return;
+    }
     await _loadAccountState();
   }
 

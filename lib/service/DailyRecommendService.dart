@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../manager/DivingFish/UserPlayDataManager.dart';
 import '../entity/DivingFish/Song.dart';
+import 'AccountStore.dart';
+import 'AccountSwitchService.dart';
 
 /// 当日谱面推荐服务
 /// 每天推荐 4 首用户未玩过的歌曲，使用日期+QQ 作为随机种子
@@ -19,12 +21,16 @@ class DailyRecommendService {
 
   /// 获取今日推荐曲目
   /// [forceRefresh] 为 true 时绕过缓存重新生成
-  Future<List<Song>> getDailyRecommendations({bool forceRefresh = false}) async {
+  Future<List<Song>> getDailyRecommendations(
+      {bool forceRefresh = false}) async {
+    final revision = AccountSwitchService.revision;
+    if (AccountSwitchService.isBusy) return [];
+    final accountKey = await AccountStore.accountKey();
     final todayStr = _getTodayDateString();
 
     // 非强制刷新时检查缓存
     if (!forceRefresh) {
-      final cached = await _getCachedRecommendations(todayStr);
+      final cached = await _getCachedRecommendations(todayStr, accountKey);
       if (cached != null && cached.isNotEmpty) {
         debugPrint('DailyRecommend: 使用缓存 ($todayStr)');
         return cached;
@@ -75,7 +81,8 @@ class DailyRecommendService {
     for (final song in candidateSongs) {
       final bestLevel = _pickBestLevel(song, playedKeys);
       if (bestLevel >= 0) {
-        candidatesWithLevel.add(_SongWithLevel(song: song, levelIndex: bestLevel));
+        candidatesWithLevel
+            .add(_SongWithLevel(song: song, levelIndex: bestLevel));
       }
     }
 
@@ -89,7 +96,8 @@ class DailyRecommendService {
       for (final song in remainingSongs) {
         final bestLevel = _pickAnyBestLevel(song);
         if (bestLevel >= 0) {
-          finalCandidates.add(_SongWithLevel(song: song, levelIndex: bestLevel));
+          finalCandidates
+              .add(_SongWithLevel(song: song, levelIndex: bestLevel));
         }
         if (finalCandidates.length >= 10) break;
       }
@@ -108,7 +116,9 @@ class DailyRecommendService {
 
     final pickCount = finalCandidates.length < 4 ? finalCandidates.length : 4;
     int attempts = 0;
-    while (result.length < pickCount && attempts < 100 && used.length < finalCandidates.length) {
+    while (result.length < pickCount &&
+        attempts < 100 &&
+        used.length < finalCandidates.length) {
       final index = random.nextInt(finalCandidates.length);
       final candidate = finalCandidates[index];
       if (!used.contains(candidate.song.id)) {
@@ -119,7 +129,10 @@ class DailyRecommendService {
     }
 
     // 缓存结果
-    await _cacheRecommendations(todayStr, result);
+    if (revision != AccountSwitchService.revision || accountKey != await AccountStore.accountKey()) {
+      return getDailyRecommendations(forceRefresh: forceRefresh);
+    }
+    await _cacheRecommendations(todayStr, result, accountKey);
 
     return result;
   }
@@ -167,13 +180,14 @@ class DailyRecommendService {
   }
 
   /// 从缓存获取推荐
-  Future<List<Song>?> _getCachedRecommendations(String dateStr) async {
+  Future<List<Song>?> _getCachedRecommendations(
+      String dateStr, String accountKey) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cachedDate = prefs.getString(_cacheDateKey);
+      final cachedDate = prefs.getString('${_cacheDateKey}_$accountKey');
       if (cachedDate != dateStr) return null;
 
-      final jsonStr = prefs.getString(_cacheKey);
+      final jsonStr = prefs.getString('${_cacheKey}_$accountKey');
       if (jsonStr == null || jsonStr.isEmpty) return null;
 
       final List<dynamic> jsonList = json.decode(jsonStr) as List<dynamic>;
@@ -187,12 +201,13 @@ class DailyRecommendService {
   }
 
   /// 缓存推荐结果
-  Future<void> _cacheRecommendations(String dateStr, List<Song> songs) async {
+  Future<void> _cacheRecommendations(
+      String dateStr, List<Song> songs, String accountKey) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonList = songs.map((s) => s.toJson()).toList();
-      await prefs.setString(_cacheKey, json.encode(jsonList));
-      await prefs.setString(_cacheDateKey, dateStr);
+      await prefs.setString('${_cacheKey}_$accountKey', json.encode(jsonList));
+      await prefs.setString('${_cacheDateKey}_$accountKey', dateStr);
     } catch (e) {
       debugPrint('DailyRecommend: 缓存失败: $e');
     }

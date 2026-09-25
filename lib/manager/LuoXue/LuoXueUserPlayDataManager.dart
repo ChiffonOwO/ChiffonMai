@@ -1,6 +1,6 @@
 import 'dart:convert';
+import '../DivingFish/UserPlayDataManager.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import './LuoXueOAuthManager.dart';
 import '../../api/ApiUrls.dart';
 import '../../entity/LuoXue/LuoXuePlayer.dart';
@@ -9,7 +9,6 @@ import '../../entity/DivingFish/RecordItem.dart';
 import '../../entity/DivingFish/Song.dart';
 import '../../utils/LuoXueToDivingFishUtil.dart';
 import '../../manager/DivingFish/MaimaiMusicDataManager.dart';
-import '../../constant/CacheKeyConstant.dart';
 import '../../service/AccountSwitchService.dart';
 import '../../utils/CurrentDataSourceNotifier.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
@@ -97,11 +96,12 @@ class LuoXueUserPlayDataManager {
   /// 同时更新所有用到 RecordItem 的缓存
   Future<List<RecordItem>?> getPlayerRecordsAsRecordItems({
     LuoXuePlayer? playerInfo,
+    List<LuoXueScore>? scores,
     List<Song>? songs,
   }) async {
     try {
-      final luoxueScores = await getPlayerRecords();
-      if (luoxueScores == null || luoxueScores.isEmpty) {
+      final luoxueScores = scores ?? await getPlayerRecords();
+      if (luoxueScores == null) {
         debugPrint('未获取到玩家成绩');
         return null;
       }
@@ -127,6 +127,7 @@ class LuoXueUserPlayDataManager {
       await _updateRecordItemCache(
         recordItems,
         nickname: playerInfo?.name ?? '',
+        accountId: playerInfo!.friendCode.toString(),
       );
       return recordItems;
     } catch (e) {
@@ -150,10 +151,8 @@ class LuoXueUserPlayDataManager {
 
   /// 更新 RecordItem 相关缓存
   Future<void> _updateRecordItemCache(List<RecordItem> recordItems,
-      {String nickname = ''}) async {
+      {String nickname = '', required String accountId}) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-
       // 构建缓存数据结构（与水鱼数据源格式保持一致）
       Map<String, dynamic> cacheData = {
         'additional_rating': 0,
@@ -164,17 +163,18 @@ class LuoXueUserPlayDataManager {
       };
 
       // 保存到 userPlayData 缓存
-      await prefs.setString(
-          CacheKeyConstant.userPlayData, json.encode(cacheData));
+      await UserPlayDataManager().storeFetchedData(cacheData,
+          source: RefreshDataSource.luoxue, accountId: accountId);
       debugPrint('✅ 已更新 RecordItem 缓存（共 ${recordItems.length} 条）');
 
       // 落雪不写 Best50 缓存（页面会按成绩重算），也不要动 last_used_qq /
       // best50_data_<id> —— 那是水鱼账号的活动槽，双账号下由 AccountStore 存档管理。
       // 只清推荐结果（它依赖个人成绩，换账号后失效）。
-      await prefs.remove(CacheKeyConstant.recommendationResults);
+
       debugPrint('✅ 已清除推荐结果缓存');
     } catch (e) {
       print('更新 RecordItem 缓存时出错: $e');
+      rethrow;
     }
   }
 
@@ -196,9 +196,9 @@ class LuoXueUserPlayDataManager {
 
   /// 登出（清除本地令牌缓存和落雪账号存档）
   Future<void> logout() async {
-    await _oauthManager.logout();
     // 双账号：移除落雪账号的存档/元信息；若当前正显示落雪，回落到水鱼
-    await AccountSwitchService.onAccountLoggedOut(RefreshDataSource.luoxue);
+    await AccountSwitchService.onAccountLoggedOut(RefreshDataSource.luoxue,
+        clearCredentials: _oauthManager.logout);
     debugPrint('✅ 已清除落雪账号缓存');
   }
 

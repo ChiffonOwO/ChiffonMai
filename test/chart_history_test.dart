@@ -7,13 +7,15 @@
 //   * 不是自己的数据不能记：好友对比会借用同一条 fetchUserPlayData。
 import 'dart:convert';
 import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:my_first_flutter_app/service/History/ChartHistoryCore.dart';
 import 'package:my_first_flutter_app/service/History/ChartHistoryStore.dart';
 
-Map<String, dynamic> dfRecord(int songId, int levelIndex, double ach, int dx) => {
+Map<String, dynamic> dfRecord(int songId, int levelIndex, double ach, int dx) =>
+    {
       'song_id': songId,
       'level_index': levelIndex,
       'achievements': ach,
@@ -214,7 +216,8 @@ void main() {
       final events = [
         for (var i = 0; i < 200; i++) <num>[i * day, 99.0 + i * 0.001, 100 + i],
       ];
-      final pruned = mergeAndPruneEvents(const [], events, max: 50, keepRecent: 20);
+      final pruned =
+          mergeAndPruneEvents(const [], events, max: 50, keepRecent: 20);
       expect(pruned.length, lessThanOrEqualTo(50));
       expect(pruned.length, greaterThan(20));
       // 最近 20 条必须一条不少
@@ -232,12 +235,16 @@ void main() {
       final day2 = DateTime(2026, 9, 2, 9).millisecondsSinceEpoch;
 
       var series = <RatingPoint>[];
-      series = appendRatingPoint(series, RatingPoint(tMs: day1, rating: 16000)).series;
-      series = appendRatingPoint(series, RatingPoint(tMs: day1Later, rating: 16100)).series;
+      series = appendRatingPoint(series, RatingPoint(tMs: day1, rating: 16000))
+          .series;
+      series =
+          appendRatingPoint(series, RatingPoint(tMs: day1Later, rating: 16100))
+              .series;
       expect(series.length, 1);
       expect(series.single.rating, 16100, reason: '当天以最后一次为准');
 
-      series = appendRatingPoint(series, RatingPoint(tMs: day2, rating: 16200)).series;
+      series = appendRatingPoint(series, RatingPoint(tMs: day2, rating: 16200))
+          .series;
       expect(series.length, 2);
       expect(series.last.rating, 16200);
     });
@@ -247,7 +254,8 @@ void main() {
       final day2 = DateTime(2026, 9, 2, 9).millisecondsSinceEpoch;
       final day3 = DateTime(2026, 9, 3, 20).millisecondsSinceEpoch;
 
-      var r = appendRatingPoint(<RatingPoint>[], RatingPoint(tMs: day1, rating: 15610));
+      var r = appendRatingPoint(
+          <RatingPoint>[], RatingPoint(tMs: day1, rating: 15610));
       expect(r.changed, isTrue, reason: '第一个点必须记');
       expect(r.series.length, 1);
 
@@ -293,10 +301,14 @@ void main() {
     });
 
     test('Rating 下降也会记（换号/换源）', () {
-      var r = appendRatingPoint(<RatingPoint>[],
-          RatingPoint(tMs: DateTime(2026, 9, 1).millisecondsSinceEpoch, rating: 16000));
-      r = appendRatingPoint(r.series,
-          RatingPoint(tMs: DateTime(2026, 9, 2).millisecondsSinceEpoch, rating: 15500));
+      var r = appendRatingPoint(
+          <RatingPoint>[],
+          RatingPoint(
+              tMs: DateTime(2026, 9, 1).millisecondsSinceEpoch, rating: 16000));
+      r = appendRatingPoint(
+          r.series,
+          RatingPoint(
+              tMs: DateTime(2026, 9, 2).millisecondsSinceEpoch, rating: 15500));
       expect(r.changed, isTrue, reason: '下降也是"变动"，必须记');
       expect(r.series.length, 2);
       expect(r.series.last.rating, 15500);
@@ -380,6 +392,7 @@ void main() {
     late Directory tmp;
 
     setUp(() {
+      SharedPreferences.setMockInitialValues({});
       tmp = Directory.systemTemp.createTempSync('chart_history_test');
       ChartHistoryStore.debugDirectoryOverride = tmp.path;
       ChartHistoryStore.instance.debugClearCache();
@@ -481,7 +494,8 @@ void main() {
       expect((await store.summary(sourceKey: 'shuiyu')).chartCount, 1);
       expect((await store.summary(sourceKey: 'luoxue')).chartCount, 1);
       expect(await store.chartEvents(8, 3, sourceKey: 'shuiyu'), isEmpty);
-      expect(File('${tmp.path}${Platform.pathSeparator}luoxue.json').existsSync(),
+      expect(
+          File('${tmp.path}${Platform.pathSeparator}luoxue.json').existsSync(),
           isTrue);
     });
 
@@ -503,17 +517,27 @@ void main() {
       final store = ChartHistoryStore.instance;
       final day1 = DateTime(2026, 9, 1, 10).millisecondsSinceEpoch;
       await store.recordRating(
-        rating: 16000, best35: 11000, best15: 5000, sourceKey: 'shuiyu', nowMs: day1,
+        rating: 16000,
+        best35: 11000,
+        best15: 5000,
+        sourceKey: 'shuiyu',
+        nowMs: day1,
       );
       await store.recordRating(
-        rating: 0, sourceKey: 'shuiyu', nowMs: day1 + 3600000,
+        rating: 0,
+        sourceKey: 'shuiyu',
+        nowMs: day1 + 3600000,
       );
       await store.recordRating(
-        rating: 16100, best35: 11100, best15: 5000, sourceKey: 'shuiyu',
+        rating: 16100,
+        best35: 11100,
+        best15: 5000,
+        sourceKey: 'shuiyu',
         nowMs: day1 + 7200000,
       );
       await store.recordRating(
-        rating: 16200, sourceKey: 'shuiyu',
+        rating: 16200,
+        sourceKey: 'shuiyu',
         nowMs: DateTime(2026, 9, 2, 9).millisecondsSinceEpoch,
       );
 
@@ -527,7 +551,8 @@ void main() {
       final file = File('${tmp.path}${Platform.pathSeparator}shuiyu.json');
       file.writeAsStringSync('{"version":1,"current":{"a":'); // 半截 JSON
 
-      final summary = await ChartHistoryStore.instance.summary(sourceKey: 'shuiyu');
+      final summary =
+          await ChartHistoryStore.instance.summary(sourceKey: 'shuiyu');
       expect(summary.chartCount, 0);
       expect(File('${file.path}.broken').existsSync(), isTrue,
           reason: '坏文件要留证据，方便排查');

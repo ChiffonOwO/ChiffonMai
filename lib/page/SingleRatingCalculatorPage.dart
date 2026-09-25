@@ -134,8 +134,8 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
     }
   }
 
+  // 显示错误对话框（当前页面走 _difficultyError 内联提示，这里保留作通用工具）
   // ignore: unused_element
-  // 显示错误对话框
   void _showError(String message) {
     showDialog(
       context: context,
@@ -163,8 +163,6 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
       {"label": "99.0%", "multiplier": 0.208, "completion": 99.0},
     ];
 
-    // ignore: unused_local_variable
-    final bodyFontSize = MediaQuery.of(context).size.width * 0.04;
     final smallFontSize = MediaQuery.of(context).size.width * 0.035;
     final List<Widget> rows = [];
     for (final tier in tiers) {

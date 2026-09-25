@@ -216,21 +216,6 @@ class SongMaidataPageService {
     return Map<String, dynamic>.from(json.decode(jsonString) as Map);
   }
 
-  String _buildMaidataUrl(String songId, {String? customTitle, String? serverTitle}) {
-    String mappedGenre = _genreMapping[genre] ?? genre;
-    String titleToUse = customTitle ?? serverTitle ?? songTitle;
-    String sanitizedTitle = _sanitizeTitle(titleToUse);
-    
-    String fileName = songId;
-    fileName += '_$sanitizedTitle';
-    
-    if (songType == 'DX') {
-      fileName += '_DX';
-    }
-    
-    return '${ApiUrls.MaidataServerPortUrl}/$mappedGenre/$fileName/maidata.txt';
-  }
-
   Future<String?> fetchMaidata({
     required void Function(List<String>) onInoteParsed,
   }) async {

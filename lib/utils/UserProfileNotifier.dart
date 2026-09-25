@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constant/CacheKeyConstant.dart';
+import 'CurrentDataSourceNotifier.dart';
+import '../service/AccountSwitchService.dart';
 
 /// 未登录 / 未写入昵称时显示的占位文案：
 /// `displayNickname` 工具方法使用，便于首页 / 我的页等保持一致。
@@ -69,8 +71,8 @@ class UserProfile {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(nickname, best50TotalRA, best35TotalRA, best15TotalRA, cachedQQ);
+  int get hashCode => Object.hash(
+      nickname, best50TotalRA, best35TotalRA, best15TotalRA, cachedQQ);
 
   /// 渲染用的昵称：未设置时回落为 "请登录"，避免暴露空字符串或硬编码占位符。
   String get displayNickname =>
@@ -98,7 +100,8 @@ class UserProfileNotifier {
   static Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     _publish(UserProfile(
-      nickname: prefs.getString('userNickname') ?? UserProfile.defaults.nickname,
+      nickname:
+          prefs.getString('userNickname') ?? UserProfile.defaults.nickname,
       best50TotalRA:
           prefs.getInt('best50TotalRA') ?? UserProfile.defaults.best50TotalRA,
       best35TotalRA:
@@ -129,57 +132,24 @@ class UserProfileNotifier {
     _publish(UserProfile.loggedOut);
   }
 
-  /// 完整登出水鱼账号：清除所有水鱼账号相关的成绩 / 缓存。
-  ///
-  /// 与 [clear] 不同：本方法还会清掉水鱼缓存的 player/records、Best50 缓存、
-  /// 排行榜缓存与参与设置、推荐结果、评论身份，并把 `lastDataSource` 重置为
-  /// `shuiyu`（同时清掉 SharedPreferences 中的条目）。
-  ///
-  /// 不清的（账号通用静态数据）：歌曲 / 难度 / 标签 / 收藏品 / maidata 缓存 /
-  /// 主题设置 / 收藏功能 / KaleidXScope 标记 / 猜歌设置 / 落雪缓存（落雪先不动）。
-  static Future<void> clearShuiyuAccountCache() async {
-    final prefs = await SharedPreferences.getInstance();
-    // 先读上一个 QQ，用于定位按 QQ 分键的 Best50 缓存。
-    final lastQQ = prefs.getString('last_used_qq');
-    // 把所有需清除的键一次性并行移除，避免逐个 await 造成长时间无反馈。
-    final keys = <String>[
-      // 1) 登录 token / 账号关联
-      CacheKeyConstant.probeDivingFishToken,
-      CacheKeyConstant.probeDivingFishImportToken,
-      CacheKeyConstant.probeDivingFishBindQQ,
-      CacheKeyConstant.shuiyuUserId,
-      // 2) 个人成绩缓存（水鱼 player/records 拉回来的原始记录）
-      CacheKeyConstant.userPlayData,
-      // 3) Best50 缓存（按 QQ 分键，清掉 last_used_qq 与上一个 QQ 的缓存）
-      'last_used_qq',
-      if (lastQQ != null && lastQQ.isNotEmpty) 'best50_data_$lastQQ',
-      // 4) 推荐结果（依赖个人成绩，账号换人后失效）
-      CacheKeyConstant.recommendationResults,
-      // 5) 排行榜参与设置（按账号绑定）
-      CacheKeyConstant.participateRankings,
-      CacheKeyConstant.showNickname,
-      // 6) 排行榜缓存（水鱼 + 总榜）
-      CacheKeyConstant.shuiyuRankingsCache,
-      CacheKeyConstant.shuiyuRankingsCacheTimestamp,
-      CacheKeyConstant.totalRankingsCache,
-      CacheKeyConstant.totalRankingsCacheTimestamp,
-      // 7) 评论身份（按账号生成）
-      CacheKeyConstant.commentDataSource,
-      CacheKeyConstant.commentOriginalId,
-      CacheKeyConstant.commentNickname,
-      // 8) 上次数据源：清掉 prefs 条目，首页"数据源"摘要回退到默认"水鱼"
-      CacheKeyConstant.lastDataSource,
-      // 9) 最后清掉内存中的 UserProfile（同时清掉 prefs 里的昵称 / Rating / QQ）
-      'userNickname',
-      'best50TotalRA',
-      'best35TotalRA',
-      'best15TotalRA',
-      'cachedQQ',
-      'probe_diving_fish_bind_qq',
-    ];
-    await Future.wait([for (final key in keys) prefs.remove(key)]);
-    _publish(UserProfile.loggedOut);
-  }
+  /// 在账号事务内登出水鱼；活动槽、回落和内存失效由协调器统一处理。
+  /// 当前是落雪/AWMC 时仅删除水鱼自己的凭据和存档。
+  static Future<void> clearShuiyuAccountCache() =>
+      AccountSwitchService.onAccountLoggedOut(RefreshDataSource.shuiyu,
+          clearCredentials: () async {
+        final prefs = await SharedPreferences.getInstance();
+        for (final key in [
+          CacheKeyConstant.probeDivingFishToken,
+          CacheKeyConstant.probeDivingFishImportToken,
+          CacheKeyConstant.probeDivingFishBindQQ,
+          CacheKeyConstant.shuiyuRankingsCache,
+          CacheKeyConstant.shuiyuRankingsCacheTimestamp,
+          CacheKeyConstant.totalRankingsCache,
+          CacheKeyConstant.totalRankingsCacheTimestamp,
+        ]) {
+          await prefs.remove(key);
+        }
+      });
 
   static void _publish(UserProfile next) {
     if (instance.value != next) {

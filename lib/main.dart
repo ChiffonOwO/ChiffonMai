@@ -19,8 +19,11 @@ import 'package:my_first_flutter_app/utils/UpdateNotifier.dart';
 import 'package:my_first_flutter_app/utils/UserProfileNotifier.dart';
 import 'package:my_first_flutter_app/service/ConnectivityService.dart';
 import 'package:my_first_flutter_app/widgets/PortablePlayerBadge.dart';
+import 'service/AccountSwitchService.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AccountSwitchService.ensureMigrated();
   await _initBackgroundAudio();
   GoogleFonts.config.allowRuntimeFetching = true;
   runApp(MyApp());

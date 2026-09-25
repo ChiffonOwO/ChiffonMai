@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'dart:convert';
 import 'dart:io' show GZipCodec, HttpClient;
 import 'package:http/http.dart' as http;
@@ -16,8 +17,11 @@ class ApiClient {
 
   /// 共享的 HTTP 客户端，复用 TCP 连接
   static http.Client? _sharedClient;
+  @visibleForTesting
+  static http.Client? debugClient;
 
   static http.Client get _client {
+    if (debugClient != null) return debugClient!;
     if (_sharedClient != null) return _sharedClient!;
     // 使用较大的连接池，支持高并发批量请求
     final ioClient = HttpClient()

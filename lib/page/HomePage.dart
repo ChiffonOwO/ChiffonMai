@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api/ApiUrls.dart';
 import '../constant/CacheKeyConstant.dart';
+import '../constant/AppLinks.dart';
 import '../constant/LoadingTipsConstant.dart';
 import '../service/HomeService.dart';
 import '../manager/LZYCheckUpdateManager.dart';
@@ -30,7 +31,7 @@ import '../utils/FeatureRegistry.dart';
 import 'AchievementFullReverseCalculatorPage.dart';
 import 'AchievementRateCalculatorPage.dart';
 import '../widgets/SyncScoreDialogs.dart';
-import 'VersionViewPage.dart' hide AppConstants;
+import 'VersionViewPage.dart';
 import 'Best50/Best50Page.dart';
 import 'Best50/DiffBest50Page.dart';
 import 'Best50/PersonalizedBest50Page.dart';
@@ -67,6 +68,7 @@ import 'CoverRecognitionPage.dart';
 import 'ScoreOcrPage.dart';
 import 'DataBackupPage.dart';
 import 'Awmc/AwmcConsolePage.dart';
+import 'AwmcNet/AwmcNetSyncFlow.dart';
 import 'Awmc/AwmcSyncFlow.dart';
 import 'DailyRecommendPage.dart';
 import '../widgets/RefreshDataDialog.dart'
@@ -91,15 +93,17 @@ import 'package:my_first_flutter_app/utils/FavoriteFeaturesNotifier.dart';
 import 'package:my_first_flutter_app/utils/FeatureFlags.dart';
 import 'package:my_first_flutter_app/utils/LoginStateNotifier.dart';
 import 'package:my_first_flutter_app/utils/UserProfileNotifier.dart';
-import '../service/AccountSwitchService.dart';
 import '../widgets/AccountSwitchSheet.dart';
+import '../service/AccountStore.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 import '../widgets/QrQuickFillButtons.dart';
 import '../service/SyncRouteStore.dart';
 import '../service/SyncStatsService.dart';
 import '../utils/SyncRouteNotifier.dart';
+import '../utils/RefreshErrorPresenter.dart';
 import '../utils/UpdateNotifier.dart';
 import '../widgets/SyncRouteFooter.dart';
+import '../widgets/SyncStatsFooter.dart';
 
 // ds值与歌曲对应关系数据类已随 _calculateRatingLimits 一起抽离到
 // lib/widgets/RefreshDataDialog.dart，不再需要此处的定义。
@@ -112,6 +116,83 @@ class _InitInterval {
 // 应用常量类：集中管理所有硬编码的配置值
 
 // ButtonItem / ButtonCategory 已移至 ../entity/FeatureModels.dart
+
+/// 首页页头的问候语：`欢迎回来，<昵称>`，**永远单行、整行同字号**。
+///
+/// ── 为什么需要它 ──
+/// 360dp 屏上页头可用宽度只有约 272px（左右各 20px 页边距 + 右侧主题按钮 48px）。
+/// 「欢迎回来，」在 24px 下要占 120px，留给昵称的只剩约 150px ——
+/// **6 个汉字就开始换行**，而机台昵称最长 8 个字，几乎人人都会撞上（实测 8 字
+/// 昵称确实会排成两行）。页头一旦变两行，下面的仪表盘就整体往下跳。
+///
+/// ── 做法 ──
+/// **不做大小混排**：问候语和昵称用同一个字号。放不下时按 `可用宽度 / 实际宽度`
+/// 把**整行等比缩小**（最短缩到 [minFontSize]），再放不下才用省略号收尾。
+/// 也就是说：昵称不长时和以前**一模一样**（原字号、原位置），只有长昵称才会
+/// 整行小一点点 —— 换来的是不换行、也不截掉名字。
+///
+/// 行高按原字号固定预留，所以不管昵称多长，页头高度都不变。
+///
+/// 回归测试：`test/home_greeting_test.dart`。
+class HomeGreetingText extends StatelessWidget {
+  /// 用户昵称；空串表示还没登录（这时显示「请登录水鱼账号」）。
+  final String nickname;
+
+  /// 允许缩到的最小字号。再小就不好看了，改用省略号。
+  static const double minFontSize = 16;
+
+  const HomeGreetingText({super.key, required this.nickname});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final base = theme.textTheme.headlineSmall
+        ?.copyWith(fontWeight: FontWeight.w800);
+    final baseSize = base?.fontSize ?? 24;
+    final text = nickname.trim().isEmpty ? '请登录水鱼账号' : '欢迎回来，$nickname';
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // ⚠️ 量宽度必须用**真正渲染时的样式**（合并环境 DefaultTextStyle，
+        // 并带上 textScaler），否则字距和系统字体缩放都会漏算 —— 详见 AGENTS.md §8
+        final style = DefaultTextStyle.of(context).style.merge(base);
+        final scaler = MediaQuery.textScalerOf(context);
+
+        TextPainter layoutAt(double size) => TextPainter(
+              text: TextSpan(text: text, style: style.copyWith(fontSize: size)),
+              textDirection: Directionality.of(context),
+              textScaler: scaler,
+              maxLines: 1,
+            )..layout();
+
+        final basePainter = layoutAt(baseSize);
+        final available = constraints.maxWidth;
+        // 行高按**原字号**预留：昵称长短不影响页头高度
+        final lineHeight = basePainter.size.height;
+
+        var size = baseSize;
+        if (basePainter.size.width > available) {
+          size = (baseSize * available / basePainter.size.width)
+              .clamp(minFontSize, baseSize);
+        }
+
+        return SizedBox(
+          height: lineHeight,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            // 整行同字号：一个 Text 就够，不用 Text.rich 分段
+            child: Text(
+              text,
+              style: style.copyWith(fontSize: size),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
 
 /// 首页组件：有状态组件，包含所有页面元素和业务数据
 class HomePage extends StatefulWidget {
@@ -132,9 +213,6 @@ class HomePageState extends State<HomePage> {
     _showAccountManageDialog(context);
   }
 
-  // 收藏的功能（实际数据来自 FavoriteFeaturesNotifier，字段保留便于本地访问）
-  Set<String> _favoriteTitles = <String>{};
-
   // 后台初始化状态
   bool _isBackgroundInitializing = false;
   bool _isInitializationCompleted = false;
@@ -148,7 +226,10 @@ class HomePageState extends State<HomePage> {
   int _best15TotalRA = 0;
 
   // 缓存的QQ号（实际数据来自 UserProfileNotifier，字段保留便于本地访问）
-  String _cachedQQ = "";
+
+  // 「同步成绩到 AWMC NET」的进行状态：显示在收藏区那个按钮上（同「系统」hub 页）
+  bool _syncingAwmcNet = false;
+  String _awmcNetText = '';
 
   // 初始化方法，用于从本地存储加载数据
   @override
@@ -157,17 +238,12 @@ class HomePageState extends State<HomePage> {
     // 监听用户档案共享状态（昵称 / Rating / QQ 跨页面同步）
     UserProfileNotifier.instance.addListener(_onUserProfileChanged);
     _onUserProfileChanged();
-    // 加载当前数据源（首页摘要"数据源"显示用），并确保旧数据已迁进双账号系统
-    CurrentDataSourceNotifier.load().then((_) {
-      AccountSwitchService.ensureMigrated();
-    });
     _loadUserData();
     _autoCheckUpdate();
     _checkDivingFishLoginStatus();
     // 注意：收藏列表的实时同步不再走 addListener，
     // 而是直接在 build 顶层用 ValueListenableBuilder<FavoritesPayload>
     // 包整个 Scaffold，确保 IndexedStack 内任意子页面点星标时首页都能立即重建。
-    _loadFavoriteCount();
     // 无论冷却状态如何，都先加载别名缓存到内存
     // 防止冷却期间别名丢失（详见：冷却逻辑在_initializeDataInBackground内）
     SongAliasManager.instance.init();
@@ -208,7 +284,6 @@ class HomePageState extends State<HomePage> {
       _best50TotalRA = prefs.getInt('best50TotalRA') ?? 0;
       _best35TotalRA = prefs.getInt('best35TotalRA') ?? 0;
       _best15TotalRA = prefs.getInt('best15TotalRA') ?? 0;
-      _cachedQQ = prefs.getString('cachedQQ') ?? "";
     });
   }
 
@@ -314,21 +389,7 @@ class HomePageState extends State<HomePage> {
   // 保存QQ号到本地存储
   Future<void> _saveQQ(String qq) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('cachedQQ', qq);
     await prefs.setString(CacheKeyConstant.probeDivingFishBindQQ, qq);
-    if (mounted) {
-      setState(() {
-        _cachedQQ = qq;
-      });
-    }
-    // 同步共享 notifier，让我的页头像区也能即时更新 QQ 字段
-    UserProfileNotifier.replace(UserProfile(
-      nickname: _userNickname,
-      best50TotalRA: _best50TotalRA,
-      best35TotalRA: _best35TotalRA,
-      best15TotalRA: _best15TotalRA,
-      cachedQQ: qq,
-    ));
   }
 
   // 使用 ValueNotifier 以便 FeatureCategoryPage 等子页面也能响应登录状态变化
@@ -363,7 +424,6 @@ class HomePageState extends State<HomePage> {
       _best50TotalRA = p.best50TotalRA;
       _best35TotalRA = p.best35TotalRA;
       _best15TotalRA = p.best15TotalRA;
-      _cachedQQ = p.cachedQQ;
     });
   }
 
@@ -375,16 +435,6 @@ class HomePageState extends State<HomePage> {
     _loginStateNotifier.value = loggedIn;
     // 同步共享 LoginStateNotifier，让"我的"页等监听者也能感知登录态变化
     LoginStateNotifier.setLoggedIn(loggedIn);
-  }
-
-  Future<void> _loadFavoriteCount() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getStringList(CacheKeyConstant.favoriteFeatures) ?? [];
-    if (mounted) {
-      setState(() {
-        _favoriteTitles = raw.toSet();
-      });
-    }
   }
 
   Future<void> _toggleFavorite(String title) async {
@@ -413,11 +463,13 @@ class HomePageState extends State<HomePage> {
     );
     try {
       await UserProfileNotifier.clearShuiyuAccountCache();
-      // 双账号：清掉水鱼账号的存档；若当前正是水鱼则回落到落雪（有缓存时）。
-      await AccountSwitchService.onAccountLoggedOut(
-          RefreshDataSource.shuiyu);
     } catch (e) {
       debugPrint('登出水鱼账号失败：$e');
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        Fluttertoast.showToast(msg: '登出失败：$e');
+      }
+      return;
     }
     if (!mounted) return;
     Navigator.of(context, rootNavigator: true).pop();
@@ -447,8 +499,7 @@ class HomePageState extends State<HomePage> {
     return ValueListenableBuilder<FavoritesPayload>(
       valueListenable: FavoriteFeaturesNotifier.instance,
       builder: (context, payload, _) {
-        // 直接用 notifier 的最新 titles 渲染；本地 _favoriteTitles 字段仍保留，
-        // 仅给 _loadFavoriteCount 初始化时使用
+        // 收藏数据完全由 notifier 提供，首页不再自行读一遍 prefs
         return _buildScaffold(context, payload.titles);
       },
     );
@@ -479,15 +530,7 @@ class HomePageState extends State<HomePage> {
                             ),
                       ),
                       const SizedBox(height: 5),
-                      Text(
-                        _userNickname.isEmpty
-                            ? '请登录水鱼账号'
-                            : '欢迎回来，$_userNickname',
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.w800),
-                      ),
+                      HomeGreetingText(nickname: _userNickname),
                     ],
                   ),
                 ),
@@ -581,11 +624,16 @@ class HomePageState extends State<HomePage> {
           builder: (context, source, _) => Row(children: [
             _summaryMetric(context, 'Best35', _displayBest35RA()),
             _summaryMetric(context, 'Best15', _displayBest15RA()),
-            // 点「数据源」即可切换水鱼 / 落雪账号（使用缓存，不联网）
+            // 点「数据源」即可切换 水鱼 / 落雪 / AWMC NET 账号（使用缓存，不联网）
+            //
+            // 用**短名**：这一行是三个 Expanded 平分宽度，每格只剩 ~90dp
+            // （还要让出右边 14dp 的切换图标），`AWMC NET` 放不下会被
+            // `TextOverflow.ellipsis` 截成「AWMC N..」。`AWMC` 与排行榜 Tab
+            // 的叫法一致；账号面板 / 导出图那类宽裕的地方仍用全名。
             _summaryMetric(
               context,
               '数据源',
-              source.displayName,
+              source.shortDisplayName,
               onTap: _showAccountSwitchSheet,
               trailingIcon: Icons.swap_horiz_rounded,
             ),
@@ -675,6 +723,7 @@ class HomePageState extends State<HomePage> {
     ]);
   }
 
+  // ignore: unused_element
   Widget _buildAllFeaturesList(BuildContext context) {
     final categories = _searchableCategories;
     return Column(
@@ -759,20 +808,8 @@ class HomePageState extends State<HomePage> {
   // 收藏品选择 tab 按钮已迁移到独立的 CollectionPickerSheet StatefulWidget
   //（避免 showModalBottomSheet.builder 多次调用时局部变量 activeTab 被重置的 bug）
 
-  // 保存上次更新使用的数据源
-  Future<void> _saveLastDataSource(String dataSource) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(CacheKeyConstant.lastDataSource, dataSource);
-    } catch (e) {
-      debugPrint('保存上次数据源失败: $e');
-    }
-  }
-
   SyncCallbacks get _syncCallbacks => SyncCallbacks(
-        cachedQQ: _cachedQQ,
         onSaveQQ: _saveQQ,
-        onSaveLastDataSource: _saveLastDataSource,
         onRefreshAfterSync: ({
           required String qq,
           required void Function(double progress, String text) onProgress,
@@ -829,6 +866,34 @@ class HomePageState extends State<HomePage> {
     SyncRouteNotifier.instance.refreshStatsSoon();
   }
 
+  /// 同步成绩到 AWMC NET（机台二维码直传）。
+  ///
+  /// 与「系统」hub 页共用 [AwmcNetSyncFlow]：**输入在对话框、等待进度在按钮上**。
+  /// 首页这里同样把进度打在收藏区那个按钮上（`_syncingAwmcNet`），
+  /// 不再用一个模态框把整页锁住 30 多秒。
+  Future<void> _syncToAwmcNet() async {
+    if (_syncingAwmcNet) return;
+    final outcome = await AwmcNetSyncFlow.run(
+      context,
+      onBusy: (label) {
+        if (!mounted) return;
+        setState(() {
+          _syncingAwmcNet = true;
+          _awmcNetText = label;
+        });
+      },
+      onIdle: () {
+        if (!mounted) return;
+        setState(() {
+          _syncingAwmcNet = false;
+          _awmcNetText = '';
+        });
+      },
+    );
+    if (!mounted || outcome.cancelled) return;
+    Fluttertoast.showToast(msg: AwmcNetSyncFlow.toastFor(outcome));
+  }
+
   Future<void> _syncToDivingFish() async {
     final prefs = await SharedPreferences.getInstance();
     final hasJwt =
@@ -870,7 +935,7 @@ class HomePageState extends State<HomePage> {
 
     final bindQQ =
         prefs.getString(CacheKeyConstant.probeDivingFishBindQQ) ?? '';
-    final cachedQQ = _cachedQQ.isNotEmpty ? _cachedQQ : null;
+    final cachedQQ = (await AccountStore.loadAll())['shuiyu']?.id;
     if (bindQQ.isNotEmpty && cachedQQ != null && bindQQ != cachedQQ) {
       if (!mounted) return;
       await showDialog<void>(
@@ -900,7 +965,7 @@ class HomePageState extends State<HomePage> {
   Future<void> _autoRefreshAfterSync({
     Future<void> Function(double progress, String text)? onProgress,
   }) async {
-    final qq = _cachedQQ.isNotEmpty ? _cachedQQ : null;
+    final qq = await DivingFishProbeManager().fetchBindQQ();
 
     if (qq == null || qq.isEmpty) {
       debugPrint('[HomePage] _autoRefreshAfterSync: QQ 为空，跳过刷新');
@@ -932,6 +997,8 @@ class HomePageState extends State<HomePage> {
   }
 
   // 显示同步成绩对话框，返回 friendCode 表示同步成功
+  // 单曲同步成绩 / 水鱼登录两个弹窗目前无调用点，保留实现备用
+  // ignore: unused_element
   Future<String?> _showSyncScoreDialog(BuildContext context) async {
     final brightness = Theme.of(context).brightness;
     final TextEditingController qrController = TextEditingController();
@@ -1330,15 +1397,13 @@ class HomePageState extends State<HomePage> {
                                 setState(() {
                                   statusText = '同步成功！正在刷新本地数据...';
                                 });
-                                String? qq =
-                                    _cachedQQ.isNotEmpty ? _cachedQQ : null;
+                                String? qq = await DivingFishProbeManager().fetchBindQQ();
                                 if (qq == null) {
                                   qq = await DivingFishProbeManager()
                                       .fetchBindQQ();
                                 }
                                 if (qq != null && qq.isNotEmpty) {
                                   await _saveQQ(qq);
-                                  await _saveLastDataSource('shuiyu');
                                 }
                                 await _autoRefreshAfterSync(
                                   onProgress: (p, t) async {
@@ -1433,14 +1498,13 @@ class HomePageState extends State<HomePage> {
                               const Duration(milliseconds: 300));
 
                           // 确保 QQ 已保存
-                          String? qq = _cachedQQ.isNotEmpty ? _cachedQQ : null;
+                          String? qq = await DivingFishProbeManager().fetchBindQQ();
                           if (qq == null) {
                             qq = await DivingFishProbeManager().fetchBindQQ();
                           }
                           final hasQQ = qq != null && qq.isNotEmpty;
                           if (hasQQ) {
                             await _saveQQ(qq);
-                            await _saveLastDataSource('shuiyu');
                           }
 
                           if (hasQQ) {
@@ -1532,6 +1596,7 @@ class HomePageState extends State<HomePage> {
   }
 
   // 显示水鱼登录对话框
+  // ignore: unused_element
   void _showDivingFishLoginDialog(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final TextEditingController userController = TextEditingController();
@@ -1911,7 +1976,8 @@ class HomePageState extends State<HomePage> {
       });
     } catch (e) {
       failed = true;
-      if (mounted) Fluttertoast.showToast(msg: '刷新数据失败：$e');
+      // 水鱼未授权时直接拉起授权页（与「系统」Tab 的刷新入口行为一致）
+      if (mounted) await presentRefreshError(e, qq: request.qq);
     } finally {
       messenger.clearSnackBars();
     }
@@ -1926,9 +1992,12 @@ class HomePageState extends State<HomePage> {
   /// SnackBar 的写法（同一时刻只留一条，避免高频进度排成长队）。
   bool _isAdvancedRefreshing = false;
 
-  Future<void> _openAdvancedRefreshData() async {
+  Future<void> _openAdvancedRefreshData({RefreshDataSource? initialSource}) async {
     if (_isAdvancedRefreshing) return;
-    final request = await showAdvancedRefreshDataDialog(context);
+    final request = await showAdvancedRefreshDataDialog(
+      context,
+      initialSource: initialSource,
+    );
     if (request == null || !mounted) return;
 
     setState(() => _isAdvancedRefreshing = true);
@@ -1950,7 +2019,7 @@ class HomePageState extends State<HomePage> {
       });
     } catch (e) {
       failed = true;
-      if (mounted) Fluttertoast.showToast(msg: '刷新数据失败：$e');
+      if (mounted) await presentRefreshError(e, qq: request.qq);
     } finally {
       messenger.clearSnackBars();
       if (mounted) setState(() => _isAdvancedRefreshing = false);
@@ -2041,7 +2110,7 @@ class HomePageState extends State<HomePage> {
     Map<String, dynamic> profile,
   ) {
     final bindQQ = profile.tryGet<String>('bind_qq') ?? '';
-    final qq = bindQQ.isNotEmpty ? bindQQ : _cachedQQ;
+    final qq = bindQQ;
     final authFuture = qq.isNotEmpty
         ? DivingFishOAuthManager().checkAuthorization(qq)
         : Future<bool?>.value(null);
@@ -2832,7 +2901,7 @@ class HomePageState extends State<HomePage> {
       );
     }
     if (item.title == '问卷调查') {
-      final uri = Uri.parse('https://wj.qq.com/s2/26540572/7828/');
+      final uri = Uri.parse(AppLinks.surveyUrl);
       try {
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -2842,6 +2911,55 @@ class HomePageState extends State<HomePage> {
       } catch (e) {
         debugPrint('打开问卷调查链接失败: $e');
         launchUrlFallback(uri.toString(), context);
+      }
+    }
+    if (item.title == '访问官方网站') {
+      final uri = Uri.parse(AppLinks.officialSite);
+      try {
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          launchUrlFallback(
+            uri.toString(),
+            context,
+            message: '无法打开浏览器，官网链接已复制到剪贴板，'
+                '请粘贴到浏览器访问 ${AppLinks.officialSite}',
+          );
+        }
+      } catch (e) {
+        debugPrint('打开官网失败: $e');
+        launchUrlFallback(
+          uri.toString(),
+          context,
+          message: '无法打开浏览器，官网链接已复制到剪贴板，'
+              '请粘贴到浏览器访问 ${AppLinks.officialSite}',
+        );
+      }
+    }
+    if (item.title == '加入 QQ 群') {
+      final uri = Uri.parse(AppLinks.qqGroupJoinUrl);
+      // 跳不动时复制的是**群号**：加群链接在浏览器里只是个空壳中转页
+      const failMessage = '没能跳转到 QQ，群号 ${AppLinks.qqGroupNumber} '
+          '已复制到剪贴板，可在 QQ 里搜索加入';
+      try {
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          launchUrlFallback(
+            uri.toString(),
+            context,
+            copyText: AppLinks.qqGroupNumber,
+            message: failMessage,
+          );
+        }
+      } catch (e) {
+        debugPrint('跳转 QQ 群失败: $e');
+        launchUrlFallback(
+          uri.toString(),
+          context,
+          copyText: AppLinks.qqGroupNumber,
+          message: failMessage,
+        );
       }
     }
     if (item.title == '同步成绩到水鱼') {
@@ -3013,6 +3131,11 @@ class HomePageState extends State<HomePage> {
         UpdateLuoXueScorePage.show(context);
       }
     }
+    if (item.title == '同步成绩到 AWMC NET') {
+      // AWMC NET 只有二维码这一条写入路径（与另外两个平台不同，没有线路概念）。
+      // 等待进度与另外两个同步入口一样显示在**按钮**上，不锁住整个页面。
+      await _syncToAwmcNet();
+    }
     if (item.title == '每日推荐') {
       Navigator.push(
         context,
@@ -3117,7 +3240,12 @@ class HomePageState extends State<HomePage> {
                 final effective =
                     isUpdate && update != null ? update : null;
                 return HubActionTile(
-                  title: UpdateNotifier.titleFor(effective),
+                  // ⚠️ 必须判 isUpdate：`UpdateNotifier.titleFor(null)` 返回的是
+                  // 「检查更新」（[UpdateNotifier.idleTitle]），不是"原样返回"。
+                  // 少了这个判断，收藏区里**每一个**功能的标题都会变成「检查更新」。
+                  title: isUpdate
+                      ? UpdateNotifier.titleFor(effective)
+                      : item.title,
                   subtitle: UpdateNotifier.subtitleFor(
                       effective, item.subtitle),
                   icon: isUpdate ? Icons.arrow_upward_rounded : item.icon,
@@ -3129,6 +3257,14 @@ class HomePageState extends State<HomePage> {
                   isFavorited: true,
                   onToggleFavorite: () => _toggleFavorite(item.title),
                   onTap: () => _handleFeatureTap(item),
+                  // 「同步成绩到 AWMC NET」的等待进度也打在按钮上：
+                  // 它一次要 30 多秒，用模态框把整页锁住太难受（与 hub 页一致）
+                  loading: item.title == '同步成绩到 AWMC NET' && _syncingAwmcNet,
+                  loadingText: _awmcNetText,
+                  // 纯统计行要贴紧按钮（线路切换器那两行不用，见 SyncStatsFooter）
+                  footerLift: item.title == '同步成绩到 AWMC NET'
+                      ? SyncStatsFooter.footerLift
+                      : 0,
                   // 两个同步入口在收藏区也带上线路切换 + 近 100 次统计，
                   // 与「系统」hub 页共享同一份状态（SyncRouteNotifier）
                   footer: _syncFooterFor(item.title),
@@ -3146,6 +3282,10 @@ class HomePageState extends State<HomePage> {
     }
     if (title == '同步成绩到落雪') {
       return const SyncRouteFooter(platform: SyncPlatform.luoXue);
+    }
+    // AWMC NET 只有二维码直传、没有线路，所以只有统计那一行
+    if (title == '同步成绩到 AWMC NET') {
+      return const SyncStatsFooter(slot: (SyncLine.direct, SyncPlatform.awmc));
     }
     return null;
   }
@@ -3195,7 +3335,6 @@ class HomePageState extends State<HomePage> {
                   ),
                 ).then((_) {
                   _checkDivingFishLoginStatus();
-                  _loadFavoriteCount();
                 });
               },
           child: Row(

@@ -1,1086 +1,1228 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ChiffonMai — 舞萌 DX 一站式工具箱</title>
-  <link rel="icon" href="icon.png" type="image/png">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0c0f">
+  <meta name="description" content="ChiffonMai 是面向舞萌 DX 玩家的开源 Android 工具箱。">
+  <title>ChiffonMai — 舞萌 DX 工具箱</title>
+  <link rel="icon" href="../icon.png" type="image/png">
   <style>
-    /* ============================================================
-       Design tokens
-       ============================================================ */
     :root {
-      /* base palette — 深邃夜空 + 暖琥珀点睛 */
-      --bg: #0a0a0f;
-      --bg-elev: #12121a;
-      --bg-elev-2: #1a1a24;
-      --surface: rgba(255, 255, 255, 0.04);
-      --surface-hover: rgba(255, 255, 255, 0.08);
-      --border: rgba(255, 255, 255, 0.08);
-      --border-strong: rgba(255, 255, 255, 0.14);
-
-      --text: #f5f5f7;
-      --text-secondary: #b8b8c2;
-      --text-muted: #6e6e7a;
-
-      /* accent — warm chiffon */
-      --accent: #f5b942;
-      --accent-hover: #ffc95e;
-      --accent-soft: rgba(245, 185, 66, 0.15);
-
-      /* semantic */
-      --success: #4ade80;
-      --info: #60a5fa;
-      --warning: #fbbf24;
-
-      /* effects */
-      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
-      --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
-      --shadow-glow: 0 0 40px rgba(245, 185, 66, 0.25);
-
-      --radius-sm: 8px;
-      --radius-md: 14px;
-      --radius-lg: 20px;
-      --radius-xl: 28px;
-
-      --transition: 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+      --bg: #0b0c0f;
+      --panel: #121419;
+      --panel2: #181b22;
+      --ink: #f5f7fb;
+      --muted: #a2a7b3;
+      --dim: #747a88;
+      --line: #2b303a;
+      --lime: #c8f169;
+      --cyan: #8de4ee;
+      --orange: #ff916c;
+      --max: 1180px;
+      --radius: 14px
     }
 
-    /* ============================================================
-       Reset & base
-       ============================================================ */
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    * {
+      box-sizing: border-box
+    }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 78px
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      margin: 0;
       background: var(--bg);
-      color: var(--text);
-      line-height: 1.65;
-      overflow-x: hidden;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased
     }
-    img { max-width: 100%; height: auto; display: block; }
-    a { color: var(--accent); text-decoration: none; transition: color var(--transition); }
-    a:hover { color: var(--accent-hover); }
 
-    /* ============================================================
-       Animations
-       ============================================================ */
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(40px); }
-      to { opacity: 1; transform: translateY(0); }
+    a {
+      color: inherit;
+      text-decoration: none
     }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes float {
-      0%, 100% { transform: translateY(0) rotate(0deg); }
-      50% { transform: translateY(-16px) rotate(2deg); }
+
+    button {
+      font: inherit
     }
-    @keyframes shimmer {
-      0% { background-position: -200% center; }
-      100% { background-position: 200% center; }
+
+    .wrap {
+      width: min(var(--max), calc(100% - 48px));
+      margin: 0 auto
     }
-    @keyframes blob {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      33% { transform: translate(30px, -40px) scale(1.15); }
-      66% { transform: translate(-30px, 30px) scale(0.9); }
+
+    .topbar {
+      position: fixed;
+      z-index: 50;
+      inset: 0 0 auto;
+      border-bottom: 1px solid transparent;
+      background: rgba(11, 12, 15, .72);
+      backdrop-filter: blur(18px);
+      transition: .2s
     }
-    @keyframes gridShift {
-      0% { background-position: 0 0; }
-      100% { background-position: 40px 40px; }
+
+    .topbar.scrolled {
+      border-color: var(--line);
+      background: rgba(11, 12, 15, .94)
+    }
+
+    .nav {
+      display: flex;
+      height: 72px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 28px
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      letter-spacing: -.03em
+    }
+
+    .brand img {
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--line);
+      border-radius: 9px
+    }
+
+    .brand small {
+      display: block;
+      color: var(--dim);
+      font-size: 9px;
+      font-weight: 650;
+      letter-spacing: .11em;
+      line-height: 1;
+      text-transform: uppercase
+    }
+
+    .navlinks {
+      display: flex;
+      align-items: center;
+      gap: 25px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 650
+    }
+
+    .navlinks a:hover {
+      color: var(--ink)
+    }
+
+    .nav-cta,
+    .button.primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 15px;
+      color: #111;
+      background: var(--lime);
+      font-size: 13px;
+      font-weight: 800;
+      transition: .2s
+    }
+
+    .nav-cta:hover,
+    .button.primary:hover {
+      background: #dcff8b;
+      transform: translateY(-2px)
+    }
+
+    .menu {
+      display: none;
+      width: 38px;
+      height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--ink);
+      background: transparent;
+      cursor: pointer
+    }
+
+    .hero {
+      position: relative;
+      min-height: 760px;
+      padding: 166px 0 94px;
+      overflow: hidden;
+      background-image: linear-gradient(rgba(255, 255, 255, .045) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .045) 1px, transparent 1px);
+      background-size: 56px 56px;
+      background-position: center top
+    }
+
+    .hero:after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse at 50% 20%, transparent 0 40%, var(--bg) 78%)
+    }
+
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      align-items: center;
+      gap: 75px
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 23px;
+      color: var(--lime);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .15em;
+      text-transform: uppercase
+    }
+
+    .eyebrow i {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--lime);
+      box-shadow: 0 0 0 5px rgba(200, 241, 105, .12)
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0
+    }
+
+    h1 {
+      max-width: 700px;
+      margin-bottom: 25px;
+      font-size: clamp(47px, 7.5vw, 86px);
+      line-height: .99;
+      letter-spacing: -.075em
+    }
+
+    h1 em {
+      color: var(--lime);
+      font-style: normal
+    }
+
+    .hero-lead {
+      max-width: 575px;
+      margin-bottom: 32px;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.75
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin-bottom: 44px
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 15px;
+      color: var(--ink);
+      background: rgba(18, 20, 25, .8);
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: .2s
+    }
+
+    .button:hover {
+      border-color: #626979;
+      transform: translateY(-2px)
+    }
+
+    .button.ghost {
+      color: var(--muted)
+    }
+
+    .hero-metrics {
+      display: flex;
+      gap: 27px;
+      flex-wrap: wrap
+    }
+
+    .metric strong {
+      display: block;
+      color: var(--ink);
+      font-size: 20px;
+      letter-spacing: -.04em
+    }
+
+    .metric span {
+      display: block;
+      color: var(--dim);
+      font-size: 11px
+    }
+
+    .console {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(18, 20, 25, .94);
+      box-shadow: 0 30px 90px rgba(0, 0, 0, .45);
+      overflow: hidden
+    }
+
+    .console-bar {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 13px 15px;
+      border-bottom: 1px solid var(--line);
+      color: var(--dim);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 11px
+    }
+
+    .console-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #ff706c
+    }
+
+    .console-dot:nth-child(2) {
+      background: #f5c95d
+    }
+
+    .console-dot:nth-child(3) {
+      background: #9dda72
+    }
+
+    .console-title {
+      margin-left: 5px
+    }
+
+    .console-body {
+      padding: 22px 21px 20px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 12px
+    }
+
+    .command {
+      margin-bottom: 18px;
+      color: var(--muted)
+    }
+
+    .command b {
+      color: var(--lime);
+      font-weight: 500
+    }
+
+    .json {
+      display: grid;
+      gap: 5px;
+      padding: 16px;
+      border: 1px solid #303640;
+      border-radius: 10px;
+      background: #0d0f13;
+      color: #bfc5d0
+    }
+
+    .json .key {
+      color: var(--cyan)
+    }
+
+    .json .value {
+      color: var(--lime)
+    }
+
+    .score-row {
+      display: grid;
+      grid-template-columns: 1.2fr .6fr .5fr;
+      gap: 10px;
+      align-items: center;
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px
+    }
+
+    .score-row strong {
+      color: var(--ink);
+      font-size: 14px
+    }
+
+    .score-row em {
+      color: var(--orange);
+      font-style: normal;
+      font-weight: 800
+    }
+
+    .console-tag {
+      position: absolute;
+      right: -15px;
+      top: 65px;
+      padding: 10px 13px;
+      border: 1px solid #566137;
+      border-radius: 8px;
+      color: #dff9a3;
+      background: #28351b;
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+      transform: rotate(4deg)
+    }
+
+    .section {
+      padding: 112px 0;
+      border-top: 1px solid #191c22
+    }
+
+    .section.alt {
+      background: #0f1115
+    }
+
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 25px;
+      margin-bottom: 42px
+    }
+
+    .kicker {
+      margin-bottom: 13px;
+      color: var(--lime);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .15em;
+      text-transform: uppercase
+    }
+
+    .section h2 {
+      margin-bottom: 0;
+      font-size: clamp(32px, 4.8vw, 57px);
+      line-height: 1.03;
+      letter-spacing: -.07em
+    }
+
+    .section-head p {
+      max-width: 390px;
+      margin-bottom: 3px;
+      color: var(--muted);
+      font-size: 14px
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px
+    }
+
+    .feature {
+      min-height: 245px;
+      padding: 25px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      transition: .25s
+    }
+
+    .feature:hover {
+      border-color: #57606e;
+      transform: translateY(-5px);
+      background: var(--panel2)
+    }
+
+    .feature-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 44px
+    }
+
+    .feature-index {
+      color: var(--dim);
+      font-family: ui-monospace, monospace;
+      font-size: 11px
+    }
+
+    .feature-symbol {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border-radius: 9px;
+      color: #101216;
+      background: var(--lime);
+      font-size: 16px;
+      font-weight: 900
+    }
+
+    .feature:nth-child(2) .feature-symbol {
+      background: var(--cyan)
+    }
+
+    .feature:nth-child(3) .feature-symbol {
+      background: var(--orange)
+    }
+
+    .feature:nth-child(4) .feature-symbol {
+      background: #d4b4ff
+    }
+
+    .feature:nth-child(5) .feature-symbol {
+      background: #ffc85b
+    }
+
+    .feature:nth-child(6) .feature-symbol {
+      background: #89d4ff
+    }
+
+    .feature h3 {
+      margin-bottom: 9px;
+      font-size: 18px;
+      letter-spacing: -.03em
+    }
+
+    .feature p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.75
+    }
+
+    .feature code {
+      color: var(--lime);
+      font-family: ui-monospace, monospace;
+      font-size: 11px
+    }
+
+    .workflow {
+      display: grid;
+      grid-template-columns: .8fr 1.2fr;
+      align-items: center;
+      gap: 88px
+    }
+
+    .workflow-copy p {
+      max-width: 440px;
+      margin-top: 22px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.8
+    }
+
+    .steps {
+      display: grid;
+      gap: 9px
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 39px 1fr auto;
+      align-items: center;
+      gap: 16px;
+      padding: 17px 18px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel)
+    }
+
+    .step-num {
+      display: grid;
+      width: 30px;
+      height: 30px;
+      place-items: center;
+      border-radius: 7px;
+      color: #111;
+      background: var(--lime);
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+      font-weight: 900
+    }
+
+    .step:nth-child(2) .step-num {
+      background: var(--cyan)
+    }
+
+    .step:nth-child(3) .step-num {
+      background: var(--orange)
+    }
+
+    .step strong {
+      display: block;
+      font-size: 14px
+    }
+
+    .step span {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px
+    }
+
+    .step small {
+      color: var(--dim);
+      font-family: ui-monospace, monospace;
+      font-size: 10px
+    }
+
+    .data-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 13px
+    }
+
+    .data-card {
+      padding: 26px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel)
+    }
+
+    .data-card h3 {
+      margin-bottom: 8px;
+      font-size: 17px
+    }
+
+    .data-card p {
+      margin-bottom: 18px;
+      color: var(--muted);
+      font-size: 13px
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px
+    }
+
+    .chip {
+      padding: 6px 9px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: #c9ced7;
+      background: #0d0f13;
+      font-family: ui-monospace, monospace;
+      font-size: 10px
+    }
+
+    .chip.accent {
+      border-color: #556932;
+      color: var(--lime)
+    }
+
+    .privacy {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 13px
+    }
+
+    .privacy-item {
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #0d0f13
+    }
+
+    .privacy-item b {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--cyan);
+      font-size: 13px
+    }
+
+    .privacy-item span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.65
+    }
+
+    .download {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 13px
+    }
+
+    .download-main {
+      padding: 36px;
+      border: 1px solid #66733d;
+      border-radius: var(--radius);
+      background: #1d2716
+    }
+
+    .download-main h2 {
+      max-width: 500px;
+      margin-bottom: 16px
+    }
+
+    .download-main p {
+      max-width: 520px;
+      margin-bottom: 23px;
+      color: #bfcaac;
+      font-size: 14px
+    }
+
+    .download-side {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 27px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel)
+    }
+
+    .download-side h3 {
+      margin-bottom: 0;
+      font-size: 18px
+    }
+
+    .download-side p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px
+    }
+
+    .download-side a {
+      color: var(--lime);
+      font-size: 13px;
+      font-weight: 800
+    }
+
+    .button.light {
+      color: #111;
+      border-color: transparent;
+      background: var(--lime)
+    }
+
+    .button.light:hover {
+      background: #dcff8b
+    }
+
+    .faq-list {
+      max-width: 820px;
+      margin: 0 auto
+    }
+
+    .faq {
+      border-top: 1px solid var(--line)
+    }
+
+    .faq:last-child {
+      border-bottom: 1px solid var(--line)
+    }
+
+    .faq button {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      justify-content: space-between;
+      gap: 15px;
+      padding: 20px 0;
+      border: 0;
+      color: var(--ink);
+      background: transparent;
+      cursor: pointer;
+      text-align: left;
+      font-size: 14px;
+      font-weight: 750
+    }
+
+    .faq button span:last-child {
+      color: var(--lime);
+      font-size: 21px;
+      font-weight: 400;
+      transition: .2s
+    }
+
+    .faq.open button span:last-child {
+      transform: rotate(45deg)
+    }
+
+    .answer {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows .25s
+    }
+
+    .answer div {
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.8
+    }
+
+    .faq.open .answer {
+      grid-template-rows: 1fr
+    }
+
+    .faq.open .answer div {
+      padding: 0 0 20px
+    }
+
+    footer {
+      padding: 32px 0;
+      border-top: 1px solid var(--line);
+      color: var(--dim);
+      background: #08090b;
+      font-size: 11px
+    }
+
+    .footer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px
+    }
+
+    .footer-row strong {
+      color: var(--ink);
+      font-size: 14px
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 17px
+    }
+
+    .footer-links a:hover {
+      color: var(--lime)
     }
 
     .reveal {
       opacity: 0;
-      transform: translateY(40px);
-      transition: opacity 0.8s var(--transition), transform 0.8s var(--transition);
+      transform: translateY(16px);
+      transition: .65s ease
     }
-    .reveal.visible {
+
+    .reveal.show {
       opacity: 1;
-      transform: translateY(0);
-    }
-    .reveal-delay-1 { transition-delay: 0.1s; }
-    .reveal-delay-2 { transition-delay: 0.2s; }
-    .reveal-delay-3 { transition-delay: 0.3s; }
-
-    /* ============================================================
-       Layout
-       ============================================================ */
-    .container { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
-    section { padding: 80px 0; position: relative; }
-
-    /* ============================================================
-       Top nav
-       ============================================================ */
-    .topnav {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      background: rgba(10, 10, 15, 0.7);
-      border-bottom: 1px solid transparent;
-      transition: border-color var(--transition);
-    }
-    .topnav.scrolled { border-bottom-color: var(--border); }
-    .topnav-inner {
-      max-width: 1180px; margin: 0 auto; padding: 14px 24px;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; }
-    .brand img { width: 28px; height: 28px; border-radius: 6px; }
-    .nav-links { display: flex; gap: 28px; }
-    .nav-links a {
-      color: var(--text-secondary);
-      font-size: 13.5px;
-      font-weight: 500;
-    }
-    .nav-links a:hover { color: var(--text); }
-    .nav-cta {
-      padding: 8px 18px; border-radius: 100px;
-      background: var(--accent); color: #1a1100;
-      font-size: 13px; font-weight: 600;
-      transition: all var(--transition);
-    }
-    .nav-cta:hover { background: var(--accent-hover); color: #1a1100; transform: translateY(-1px); }
-
-    .nav-toggle {
-      display: none; background: transparent; border: 0; color: var(--text);
-      font-size: 22px; cursor: pointer; padding: 4px;
+      transform: none
     }
 
-    /* ============================================================
-       Hero
-       ============================================================ */
-    .hero {
-      min-height: 100vh;
-      display: flex; align-items: center; justify-content: center;
-      padding: 120px 24px 80px;
-      position: relative;
-      overflow: hidden;
-    }
-    .hero::before {
-      content: ''; position: absolute; inset: 0; z-index: 0;
-      background-image:
-        linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-      background-size: 40px 40px;
-      animation: gridShift 20s linear infinite;
-      mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
-      -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
-    }
-    .hero-blob {
-      position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.4;
-      pointer-events: none; z-index: 0;
-    }
-    .hero-blob-1 { width: 600px; height: 600px; background: var(--accent); top: -200px; right: -150px; animation: blob 25s ease-in-out infinite; }
-    .hero-blob-2 { width: 500px; height: 500px; background: #6e3aff; bottom: -200px; left: -150px; animation: blob 30s ease-in-out infinite reverse; }
-
-    .hero-content { position: relative; z-index: 1; text-align: center; max-width: 880px; }
-    .hero-badge {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 6px 14px; border-radius: 100px;
-      background: var(--surface); border: 1px solid var(--border);
-      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-      font-size: 12.5px; color: var(--text-secondary);
-      margin-bottom: 28px;
-    }
-    .hero-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); animation: pulse 2s infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-
-    .hero-icon {
-      width: 112px; height: 112px; border-radius: 26px;
-      box-shadow: var(--shadow-glow), var(--shadow-md);
-      margin: 0 auto 32px;
-      animation: float 5s ease-in-out infinite;
-    }
-
-    .hero h1 {
-      font-size: clamp(40px, 7vw, 72px);
-      font-weight: 800;
-      letter-spacing: -2px;
-      line-height: 1.05;
-      margin-bottom: 24px;
-    }
-    .hero h1 .grad {
-      background: linear-gradient(135deg, var(--accent), #ff7e5f);
-      -webkit-background-clip: text; background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .hero p.sub {
-      font-size: clamp(15px, 2vw, 19px);
-      color: var(--text-secondary);
-      max-width: 620px; margin: 0 auto 36px;
-      line-height: 1.6;
-    }
-
-    .hero-actions {
-      display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
-      margin-bottom: 48px;
-    }
-    .btn {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 14px 28px; border-radius: 100px;
-      font-size: 15px; font-weight: 600;
-      cursor: pointer; transition: all var(--transition);
-      border: 0; text-decoration: none;
-    }
-    .btn-primary { background: var(--accent); color: #1a1100; box-shadow: 0 4px 20px rgba(245, 185, 66, 0.35); }
-    .btn-primary:hover { background: var(--accent-hover); transform: translateY(-2px); box-shadow: 0 8px 28px rgba(245, 185, 66, 0.45); color: #1a1100; }
-    .btn-ghost { background: var(--surface); color: var(--text); border: 1px solid var(--border); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-    .btn-ghost:hover { background: var(--surface-hover); border-color: var(--border-strong); transform: translateY(-2px); color: var(--text); }
-
-    .hero-stats { display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; }
-    .hero-stat { text-align: center; }
-    .hero-stat .num {
-      font-size: 28px; font-weight: 800;
-      background: linear-gradient(135deg, var(--accent), #ff7e5f);
-      -webkit-background-clip: text; background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .hero-stat .label { font-size: 12px; color: var(--text-muted); margin-top: 2px; letter-spacing: 0.5px; }
-
-    /* ============================================================
-       Section header
-       ============================================================ */
-    .section-header { text-align: center; margin-bottom: 56px; }
-    .section-tag {
-      display: inline-block; padding: 4px 12px; border-radius: 100px;
-      background: var(--accent-soft); color: var(--accent);
-      font-size: 12px; font-weight: 600;
-      margin-bottom: 16px; letter-spacing: 0.5px;
-    }
-    .section-header h2 {
-      font-size: clamp(28px, 4vw, 40px); font-weight: 700;
-      letter-spacing: -0.5px; margin-bottom: 12px;
-    }
-    .section-header p {
-      color: var(--text-secondary); font-size: 16px;
-      max-width: 560px; margin: 0 auto;
-    }
-
-    /* ============================================================
-       Feature cards (5 tabs)
-       ============================================================ */
-    .features-section { padding: 80px 0; }
-    .tabs-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 16px;
-    }
-    .feature-card {
-      background: var(--bg-elev);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 28px;
-      transition: all var(--transition);
-      position: relative;
-      overflow: hidden;
-    }
-    .feature-card::before {
-      content: ''; position: absolute; inset: 0;
-      background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), var(--accent-soft), transparent 40%);
-      opacity: 0; transition: opacity var(--transition);
-      pointer-events: none;
-    }
-    .feature-card:hover {
-      border-color: var(--border-strong);
-      transform: translateY(-4px);
-    }
-    .feature-card:hover::before { opacity: 1; }
-
-    .feature-icon {
-      width: 48px; height: 48px;
-      display: inline-flex; align-items: center; justify-content: center;
-      background: var(--accent-soft);
-      color: var(--accent);
-      border-radius: 12px;
-      font-size: 22px;
-      margin-bottom: 18px;
-    }
-    .feature-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
-    .feature-card .card-desc { color: var(--text-secondary); font-size: 14px; line-height: 1.55; margin-bottom: 18px; }
-    .feature-list { list-style: none; padding: 0; }
-    .feature-list li {
-      display: flex; align-items: center; gap: 8px;
-      padding: 6px 0; color: var(--text-secondary); font-size: 13.5px;
-    }
-    .feature-list li::before {
-      content: ''; width: 4px; height: 4px; border-radius: 50%;
-      background: var(--accent); flex-shrink: 0;
-    }
-
-    /* ============================================================
-       Highlight blocks (sync flow, etc.)
-       ============================================================ */
-    .highlight {
-      background: var(--bg-elev);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-xl);
-      padding: 48px;
-      position: relative;
-      overflow: hidden;
-    }
-    .highlight::before {
-      content: ''; position: absolute; top: -100px; right: -100px;
-      width: 300px; height: 300px; border-radius: 50%;
-      background: var(--accent); filter: blur(120px); opacity: 0.15;
-    }
-    .highlight-content { position: relative; z-index: 1; }
-    .highlight h3 { font-size: 28px; font-weight: 700; margin-bottom: 12px; }
-    .highlight > p { color: var(--text-secondary); font-size: 16px; max-width: 640px; }
-
-    .flow-steps {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 16px;
-      margin-top: 36px;
-    }
-    .step {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      padding: 22px 18px;
-      text-align: center;
-      transition: all var(--transition);
-    }
-    .step:hover { transform: translateY(-4px); border-color: var(--accent); }
-    .step-num {
-      width: 36px; height: 36px;
-      display: inline-flex; align-items: center; justify-content: center;
-      background: linear-gradient(135deg, var(--accent), #ff7e5f);
-      color: #1a1100; font-weight: 700; font-size: 15px;
-      border-radius: 50%;
-      margin-bottom: 12px;
-    }
-    .step-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
-    .step-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
-
-    /* ============================================================
-       Data sources / architecture
-       ============================================================ */
-    .sources-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 16px;
-    }
-    .source-card {
-      background: var(--bg-elev);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      padding: 24px;
-      transition: all var(--transition);
-    }
-    .source-card:hover { border-color: var(--border-strong); transform: translateY(-3px); }
-    .source-name { font-size: 16px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
-    .source-desc { color: var(--text-secondary); font-size: 13px; line-height: 1.55; }
-
-    .arch-block {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      padding: 24px;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 12.5px;
-      line-height: 1.85;
-      color: var(--text-secondary);
-      white-space: pre-wrap;
-      overflow-x: auto;
-    }
-    .arch-block strong { color: var(--accent); font-weight: 600; }
-
-    /* ============================================================
-       Tech badges
-       ============================================================ */
-    .tech-stack {
-      display: flex; gap: 10px; justify-content: center;
-      flex-wrap: wrap;
-    }
-    .tech-badge {
-      background: var(--bg-elev);
-      border: 1px solid var(--border);
-      border-radius: 100px;
-      padding: 9px 20px;
-      font-size: 13.5px; font-weight: 500;
-      display: inline-flex; align-items: center; gap: 8px;
-      transition: all var(--transition);
-    }
-    .tech-badge:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
-
-    /* ============================================================
-       Download + support
-       ============================================================ */
-    .download-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 20px;
-      max-width: 720px; margin: 0 auto;
-    }
-    .download-card {
-      background: var(--bg-elev);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 36px 28px;
-      text-align: center;
-      transition: all var(--transition);
-    }
-    .download-card:hover { transform: translateY(-4px); border-color: var(--border-strong); }
-    .download-card .platform-icon { font-size: 48px; margin-bottom: 14px; }
-    .download-card h3 { font-size: 19px; font-weight: 700; margin-bottom: 8px; }
-    .download-card p { color: var(--text-secondary); font-size: 14px; margin-bottom: 20px; }
-    .download-card.coming-soon { opacity: 0.55; }
-    .download-card.coming-soon:hover { transform: none; }
-    .coming-tag { display: inline-block; background: var(--bg); color: var(--text-muted); font-size: 13px; padding: 8px 22px; border-radius: 100px; border: 1px solid var(--border); }
-
-    .support-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 20px;
-      max-width: 760px; margin: 0 auto;
-    }
-    .support-card {
-      background: var(--bg-elev);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 32px 28px;
-      text-align: center;
-    }
-    .support-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
-    .support-card p { color: var(--text-secondary); font-size: 14px; margin-bottom: 18px; }
-    .support-qr { width: 180px; height: 180px; border-radius: var(--radius-sm); margin: 0 auto; box-shadow: var(--shadow-sm); }
-
-    /* ============================================================
-       Credits
-       ============================================================ */
-    .credits-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 12px;
-    }
-    .credit-item {
-      background: var(--bg-elev);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      padding: 14px 18px;
-      font-size: 13px;
-      color: var(--text-secondary);
-      transition: all var(--transition);
-    }
-    .credit-item:hover { border-color: var(--accent); transform: translateY(-2px); }
-    .credit-item strong { color: var(--text); font-weight: 600; }
-    .credit-item a { color: inherit; }
-    .credit-item a strong { color: var(--accent); }
-
-    /* ============================================================
-       FAQ
-       ============================================================ */
-    .faq-list { max-width: 760px; margin: 0 auto; }
-    .faq-item {
-      background: var(--bg-elev);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      margin-bottom: 10px;
-      overflow: hidden;
-      transition: border-color var(--transition);
-    }
-    .faq-item:hover { border-color: var(--border-strong); }
-    .faq-q {
-      padding: 18px 22px;
-      font-size: 15px; font-weight: 600;
-      cursor: pointer; user-select: none;
-      display: flex; justify-content: space-between; align-items: center; gap: 16px;
-    }
-    .faq-q .arrow {
-      width: 24px; height: 24px;
-      display: flex; align-items: center; justify-content: center;
-      transition: transform 0.3s ease; color: var(--text-muted);
-      flex-shrink: 0;
-    }
-    .faq-a {
-      max-height: 0; overflow: hidden;
-      transition: max-height 0.35s ease;
-      color: var(--text-secondary); font-size: 14px; line-height: 1.75;
-    }
-    .faq-a-inner { padding: 0 22px 18px; }
-    .faq-item.open .faq-a { max-height: 600px; }
-    .faq-item.open .arrow { transform: rotate(180deg); color: var(--accent); }
-
-    /* ============================================================
-       Footer
-       ============================================================ */
-    footer {
-      padding: 48px 24px;
-      border-top: 1px solid var(--border);
-      background: var(--bg-elev);
-      text-align: center;
-    }
-    .footer-inner { max-width: 1180px; margin: 0 auto; }
-    .footer-links { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin: 14px 0; }
-    .footer-links a { color: var(--text-secondary); font-size: 13px; }
-    .footer-links a:hover { color: var(--accent); }
-    .footer-meta { color: var(--text-muted); font-size: 12.5px; line-height: 1.8; margin-top: 16px; }
-
-    /* ============================================================
-       Back to top
-       ============================================================ */
-    .back-to-top {
-      position: fixed; bottom: 28px; right: 28px;
-      width: 44px; height: 44px;
-      background: var(--accent); color: #1a1100;
-      border: 0; border-radius: 50%;
-      cursor: pointer; font-size: 20px;
-      display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 8px 24px rgba(245, 185, 66, 0.4);
-      opacity: 0; transform: translateY(20px); pointer-events: none;
-      transition: all var(--transition);
-      z-index: 50;
-    }
-    .back-to-top.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
-    .back-to-top:hover { transform: translateY(-4px); }
-
-    /* ============================================================
-       Responsive
-       ============================================================ */
-    @media (max-width: 768px) {
-      .nav-links { display: none; }
-      .nav-toggle { display: block; }
-      .nav-links.open {
-        display: flex; flex-direction: column;
-        position: absolute; top: 100%; left: 0; right: 0;
-        background: var(--bg-elev); padding: 16px 24px;
-        border-bottom: 1px solid var(--border);
+    @media(max-width:900px) {
+      .navlinks {
+        display: none;
+        position: absolute;
+        inset: 72px 24px auto;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        padding: 9px 16px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #13161b;
+        box-shadow: 0 20px 50px #000
       }
-      section { padding: 56px 0; }
-      .hero { padding: 100px 20px 60px; min-height: auto; }
-      .hero-stats { gap: 20px; }
-      .hero-stat .num { font-size: 22px; }
-      .highlight { padding: 28px 22px; }
-      .highlight h3 { font-size: 22px; }
-      .download-card, .support-card { padding: 24px 18px; }
+
+      .navlinks.open {
+        display: flex
+      }
+
+      .navlinks a {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--line)
+      }
+
+      .navlinks a:last-child {
+        border-bottom: 0
+      }
+
+      .menu {
+        display: block
+      }
+
+      .nav-cta {
+        display: none
+      }
+
+      .hero-inner,
+      .workflow {
+        grid-template-columns: 1fr;
+        gap: 52px
+      }
+
+      .hero {
+        min-height: auto;
+        padding-top: 135px
+      }
+
+      .console {
+        max-width: 650px
+      }
+
+      .feature-grid {
+        grid-template-columns: repeat(2, 1fr)
+      }
+
+      .download {
+        grid-template-columns: 1fr
+      }
     }
-    @media (max-width: 480px) {
-      .hero h1 { font-size: 32px; }
-      .hero-actions { flex-direction: column; align-items: stretch; }
-      .btn { justify-content: center; }
-      .hero-stats { gap: 14px; }
-      .hero-stat .num { font-size: 18px; }
-      .arch-block { padding: 16px; font-size: 11px; }
+
+    @media(max-width:560px) {
+      .wrap {
+        width: min(var(--max), calc(100% - 36px))
+      }
+
+      .hero {
+        padding-bottom: 75px;
+        background-size: 42px 42px
+      }
+
+      .hero-inner {
+        gap: 38px
+      }
+
+      h1 {
+        font-size: 49px
+      }
+
+      .hero-lead {
+        font-size: 16px
+      }
+
+      .hero-actions {
+        align-items: stretch;
+        flex-direction: column
+      }
+
+      .hero-actions .button {
+        width: 100%
+      }
+
+      .hero-metrics {
+        gap: 18px
+      }
+
+      .console-body {
+        padding: 16px 14px;
+        font-size: 10px
+      }
+
+      .score-row {
+        grid-template-columns: 1fr .6fr
+      }
+
+      .score-row span:last-child {
+        display: none
+      }
+
+      .console-tag {
+        right: 7px;
+        top: 61px
+      }
+
+      .section {
+        padding: 78px 0
+      }
+
+      .section-head {
+        display: block
+      }
+
+      .section-head p {
+        margin-top: 15px
+      }
+
+      .feature-grid,
+      .data-layout {
+        grid-template-columns: 1fr
+      }
+
+      .feature {
+        min-height: 0
+      }
+
+      .feature-top {
+        margin-bottom: 28px
+      }
+
+      .workflow {
+        gap: 35px
+      }
+
+      .step {
+        grid-template-columns: 34px 1fr
+      }
+
+      .step small {
+        display: none
+      }
+
+      .privacy {
+        grid-template-columns: 1fr
+      }
+
+      .download-main {
+        padding: 27px 22px
+      }
+
+      .footer-row {
+        align-items: flex-start;
+        flex-direction: column
+      }
     }
   </style>
 </head>
+
 <body>
-
-  <!-- ===== Top nav ===== -->
-  <nav class="topnav" id="topnav">
-    <div class="topnav-inner">
-      <a href="#sec-hero" class="brand">
-        <img src="icon.png" alt="ChiffonMai">
-        <span>ChiffonMai</span>
-      </a>
-      <div class="nav-links" id="navLinks">
-        <a href="#sec-features">功能</a>
-        <a href="#sec-sync">同步</a>
-        <a href="#sec-arch">架构</a>
-        <a href="#sec-tech">技术</a>
-        <a href="#sec-faq">FAQ</a>
-      </div>
-      <button class="nav-toggle" id="navToggle" aria-label="菜单">☰</button>
-      <a class="nav-cta" href="#sec-down">立即下载</a>
+  <header class="topbar" id="topbar">
+    <div class="wrap nav"><a class="brand" href="#top" aria-label="ChiffonMai 首页"><img src="../icon.png"
+          alt="ChiffonMai 图标"><span>ChiffonMai<small>maimai DX toolkit</small></span></a>
+      <nav class="navlinks" id="navlinks" aria-label="主导航"><a href="#features">功能</a><a href="#workflow">工作流</a><a
+          href="#data">数据与隐私</a><a href="#faq">FAQ</a></nav><a class="nav-cta" href="#download">获取 Android 版 <span
+          aria-hidden="true">↗</span></a><button class="menu" id="menu" aria-label="打开菜单"
+        aria-expanded="false">☰</button>
     </div>
-  </nav>
-
-  <!-- ===== Hero ===== -->
-  <section class="hero" id="sec-hero">
-    <div class="hero-blob hero-blob-1"></div>
-    <div class="hero-blob hero-blob-2"></div>
-
-    <div class="hero-content">
-      <div class="hero-badge">
-        <span class="dot"></span>
-        v2.0.0 预更新 · 全新视觉
+  </header>
+  <main id="top">
+    <section class="hero">
+      <div class="wrap hero-inner">
+        <div class="reveal">
+          <div class="eyebrow"><i></i> Open source / maimai DX</div>
+          <h1>让每次游玩，<br><em>都有迹可循。</em></h1>
+          <p class="hero-lead">ChiffonMai 是面向舞萌 DX 玩家的 Android 工具箱：查曲目与谱面、分析成绩、规划上分、管理收藏，也能在应用内播放和导出谱面。</p>
+          <div class="hero-actions"><a class="button primary" href="#download">下载 Android 版 <span
+                aria-hidden="true">→</span></a><a class="button ghost" href="https://github.com/ChiffonOwO/ChiffonMai"
+              target="_blank" rel="noreferrer">查看 GitHub <span aria-hidden="true">↗</span></a></div>
+          <div class="hero-metrics">
+            <div class="metric"><strong>本地优先</strong><span>计算与收藏留在设备</span></div>
+            <div class="metric"><strong>多数据源</strong><span>水鱼 / 落雪 / AWMC NET</span></div>
+            <div class="metric"><strong>开源</strong><span>MIT License</span></div>
+          </div>
+        </div>
+        <div class="console reveal">
+          <div class="console-bar"><i class="console-dot"></i><i class="console-dot"></i><i
+              class="console-dot"></i><span class="console-title">chiffonmai / score-inspector</span></div>
+          <div class="console-body">
+            <div class="command"><b>$</b> refresh --source diving-fish</div>
+            <div class="json"><span>{</span><span>&nbsp;&nbsp;<span class="key">"song"</span>: <span
+                  class="value">"MarbleBlue."</span>,</span><span>&nbsp;&nbsp;<span class="key">"chart"</span>: <span
+                  class="value">"MASTER 14"</span>,</span><span>&nbsp;&nbsp;<span class="key">"achievement"</span>:
+                <span class="value">"101.0000%"</span>,</span><span>&nbsp;&nbsp;<span class="key">"source"</span>: <span
+                  class="value">"Diving-Fish"</span></span><span>}</span></div>
+            <div class="score-row"><strong>Best50</strong><span>Rating <em>16600</em></span><span>UPDATED NOW</span>
+            </div>
+          </div>
+          <div class="console-tag">SYNCED</div>
+        </div>
       </div>
-      <img class="hero-icon" src="icon.png" alt="ChiffonMai">
-      <h1><span class="grad">Chiffon</span>Mai</h1>
-      <p class="sub">
-        专为舞萌 DX 玩家打造的一站式工具箱<br>
-        50+ 实用功能，从曲库查询到谱面播放，从猜歌对战到多维排行
-      </p>
-      <div class="hero-actions">
-        <a class="btn btn-primary" href="#sec-down">⬇ 免费下载</a>
-        <a class="btn btn-ghost" href="https://github.com/ChiffonOwO/ChiffonMai" target="_blank">⭐ Star on GitHub</a>
+    </section>
+    <section class="section" id="features">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div>
+            <div class="kicker">What you can do</div>
+            <h2>常用操作，<br>集中在一个入口。</h2>
+          </div>
+          <p>从找歌到复盘，从收藏到同步。每个功能都对应真实的应用页面和服务。</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature reveal">
+            <div class="feature-top"><span class="feature-index">01 / DISCOVER</span><span
+                class="feature-symbol">⌕</span></div>
+            <h3>曲目与谱面</h3>
+            <p>搜索歌曲、别名和版本，查看难度、定数、maidata；支持在应用内解析并播放谱面。</p>
+          </article>
+          <article class="feature reveal">
+            <div class="feature-top"><span class="feature-index">02 / ANALYZE</span><span
+                class="feature-symbol">↗</span></div>
+            <h3>成绩与 Best50</h3>
+            <p>查看游玩记录、Rating、Best50 和成绩历史，导出 Best50、牌子进度与个性化成绩长图。</p>
+          </article>
+          <article class="feature reveal">
+            <div class="feature-top"><span class="feature-index">03 / PLAN</span><span class="feature-symbol">◎</span>
+            </div>
+            <h3>推荐与计算</h3>
+            <p>按标签、目标 Rating 或定数区间找谱面，也可以使用达成率反推和单曲 Rating 计算。</p>
+          </article>
+          <article class="feature reveal">
+            <div class="feature-top"><span class="feature-index">04 / COLLECT</span><span
+                class="feature-symbol">♡</span></div>
+            <h3>收藏与资料</h3>
+            <p>创建收藏夹、查看收藏品解锁条件，记录谱面笔记，并在设备之间交换收藏夹文件。</p>
+          </article>
+          <article class="feature reveal">
+            <div class="feature-top"><span class="feature-index">05 / PLAY</span><span class="feature-symbol">▷</span>
+            </div>
+            <h3>谱面播放与猜歌</h3>
+            <p>支持自定义谱面播放、无提示猜歌、曲绘和歌曲片段猜歌，以及 WebSocket 多人对战。</p>
+          </article>
+          <article class="feature reveal">
+            <div class="feature-top"><span class="feature-index">06 / SYNC</span><span class="feature-symbol">⇄</span>
+            </div>
+            <h3>成绩同步</h3>
+            <p>可从机台 QR 码获取数据，并将成绩同步到水鱼、落雪或 AWMC NET；同步过程显示统计。</p>
+          </article>
+        </div>
       </div>
-      <div class="hero-stats">
-        <div class="hero-stat"><div class="num">50+</div><div class="label">实用功能</div></div>
-        <div class="hero-stat"><div class="num">5</div><div class="label">主分类</div></div>
-        <div class="hero-stat"><div class="num">6+</div><div class="label">猜歌模式</div></div>
-        <div class="hero-stat"><div class="num">14</div><div class="label">排行榜维度</div></div>
-        <div class="hero-stat"><div class="num">3</div><div class="label">别名数据源</div></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== Features (5 tabs) ===== -->
-  <section class="features-section" id="sec-features">
-    <div class="container">
-      <div class="section-header reveal">
-        <span class="section-tag">核心功能</span>
-        <h2>一个 App，覆盖舞萌玩家的所有需求</h2>
-        <p>5 大主分类，50+ 功能，覆盖查询、统计、推荐、社交全场景</p>
-      </div>
-
-      <div class="tabs-grid">
-
-        <div class="feature-card reveal">
-          <div class="feature-icon">🎶</div>
-          <h3>曲库与数据</h3>
-          <p class="card-desc">查歌、查分、查收藏、查百科 — 围绕舞萌数据的全能查询工具。</p>
-          <ul class="feature-list">
-            <li>乐曲查询（中/日/英 + 别名）</li>
-            <li>成绩查询 + 单曲判定详情</li>
-            <li>牌子进度（白极/将/神）</li>
-            <li>收藏品查询（称号/名牌/背景/面板）</li>
-            <li>舞萌百科（术语/机制/社区黑话）</li>
-            <li>谱面 maidata 源码查看 + 内嵌播放</li>
-          </ul>
+    </section>
+    <section class="section alt" id="workflow">
+      <div class="wrap workflow">
+        <div class="workflow-copy reveal">
+          <div class="kicker">A predictable flow</div>
+          <h2>从一次刷新，<br>到完整复盘。</h2>
+          <p>把数据源、分析工具和导出结果放在同一条路径里。你可以只查一首歌，也可以一次整理完整的成绩库。</p>
         </div>
-
-        <div class="feature-card reveal reveal-delay-1">
-          <div class="feature-icon">🏆</div>
-          <h3>Best50 与排行榜</h3>
-          <p class="card-desc">多角度审视你的成绩 — 从当前最佳到潜在上限，从个人到全网。</p>
-          <ul class="feature-list">
-            <li>Best50 / Best35+15 / 拟合 / 个性化</li>
-            <li>一键导出精美长图分享</li>
-            <li>14 种排行榜（绝赞/物量/定数差值/BPM …）</li>
-            <li>总 Rating / 水鱼 / 落雪 三榜</li>
-            <li>参与/退出可选，隐私保护</li>
-          </ul>
-        </div>
-
-        <div class="feature-card reveal reveal-delay-2">
-          <div class="feature-icon">🎮</div>
-          <h3>猜歌游戏</h3>
-          <p class="card-desc">6 种单人模式 + 多人实时对战，WebSocket 全双工通信。</p>
-          <ul class="feature-list">
-            <li>无提示 / 部分曲绘 / 模糊曲绘</li>
-            <li>歌曲片段 / 别名 / 开字母</li>
-            <li>创建房间 · 邀请好友 · 实时计分板</li>
-            <li>难度自定 / 限时可选</li>
-          </ul>
-        </div>
-
-        <div class="feature-card reveal reveal-delay-3">
-          <div class="feature-icon">🧮</div>
-          <h3>实用工具</h3>
-          <p class="card-desc">从打歌到游玩规划，一站式覆盖你的日常需求。</p>
-          <ul class="feature-list">
-            <li>Rating / 达成率 / 反推 / 版本对照</li>
-            <li>标签推荐 / 目标 Rating / 定数区间推荐</li>
-            <li>随机选曲 / 每日推荐</li>
-            <li>曲绘识别（拍照识曲）</li>
-            <li>结算画面识别（OCR 抓成绩）</li>
-            <li>定数分布 / 好友对比 / 收藏夹管理</li>
-            <li>KALEIDXSCOPE 五色门进度</li>
-            <li>全国 + 全球音游街机地图</li>
-          </ul>
-        </div>
-
-        <div class="feature-card reveal">
-          <div class="feature-icon">⚙️</div>
-          <h3>系统与社交</h3>
-          <p class="card-desc">数据管理、主题定制、社区互动，让 App 真正属于你。</p>
-          <ul class="feature-list">
-            <li>多数据源（水鱼 + 落雪）</li>
-            <li>同步 / 备份 / 刷新 / 高级刷新</li>
-            <li>评论 + 谱面评分（含敏感词过滤）</li>
-            <li>浅色 / 深色 / 自定义主题</li>
-            <li>服务器状态监控</li>
-            <li>收藏夹 / 留言 / 友情链接</li>
-          </ul>
-        </div>
-
-        <div class="feature-card reveal reveal-delay-1">
-          <div class="feature-icon">🎵</div>
-          <h3>谱面播放</h3>
-          <p class="card-desc">在手机上直接播放舞萌谱面 — 不只是看，是体验。</p>
-          <ul class="feature-list">
-            <li>解析本地 maidata.txt</li>
-            <li>可视化渲染（谱面预览）</li>
-            <li>支持自定义谱面播放</li>
-            <li>关联推荐选曲</li>
-          </ul>
-        </div>
-
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== Sync highlight ===== -->
-  <section id="sec-sync">
-    <div class="container">
-      <div class="highlight reveal">
-        <div class="highlight-content">
-          <h3>📡 一键同步水鱼 / 落雪</h3>
-          <p>基于 maimai-score-hub 服务，从机台扫码到推送官方成绩，全流程无需手动。进度条实时显示当前阶段。</p>
-
-          <div class="flow-steps">
-            <div class="step"><div class="step-num">1</div><div class="step-title">机台扫码</div><div class="step-desc">复制 SGWCMAID 开头的完整字符串</div></div>
-            <div class="step"><div class="step-num">2</div><div class="step-title">Bot 加好友</div><div class="step-desc">App 自动连接 Hub，发送好友请求</div></div>
-            <div class="step"><div class="step-num">3</div><div class="step-title">抓取 NET 成绩</div><div class="step-desc">Hub 服务读取官方游玩数据</div></div>
-            <div class="step"><div class="step-num">4</div><div class="step-title">推送 + 刷新本地</div><div class="step-desc">推水鱼 / 落雪 + 更新 Best50</div></div>
-            <div class="step"><div class="step-num">✓</div><div class="step-title">导出长图</div><div class="step-desc">一键生成精美 Best50 长图</div></div>
+        <div class="steps reveal">
+          <div class="step"><b class="step-num">01</b>
+            <div><strong>选择数据源</strong><span>水鱼、落雪、AWMC NET，或使用本地缓存</span></div><small>SELECT</small>
+          </div>
+          <div class="step"><b class="step-num">02</b>
+            <div><strong>刷新并分析</strong><span>更新歌曲、谱面、成绩与收藏品数据</span></div><small>REFRESH</small>
+          </div>
+          <div class="step"><b class="step-num">03</b>
+            <div><strong>行动或导出</strong><span>推荐下一首、播放谱面、同步成绩或导出图片</span></div><small>ACT</small>
           </div>
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- ===== Data sources ===== -->
-  <section>
-    <div class="container">
-      <div class="section-header reveal">
-        <span class="section-tag">数据来源</span>
-        <h2>多源数据，全部为你聚合</h2>
-        <p>支持 Diving-Fish 与 落雪咖啡屋双数据源，并整合多家第三方服务</p>
-      </div>
-
-      <div class="sources-grid reveal">
-        <div class="source-card">
-          <div class="source-name">🐟 Diving-Fish 水鱼</div>
-          <div class="source-desc">曲库、玩家记录、Best50。QQ 号即可查询，数据全面。</div>
+    </section>
+    <section class="section" id="data">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div>
+            <div class="kicker">Data, on your terms</div>
+            <h2>数据源清楚，<br>边界也清楚。</h2>
+          </div>
+          <p>第三方服务负责提供公开数据和同步接口，应用内的计算、收藏与设置由你控制。</p>
         </div>
-        <div class="source-card">
-          <div class="source-name">❄️ 落雪咖啡屋</div>
-          <div class="source-desc">曲库、收藏品、音源、玩家记录。OAuth 2.0 授权，实时性更高。</div>
+        <div class="data-layout">
+          <article class="data-card reveal">
+            <h3>连接的数据源</h3>
+            <p>根据需要选择来源，不同服务提供不同的歌曲、成绩和收藏数据。</p>
+            <div class="chips"><span class="chip accent">Diving-Fish / 水鱼</span><span class="chip">LXNS / 落雪</span><span
+                class="chip">AWMC NET</span><span class="chip">DXRating.net</span><span class="chip">Union</span><span
+                class="chip">maimai-score-hub</span></div>
+          </article>
+          <article class="data-card reveal">
+            <h3>本地优先的工作方式</h3>
+            <p>账号绑定只用于对应的数据同步；应用的计算、收藏夹和大部分偏好保存在本地。</p>
+            <div class="chips"><span class="chip">Rating 计算</span><span class="chip">Best50 分析</span><span
+                class="chip">收藏夹</span><span class="chip">谱面缓存</span><span class="chip">播放设置</span></div>
+          </article>
         </div>
-        <div class="source-card">
-          <div class="source-name">📊 DXRating.net</div>
-          <div class="source-desc">谱面标签、别名、全量 dxdata。智能推荐的燃料。</div>
-        </div>
-        <div class="source-card">
-          <div class="source-name">🌐 Union</div>
-          <div class="source-desc">全量歌曲元数据（cn/jp 地区、releaseDate）。</div>
-        </div>
-        <div class="source-card">
-          <div class="source-name">🔌 maimai-score-hub</div>
-          <div class="source-desc">QR 码成绩同步中间层（WebSocket）。</div>
-        </div>
-        <div class="source-card">
-          <div class="source-name">🟢 AWMC Status</div>
-          <div class="source-desc">舞萌服务器运行状态监控，避免白跑。</div>
+        <div class="privacy">
+          <div class="privacy-item reveal"><b>01 / 公开数据</b><span>曲库、谱面标签、别名和排行榜来自项目接入的数据服务。</span></div>
+          <div class="privacy-item reveal"><b>02 / 私人数据</b><span>账号凭据用于请求授权或同步，不用于应用内广告画像。</span></div>
+          <div class="privacy-item reveal"><b>03 / 你来导出</b><span>谱面包、图片和收藏交换文件由你主动生成，路径会在页面中提示。</span></div>
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- ===== Architecture ===== -->
-  <section id="sec-arch">
-    <div class="container">
-      <div class="section-header reveal">
-        <span class="section-tag">架构</span>
-        <h2>清晰分层，干净高效</h2>
-        <p>本地处理敏感计算，云端承担社交与排行</p>
-      </div>
-
-      <div class="arch-block reveal"><strong>📱 本地层</strong> · Flutter / Dart
-  ├─ 本地存储（SharedPreferences）
-  │   ├─ QQ / 授权码 / ImportToken
-  │   ├─ 排行榜设置 / 收藏夹 / 配置偏好
-  │   └─ 歌曲 / maidata / diff 缓存
-  ├─ 本地计算引擎
-  │   ├─ Rating 计算 / 达成率核算 / 反推
-  │   ├─ Best50 拟合 / 个性化 / 猜歌逻辑
-  │   └─ 谱面 maidata 解析 + 播放
-  └─ UI 渲染层
-
-<strong style="color: var(--info);">🌐 第三方数据源</strong> · 直连
-  ├─ Diving-Fish 水鱼       → 曲库 / 记录 / Best50
-  ├─ 落雪咖啡屋 (LXNS)     → 曲库 / 收藏品 / 记录
-  ├─ DXRating.net          → 标签 / 别名 / dxdata
-  ├─ Union (godserver.cn)  → 全量歌曲元数据
-  ├─ AWMC status           → 服务器状态
-  └─ maimai-score-hub      → QR 码同步（WebSocket）
-
-<strong>🖥️ 自家后端</strong> · Node.js · chiffonmai.cloud
-  ├─ RESTful API（Express）
-  │   ├─ /api/prober/*       — OAuth 代理换票
-  │   ├─ /api/rankings/*     — 总/水鱼/落雪 Rating 榜
-  │   ├─ /api/song-rankings/* — 单曲达成率 / DX 分榜
-  │   ├─ /api/comments/*     — 歌曲评论
-  │   ├─ /api/ratings/*      — 谱面评分
-  │   ├─ /api/kaleidxscope/* — 万花镜门进度
-  │   └─ /api/knowledge      — 舞萌百科词条
-  ├─ 存储层
-  │   ├─ MySQL — 持久化数据
-  │   └─ Redis — 缓存 + ZSet 排行 + 播放量
-  └─ WebSocket 服务器 — 多人猜歌实时对战</div>
-    </div>
-  </section>
-
-  <!-- ===== Tech stack ===== -->
-  <section id="sec-tech">
-    <div class="container">
-      <div class="section-header reveal">
-        <span class="section-tag">技术栈</span>
-        <h2>现代化跨平台技术构建</h2>
-      </div>
-
-      <div class="tech-stack reveal">
-        <span class="tech-badge">🦋 Flutter</span>
-        <span class="tech-badge">🎯 Dart</span>
-        <span class="tech-badge">📱 Android</span>
-        <span class="tech-badge">🍎 iOS</span>
-        <span class="tech-badge">🟢 Node.js</span>
-        <span class="tech-badge">🌐 RESTful</span>
-        <span class="tech-badge">🔌 WebSocket</span>
-        <span class="tech-badge">🗄️ MySQL</span>
-        <span class="tech-badge">⚡ Redis</span>
-        <span class="tech-badge">📡 maimai-score-hub</span>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== Download ===== -->
-  <section id="sec-down">
-    <div class="container">
-      <div class="section-header reveal">
-        <span class="section-tag">下载</span>
-        <h2>完全免费，即刻体验</h2>
-      </div>
-
-      <div class="download-grid reveal">
-        <div class="download-card">
-          <div class="platform-icon">🤖</div>
-          <h3>Android</h3>
-          <p>下载 APK 直接安装<br>支持 Android 5.0+</p>
-          <a class="btn btn-primary" href="https://wward.lanzouw.com/chiffonmai" target="_blank">📦 蓝奏云下载</a>
+    </section>
+    <section class="section alt" id="download">
+      <div class="wrap download reveal">
+        <div class="download-main">
+          <div class="kicker">Available today</div>
+          <h2>现在开始整理<br>你的下一次游玩。</h2>
+          <p>当前提供 Android 版本。通过蓝奏云获取 APK，或在 GitHub 查看源码、Issue 和更新。</p><a class="button light"
+            href="https://wward.lanzouw.com/chiffonmai" target="_blank" rel="noreferrer">下载 APK <span
+              aria-hidden="true">↗</span></a>
         </div>
-        <div class="download-card coming-soon">
-          <div class="platform-icon">🍎</div>
-          <h3>iOS</h3>
-          <p>正在尽力协调上架中<br>暂时仅 Android 可用</p>
-          <span class="coming-tag">⏳ 敬请期待</span>
+        <div class="download-side">
+          <h3>开源项目</h3>
+          <p>ChiffonMai 使用 Flutter / Dart 构建，采用 MIT License。iOS 版本目前尚未发布。</p><a
+            href="https://github.com/ChiffonOwO/ChiffonMai" target="_blank" rel="noreferrer">打开 GitHub 仓库 →</a>
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- ===== Support ===== -->
-  <section>
-    <div class="container">
-      <div class="section-header reveal">
-        <span class="section-tag">支持</span>
-        <h2>❤️ 助力持续开发</h2>
-        <p>ChiffonMai 是完全免费的开源工具，你的支持是我持续维护的动力</p>
-      </div>
-
-      <div class="support-grid reveal">
-        <div class="support-card">
-          <h3>📱 微信赞赏</h3>
-          <p>扫码赞赏</p>
-          <img class="support-qr" src="zanshangma.png" alt="微信赞赏码">
+    </section>
+    <section class="section" id="faq">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div>
+            <div class="kicker">Questions</div>
+            <h2>常见问题。</h2>
+          </div>
+          <p>用一句话说明使用边界，减少第一次打开时的疑惑。</p>
         </div>
-        <div class="support-card">
-          <h3>⚡ 爱发电</h3>
-          <p>通过爱发电支持开发者</p>
-          <a class="btn btn-primary" href="https://ifdian.net/a/chiffonmai/plan" target="_blank">前往爱发电</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== Credits ===== -->
-  <section>
-    <div class="container">
-      <div class="section-header reveal">
-        <span class="section-tag">致谢</span>
-        <h2>特别致谢</h2>
-        <p>感谢每一位为 ChiffonMai 做出贡献的朋友（排名不分先后）</p>
-      </div>
-
-      <div class="credits-grid reveal">
-        <div class="credit-item"><a href="https://huajia.163.com/main/profile/RrwM5xQB" target="_blank"><strong>Xn1xUfguF1GiNg</strong></a> — 背景图与戚风小狐狸</div>
-        <div class="credit-item"><strong>Takanashi Rikkkkkkka</strong> — 个性化谱面推荐设计思路</div>
-        <div class="credit-item"><strong>三由yyyh</strong> — 页面设计宝贵意见</div>
-        <div class="credit-item"><strong>MYD</strong> — 测试开发数据</div>
-        <div class="credit-item"><a href="https://space.bilibili.com/438391224" target="_blank"><strong>乐观的熊猫</strong></a> — 提议开发，最初契机</div>
-        <div class="credit-item"><a href="https://www.diving-fish.com/maimaidx/prober/" target="_blank"><strong>Diving-Fish 水鱼</strong></a> — 曲库与玩家记录</div>
-        <div class="credit-item"><a href="https://dxrating.net" target="_blank"><strong>DXRating.net</strong></a> — 谱面标签与别名</div>
-        <div class="credit-item"><a href="https://github.com/Yuri-YuzuChaN/maimaiDX" target="_blank"><strong>Yuri-YuzuChaN</strong></a> — 别名数据库</div>
-        <div class="credit-item"><a href="https://maimai.lxns.net" target="_blank"><strong>落雪咖啡屋</strong></a> — 收藏品/音源/曲库/记录</div>
-        <div class="credit-item"><a href="https://github.com/Neskol/Maichart-Converts" target="_blank"><strong>Neskol</strong></a> — 谱面转换支持</div>
-        <div class="credit-item"><a href="https://status.awmc.cc/status/maimai" target="_blank"><strong>status.awmc.cc</strong></a> — 服务器状态查询</div>
-        <div class="credit-item"><a href="https://github.com/bakapiano/maimai-score-hub" target="_blank"><strong>Bakapiano</strong></a> — 成绩同步支持</div>
-        <div class="credit-item"><a href="https://union.godserver.cn/" target="_blank"><strong>Union</strong></a> — 曲目数据库</div>
-        <div class="credit-item"><a href="https://github.com/k4641321/chusearchsong_flutter" target="_blank"><strong>k4641321</strong></a> — 落雪查分器成绩同步</div>
-        <div class="credit-item"><a href="https://net.wmc.pub/" target="_blank"><strong>AWMC NET.</strong></a> — 同步支持与项目资助</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== FAQ ===== -->
-  <section id="sec-faq">
-    <div class="container">
-      <div class="section-header reveal">
-        <span class="section-tag">FAQ</span>
-        <h2>常见问题</h2>
-      </div>
-
-      <div class="faq-list reveal">
-        <div class="faq-item">
-          <div class="faq-q" onclick="toggleFAQ(this)">安全吗？我的数据会上传吗？<span class="arrow">▾</span></div>
-          <div class="faq-a"><div class="faq-a-inner">
-            所有数据在手机本地处理。登录水鱼 / 落雪仅用于同步官方数据，不收集敏感信息：<br>
-            · 个人数据（QQ、授权码）仅存本地 SharedPreferences<br>
-            · 排行榜可随时关闭参与，关闭后不再公开<br>
-            · 不含任何第三方统计 SDK（友盟、GA 等）<br>
-            · 源代码完全开源，可自行审查
-          </div></div>
-        </div>
-
-        <div class="faq-item">
-          <div class="faq-q" onclick="toggleFAQ(this)">QR 码同步怎么用？<span class="arrow">▾</span></div>
-          <div class="faq-a"><div class="faq-a-inner">
-            机台「信息」页 → 「QR 码发行」→ 微信扫码 → 复制以 <strong>SGWCMAID</strong> 开头的字符串 → App 内「同步成绩」→ 粘贴 → 「同步」。App 自动通过 maimai-score-hub 完成 Bot 加好友、抓取、推送、刷新本地 Best50 全流程，进度条实时显示当前阶段。
-          </div></div>
-        </div>
-
-        <div class="faq-item">
-          <div class="faq-q" onclick="toggleFAQ(this)">必须登录水鱼吗？密码安全吗？<span class="arrow">▾</span></div>
-          <div class="faq-a"><div class="faq-a-inner">
-            首次 QR 同步需要登录一次水鱼账号，App 自动缓存 ImportToken，后续无需重复输入。密码仅用于获取 ImportToken，不存明文、不上传第三方。查 Best50、排行榜、猜歌游戏等基础功能无需登录。
-          </div></div>
-        </div>
-
-        <div class="faq-item">
-          <div class="faq-q" onclick="toggleFAQ(this)">相比官方 NET，ChiffonMai 有什么？<span class="arrow">▾</span></div>
-          <div class="faq-a"><div class="faq-a-inner">
-            · Best50 长图导出（一键生成精美分享图）<br>
-            · 6 种猜歌游戏 + 多人实时 WebSocket 对战<br>
-            · 牌子进度可视化 + 一键导出<br>
-            · Rating 计算器 + 达成率反推<br>
-            · 14 种多维排行榜（绝赞/物量/定数差值/BPM 等）<br>
-            · 收藏品攻略 + 谱面内嵌播放<br>
-            · KALEIDXSCOPE 五色门进度<br>
-            · 舞萌百科 + 双数据源（水鱼 + 落雪）
-          </div></div>
-        </div>
-
-        <div class="faq-item">
-          <div class="faq-q" onclick="toggleFAQ(this)">猜歌支持多人对战吗？<span class="arrow">▾</span></div>
-          <div class="faq-a"><div class="faq-a-inner">
-            支持。6 种猜歌模式均支持 WebSocket 实时对战：<br>
-            · 创建房间 → 选择模式 → 分享房间号<br>
-            · 加入房间 → 输入房间号 → 等待开始<br>
-            · 实时同步答题、计分板、最终排名<br>
-            建议使用稳定 Wi-Fi 或 5G 网络。
-          </div></div>
-        </div>
-
-        <div class="faq-item">
-          <div class="faq-q" onclick="toggleFAQ(this)">支持水鱼 + 落雪双数据源吗？<span class="arrow">▾</span></div>
-          <div class="faq-a"><div class="faq-a-inner">
-            支持。随时在「刷新数据」对话框切换：<br>
-            · <strong>水鱼</strong>：QQ 号查询，数据全面<br>
-            · <strong>落雪</strong>：OAuth 2.0 授权，实时性更高，附收藏品<br>
-            App 自动记忆上次使用的数据源。
-          </div></div>
-        </div>
-
-        <div class="faq-item">
-          <div class="faq-q" onclick="toggleFAQ(this)">「拟合 Best50」和「个性化 Best50」是什么？<span class="arrow">▾</span></div>
-          <div class="faq-a"><div class="faq-a-inner">
-            <strong>拟合 Best50</strong>：假设你所有谱面都达到最高 Rating 时的理论上限，帮你评估冲分空间。<br>
-            <strong>个性化 Best50</strong>：趣味化的最佳 50，包括：<br>
-            · 锁血 50（达成率最低）<br>
-            · AP 50（达成率最高）<br>
-            · FS 50（Full Sync+ 最多）<br>
-            持续增加中。所有模式均支持长图导出。
-          </div></div>
-        </div>
-
-        <div class="faq-item">
-          <div class="faq-q" onclick="toggleFAQ(this)">iOS 什么时候出？<span class="arrow">▾</span></div>
-          <div class="faq-a"><div class="faq-a-inner">
-            正在尽力协调 iOS 端上架（App Store 审核流程较为复杂）。Android 用户可先通过蓝奏云下载。有进展会第一时间通过 GitHub Releases 通知。
-          </div></div>
-        </div>
-
-        <div class="faq-item">
-          <div class="faq-q" onclick="toggleFAQ(this)">开源吗？<span class="arrow">▾</span></div>
-          <div class="faq-a"><div class="faq-a-inner">
-            完全开源！<strong>MIT License</strong>，托管在 <a href="https://github.com/ChiffonOwO/ChiffonMai" target="_blank">GitHub</a> 与 <a href="https://gitee.com/lyjChiFFoN/ChiffonMai" target="_blank">Gitee</a>。欢迎 PR、Issue、文档完善、翻译、社区推广等任何贡献。
-          </div></div>
+        <div class="faq-list reveal">
+          <div class="faq"><button type="button"><span>必须登录数据源才能使用吗？</span><span>＋</span></button>
+            <div class="answer">
+              <div>不需要。查曲、计算、推荐、猜歌和本地收藏等功能可以直接使用；登录或授权只在读取账号成绩、收藏，或同步成绩时需要。</div>
+            </div>
+          </div>
+          <div class="faq"><button type="button"><span>应用支持哪些数据源？</span><span>＋</span></button>
+            <div class="answer">
+              <div>当前项目接入水鱼、落雪和 AWMC NET 等成绩来源，也使用 DXRating.net、Union 和 maimai-score-hub 提供的相关数据或同步能力。</div>
+            </div>
+          </div>
+          <div class="faq"><button type="button"><span>导出的谱面包是什么格式？</span><span>＋</span></button>
+            <div class="answer">
+              <div>AstroDX 导出为 .adx：压缩包内包含以曲名命名的谱面文件夹；通用导出为平铺三件套的 zip。导出文件会写入公开 Download/ChiffonMai 目录，无法写入时会明确提示。</div>
+            </div>
+          </div>
+          <div class="faq"><button type="button"><span>收藏夹可以在设备之间转移吗？</span><span>＋</span></button>
+            <div class="answer">
+              <div>可以。收藏夹使用带版本信息的 JSON 交换格式，导入按内容校验，支持合并与覆盖两种模式。</div>
+            </div>
+          </div>
+          <div class="faq"><button type="button"><span>iOS 版本什么时候发布？</span><span>＋</span></button>
+            <div class="answer">
+              <div>项目目前主要提供 Android 版本，iOS 仍在准备中，具体进展以 GitHub 仓库为准。</div>
+            </div>
+          </div>
+          <div class="faq"><button type="button"><span>这是 SEGA 官方应用吗？</span><span>＋</span></button>
+            <div class="answer">
+              <div>不是。ChiffonMai 是第三方开源工具，仅供学习和娱乐使用；数据服务的使用请遵守对应平台规则。</div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- ===== Footer ===== -->
+    </section>
+  </main>
   <footer>
-    <div class="footer-inner">
-      <p>ChiffonMai · 舞萌玩家的小助手 · 非 SEGA 官方出品 · 仅供学习与娱乐</p>
-      <div class="footer-links">
-        <a href="https://github.com/ChiffonOwO/ChiffonMai" target="_blank">GitHub</a>
-        <a href="https://gitee.com/lyjChiFFoN/ChiffonMai" target="_blank">Gitee</a>
-        <a href="https://www.diving-fish.com/maimaidx/prober/" target="_blank">Diving-Fish 水鱼</a>
-        <a href="https://maimai.lxns.net" target="_blank">落雪咖啡屋</a>
-        <a href="https://dxrating.net" target="_blank">DXRating.net</a>
-        <a href="https://union.godserver.cn/" target="_blank">Union</a>
-        <a href="https://ifdian.net/a/chiffonmai/plan" target="_blank">爱发电</a>
-      </div>
-      <p class="footer-meta">
-        Made with ❤️ by ChiffonOwO · 反馈：<a href="mailto:chiffonowo@foxmail.com">chiffonowo@foxmail.com</a><br>
-        <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">津ICP备2024015256号-2</a> ·
-        <a href="https://beian.mps.gov.cn/#/query/webSearch?code=13092202000515" rel="noreferrer" target="_blank">冀公网安备13092202000515号</a>
-      </p>
+    <div class="wrap footer-row"><strong>ChiffonMai</strong><span>第三方开源舞萌 DX 工具箱 · MIT License</span>
+      <div class="footer-links"><a href="https://github.com/ChiffonOwO/ChiffonMai" target="_blank"
+          rel="noreferrer">GitHub ↗</a><a href="https://gitee.com/lyjChiFFoN/ChiffonMai" target="_blank"
+          rel="noreferrer">Gitee ↗</a><a href="#top">回到顶部 ↑</a></div>
     </div>
   </footer>
-
-  <button class="back-to-top" id="backToTop" aria-label="回到顶部">↑</button>
-
   <script>
-    // FAQ toggle
-    function toggleFAQ(el) {
-      el.parentElement.classList.toggle('open');
-    }
-
-    // Scroll-reveal
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) entry.target.classList.add('visible');
-      });
-    }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
-    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-
-    // Top nav scroll state
-    const topnav = document.getElementById('topnav');
-    const backToTop = document.getElementById('backToTop');
-    window.addEventListener('scroll', () => {
-      if (window.scrollY > 20) topnav.classList.add('scrolled');
-      else topnav.classList.remove('scrolled');
-      if (window.scrollY > 500) backToTop.classList.add('show');
-      else backToTop.classList.remove('show');
-    }, { passive: true });
-
-    // Back to top
-    backToTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
-
-    // Mobile nav
-    const navToggle = document.getElementById('navToggle');
-    const navLinks = document.getElementById('navLinks');
-    navToggle.addEventListener('click', () => navLinks.classList.toggle('open'));
-    navLinks.querySelectorAll('a').forEach(a => a.addEventListener('click', () => navLinks.classList.remove('open')));
-
-    // Feature card cursor tracking (subtle glow)
-    document.querySelectorAll('.feature-card').forEach(card => {
-      card.addEventListener('mousemove', (e) => {
-        const r = card.getBoundingClientRect();
-        card.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
-        card.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
-      });
+    const topbar = document.getElementById('topbar'),
+      navlinks = document.getElementById('navlinks'),
+      menu = document.getElementById('menu');
+    const setScrolled = () => topbar.classList.toggle('scrolled', window.scrollY > 12);
+    window.addEventListener('scroll', setScrolled, {
+      passive: true
     });
+    setScrolled();
+    menu.addEventListener('click', () => {
+      const open = navlinks.classList.toggle('open');
+      menu.setAttribute('aria-expanded', String(open));
+      menu.textContent = open ? '×' : '☰'
+    });
+    navlinks.querySelectorAll('a').forEach(link => link.addEventListener('click', () => {
+      navlinks.classList.remove('open');
+      menu.setAttribute('aria-expanded', 'false');
+      menu.textContent = '☰'
+    }));
+    document.querySelectorAll('.faq button').forEach(button => button.addEventListener('click', () => button
+      .parentElement.classList.toggle('open')));
+    const observer = new IntersectionObserver(entries => entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('show');
+        observer.unobserve(entry.target)
+      }
+    }), {
+      threshold: .1
+    });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
   </script>
-
 </body>
+
 </html>

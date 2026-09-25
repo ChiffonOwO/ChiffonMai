@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../service/RankingList/RatingRankListService.dart';
-import '../../constant/CacheKeyConstant.dart';
 import '../../utils/AppTheme.dart';
 import '../../utils/ColorUtil.dart';
 import '../../widgets/PageTopBar.dart';
+import '../../widgets/DataSourceTag.dart';
+import '../../utils/CurrentDataSourceNotifier.dart';
 
 class RatingRankListPage extends StatefulWidget {
   const RatingRankListPage({super.key});
@@ -19,9 +20,26 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
   String _errorMessage = '';
 
   // 当前选择的排行榜类型
-  int _selectedTab = 0; // 0: 总排行榜, 1: 水鱼, 2: 落雪
+  int _selectedTab = 0; // 0: 总排行榜, 之后依次是 _tabSources 里的数据源
 
-  final List<String> _tabNames = ['总排行榜', '水鱼', '落雪'];
+  /// Tab 1..N 依次对应的数据源。
+  ///
+  /// 抽成列表是为了**加源时不用改逻辑**：`_tabNames` 与它一一对应，
+  /// `_loadRankings` 按下标取源，不再写死 1→水鱼 / 2→落雪 的 switch。
+  static const List<RefreshDataSource> _tabSources = [
+    RefreshDataSource.shuiyu,
+    RefreshDataSource.luoxue,
+    RefreshDataSource.awmc,
+  ];
+
+  /// Tab 标题。第 0 个是跨源总榜，其余按 [_tabSources] 的**短名**生成。
+  ///
+  /// 不写字面量列表：否则「Tab 上写 AWMC、标签里写 AWMC NET」这种两处名字
+  /// 不一致的坑早晚会出现，加源时也要记得回来补一个字符串。
+  late final List<String> _tabNames = [
+    '总排行榜',
+    for (final source in _tabSources) source.shortDisplayName,
+  ];
 
   // 当前用户信息
   String? _currentUserId;
@@ -45,56 +63,39 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
     await _loadRankings();
   }
 
-  // 获取当前用户信息
+  /// 推断当前玩家（数据源 + 排行榜 id）。
+  ///
+  /// 按源区分的标记键（`shuiyu_user_id` / `luoxue_user_id` / `awmc_user_id`）由各源的
+  /// 刷新流程写入，比共用的 `cachedQQ` 权威。优先当前活动数据源，拿不到再按 enum
+  /// 顺序兜底，全都没有才退化到 `cachedQQ`（历史上只有水鱼写它）。
+  ///
+  /// 原来的二元写法只认 水鱼 / 落雪，且 `lastDataSource == 'awmc'` 时会把数据源
+  /// 标成水鱼、id 却取水鱼的 QQ —— 拿 AWMC 账号看排行榜会高亮错人。
   Future<void> _loadCurrentUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    final lastDataSource = prefs.getString(CacheKeyConstant.lastDataSource);
-    final qq = prefs.getString('cachedQQ');
-    final shuiyuUserId = prefs.getString(CacheKeyConstant.shuiyuUserId);
-    final luoxueUserId = prefs.getString(CacheKeyConstant.luoxueUserId);
+    final current = CurrentDataSourceNotifier.instance.value;
+    final ordered = <RefreshDataSource>[
+      current,
+      ...RefreshDataSource.values.where((s) => s != current),
+    ];
 
-    // 优先使用正式存储的用户ID（shuiyu_user_id / luoxue_user_id），
-    // 因为它们在数据刷新时由 HomePage 写入，比 cachedQQ 更权威
-    final hasShuiyuId = shuiyuUserId != null && shuiyuUserId.isNotEmpty;
-    final hasLuoxueId = luoxueUserId != null && luoxueUserId.isNotEmpty;
-    final hasQQ = qq != null && qq.isNotEmpty;
-
-    // 根据缓存推断当前数据源：优先使用有有效用户ID的数据源
-    if (hasShuiyuId && !hasLuoxueId) {
-      _currentDataSource = 'shuiyu';
-      _currentUserId = shuiyuUserId;
-    } else if (hasLuoxueId && !hasShuiyuId) {
-      _currentDataSource = 'luoxue';
-      _currentUserId = luoxueUserId;
-    } else if (hasShuiyuId && hasLuoxueId) {
-      // 两者都有，使用上次数据源
-      _currentDataSource = lastDataSource;
-      if (_currentDataSource == 'shuiyu') {
-        _currentUserId = shuiyuUserId;
-      } else if (_currentDataSource == 'luoxue') {
-        _currentUserId = luoxueUserId;
-      } else {
-        // 如果 lastDataSource 为空或无效，默认使用水鱼
-        _currentDataSource = 'shuiyu';
-        _currentUserId = shuiyuUserId;
-      }
-    } else {
-      // 都没有正式ID，fallback 到 cachedQQ
-      if (hasQQ) {
-        _currentDataSource = lastDataSource ?? 'shuiyu';
-        _currentUserId = 'shuiyu:$qq';
-      } else {
-        _currentDataSource = lastDataSource;
+    _currentDataSource = null;
+    _currentUserId = null;
+    for (final source in ordered) {
+      final marker = prefs.getString(source.userIdCacheKey);
+      if (marker != null && marker.isNotEmpty) {
+        _currentDataSource = source.key;
+        _currentUserId = marker;
+        return;
       }
     }
 
-    // 调试日志
-    print('[DEBUG] 缓存的上次数据源: $lastDataSource');
-    print('[DEBUG] 推断的当前数据源: $_currentDataSource');
-    print('[DEBUG] 水鱼QQ: $qq');
-    print('[DEBUG] 水鱼用户ID: $shuiyuUserId');
-    print('[DEBUG] 落雪用户ID: $luoxueUserId');
-    print('[DEBUG] 当前用户ID: $_currentUserId');
+    // 都没有按源标记，fallback 到 cachedQQ
+    final qq = prefs.getString('cachedQQ');
+    if (qq != null && qq.isNotEmpty) {
+      _currentDataSource = RefreshDataSource.shuiyu.key;
+      _currentUserId = 'shuiyu:$qq';
+    }
   }
 
   // 禁用按钮并在1秒后恢复
@@ -145,18 +146,18 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
 
     try {
       List<RankItem> items;
-      switch (_selectedTab) {
-        case 0:
-          items = await RatingRankListService.getTotalRankings(limit: 100);
-          break;
-        case 1:
-          items = await RatingRankListService.getShuiyuRankings(limit: 100);
-          break;
-        case 2:
-          items = await RatingRankListService.getLuoxueRankings(limit: 100);
-          break;
-        default:
-          items = [];
+      if (_selectedTab == 0) {
+        // 第 0 个 Tab 是跨源总榜
+        items = await RatingRankListService.getTotalRankings(limit: 100);
+      } else {
+        // 其余 Tab 按 _tabSources 取对应数据源的榜（水鱼 / 落雪 / AWMC NET）
+        final index = _selectedTab - 1;
+        items = index >= 0 && index < _tabSources.length
+            ? await RatingRankListService.getSourceRankings(
+                _tabSources[index],
+                limit: 100,
+              )
+            : <RankItem>[];
       }
 
       // 计算并列排名
@@ -226,26 +227,8 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
             ),
           ),
 
-          // 数据源标识
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: item.dataSource == 'shuiyu'
-                  ? AppColors.linkBlue(brightness).withValues(alpha: 0.15)
-                  : (brightness == Brightness.dark ? Colors.purple.withValues(alpha: 0.25) : Colors.purple[100]),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              item.dataSource == 'shuiyu' ? '水鱼' : '落雪',
-              style: TextStyle(
-                fontSize: 10,
-                color: item.dataSource == 'shuiyu'
-                    ? AppColors.linkBlue(brightness)
-                    : (brightness == Brightness.dark ? Colors.purple[200] : Colors.purple[700]),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+          // 数据源标识（配色/取名统一在 DataSourceTag）
+          DataSourceTag(dataSource: item.dataSource),
 
           const SizedBox(width: 12),
 
@@ -495,6 +478,10 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
                       child: Center(
                         child: Text(
                           _tabNames[index],
+                          // 4 个 Tab 平分一行，每格只有 ~80dp：宁可省略号，
+                          // 也不要让它折成两行把 Tab 栏撑高
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: _selectedTab == index
@@ -556,26 +543,9 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
                     ),
                   ),
 
-                  // 数据源标识
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: _currentUserRankItem!.dataSource == 'shuiyu'
-                          ? AppColors.linkBlue(brightness).withValues(alpha: 0.15)
-                          : (brightness == Brightness.dark ? Colors.purple.withValues(alpha: 0.25) : Colors.purple[100]),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      _currentUserRankItem!.dataSource == 'shuiyu' ? '水鱼' : '落雪',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: _currentUserRankItem!.dataSource == 'shuiyu'
-                            ? AppColors.linkBlue(brightness)
-                            : (brightness == Brightness.dark ? Colors.purple[200] : Colors.purple[700]),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                  // 数据源标识（配色/取名统一在 DataSourceTag）
+                  DataSourceTag(
+                      dataSource: _currentUserRankItem!.dataSource),
 
                   const SizedBox(width: 12),
 

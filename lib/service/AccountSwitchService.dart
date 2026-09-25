@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -6,161 +9,267 @@ import '../utils/CurrentDataSourceNotifier.dart';
 import '../utils/LoginStateNotifier.dart';
 import '../utils/UserProfileNotifier.dart';
 import 'AccountStore.dart';
+import 'AWMC/AwmcPlayCountStore.dart';
+import 'History/ChartHistoryStore.dart';
+import 'PaiziProgressService.dart';
+import 'PersonalizedScoreService.dart';
 
-enum SwitchOutcome {
-  /// 切换成功
-  switched,
+enum SwitchOutcome { switched, noCache, sameSource, busy, failed }
 
-  /// 目标账号没有缓存数据，需要先刷新
-  noCache,
-
-  /// 目标就是当前账号
-  sameSource,
-
-  /// 正在切换中
-  busy,
-}
-
-/// 双账号切换的核心逻辑。
-///
-/// 现有单槽 prefs 键是「当前账号活动槽」，每个数据源另有一份存档；
-/// 切换 = 活动槽写回当前源存档 → 目标源存档写进活动槽 → 更新指针与各 Notifier。
-/// 读取端（约 50 处 `getCachedUserPlayData()`）完全不需要改动。
+/// 活动槽的唯一协调入口。切换、刷新、清理共享一个锁；刷新锁覆盖整个请求周期。
+/// 每次破坏性写入前先保存原账号，失败/进程中断时从存档恢复。
 class AccountSwitchService {
   AccountSwitchService._();
 
   static bool _busy = false;
+  static int revision = 0;
+  static final Object _refreshScope = Object();
+  static Future<void>? _initializing;
+  static bool get isBusy => _busy;
 
-  /// 把当前活动槽的账号数据切到 [target]。使用缓存，不联网。
+  static void requireIdle() {
+    if (_busy) throw StateError('账号数据正在更新，请完成后重试');
+  }
+
+  static void _invalidateRecords() {
+    PersonalizedScoreService().clearRecordsCache();
+    PaiziProgressService().clearRecordsCache();
+  }
+
+  static Future<void> _publish(RefreshDataSource source) async {
+    revision++;
+    _invalidateRecords();
+    await CurrentDataSourceNotifier.instance.set(source);
+    await UserProfileNotifier.load();
+    await LoginStateNotifier.load();
+  }
+
+  static Future<void> _activate(RefreshDataSource source) async {
+    await AccountStore.loadArchiveIntoActiveSlot(source.key);
+    await _publish(source);
+  }
+
+  static Future<void> _pending(RefreshDataSource restore,
+      {RefreshDataSource? target}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final checkpoint = <String, dynamic>{'restore': restore.key};
+    if (target != null) {
+      checkpoint['target'] = target.key;
+      checkpoint['identity'] = prefs.getString(
+          '${CacheKeyConstant.accountArchiveIdentityPrefix}${target.key}');
+      checkpoint['play'] = prefs.getString(
+          '${CacheKeyConstant.accountArchivePlayPrefix}${target.key}');
+      checkpoint['metas'] = prefs.getString(CacheKeyConstant.accountStore);
+    }
+    if (!await prefs.setString(
+        CacheKeyConstant.accountRotationPending, json.encode(checkpoint))) {
+      throw StateError('无法保存账号恢复信息');
+    }
+  }
+
+  static Future<void> _finish() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(CacheKeyConstant.accountRotationPending);
+  }
+
   static Future<SwitchOutcome> switchTo(RefreshDataSource target) async {
+    await ensureMigrated();
     if (_busy) return SwitchOutcome.busy;
     _busy = true;
+    revision++;
+    final current = CurrentDataSourceNotifier.instance.value;
     try {
-      final current = CurrentDataSourceNotifier.instance.value;
       if (current == target) return SwitchOutcome.sameSource;
-
-      // 1) 先把当前账号的数据存回它自己的存档
-      await AccountStore.writeActiveSlotToArchive(current.key);
-
-      // 2) 目标没有缓存 → 什么都不动，交给调用方引导刷新
       if (!await AccountStore.hasCache(target.key)) {
         return SwitchOutcome.noCache;
       }
-
-      // 3) 崩溃恢复标记：清槽前先记下目标源，中途被杀也能恢复
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(CacheKeyConstant.accountRotationPending, target.key);
-
-      // 4) 活动槽换入目标源存档
-      await AccountStore.clearActiveSlot();
-      await AccountStore.loadArchiveIntoActiveSlot(target.key);
-      await CurrentDataSourceNotifier.instance.set(target);
-
-      // 5) 刷新内存里的共享状态（首页 / 各页面自动重建）
-      await UserProfileNotifier.load();
-      await LoginStateNotifier.load();
-
-      await prefs.remove(CacheKeyConstant.accountRotationPending);
+      await AccountStore.writeActiveSlotToArchive(current.key);
+      await _pending(current);
+      await _activate(target);
+      await _finish();
       return SwitchOutcome.switched;
     } catch (e) {
       debugPrint('切换账号失败: $e');
-      return SwitchOutcome.busy;
+      try {
+        await _restorePending();
+      } catch (restoreError) {
+        debugPrint('账号恢复未完成，保留恢复标记: $restoreError');
+      }
+      return SwitchOutcome.failed;
     } finally {
       _busy = false;
     }
   }
 
-  /// 刷新前调用：保证活动槽属于即将刷新的 [source]。
-  ///
-  /// 必须做这一步，否则「当前是落雪、用户去刷水鱼」会把落雪的活动槽直接覆盖。
-  /// 目标没有缓存时也继续——刷新流程随后会把数据填进去。
-  static Future<void> prepareForRefresh(RefreshDataSource source) async {
+  /// 所有成绩刷新入口（含同步后的自动刷新）必须调用此方法。
+  /// 锁的获取/释放/回滚由同一个调用持有，拒绝的第二个任务不能回滚第一个任务。
+  static Future<T> runRefresh<T>(
+      RefreshDataSource source, Future<T> Function() body) async {
     await ensureMigrated();
-    if (CurrentDataSourceNotifier.instance.value == source) return;
-    await switchTo(source);
-  }
-
-  /// 刷新成功后调用：把新的活动槽存进该源存档并更新元信息。
-  static Future<void> onRefreshCompleted(RefreshDataSource source) async {
-    await AccountStore.writeActiveSlotToArchive(source.key);
-    final meta = await AccountStore.buildMetaFromActiveSlot(source);
-    await AccountStore.upsert(meta);
-    await CurrentDataSourceNotifier.instance.set(source);
-    await UserProfileNotifier.load();
-  }
-
-  /// 清除某个账号的**缓存数据**（成绩 / Best50 / 玩家信息 / 推荐结果等），
-  /// **不动登录 token**——下次刷新不用重新登录。
-  ///
-  /// 若清除的正是当前账号：回落到另一个账号（有缓存时），否则清空当前资料。
-  static Future<void> clearAccountData(RefreshDataSource source) async {
-    await AccountStore.remove(source.key);
-    if (CurrentDataSourceNotifier.instance.value != source) {
-      await UserProfileNotifier.load();
-      return;
-    }
-    final other = source == RefreshDataSource.shuiyu
-        ? RefreshDataSource.luoxue
-        : RefreshDataSource.shuiyu;
-    await AccountStore.clearActiveSlot();
-    if (await AccountStore.hasCache(other.key)) {
-      await AccountStore.loadArchiveIntoActiveSlot(other.key);
-      await CurrentDataSourceNotifier.instance.set(other);
-    } else {
-      await CurrentDataSourceNotifier.instance.set(RefreshDataSource.shuiyu);
-    }
-    await UserProfileNotifier.load();
-    await LoginStateNotifier.load();
-  }
-
-  /// 某个账号登出后调用。数据清理与 [clearAccountData] 相同；
-  /// 该源的 token / 评分缓存由调用方负责清除。
-  static Future<void> onAccountLoggedOut(RefreshDataSource source) =>
-      clearAccountData(source);
-
-  /// 启动时调用：若上次切换中途被杀，重新把标记的目标源存档写回活动槽。
-  static Future<void> recoverIfInterrupted() async {
-    final prefs = await SharedPreferences.getInstance();
-    final pending = prefs.getString(CacheKeyConstant.accountRotationPending);
-    if (pending == null || pending.isEmpty) return;
+    requireIdle();
+    _busy = true;
+    revision++;
+    final previous = CurrentDataSourceNotifier.instance.value;
     try {
-      await AccountStore.loadArchiveIntoActiveSlot(pending);
-      await CurrentDataSourceNotifier.instance
-          .set(RefreshDataSource.fromKey(pending));
-      await UserProfileNotifier.load();
-    } catch (e) {
-      debugPrint('恢复账号切换失败: $e');
+      await AccountStore.writeActiveSlotToArchive(previous.key);
+      await _pending(previous, target: source);
+      // 无缓存目标也要清空旧活动槽，再明确切到目标源。
+      await _activate(source);
+      final result = await runZoned(body, zoneValues: {_refreshScope: source});
+      await AccountStore.writeActiveSlotToArchive(source.key);
+      await AccountStore.upsert(
+          await AccountStore.buildMetaFromActiveSlot(source));
+      await _publish(source);
+      await _finish();
+      return result;
+    } catch (_) {
+      await _restorePending();
+      rethrow;
     } finally {
-      await prefs.remove(CacheKeyConstant.accountRotationPending);
+      _busy = false;
     }
   }
 
-  /// 首次运行时把旧的「单套缓存」迁进账号系统（按 last_data_source 归到对应源）。
-  static Future<void> ensureMigrated() async {
+  static void requireRefresh(RefreshDataSource source) {
+    if (!_busy ||
+        Zone.current[_refreshScope] != source ||
+        CurrentDataSourceNotifier.instance.value != source) {
+      throw StateError('成绩写入缺少对应账号的刷新事务');
+    }
+  }
+
+  /// 身份已从本次响应确认后调用。换人时丢弃旧人的派生缓存和评论身份。
+  static Future<void> bindIdentity(RefreshDataSource source, String id) async {
+    requireRefresh(source);
+    if (id.isEmpty) throw StateError('账号 ID 不能为空');
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.containsKey(CacheKeyConstant.accountStore)) {
-      await recoverIfInterrupted();
-      return;
+    final oldId = RefreshDataSource.parseUserIdMarker(
+            prefs.getString(source.userIdCacheKey)) ??
+        prefs.getString(CacheKeyConstant.cachedQQ);
+    if (oldId != null && oldId != id) {
+      await AccountStore.clearActiveSlot();
+      await AwmcPlayCountStore.clear(source: source);
+      _invalidateRecords();
     }
-    final source = RefreshDataSource.fromKey(
-      prefs.getString(CacheKeyConstant.lastDataSource),
-    );
-    final hasPlay = prefs.getString(CacheKeyConstant.userPlayData) != null;
-    if (hasPlay) {
+    await prefs.setString(source.userIdCacheKey, '${source.key}:$id');
+    await prefs.setString(CacheKeyConstant.cachedQQ, id);
+  }
+
+  static Future<void> clearAccountData(RefreshDataSource source,
+      {Future<void> Function()? clearCredentials}) async {
+    await ensureMigrated();
+    requireIdle();
+    _busy = true;
+    revision++;
+    try {
+      await clearCredentials?.call();
+      await AccountStore.remove(source.key);
+      await AwmcPlayCountStore.clear(source: source);
+      if (CurrentDataSourceNotifier.instance.value == source) {
+        var fallback = RefreshDataSource.shuiyu;
+        for (final candidate in RefreshDataSource.values) {
+          if (candidate != source &&
+              await AccountStore.hasCache(candidate.key)) {
+            fallback = candidate;
+            break;
+          }
+        }
+        await _pending(fallback);
+        await _activate(fallback);
+        await _finish();
+      } else {
+        await LoginStateNotifier.load();
+      }
+    } finally {
+      _busy = false;
+    }
+  }
+
+  static Future<void> onAccountLoggedOut(RefreshDataSource source,
+          {Future<void> Function()? clearCredentials}) =>
+      clearAccountData(source, clearCredentials: clearCredentials);
+
+  static Future<void> _restorePending() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(CacheKeyConstant.accountRotationPending);
+    if (raw == null) return;
+    String key = raw;
+    if (raw.startsWith('{')) {
+      final data = json.decode(raw) as Map;
+      key = (data['restore'] ?? data['from'] ?? data['to']) as String;
+      final target = data['target'];
+      if (target is String &&
+          RefreshDataSource.values.any((s) => s.key == target)) {
+        // 提交分成多个 prefs 写入；即使中途被杀，也先恢复目标存档的完整旧版本。
+        for (final entry in {
+          '${CacheKeyConstant.accountArchiveIdentityPrefix}$target':
+              data['identity'],
+          '${CacheKeyConstant.accountArchivePlayPrefix}$target': data['play'],
+          CacheKeyConstant.accountStore: data['metas'],
+        }.entries) {
+          final ok = entry.value == null
+              ? await prefs.remove(entry.key)
+              : await prefs.setString(entry.key, entry.value as String);
+          if (!ok) throw StateError('账号存档回滚失败');
+        }
+      }
+    }
+    if (!RefreshDataSource.values.any((s) => s.key == key)) {
+      throw StateError('无法识别待恢复的账号');
+    }
+    await _activate(RefreshDataSource.fromKey(key));
+    await _finish();
+  }
+
+  static Future<void> recoverIfInterrupted() => ensureMigrated();
+
+  /// 并发启动请求共用同一初始化 Future；运行中的事务标记不当作崩溃恢复。
+  static Future<void> ensureMigrated() {
+    if (_busy) return Future<void>.value();
+    return _initializing ??=
+        _initialize().whenComplete(() => _initializing = null);
+  }
+
+  static Future<void> _initialize() async {
+    final prefs = await SharedPreferences.getInstance();
+    await _restorePending();
+    await CurrentDataSourceNotifier.load();
+    if (!prefs.containsKey(CacheKeyConstant.accountStore)) {
+      final source = CurrentDataSourceNotifier.instance.value;
       await AccountStore.writeActiveSlotToArchive(source.key);
+      await AccountStore.upsert(
+          await AccountStore.buildMetaFromActiveSlot(source));
     }
-    final meta = await AccountStore.buildMetaFromActiveSlot(source);
-    await AccountStore.upsert(meta.copyWith(hasData: hasPlay));
-
-    // 另一源写一份空占位，切换面板才能同时列出两个账号
-    final other = source == RefreshDataSource.shuiyu
-        ? RefreshDataSource.luoxue
-        : RefreshDataSource.shuiyu;
-    final all = await AccountStore.loadAll();
-    if (!all.containsKey(other.key)) {
-      await AccountStore.upsert(AccountMeta(source: other.key));
+    const migration = 'account_history_identity_migrated_v1';
+    const ownersKey = 'account_history_owners_v1';
+    if (!prefs.containsKey(migration)) {
+      // 固定升级前的归属，磁盘失败重试时也不能把旧文件绑定给后来登录的人。
+      var rawOwners = prefs.getString(ownersKey);
+      if (rawOwners == null) {
+        final metas = await AccountStore.loadAll();
+        rawOwners =
+            json.encode({for (final e in metas.entries) e.key: e.value.id});
+        if (!await prefs.setString(ownersKey, rawOwners)) {
+          throw StateError('无法保存历史迁移信息');
+        }
+      }
+      final owners = Map<String, dynamic>.from(json.decode(rawOwners) as Map);
+      var migrated = true;
+      for (final entry in owners.entries) {
+        migrated = await ChartHistoryStore.instance
+                .migrateLegacy(entry.key, entry.value as String) &&
+            migrated;
+      }
+      if (migrated) await prefs.setBool(migration, true);
     }
-
-    await recoverIfInterrupted();
+    const snapshotMigration = 'account_snapshots_migrated_v1';
+    if (!prefs.containsKey(snapshotMigration)) {
+      final old = prefs.getString('b50_snapshots');
+      if (old != null) {
+        final key = 'b50_snapshots_${await AccountStore.accountKey()}';
+        if (!prefs.containsKey(key)) await prefs.setString(key, old);
+      }
+      await prefs.setBool(snapshotMigration, true);
+    }
   }
 }

@@ -5,6 +5,7 @@ import '../../constant/CacheKeyConstant.dart';
 import '../../constant/CacheTimestampConstant.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
+import 'SongRankingService.dart' show parseDataSource;
 
 /// 拟合总Rating排行榜的模式（对应服务端 fitted-ranking 的 mode 参数）
 enum FittedMode {
@@ -84,12 +85,10 @@ class FittedRankItem {
   }
 }
 
-/// 根据 playerId 前缀推断数据源（与 SongRankingService.parseDataSource 一致）
-String _parseDataSource(String playerId) {
-  if (playerId.startsWith('shuiyu:')) return 'shuiyu';
-  if (playerId.startsWith('luoxue:')) return 'luoxue';
-  return 'luoxue';
-}
+/// 根据 playerId 前缀推断数据源。
+///
+/// 复用 [SongRankingService] 里那份唯一的实现（原因见 AvgRankingListService 的同名注释）。
+String _parseDataSource(String playerId) => parseDataSource(playerId);
 
 class FittedRatingRankingListService {
   // 缓存有效期：从常量文件读取（分钟转秒）

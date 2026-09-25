@@ -8,8 +8,8 @@ import 'FishIcon.dart';
 
 /// 弹出「切换账号」底部面板。
 ///
-/// 两个数据源（水鱼 / 落雪）各占一行；点击即用**缓存**切换数据源与玩家信息，
-/// 不联网。目标账号没有缓存时提示并回调 [onNeedRefresh] 引导去刷新。
+/// 三个数据源（水鱼 / 落雪 / AWMC NET）各占一行；点击即用**缓存**切换数据源与
+/// 玩家信息，不联网。目标账号没有缓存时提示并回调 [onNeedRefresh] 引导去刷新。
 Future<void> showAccountSwitchSheet(
   BuildContext context, {
   required Future<void> Function(RefreshDataSource source) onNeedRefresh,
@@ -78,7 +78,18 @@ class _AccountSwitchSheetState extends State<_AccountSwitchSheet> {
       _busy = true;
       _clearing = source;
     });
-    await AccountSwitchService.clearAccountData(source);
+    try {
+      await AccountSwitchService.clearAccountData(source);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _clearing = null;
+        });
+      }
+      Fluttertoast.showToast(msg: '清除失败：$e');
+      return;
+    }
     final loaded = await AccountStore.loadAll();
     if (!mounted) return;
     setState(() {
@@ -117,6 +128,9 @@ class _AccountSwitchSheetState extends State<_AccountSwitchSheet> {
         break;
       case SwitchOutcome.sameSource:
         Navigator.of(context).pop();
+        break;
+      case SwitchOutcome.failed:
+        Fluttertoast.showToast(msg: '账号切换失败，已尝试恢复原账号');
         break;
       case SwitchOutcome.busy:
         Fluttertoast.showToast(msg: '正在切换，请稍候');
@@ -189,17 +203,31 @@ class _AccountSwitchSheetState extends State<_AccountSwitchSheet> {
                   style:
                       TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
             const SizedBox(height: 12),
-            _buildAccountTile(RefreshDataSource.shuiyu),
-            const SizedBox(height: 8),
-            _buildAccountTile(RefreshDataSource.luoxue),
-            const SizedBox(height: 12),
-            Text('刷新数据可更新当前账号；两个账号的登录状态相互独立。',
-                style:
-                    TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
+            // 逐个源渲染（水鱼 / 落雪 / AWMC NET）。
+            // 原来是写死两行，加第三个源时必须记得再加一行；改成枚举就不会漏。
+            for (final source in RefreshDataSource.values) ...[
+              _buildAccountTile(source),
+              const SizedBox(height: 8),
+            ],
+            const SizedBox(height: 4),
+            Text('刷新数据可更新当前账号；水鱼 / 落雪的登录状态相互独立，AWMC NET 按 QQ 查询无需登录。',
+                style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
           ],
         ),
       ),
     );
+  }
+
+  /// 各数据源的图标：水鱼用自绘的 FishIcon，落雪雪花，AWMC NET 用云（它是 web 查分站）。
+  Widget _sourceIcon(RefreshDataSource source, Color color) {
+    switch (source) {
+      case RefreshDataSource.shuiyu:
+        return FishIcon(size: 24, color: color);
+      case RefreshDataSource.luoxue:
+        return Icon(Icons.ac_unit_outlined, color: color);
+      case RefreshDataSource.awmc:
+        return Icon(Icons.cloud_outlined, color: color);
+    }
   }
 
   Widget _buildAccountTile(RefreshDataSource source) {
@@ -207,12 +235,12 @@ class _AccountSwitchSheetState extends State<_AccountSwitchSheet> {
     final bool isCurrent = CurrentDataSourceNotifier.instance.value == source;
     final meta = _metas[source.key];
     final bool hasData = meta?.hasData ?? false;
-    final String nickname =
-        (meta?.nickname.isNotEmpty ?? false) ? meta!.nickname : '${source.displayName}账号';
+    final String nickname = (meta?.nickname.isNotEmpty ?? false)
+        ? meta!.nickname
+        : '${source.displayName}账号';
+    // 水鱼 / AWMC NET 都是按 QQ，只有落雪是 friendCode
     final String idLine = (meta?.id.isNotEmpty ?? false)
-        ? (source == RefreshDataSource.shuiyu
-            ? 'QQ ${meta!.id}'
-            : 'ID ${meta!.id}')
+        ? '${source.idIsQQ ? 'QQ' : 'ID'} ${meta!.id}'
         : '未绑定';
     final int ra = meta?.best50TotalRA ?? 0;
     final bool isSwitching = _switchingTo == source;
@@ -235,16 +263,8 @@ class _AccountSwitchSheetState extends State<_AccountSwitchSheet> {
         ),
         child: Row(
           children: [
-            if (source == RefreshDataSource.shuiyu)
-              FishIcon(
-                size: 24,
-                color: isCurrent ? scheme.primary : scheme.onSurfaceVariant,
-              )
-            else
-              Icon(
-                Icons.ac_unit_outlined,
-                color: isCurrent ? scheme.primary : scheme.onSurfaceVariant,
-              ),
+            _sourceIcon(
+                source, isCurrent ? scheme.primary : scheme.onSurfaceVariant),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -262,8 +282,8 @@ class _AccountSwitchSheetState extends State<_AccountSwitchSheet> {
                     ra > 0 ? '$idLine · RA $ra' : idLine,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontSize: 12, color: scheme.onSurfaceVariant),
+                    style:
+                        TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -295,8 +315,8 @@ class _AccountSwitchSheetState extends State<_AccountSwitchSheet> {
                 )
               else if (!hasData)
                 Text('暂无缓存',
-                    style: TextStyle(
-                        fontSize: 11, color: scheme.onSurfaceVariant))
+                    style:
+                        TextStyle(fontSize: 11, color: scheme.onSurfaceVariant))
               else
                 Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
               // 只有缓存过数据才显示「清除」入口

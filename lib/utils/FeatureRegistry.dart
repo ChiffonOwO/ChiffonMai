@@ -73,6 +73,7 @@ class FeatureRegistry {
       const ButtonItem(icon: Icons.cleaning_services, title: '刷新 maidata', subtitle: '手动刷新所有 maidata 缓存'),
       const ButtonItem(icon: Icons.qr_code_scanner, title: '同步成绩到水鱼', subtitle: '扫码抓取并同步最新成绩'),
       const ButtonItem(icon: Icons.cloud_sync, title: '同步成绩到落雪', subtitle: '将本地成绩同步到落雪咖啡屋'),
+      const ButtonItem(icon: Icons.cloud_upload_outlined, title: '同步成绩到 AWMC NET', subtitle: '用机台二维码导入成绩到 AWMC NET'),
       if (isDivingFishLoggedIn)
         const ButtonItem(icon: Icons.logout, title: '登出水鱼账号', subtitle: '清除水鱼登录状态')
       else
@@ -81,6 +82,8 @@ class FeatureRegistry {
       const ButtonItem(icon: Icons.update, title: '检查更新', subtitle: '检查应用是否有新版本'),
       const ButtonItem(icon: Icons.info_outline, title: '关于 APP', subtitle: '了解项目与版本信息'),
       const ButtonItem(icon: Icons.poll_outlined, title: '问卷调查', subtitle: '助力 ChiffonMai 更上一层楼'),
+      const ButtonItem(icon: Icons.public, title: '访问官方网站', subtitle: '前往 chiffonmai.cloud 查看项目主页'),
+      const ButtonItem(icon: Icons.groups_outlined, title: '加入 QQ 群', subtitle: '一键跳转官方交流群'),
       const ButtonItem(icon: Icons.volunteer_activism, title: '支持开发者', subtitle: '支持项目持续更新'),
       const ButtonItem(icon: Icons.manage_accounts, title: '账号管理', subtitle: '查看已绑定的水鱼账号信息'),
       const ButtonItem(icon: Icons.backup, title: '数据备份', subtitle: '导入或导出本地数据'),

@@ -8,6 +8,8 @@ import '../../constant/CacheKeyConstant.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 import '../../service/History/ChartHistoryStore.dart';
 import 'ProberException.dart';
+import '../../utils/CurrentDataSourceNotifier.dart';
+import '../../service/AccountSwitchService.dart';
 
 class UserPlayDataManager {
   // 单例模式
@@ -22,7 +24,9 @@ class UserPlayDataManager {
   static const String _apiUrl = ApiUrls.UserPlayDataApi;
 
   // 从 API 获取用户游玩数据（经后端 OAuth 代理，后端自动换票并代理水鱼 /player/records）
-  Future<Map<String, dynamic>?> fetchUserPlayData(String qq) async {
+  Future<Map<String, dynamic>?> fetchUserPlayData(
+    String qq,
+  ) async {
     try {
       // 构建 API URL
       final url = Uri.parse('$_apiUrl?qq=$qq');
@@ -45,17 +49,6 @@ class UserPlayDataManager {
           }
           return null;
         }
-
-        // 保存到缓存
-        await _saveToCache(data);
-
-        // 顺手把这次拿到的成绩记进本机历史（Rating / 单谱达成率 / DX 分曲线）。
-        // 说明：**不 await、失败也不影响这里**——采集是纯本地 diff + 落盘，
-        // 而且是"能记就赚、记不上就少一条"，绝不能拖慢或打断刷新成绩。
-        // 好友对比会借用同一个方法拉好友的成绩，那段用
-        // ChartHistoryStore.runWithoutRecording 包住了（见 FriendCompareService）。
-        unawaited(ChartHistoryStore.instance
-            .recordChartSnapshot(data, reason: 'fetchUserPlayData'));
 
         debugPrint('成功从 API 获取用户游玩数据');
         return data;
@@ -138,7 +131,7 @@ class UserPlayDataManager {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = prefs.getString(CacheKeyConstant.userPlayData);
-      
+
       if (jsonString != null) {
         return json.decode(jsonString);
       }
@@ -149,31 +142,23 @@ class UserPlayDataManager {
     }
   }
 
-  // 保存数据到缓存
-  Future<void> _saveToCache(Map<String, dynamic> data) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(CacheKeyConstant.userPlayData, json.encode(data));
-      await prefs.setInt(_lastUpdateKey, DateTime.now().millisecondsSinceEpoch);
-    } catch (e) {
-      debugPrint('保存用户游玩数据到缓存时出错: $e');
-    }
-  }
-
-  /// 恢复缓存数据（用于对比好友战绩后恢复本地数据不被覆盖）
-  Future<void> restoreCache(Map<String, dynamic> data) async {
-    await _saveToCache(data);
-  }
-
-  // 清除缓存
-  Future<void> clearCache() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(CacheKeyConstant.userPlayData);
-      await prefs.remove(_lastUpdateKey);
-    } catch (e) {
-      debugPrint('清除用户游玩数据缓存时出错: $e');
-    }
+  /// 查询本身只返回数据；只有持有刷新事务的调用方才能提交自己的成绩。
+  Future<void> storeFetchedData(
+    Map<String, dynamic> data, {
+    required RefreshDataSource source,
+    required String accountId,
+  }) async {
+    AccountSwitchService.requireRefresh(source);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(CacheKeyConstant.userPlayData, json.encode(data));
+    final updateKey = source == RefreshDataSource.awmc
+        ? 'awmc_net_user_play_data_last_update'
+        : _lastUpdateKey;
+    await prefs.setInt(updateKey, DateTime.now().millisecondsSinceEpoch);
+    await prefs.remove(CacheKeyConstant.recommendationResults);
+    final historyFuture = ChartHistoryStore.instance.recordChartSnapshot(data,
+        sourceKey: source.key, accountId: accountId, reason: 'refresh');
+    unawaited(historyFuture);
   }
 
   // 获取最后更新时间

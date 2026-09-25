@@ -13,14 +13,10 @@ import 'QrQuickFillButtons.dart';
 
 /// 同步成绩相关的回调上下文：用于让同步对话框在父页面（首页 / 我的）之间复用。
 class SyncCallbacks {
-  /// 当前缓存的 QQ
-  final String cachedQQ;
 
   /// 同步成功后保存新 QQ
   final Future<void> Function(String qq) onSaveQQ;
 
-  /// 同步成功后保存数据源
-  final Future<void> Function(String source) onSaveLastDataSource;
 
   /// 同步完成后自动刷新本地数据（用于继续展示进度）
   final Future<void> Function({
@@ -34,9 +30,7 @@ class SyncCallbacks {
   final Future<void> Function() onLoginStateChanged;
 
   const SyncCallbacks({
-    required this.cachedQQ,
     required this.onSaveQQ,
-    required this.onSaveLastDataSource,
     required this.onRefreshAfterSync,
     required this.onLoginStateChanged,
   });
@@ -458,14 +452,13 @@ Future<DivingFishSyncOutcome> executeDivingFishSync(
 
   onProgress(0.70, '同步成功！正在刷新本地数据...');
 
-  String? qq = callbacks.cachedQQ.isNotEmpty ? callbacks.cachedQQ : null;
+  String? qq = await DivingFishProbeManager().fetchBindQQ();
   qq ??= await DivingFishProbeManager().fetchBindQQ();
   final hasQQ = qq != null && qq.isNotEmpty;
 
   var refreshed = false;
   if (hasQQ) {
-    await callbacks.onSaveQQ(qq!);
-    await callbacks.onSaveLastDataSource('shuiyu');
+    await callbacks.onSaveQQ(qq);
     await callbacks.onRefreshAfterSync(
       qq: qq,
       onProgress: (p, t) => onProgress(p, t),
@@ -717,9 +710,7 @@ class SyncScoreDialogs {
                                 progress = 0.70;
                               });
 
-                              String? qq = callbacks.cachedQQ.isNotEmpty
-                                  ? callbacks.cachedQQ
-                                  : null;
+                              String? qq = await DivingFishProbeManager().fetchBindQQ();
                               if (qq == null) {
                                 qq = await DivingFishProbeManager()
                                     .fetchBindQQ();
@@ -727,12 +718,11 @@ class SyncScoreDialogs {
                               final hasQQ = qq != null && qq.isNotEmpty;
                               if (hasQQ) {
                                 await callbacks.onSaveQQ(qq);
-                                await callbacks.onSaveLastDataSource('shuiyu');
                               }
 
                               if (hasQQ) {
                                 await callbacks.onRefreshAfterSync(
-                                  qq: qq!,
+                                  qq: qq,
                                   onProgress: (p, t) {
                                     setState(() {
                                       progress = p;
@@ -980,9 +970,7 @@ class SyncScoreDialogs {
                                   statusText = '同步成功！正在刷新本地数据...';
                                   progress = 0.70;
                                 });
-                                String? qq = callbacks.cachedQQ.isNotEmpty
-                                    ? callbacks.cachedQQ
-                                    : null;
+                                String? qq = await DivingFishProbeManager().fetchBindQQ();
                                 if (qq == null) {
                                   qq = await DivingFishProbeManager()
                                       .fetchBindQQ();
@@ -990,8 +978,6 @@ class SyncScoreDialogs {
                                 final hasQQ = qq != null && qq.isNotEmpty;
                                 if (hasQQ) {
                                   await callbacks.onSaveQQ(qq);
-                                  await callbacks
-                                      .onSaveLastDataSource('shuiyu');
                                   await callbacks.onRefreshAfterSync(
                                     qq: qq,
                                     onProgress: (p, t) {

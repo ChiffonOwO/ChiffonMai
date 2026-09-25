@@ -13,7 +13,8 @@ import '../service/SyncStatsService.dart';
 /// 收敛到这里之后：
 ///   * **线路**：内存里只有一份，落盘仍走 [SyncRouteStore]（同一套 prefs 键），
 ///     两个页面读写同一份记忆；
-///   * **统计**：4 个组合只拉一次，谁先加载完另一边直接复用。
+///   * **统计**：所有槽位（[SyncStatsService.allSlots]，含 AWMC NET 二维码直传）
+///     只拉一次，谁先加载完另一边直接复用。
 ///
 /// 统计是**所有使用者共享**的聚合（Redis 里近 100 次），别处的同步随时会改变它，
 /// 所以这里还会**定时重拉**把 UI 刷新到最新：
@@ -159,20 +160,37 @@ class SyncRouteNotifier extends ChangeNotifier {
   }
 
   /// 某平台的当前线路（[SyncRouteStore.routeScoreHub] / [SyncRouteStore.routeAwmc]）。
-  int routeOf(SyncPlatform platform) =>
-      platform == SyncPlatform.divingFish ? _divingFishRoute : _luoXueRoute;
+  ///
+  /// ⚠️ **没有线路可选的平台**（[SyncPlatform.awmc] 只有二维码直传）会抛
+  /// [ArgumentError]：与其悄悄返回「落雪那条线路」这种错值，不如当场叫停 ——
+  /// 给 AWMC NET 画线路切换器本身就是调用方的 bug。
+  int routeOf(SyncPlatform platform) => switch (platform) {
+        SyncPlatform.divingFish => _divingFishRoute,
+        SyncPlatform.luoXue => _luoXueRoute,
+        SyncPlatform.awmc => throw ArgumentError.value(
+            platform,
+            'platform',
+            'AWMC NET 只有二维码直传，没有线路可选（统计槽位见 SyncLine.direct）',
+          ),
+      };
 
-  /// 某平台**当前所选线路**的统计；Redis 不可用时为 null（UI 显示「统计不可用」）。
-  SyncStats? statsFor(SyncPlatform platform) {
-    final line = routeOf(platform) == SyncRouteStore.routeAwmc
+  /// 平台对应的**统计线路**。
+  ///
+  /// 水鱼 / 落雪看用户选的线路；AWMC NET 恒为 [SyncLine.direct]。
+  SyncLine lineOf(SyncPlatform platform) {
+    if (platform == SyncPlatform.awmc) return SyncLine.direct;
+    return routeOf(platform) == SyncRouteStore.routeAwmc
         ? SyncLine.awmc
         : SyncLine.scoreHub;
-    return _stats['${line.key}:${platform.key}'];
   }
+
+  /// 某平台**当前所选线路**的统计；Redis 不可用时为 null（UI 显示「统计不可用」）。
+  SyncStats? statsFor(SyncPlatform platform) =>
+      statsOf(lineOf(platform), platform);
 
   /// 某个「线路 + 平台」组合的统计（详情弹窗用）。
   SyncStats? statsOf(SyncLine line, SyncPlatform platform) =>
-      _stats['${line.key}:${platform.key}'];
+      _stats[SyncStatsService.slotOf(line, platform)];
 
   /// 首次进入时调用：读线路 + 拉统计。重复调用安全（幂等）。
   Future<void> ensureLoaded() async {
@@ -192,6 +210,15 @@ class SyncRouteNotifier extends ChangeNotifier {
 
   /// 切换线路并落盘（两个页面共用，谁切都生效）。
   Future<void> setRoute(SyncPlatform platform, int route) async {
+    // 先在这儿拦一道：给没有线路的平台切线路是调用方 bug，
+    // 别等落盘了才发现记了个永远不会被读到的值。
+    if (platform == SyncPlatform.awmc) {
+      throw ArgumentError.value(
+        platform,
+        'platform',
+        'AWMC NET 只有二维码直传，不需要线路',
+      );
+    }
     if (platform == SyncPlatform.divingFish) {
       _divingFishRoute = route;
     } else {
@@ -208,7 +235,7 @@ class SyncRouteNotifier extends ChangeNotifier {
     }
   }
 
-  /// 拉取 4 个组合的统计（一次 Redis 连接）。
+  /// 拉取全部槽位的统计（一次 Redis 连接）。
   ///
   /// [silent] = true 时是**定时轮询**用的静默刷新：不改「加载中」状态、
   /// 不提前 notify，只在数据真正回来后刷一次 UI —— 否则那一行会每隔一分钟
@@ -220,10 +247,7 @@ class SyncRouteNotifier extends ChangeNotifier {
       notifyListeners();
     }
     try {
-      final queries = <(SyncLine, SyncPlatform)>[
-        for (final line in SyncLine.values)
-          for (final platform in SyncPlatform.values) (line, platform),
-      ];
+      final queries = SyncStatsService.allSlots;
       final loader = debugStatsLoader;
       final next = loader != null
           ? await loader(queries)

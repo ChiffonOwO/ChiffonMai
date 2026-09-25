@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:my_first_flutter_app/constant/CacheKeyConstant.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
+import 'CurrentDataSourceNotifier.dart';
 
 /// 导出图片共享个人信息组件
 class ExportUserInfoWidget {
@@ -228,11 +229,8 @@ class ExportUserInfoWidget {
       final plateId = prefs.getInt(CacheKeyConstant.selectedPlateIdCache);
 
       // 读取数据源
-      final lastDataSource =
-          prefs.getString(CacheKeyConstant.lastDataSource) ?? '';
-      final dataSource = lastDataSource == 'luoxue'
-          ? '落雪'
-          : (lastDataSource == 'shuiyu' ? '水鱼' : '');
+      final dataSource = RefreshDataSource.displayNameOfKey(
+          prefs.getString(CacheKeyConstant.lastDataSource));
 
       // 格式化导出时间
       final exportTimeStr =

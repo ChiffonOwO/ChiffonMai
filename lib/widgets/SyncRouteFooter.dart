@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../service/SyncStatsService.dart';
 import '../utils/SyncRouteNotifier.dart';
 import 'SyncRouteSwitcher.dart';
-import 'SyncStatsView.dart';
+import 'SyncStatsFooter.dart';
 
 /// 「同步成绩到水鱼 / 落雪」入口下方的统一附加区：**线路切换 + 近 100 次统计**。
 ///
@@ -12,6 +12,9 @@ import 'SyncStatsView.dart';
 ///   * 两边显示的线路与统计永远一致（同一份内存状态 + 同一套 prefs 键）；
 ///   * 在哪边切线路，另一边立刻跟着变；
 ///   * 统计只拉一次，不用两个页面各拉一遍。
+///
+/// 统计那一行的文案/取数在 [SyncStatsFooter.line]，与 AWMC NET 那个
+/// 无线路的页脚共用。
 class SyncRouteFooter extends StatelessWidget {
   /// 这个入口对应的平台（水鱼 / 落雪）。
   final SyncPlatform platform;
@@ -46,15 +49,10 @@ class SyncRouteFooter extends StatelessWidget {
                   (value) => notifier.setRoute(platform, value),
             ),
             const SizedBox(height: 4),
-            SyncStatsView.summaryLine(
+            // 统计跟着**当前线路**走，所以 slot 在这里现算（不能提到 build 外面）
+            SyncStatsFooter.line(
               context,
-              stats: notifier.statsFor(platform),
-              loading: notifier.statsLoading,
-              // 长按/悬停看数据新鲜度（那行字本身必须够短，塞不下）
-              tooltip: notifier.statsRefreshFailed
-                  ? '${notifier.statsAgeText} · 上次刷新失败，显示的是旧数据'
-                  : notifier.statsAgeText,
-              onTap: () => SyncStatsView.showDetail(context),
+              slot: (notifier.lineOf(platform), platform),
             ),
           ],
         );

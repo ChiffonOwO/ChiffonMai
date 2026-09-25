@@ -71,7 +71,6 @@ class _FeatureCategoryPageState extends State<FeatureCategoryPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
     final safeBottom = MediaQuery.of(context).padding.bottom;
-    final Color textPrimaryColor = Theme.of(context).colorScheme.onSurface;
     final Color cardBgColor = Theme.of(context).colorScheme.surface.withValues(alpha: 0.9);
     final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
 

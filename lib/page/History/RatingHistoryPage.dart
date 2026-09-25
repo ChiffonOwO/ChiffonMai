@@ -6,6 +6,7 @@ import '../../service/History/ChartHistoryStore.dart';
 import '../../utils/AppTheme.dart';
 import '../../utils/CommonWidgetUtil.dart';
 import '../../utils/CurrentDataSourceNotifier.dart';
+import '../../utils/UserProfileNotifier.dart';
 import '../../widgets/HistoryLineChart.dart';
 import '../../widgets/PageTopBar.dart';
 
@@ -28,6 +29,7 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
   /// 0 = 全部。
   int _rangeDays = 90;
 
+  int _loadGeneration = 0;
   bool _loading = true;
   List<RatingPoint> _all = const [];
   ChartHistorySummary? _summary;
@@ -35,15 +37,36 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
   @override
   void initState() {
     super.initState();
+    CurrentDataSourceNotifier.instance.addListener(_onSourceChanged);
+    UserProfileNotifier.instance.addListener(_onSourceChanged);
     _load();
   }
 
+  @override
+  void dispose() {
+    CurrentDataSourceNotifier.instance.removeListener(_onSourceChanged);
+    UserProfileNotifier.instance.removeListener(_onSourceChanged);
+    super.dispose();
+  }
+
+  void _onSourceChanged() {
+    if (mounted) _load();
+  }
+
   Future<void> _load() async {
-    setState(() => _loading = true);
+    final generation = ++_loadGeneration;
+    setState(() {
+      _loading = true;
+      _all = const [];
+      _summary = null;
+    });
     try {
-      final series = await ChartHistoryStore.instance.ratingSeries();
-      final summary = await ChartHistoryStore.instance.summary();
-      if (!mounted) return;
+      final sourceKey = await ChartHistoryStore.storageKey();
+      final series =
+          await ChartHistoryStore.instance.ratingSeries(sourceKey: sourceKey);
+      final summary =
+          await ChartHistoryStore.instance.summary(sourceKey: sourceKey);
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _all = series;
         _summary = summary;
@@ -51,7 +74,7 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
       });
     } catch (e) {
       debugPrint('[RatingHistory] 读取失败: $e');
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() => _loading = false);
     }
   }
@@ -62,12 +85,11 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
     final cutoff = DateTime.now()
         .subtract(Duration(days: _rangeDays))
         .millisecondsSinceEpoch;
-    final filtered =
-        _all.where((p) => p.tMs >= cutoff).toList(growable: false);
+    final filtered = _all.where((p) => p.tMs >= cutoff).toList(growable: false);
     // 范围里只剩一个点时，把范围前最后一个点也带上，曲线才有起点可比
     if (filtered.length == 1) {
       final idx = _all.indexOf(filtered.first);
-      if (idx > 0) return [ _all[idx - 1], filtered.first ];
+      if (idx > 0) return [_all[idx - 1], filtered.first];
     }
     return filtered.isEmpty ? _all.sublist(_all.length - 1) : filtered;
   }
@@ -160,7 +182,7 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
             ),
           const SizedBox(height: 4),
           Text(
-            '水鱼 / 落雪 各记各的历史，切换账号不会串。'
+            '水鱼 / 落雪 / AWMC NET 按账号分别记录历史。'
             '${summary?.firstRecordedText ?? ''}'
             '（历史只能从现在开始攒：水鱼与落雪都不提供历史成绩接口）',
             style: TextStyle(
@@ -195,9 +217,8 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
     if (visible.isEmpty) return const SizedBox.shrink();
     final current = visible.last;
     final best = visible.reduce((a, b) => a.rating >= b.rating ? a : b);
-    final delta = visible.length >= 2
-        ? visible.last.rating - visible.first.rating
-        : 0;
+    final delta =
+        visible.length >= 2 ? visible.last.rating - visible.first.rating : 0;
 
     Widget cell(String label, String value, {Color? color}) => Expanded(
           child: Column(
@@ -275,8 +296,8 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
     final axis = niceAxisRange(minR, maxR);
 
     final spots = [for (final p in visible) FlSpot(x(p), p.rating.toDouble())];
-    final bestIdx =
-        visible.indexWhere((p) => p.rating == ratings.reduce((a, b) => a > b ? a : b));
+    final bestIdx = visible
+        .indexWhere((p) => p.rating == ratings.reduce((a, b) => a > b ? a : b));
 
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),

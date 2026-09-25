@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../service/History/ChartHistoryCore.dart';
 import '../service/History/ChartHistoryStore.dart';
 import '../utils/AppTheme.dart';
+import '../utils/CurrentDataSourceNotifier.dart';
+import '../utils/UserProfileNotifier.dart';
 import 'HistoryLineChart.dart';
 
 /// 曲目详情页里的「这张谱面的成绩历史」区块（达成率曲线 + DX 曲线）。
@@ -64,6 +66,7 @@ class ChartHistorySection extends StatefulWidget {
 enum _HistoryMetric { achievement, dxScore }
 
 class _ChartHistorySectionState extends State<ChartHistorySection> {
+  int _loadGeneration = 0;
   bool _loading = true;
   List<ChartHistoryEvent> _events = const [];
   ChartBaseline? _baseline;
@@ -72,7 +75,20 @@ class _ChartHistorySectionState extends State<ChartHistorySection> {
   @override
   void initState() {
     super.initState();
+    CurrentDataSourceNotifier.instance.addListener(_onSourceChanged);
+    UserProfileNotifier.instance.addListener(_onSourceChanged);
     _load();
+  }
+
+  @override
+  void dispose() {
+    CurrentDataSourceNotifier.instance.removeListener(_onSourceChanged);
+    UserProfileNotifier.instance.removeListener(_onSourceChanged);
+    super.dispose();
+  }
+
+  void _onSourceChanged() {
+    if (mounted) _load();
   }
 
   @override
@@ -86,16 +102,20 @@ class _ChartHistorySectionState extends State<ChartHistorySection> {
   }
 
   Future<void> _load() async {
+    final generation = ++_loadGeneration;
     setState(() => _loading = true);
     try {
+      final songId = widget.songId;
+      final levelIndex = widget.levelIndex;
       final store = ChartHistoryStore.instance;
+      final sourceKey = await ChartHistoryStore.storageKey();
       final events =
-          await store.chartEvents(widget.songId, widget.levelIndex);
+          await store.chartEvents(songId, levelIndex, sourceKey: sourceKey);
       // 没有事件时才需要基线（用来区分"没记录过"和"记录过但没变化"）
       final baseline = events.isEmpty
-          ? await store.chartBaseline(widget.songId, widget.levelIndex)
+          ? await store.chartBaseline(songId, levelIndex, sourceKey: sourceKey)
           : null;
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _events = events;
         _baseline = baseline;
@@ -103,7 +123,7 @@ class _ChartHistorySectionState extends State<ChartHistorySection> {
       });
     } catch (e) {
       debugPrint('[ChartHistory] 读取谱面历史失败（忽略）: $e');
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _events = const [];
         _baseline = null;
@@ -129,8 +149,7 @@ class _ChartHistorySectionState extends State<ChartHistorySection> {
       if (base == null) return const SizedBox.shrink();
       // 记录过、但成绩还没变化过 → 给一行，让用户知道功能是活的、曲线在等数据
       final dxText = base.dxScore > 0 ? '，DX ${base.dxScore}' : '';
-      final whenText =
-          base.tMs > 0 ? '（${_formatDate(base.tMs)}）' : '';
+      final whenText = base.tMs > 0 ? '（${_formatDate(base.tMs)}）' : '';
       return _wrap(
         widget.textPadding,
         Text(

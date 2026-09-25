@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/entity/AWMC/MaimaiServerStatusModel.dart';
 import 'package:my_first_flutter_app/entity/AWMC/MaimaiServerStatusTitleModel.dart';

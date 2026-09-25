@@ -7,7 +7,8 @@ import '../service/SyncStatsService.dart';
 /// 显示位置（线路1 / 线路2 都有）：
 ///   * 「系统 → 同步成绩到水鱼 / 落雪」每个 tile 的线路切换器下面一行小字：
 ///     `近 100 次 · 平均 12.3s · 成功率 96%`，点它打开详情；
-///   * 详情弹窗并排比较 4 个组合（线路1/线路2 × 水鱼/落雪）；
+///   * 「同步成绩到 AWMC NET」对话框里同样一行（二维码直传，没有线路切换器）；
+///   * 详情弹窗按线路分组列出全部槽位（线路1/线路2 × 水鱼/落雪 + 二维码直传）；
 ///   * 「系统 → AWMC 网关 → 连通性与用量」里也有一行入口。
 class SyncStatsView {
   SyncStatsView._();
@@ -67,13 +68,9 @@ class SyncStatsView {
     return Tooltip(message: tooltip, child: line);
   }
 
-  /// 详情弹窗：4 个组合的耗时与成功率。
+  /// 详情弹窗：所有槽位的耗时与成功率（按线路分组）。
   static Future<void> showDetail(BuildContext context) async {
-    final queries = <(SyncLine, SyncPlatform)>[
-      for (final line in SyncLine.values)
-        for (final platform in SyncPlatform.values) (line, platform),
-    ];
-    final stats = await SyncStatsService.loadMany(queries);
+    final stats = await SyncStatsService.loadMany(SyncStatsService.allSlots);
     if (!context.mounted) return;
 
     await showDialog<void>(
@@ -94,21 +91,26 @@ class SyncStatsView {
                       fontSize: 12, color: scheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 12),
-                for (final line in SyncLine.values) ...[
-                  Text(
-                    line.label,
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 4),
-                  for (final platform in SyncPlatform.values)
-                    _row(
-                      ctx,
-                      platform.label,
-                      stats['${line.key}:${platform.key}'],
+                // 按 SyncLine 分组、组内平台取自 allSlots 而不是叉乘：
+                // 二维码直传没有线路，叉乘会多出一堆永远「暂无记录」的行。
+                for (final line in SyncLine.values)
+                  if (_hasSlotFor(line)) ...[
+                    Text(
+                      line.label,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w700),
                     ),
-                  const SizedBox(height: 10),
-                ],
+                    const SizedBox(height: 4),
+                    for (final (slotLine, platform)
+                        in SyncStatsService.allSlots)
+                      if (slotLine == line)
+                        _row(
+                          ctx,
+                          platform.label,
+                          stats[SyncStatsService.slotOf(line, platform)],
+                        ),
+                    const SizedBox(height: 10),
+                  ],
               ],
             ),
           ),
@@ -122,6 +124,9 @@ class SyncStatsView {
       },
     );
   }
+
+  static bool _hasSlotFor(SyncLine line) =>
+      SyncStatsService.allSlots.any((slot) => slot.$1 == line);
 
   static Widget _row(BuildContext context, String name, SyncStats? stats) {
     final scheme = Theme.of(context).colorScheme;

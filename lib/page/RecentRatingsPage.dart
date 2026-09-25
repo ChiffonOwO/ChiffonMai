@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../api/ApiUrls.dart';
 import '../entity/DivingFish/Song.dart';
@@ -9,6 +8,7 @@ import '../utils/AppTheme.dart';
 import '../utils/AppConstants.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/CoverUtil.dart';
+import '../utils/CurrentDataSourceNotifier.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 import '../widgets/PageTopBar.dart';
 
@@ -360,9 +360,10 @@ class _RecentRatingsPageState extends State<RecentRatingsPage> {
   }
 
   String _getUserIdDisplay(RatingRecordItem rating) {
-    final ds = rating.dataSource ?? '';
-    if (ds == 'shuiyu') return '水鱼用户';
-    if (ds == 'luoxue') return '落雪用户';
+    // 三个源都认（原来只判断 shuiyu / luoxue，AWMC NET 会掉到下面显示原始 uid）。
+    // 用短名：这里拼出来是「AWMC用户」，全名会变成「AWMC NET用户」，读着别扭。
+    final label = RefreshDataSource.shortDisplayNameOfKey(rating.dataSource);
+    if (label.isNotEmpty) return '$label用户';
     final uid = rating.userId;
     return uid.length > 8 ? '${uid.substring(0, 8)}...' : uid;
   }

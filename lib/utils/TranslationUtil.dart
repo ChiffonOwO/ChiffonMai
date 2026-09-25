@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart';
-import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/DeveloperToken.dart';
 import 'package:intl/intl.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';

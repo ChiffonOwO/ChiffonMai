@@ -36,9 +36,13 @@ void main() {
 
     expect(titles, contains('同步成绩到水鱼'));
     expect(titles, contains('同步成绩到落雪'));
+    expect(titles, contains('同步成绩到 AWMC NET'));
+    expect(titles, contains('访问官方网站'));
+    expect(titles, contains('加入 QQ 群'));
     expect(titles, contains('数据备份'));
     expect(titles, contains('主题与背景'));
-    // 15 个公开入口 + 开关打开时多一个「AWMC 网关」
-    expect(titles.length, FeatureFlags.awmcGateway ? 16 : 15);
+    // 18 个公开入口 + 开关打开时多一个「AWMC 网关」
+    expect(titles.length, FeatureFlags.awmcGateway ? 19 : 18,
+        reason: '往「系统」分类加/删入口时，这里的数字要一起改');
   });
 }

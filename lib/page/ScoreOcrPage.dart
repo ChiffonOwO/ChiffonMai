@@ -609,7 +609,7 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
     String qq = '';
     try {
       final prefs = await SharedPreferences.getInstance();
-      qq = prefs.getString('cachedQQ') ?? '';
+      qq = prefs.getString(CacheKeyConstant.probeDivingFishBindQQ) ?? '';
 
       final jwt = prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '';
       if (jwt.isNotEmpty) {
@@ -625,7 +625,7 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
           if (resp.statusCode == 200) {
             final p = json.decode(resp.body) as Map<String, dynamic>;
             final bindQQ = p['bind_qq']?.toString() ?? '';
-            if (bindQQ.isNotEmpty) qq = bindQQ;
+            qq = bindQQ;
           }
         } catch (e) {
           debugPrint('[ScoreOcr] 拉取水鱼 profile 失败: $e');

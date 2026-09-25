@@ -24,6 +24,8 @@ import '../../entity/DivingFish/RecordItem.dart';
 import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 import '../../widgets/PageTopBar.dart';
+import '../../service/AccountStore.dart';
+import '../../service/AccountSwitchService.dart';
 
 class B50Page extends StatefulWidget {
   final Map<String, dynamic>? b50Data;
@@ -73,6 +75,8 @@ class _B50PageState extends State<B50Page> {
 
   Future<void> _loadB50Data() async {
     try {
+      _snapshotRevision = AccountSwitchService.revision;
+      _snapshotKey = 'b50_snapshots_${await AccountStore.accountKey()}';
       // 加载maimai音乐数据
       if (await MaimaiMusicDataManager().hasCachedData()) {
         final songs = await MaimaiMusicDataManager().getCachedSongs();
@@ -541,7 +545,6 @@ class _B50PageState extends State<B50Page> {
       );
     }
 
-    final Color textPrimaryColor = Theme.of(context).colorScheme.onSurface;
     final double borderRadiusSmall = 8.0;
     final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
     final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
@@ -608,13 +611,16 @@ class _B50PageState extends State<B50Page> {
   }
 
   // Best50 历史快照
-  static const String _snapshotKey = 'b50_snapshots';
+  int _snapshotRevision = -1;
+  String? _snapshotKey;
   List<Map<String, dynamic>> _snapshots = [];
 
   Future<void> _loadSnapshots() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString(_snapshotKey);
+      if (_snapshotKey == null) return;
+      _snapshots = [];
+      final jsonStr = prefs.getString(_snapshotKey!);
       if (jsonStr != null && jsonStr.isNotEmpty) {
         _snapshots = (json.decode(jsonStr) as List).map((e) => e as Map<String, dynamic>).toList();
       }
@@ -623,6 +629,13 @@ class _B50PageState extends State<B50Page> {
 
   Future<void> _saveSnapshot() async {
     if (_b50Data == null) return;
+    if (AccountSwitchService.isBusy || _snapshotRevision != AccountSwitchService.revision) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('账号数据已更新，请重新打开 Best50 后保存')));
+      }
+      return;
+    }
     try {
       await _loadSnapshots();
       final now = DateTime.now();
@@ -638,7 +651,7 @@ class _B50PageState extends State<B50Page> {
       if (_snapshots.length > 10) _snapshots = _snapshots.take(10).toList();
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_snapshotKey, json.encode(_snapshots));
+      await prefs.setString(_snapshotKey!, json.encode(_snapshots));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Best50 记录已保存 ($dateStr)'), duration: Duration(seconds: 1)));
@@ -652,7 +665,7 @@ class _B50PageState extends State<B50Page> {
     try {
       _snapshots.removeAt(index);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_snapshotKey, json.encode(_snapshots));
+      await prefs.setString(_snapshotKey!, json.encode(_snapshots));
     } catch (_) {}
   }
 

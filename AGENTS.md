@@ -140,7 +140,50 @@ android:launchMode="singleTask"   <!-- 全局单实例，后续启动走 onNewIn
 
 ---
 
-## 8. 验证方式（重要）
+## 8. 滚动文案（跑马灯）：别直接用 `marquee` 包
+
+超长文本要横向滚动时（hub 按钮副标题、进度文案等），用 **`lib/widgets/MarqueeText.dart`**。
+
+**踩过的坑（真机反馈）**：`marquee` 包的每一轮滚动距离，是拿**开滚那一刻**量到的文本宽度
+算出来的，而两轮之间的空隙（`blankSpace`）是一个独立的 `SizedBox` 项。这类文案往往
+**每秒都在变**（`正在导入成绩…已等待 12 秒` → `已等待 13 秒`）：宽度一变，内容就在视口下
+整体平移，于是「轮末停顿」的落点漂到 ±`blankSpace` 之间 —— 表现就是**停下来时第一个字
+前面空出约两个字**（实测 +17.9px @ textScale 1.5；同一处也可能是 -12 ~ -37px，变成第一个
+字被切掉）。文案一成不变时完全看不出来，所以很容易被当成偶发问题。
+
+`MarqueeText` 的位移是 `相位 × 周期`，周期**每帧按当前文本宽度重算**，所以：
+
+- 停顿时的位移恒等于整数个周期 → 左边缘永远正好落在第一个字上；
+- 文本中途变宽/变窄只会让当帧平移几像素，不会把停顿位置顶歪；
+- 两份文本由我们自己摆放，**即使量宽度量歪了**停顿位置仍然对齐（误差只体现为空隙大小）。
+
+回归测试：`test/marquee_text_test.dart` —— 跑到每一个停顿处，断言第一个可见字符离视口
+左边缘 ≤ 0.5px（覆盖 textScale 1.0 / 1.3 / 1.5，文案逐秒变化）。
+
+### 量文本宽度有两个「必须」
+
+`TextPainter` 不会自动帮你对齐渲染样式，两点都要自己带：
+
+1. **带 `textScaler: MediaQuery.textScalerOf(context)`**：用户把系统字体调大时，实际渲染
+   宽度是放大过的。不带的话「放不下」会被判成「放得下」，用户看到的就是被省略号截断的
+   半句话。
+2. **带环境的 `DefaultTextStyle`**：先 `DefaultTextStyle.of(context).style.merge(style)`
+   再量（`Text` 内部就是这么合并的）。ListTile 副标题是 Material 的 `bodyMedium`，
+   带 `letterSpacing`（本项目实测 0.3）—— 十几个字就差 3~4px，周期量短了，停顿就落在
+   第一个字前面空出那几个像素。
+
+### 还有一个耗电点
+
+静态文本（没溢出）时**必须停掉 ticker**。一直 `repeat()` 的 `AnimationController` 会持续
+请求新帧，整页都别想进入空闲。
+
+`lib/page/SongInfoPage.dart` 与 `lib/page/FriendLinksPage.dart` 里还有两处直接用
+`marquee` 包的地方（歌名 / 友链），它们的文案基本不变所以没暴露这个问题；
+哪天要给它们加会变化的文案，一并换到 `MarqueeText`。
+
+---
+
+## 9. 验证方式（重要）
 
 **当前开发环境没有连接安卓设备，任何改动都无法真机验证。**
 
@@ -178,7 +221,7 @@ build/app/intermediates/merged_manifests/release/processReleaseManifest/AndroidM
 
 ---
 
-## 9. 其它
+## 10. 其它
 
 - release 构建目前用 debug 签名（`android/app/build.gradle.kts`），所以 `flutter build apk --release` 可直接安装。
 - `applicationId` = `com.example.my_first_flutter_app`，但 App 显示名是 `ChiffonMai`。

@@ -86,13 +86,13 @@ class DiffBest50ConvertToImg {
       ui.Image image;
       try {
         // 尝试直接捕获图片，使用更高的pixelRatio提高清晰度
-        image = await boundary.toImage(pixelRatio: 3.0);
+        image = await boundary.toImage(pixelRatio: ImageEncodeUtil.safeCapturePixelRatio(boundary.size.width, boundary.size.height));
         debugPrint('Image captured successfully');
       } catch (e) {
         debugPrint('First capture failed: $e');
         // 重试一次
         await Future.delayed(Duration(milliseconds: 200));
-        image = await boundary.toImage(pixelRatio: 3.0);
+        image = await boundary.toImage(pixelRatio: ImageEncodeUtil.safeCapturePixelRatio(boundary.size.width, boundary.size.height));
         debugPrint('Image captured on retry');
       }
       
@@ -107,12 +107,17 @@ class DiffBest50ConvertToImg {
 
       // 将图片数据写入文件
       Uint8List pngBytes = byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes);
+      // 立刻释放 ui.Image：它本身也是上百 MB 的原生位图，而下面的 JPEG
+      // 转码还要再分配上百 MB（decodePng + copyResize）。等转码完再释放，
+      // 峰值内存会白白多一份 —— 低内存机就是这样被 OOM 掉的。
+      // 转码只用得到 pngBytes，用不到这个 image。
+      image.dispose();
 
       // 根据质量参数决定最终格式
       Uint8List finalBytes;
       String extension;
       if (jpegQuality != null) {
-        finalBytes = ImageEncodeUtil.pngToJpeg(pngBytes, quality: jpegQuality);
+        finalBytes = await ImageEncodeUtil.pngToJpegAsync(pngBytes, quality: jpegQuality);
         extension = 'jpg';
       } else {
         finalBytes = pngBytes;
@@ -120,7 +125,7 @@ class DiffBest50ConvertToImg {
       }
 
       // 释放图片资源
-      image.dispose();
+
       
       // 立即移除Overlay，避免占用资源
       overlayEntry.remove();

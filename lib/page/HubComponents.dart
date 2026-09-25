@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:marquee/marquee.dart';
 import '../utils/AppDesignTokens.dart';
+import '../widgets/MarqueeText.dart';
 
 /// Hub 页面通用组件库：Section、ActionTile、Scaffold。
 /// UI 设计原则：留白克制、卡片浮起感、主题色仅作点缀。
@@ -217,6 +217,17 @@ class HubActionTile extends StatelessWidget {
   /// 它是独立的一行，点击不会触发本 tile 的 [onTap]。
   final Widget? footer;
 
+  /// [footer] 相对 tile 底边**上提**多少像素（0 = 贴着 tile 底边，默认）。
+  ///
+  /// 为什么需要它：两行 tile 的最小高度是 72px，内容撑不满时底部本来就空着
+  /// 一截（实测副标题下面还有约 23px）。footer 里如果只有一行小字（统计行），
+  /// 那截空白就会变成「离按钮有点远」的观感。
+  ///
+  /// 上提是**只改绘制位置**（`Transform`，命中测试一起走），同时把 footer 自己的
+  /// 底部内边距减掉同样多 —— 所以「footer 到下一个 tile」的间距和整体高度都不变，
+  /// 只有「按钮 ↔ footer」这一段变紧。取值 0~10（底部内边距是 10，再大就贴死了）。
+  final double footerLift;
+
   /// 可选：完全替换左侧的图标容器。
   ///
   /// 默认左侧是「圆角方块 + [icon]」；给「发现新版本」这类需要在图标上做额外
@@ -243,9 +254,11 @@ class HubActionTile extends StatelessWidget {
     this.progressCurrent,
     this.progressTotal,
     this.footer,
+    this.footerLift = 0,
     this.leading,
     this.titleColor,
-  });
+  }) : assert(footerLift >= 0 && footerLift <= 10,
+            'footerLift 只能是 0~10：底部内边距一共就 10，再多就贴死了');
 
   bool get _showStar => isFavorited != null && onToggleFavorite != null;
 
@@ -375,8 +388,14 @@ class HubActionTile extends StatelessWidget {
       children: [
         tile,
         Padding(
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-          child: footer!,
+          // 上提多少，底部内边距就减多少：footer 下方留白与整体高度都不变
+          padding: EdgeInsets.fromLTRB(14, 0, 14, 10 - footerLift),
+          child: footerLift == 0
+              ? footer!
+              : Transform.translate(
+                  offset: Offset(0, -footerLift),
+                  child: footer!,
+                ),
         ),
       ],
     );
@@ -462,8 +481,13 @@ class _StarToggleButton extends StatelessWidget {  final bool isFavorited;
   }
 }
 
-/// 副标题：宽度够就静态显示；超长才走 marquee 自动横向滚动，
+/// 副标题：宽度够就静态显示；超长才自动横向滚动，
 /// 短文本不会被无意义的循环动画干扰。
+///
+/// 滚动实现走 [MarqueeText]（**不是** `marquee` 包）：
+/// 这里的文案会逐秒变化（`已等待 12 秒`），而 marquee 包的轮末停顿位置
+/// 会随文案宽度漂移，实测会停在「第一个字前面空 18~40px」的地方。
+/// 细节与回归测试见 `lib/widgets/MarqueeText.dart`。
 class _MarqueeSubtitle extends StatelessWidget {
   final String text;
   final Color color;
@@ -479,50 +503,16 @@ class _MarqueeSubtitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textStyle = TextStyle(
-      fontSize: fontSize,
-      color: color,
-      fontWeight: fontWeight,
-    );
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // 量一下文本宽度，判断是否真需要滚动
-        final tp = TextPainter(
-          text: TextSpan(text: text, style: textStyle),
-          textDirection: TextDirection.ltr,
-          maxLines: 1,
-        )..layout(maxWidth: double.infinity);
-        final overflows = tp.size.width > constraints.maxWidth;
-
-        if (!overflows) {
-          // 短文本：纯静态，没有任何动画
-          return SizedBox(
-            height: fontSize * 1.35,
-            child: Text(
-              text,
-              style: textStyle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          );
-        }
-
-        // 溢出：marquee 自动横向滚动（无文本时仍会创建 controller，但不动画）
-        return SizedBox(
-          height: fontSize * 1.35,
-          child: Marquee(
-            text: text,
-            style: textStyle,
-            scrollAxis: Axis.horizontal,
-            blankSpace: 40,
-            velocity: 30,
-            pauseAfterRound: const Duration(milliseconds: 1500),
-            // startPadding 必须为 0：跟主标题左对齐；非 0 的话滚动起来左侧有
-            // 间隙，副标题起始位置和主标题错开。
-            startPadding: 0,
-          ),
-        );
-      },
+    return SizedBox(
+      height: fontSize * 1.35,
+      child: MarqueeText(
+        text: text,
+        style: TextStyle(
+          fontSize: fontSize,
+          color: color,
+          fontWeight: fontWeight,
+        ),
+      ),
     );
   }
 }

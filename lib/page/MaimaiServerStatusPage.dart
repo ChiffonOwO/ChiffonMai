@@ -68,7 +68,6 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
-    final screenWidth = MediaQuery.of(context).size.width;
     final safeBottom = MediaQuery.of(context).padding.bottom;
     
     // 字体大小

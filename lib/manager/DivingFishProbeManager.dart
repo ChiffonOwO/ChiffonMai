@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../api/ApiUrls.dart';
 import '../service/AWMC/AwmcPlayCountStore.dart';
 import '../constant/CacheKeyConstant.dart';
+import '../utils/CurrentDataSourceNotifier.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 // =============================================================================
@@ -604,8 +605,10 @@ class DivingFishProbeManager {
 
     // 与线路2 一样顺手刷新一次游玩次数（AWMC `/v1/user/music`）。
     // **尽力而为、绝不 await**：没令牌/超时/报错都忽略，下面的原有同步流程照走。
+    // 次数算在**水鱼**名下（这条链路同步的目标就是水鱼），别落到别的账号上。
     // 详见 AwmcPlayCountStore.refreshQuietly。
-    AwmcPlayCountStore.refreshQuietly(qrCode);
+    AwmcPlayCountStore.refreshQuietly(qrCode,
+        source: RefreshDataSource.shuiyu);
 
     // 恢复或检查认证 token；若无则直接用 QR 码登录 Hub
     final hasToken = await _ensureAuthToken();
@@ -1018,6 +1021,8 @@ class DivingFishProbeManager {
         if (bindQQ.isNotEmpty) {
           await prefs.setString(CacheKeyConstant.probeDivingFishBindQQ, bindQQ);
           _log('  bind_qq 已缓存: $bindQQ');
+        } else {
+          await prefs.remove(CacheKeyConstant.probeDivingFishBindQQ);
         }
         _log('  ✓ JWT 和 importToken 已缓存');
 
@@ -1876,8 +1881,10 @@ class DivingFishProbeManager {
 
     // 与线路2 一样顺手刷新一次游玩次数（AWMC `/v1/user/music`）。
     // **尽力而为、绝不 await**：没令牌/超时/报错都忽略，下面的原有同步流程照走。
+    // 次数算在**落雪**名下（这条链路同步的目标就是落雪），别落到别的账号上。
     // 详见 AwmcPlayCountStore.refreshQuietly。
-    AwmcPlayCountStore.refreshQuietly(qrCode);
+    AwmcPlayCountStore.refreshQuietly(qrCode,
+        source: RefreshDataSource.luoxue);
 
     _isSyncing = true;
     _cancelled = false;

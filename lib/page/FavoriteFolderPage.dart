@@ -533,7 +533,6 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
     final safeBottom = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(

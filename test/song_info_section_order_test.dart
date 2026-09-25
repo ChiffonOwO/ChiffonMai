@@ -144,7 +144,6 @@ void main() {
     for (final e in ordered) {
       final head = card.substring(0, e.value);
       final lastGap = head.lastIndexOf('SizedBox(height: 8)');
-      final lastOther = head.lastIndexOf("'玩家最佳成绩'");
       expect(lastGap, greaterThan(0), reason: '「${e.key}」上方没有 8dp 间隔');
     }
 

@@ -111,6 +111,9 @@ class _AchievementBreakdown {
   });
 }
 
+// 基础+额外评价 → 总达成率的共享算法：当前无调用点（页面内走 1872 行起的
+// 内联实现，_AchievementRateCalculatorPage 也自带一份），保留备查。
+// ignore: unused_element
 _AchievementBreakdown _calculateAchievementBreakdown({
   required List<List<int>> noteCounts, // 5 行 × 5 列 [CP, PF, GR, GD, MS]
   required List<int> breakSubs, // 8 列: [P, 100, 50, 80, 60, 50g, Go, Miss]
@@ -1992,21 +1995,6 @@ class _ScoreLineTabState extends State<_ScoreLineTab> {
             child: const Text('确定'),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _cell(String text, double screenWidth, Brightness brightness, {bool bold = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-      child: Text(
-        text,
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: screenWidth * 0.025,
-          fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-          color: AppColors.primaryText(brightness),
-        ),
       ),
     );
   }

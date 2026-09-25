@@ -6,6 +6,8 @@ import '../../utils/AppTheme.dart';
 import '../../utils/ColorUtil.dart';
 import '../../utils/StringUtil.dart';
 import '../../widgets/PageTopBar.dart';
+import '../../widgets/DataSourceTag.dart';
+import '../../utils/CurrentDataSourceNotifier.dart';
 
 class AvgScoreRankingListPage extends StatefulWidget {
   final AvgMetric initialMetric;
@@ -58,31 +60,27 @@ class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
     await _loadRankings();
   }
 
-  // 获取当前用户信息
+  /// 取当前玩家的排行榜 id（`'<source>:<id>'`）。
+  ///
+  /// 优先当前活动数据源，拿不到再按 enum 顺序找任一有标记的源；全都没有才退化到
+  /// `cachedQQ`（历史上只有水鱼写它）。原来的二元写法只认 水鱼 / 落雪，
+  /// 且 `lastDataSource == 'awmc'` 时会落到 `shuiyu` 分支，把水鱼的 id 当自己。
   Future<void> _loadCurrentUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    final lastDataSource = prefs.getString(CacheKeyConstant.lastDataSource);
-    final qq = prefs.getString(CacheKeyConstant.cachedQQ);
-    final shuiyuUserId = prefs.getString(CacheKeyConstant.shuiyuUserId);
-    final luoxueUserId = prefs.getString(CacheKeyConstant.luoxueUserId);
-
-    final hasShuiyuId = shuiyuUserId != null && shuiyuUserId.isNotEmpty;
-    final hasLuoxueId = luoxueUserId != null && luoxueUserId.isNotEmpty;
-    final hasQQ = qq != null && qq.isNotEmpty;
-
-    // 优先使用正式存储的用户ID，其次 fallback 到 cachedQQ
-    if (hasShuiyuId && !hasLuoxueId) {
-      _currentUserId = shuiyuUserId;
-    } else if (hasLuoxueId && !hasShuiyuId) {
-      _currentUserId = luoxueUserId;
-    } else if (hasShuiyuId && hasLuoxueId) {
-      _currentUserId =
-          lastDataSource == 'luoxue' ? luoxueUserId : shuiyuUserId;
-    } else if (hasQQ) {
-      _currentUserId = 'shuiyu:$qq';
-    } else {
-      _currentUserId = null;
+    final current = CurrentDataSourceNotifier.instance.value;
+    final ordered = <RefreshDataSource>[
+      current,
+      ...RefreshDataSource.values.where((s) => s != current),
+    ];
+    for (final source in ordered) {
+      final marker = prefs.getString(source.userIdCacheKey);
+      if (marker != null && marker.isNotEmpty) {
+        _currentUserId = marker;
+        return;
+      }
     }
+    final qq = prefs.getString(CacheKeyConstant.cachedQQ);
+    _currentUserId = (qq != null && qq.isNotEmpty) ? 'shuiyu:$qq' : null;
   }
 
   // 禁用按钮并在1秒后恢复
@@ -188,31 +186,10 @@ class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
           ? item.achievementCount
           : item.dxCount;
 
-  Widget _buildDataSourceTag(String dataSource, {required Brightness brightness}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: dataSource == 'shuiyu'
-            ? AppColors.linkBlue(brightness).withValues(alpha: 0.15)
-            : (brightness == Brightness.dark
-                ? Colors.purple.withValues(alpha: 0.25)
-                : Colors.purple[100]),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        dataSource == 'shuiyu' ? '水鱼' : '落雪',
-        style: TextStyle(
-          fontSize: 10,
-          color: dataSource == 'shuiyu'
-              ? AppColors.linkBlue(brightness)
-              : (brightness == Brightness.dark
-                  ? Colors.purple[200]
-                  : Colors.purple[700]),
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
+  /// 数据源标签。配色/取名统一在 [DataSourceTag] 里（原来这里抄了一份
+  /// `dataSource == 'shuiyu' ? '水鱼' : '落雪'`，AWMC NET 会被错标成落雪）。
+  Widget _buildDataSourceTag(String dataSource) =>
+      DataSourceTag(dataSource: dataSource);
 
   Widget _buildRankBadge(int rank, {required Brightness brightness}) {
     if (rank == 1) {
@@ -349,7 +326,7 @@ class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
           ),
 
           // 数据源标识
-          _buildDataSourceTag(item.dataSource, brightness: brightness),
+          _buildDataSourceTag(item.dataSource),
 
           const SizedBox(width: 12),
 
@@ -512,8 +489,7 @@ class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
                   ),
 
                   // 数据源标识
-                  _buildDataSourceTag(_currentUserRankItem!.dataSource,
-                      brightness: brightness),
+                  _buildDataSourceTag(_currentUserRankItem!.dataSource),
 
                   const SizedBox(width: 12),
 

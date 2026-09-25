@@ -91,7 +91,6 @@ class _GameRoomPageState extends State<GameRoomPage> {
   int? _audioStartTime;
   double _currentPosition = 0.0;
   double _totalDuration = 0.0;
-  int _elapsedTime = 0;
   Timer? _playbackTimer;
   AudioPlayer? _audioPlayer;
   StreamSubscription<Duration>? _positionSubscription;
@@ -3580,7 +3579,6 @@ class _GameRoomPageState extends State<GameRoomPage> {
                 onChanged: (value) {
                   setState(() {
                     _currentPosition = value;
-                    _elapsedTime = value.toInt();
                   });
                 },
                 activeColor: Colors.white,
@@ -3645,7 +3643,6 @@ class _GameRoomPageState extends State<GameRoomPage> {
         _isPlaying = true;
         _totalDuration = playDuration.toDouble();
         _currentPosition = 0.0;
-        _elapsedTime = 0;
       });
 
       // 停止之前的播放
@@ -3695,7 +3692,6 @@ class _GameRoomPageState extends State<GameRoomPage> {
           final elapsed = DateTime.now().difference(playStartTime).inMilliseconds / 1000;
           setState(() {
             _currentPosition = elapsed;
-            _elapsedTime = elapsed.toInt();
           });
           if (elapsed >= playDuration) {
             timer.cancel();
@@ -3715,7 +3711,6 @@ class _GameRoomPageState extends State<GameRoomPage> {
           final elapsed = DateTime.now().difference(playStartTime).inMilliseconds / 1000;
           setState(() {
             _currentPosition = elapsed;
-            _elapsedTime = elapsed.toInt();
           });
           if (elapsed >= playDuration) {
             timer.cancel();
@@ -3737,7 +3732,6 @@ class _GameRoomPageState extends State<GameRoomPage> {
       _isPlaying = false;
       _hasPlayed = true;
       _currentPosition = _totalDuration;
-      _elapsedTime = (_currentRoom?.playDuration ?? 5);
     });
   }
 
@@ -3772,7 +3766,6 @@ class _GameRoomPageState extends State<GameRoomPage> {
     _hasPlayed = false;
     _currentPosition = 0.0;
     _totalDuration = 0.0;
-    _elapsedTime = 0;
     _playbackTimer?.cancel();
     _positionSubscription?.cancel();
     _audioPlayer?.stop();

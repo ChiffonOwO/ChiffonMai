@@ -6,13 +6,20 @@ import 'package:redis/redis.dart';
 
 import '../api/DeveloperToken.dart';
 
-/// 同步成绩的线路（与 `SyncRouteStore` 的两个取值对应）。
+/// 同步成绩走的**通道**（前两个就是 `SyncRouteStore` 里可选的两条线路）。
 enum SyncLine {
   /// 线路1：maimai Score Hub（scorehub 探针）。
   scoreHub(key: 'scorehub', label: '线路1 · maimai Score Hub'),
 
   /// 线路2：AWMC 网关。
-  awmc(key: 'awmc', label: '线路2 · AWMC 网关');
+  awmc(key: 'awmc', label: '线路2 · AWMC 网关'),
+
+  /// **不是线路**：机台二维码直传（目前只有 AWMC NET 用）。
+  ///
+  /// 它不经过任何网关、也不依赖 [SyncRouteStore] 的线路选择，所以统计里
+  /// **自成一个槽位**，不要去和上面两个线路混着算平均（二维码导入要 30 多秒，
+  /// 混进去会把线路1/线路2 的平均耗时整体拉高，看起来像网关变慢了）。
+  direct(key: 'direct', label: '二维码直传');
 
   const SyncLine({required this.key, required this.label});
 
@@ -23,13 +30,19 @@ enum SyncLine {
 /// 同步目标平台。
 enum SyncPlatform {
   divingFish(key: 'fish', label: '水鱼'),
-  luoXue(key: 'lx', label: '落雪');
+  luoXue(key: 'lx', label: '落雪'),
+
+  /// AWMC NET 查分器（目前只有二维码直传这一条路）。
+  awmc(key: 'awmc', label: 'AWMC NET');
 
   const SyncPlatform({required this.key, required this.label});
 
   final String key;
   final String label;
 }
+
+/// 统计的**槽位**：`<线路>:<平台>`，见 [SyncStatsService.slotOf]。
+typedef SyncSlot = (SyncLine, SyncPlatform);
 
 /// 近 N 次同步的聚合结果。
 class SyncStats {
@@ -163,6 +176,9 @@ class SyncStats {
 ///     **不计样本**（算失败会拉低成功率、误导看统计的人）；
 ///   * 同一次尝试重复 `finish` → 只算一条（流程里多个分支都可能调）；
 ///   * 耗时 ≤ 0（压根没开始）→ 不计样本。
+///
+/// 落到哪个槽位由构造时的 line/platform 决定：水鱼/落雪走线路1、线路2，
+/// **AWMC NET 的二维码直传用 `(SyncLine.direct, SyncPlatform.awmc)`**。
 class SyncAttemptTracker {
   SyncAttemptTracker({required this.line, required this.platform});
 
@@ -202,8 +218,7 @@ class SyncAttemptTracker {
 
 /// 同步成绩的耗时 / 成功率统计（Redis）。
 ///
-/// 两条线路（线路1 maimai Score Hub / 线路2 AWMC 网关）× 两个平台
-/// （水鱼 / 落雪）各一条 Redis LIST，只保留**最近 100 次**：
+/// 每个「线路 × 平台」槽位一条 Redis LIST（共 [allSlots] 个），只保留**最近 100 次**：
 ///
 /// ```
 /// chiffonmai:sync_stats:<line>:<platform>     # LPUSH 新条目 + LTRIM 0 99
@@ -227,9 +242,27 @@ class SyncStatsService {
   /// 每次操作的整体超时（连不上就快速放弃，别拖住 UI）。
   static const Duration timeout = Duration(seconds: 6);
 
+  /// 全部统计槽位 —— **显式列出，不要用 `SyncLine.values × SyncPlatform.values` 的叉乘**。
+  ///
+  /// 叉乘会得到 9 个组合，其中 5 个是没意义的（二维码直传没有线路、
+  /// AWMC NET 也不走线路1/线路2），既白读 5 个空键，详情弹窗里还会多出
+  /// 一堆永远「暂无记录」的行。
+  static const List<SyncSlot> allSlots = [
+    (SyncLine.scoreHub, SyncPlatform.divingFish),
+    (SyncLine.scoreHub, SyncPlatform.luoXue),
+    (SyncLine.awmc, SyncPlatform.divingFish),
+    (SyncLine.awmc, SyncPlatform.luoXue),
+    // 机台二维码直传 → AWMC NET（30 多秒一次，单列一项）
+    (SyncLine.direct, SyncPlatform.awmc),
+  ];
+
+  /// 槽位名：`<line>:<platform>`（就是 Redis 键去掉前缀的部分）。
+  static String slotOf(SyncLine line, SyncPlatform platform) =>
+      '${line.key}:${platform.key}';
+
   /// 键名：`chiffonmai:sync_stats:<line>:<platform>`。
   static String keyFor(SyncLine line, SyncPlatform platform) =>
-      '$keyPrefix:${line.key}:${platform.key}';
+      '$keyPrefix:${slotOf(line, platform)}';
 
   /// 仅供测试：置 true 后 [record] 直接返回。
   ///
@@ -306,10 +339,8 @@ class SyncStatsService {
   /// 清空统计（调试 / 排查用；正常流程不会调用）。
   static Future<void> clearAll() async {
     await _withConnection((conn) async {
-      for (final line in SyncLine.values) {
-        for (final platform in SyncPlatform.values) {
-          await conn.send_object(['DEL', keyFor(line, platform)]);
-        }
+      for (final (line, platform) in allSlots) {
+        await conn.send_object(['DEL', keyFor(line, platform)]);
       }
     });
   }

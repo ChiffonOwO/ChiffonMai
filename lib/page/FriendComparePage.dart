@@ -8,7 +8,6 @@ import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
-import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'SongInfoPage.dart';
 import '../widgets/PageTopBar.dart';
 

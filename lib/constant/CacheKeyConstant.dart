@@ -60,14 +60,14 @@ class CacheKeyConstant {
   // 自定义 Best50 手动录入数据（50 个固定卡位）
   static const String customBest50Data = 'custom_best50_data_v1';
 
-  // ===== 双账号系统（水鱼 / 落雪各一套缓存）=====
+  // ===== 三账号系统（水鱼 / 落雪 / AWMC NET 各一套缓存）=====
   // 账号元信息（昵称 / Rating / id / 是否有缓存），一个 JSON map
   static const String accountStore = 'account_store_v1';
   // 账号身份存档（昵称 / QQ / id / 评论身份 / 排行榜参与开关）：属于用户数据，进备份
   static const String accountArchiveIdentityPrefix = 'account_archive_identity_';
   // 账号成绩存档（游玩数据 / Best50 / 推荐结果）：可重新拉取，不进备份
   static const String accountArchivePlayPrefix = 'account_archive_play_';
-  // 切换中途被杀时的恢复标记（值 = 目标数据源的 key）
+  // 活动槽事务恢复日志（JSON；兼容旧版仅保存目标源 key 的标记），不进备份
   static const String accountRotationPending = 'account_rotation_pending';
 
   // 舞萌CN探针相关
@@ -137,6 +137,10 @@ class CacheKeyConstant {
   static const String luoxueRankingsCache = 'luoxue_rankings_cache';
   static const String luoxueRankingsCacheTimestamp =
       'luoxue_rankings_cache_timestamp';
+  // AWMC NET.（net.wmc.pub）总 Rating 榜
+  static const String awmcRankingsCache = 'awmc_rankings_cache';
+  static const String awmcRankingsCacheTimestamp =
+      'awmc_rankings_cache_timestamp';
 
   // 平均值排行榜缓存相关（平均达成率 / 平均DX分数）
   static const String avgRankingsCache = 'avg_rankings_cache';
@@ -200,8 +204,29 @@ class CacheKeyConstant {
   // AWMC 调用审计日志（JSON 数组，不含 qrcode / 令牌 / 请求体）
   static const String awmcAuditLog = 'awmc_audit_log';
   // 游玩次数缓存（/v1/user/music 的 (musicId, level, playCount)）：
-  // 属于可重新拉取的缓存，且与具体账号绑定，不进备份
-  static const String awmcPlayCounts = 'awmc_play_counts_v1';
+  // 属于可重新拉取的缓存，且与具体账号绑定，不进备份。
+  //
+  // ⚠️ **按数据源分开存**（`awmc_play_counts_v1_<source>`）：水鱼 / 落雪 / AWMC NET
+  // 在账号系统里是三类**互不相干**的账号，机台游玩次数自然也各算各的 ——
+  // 共用一个键的话，换到另一个账号后谱面详情与 PC50 会显示**上一个账号**的次数。
+  /// 按源区分的游玩次数键前缀（后面接 `RefreshDataSource.key`）。
+  static const String awmcPlayCountsPrefix = 'awmc_play_counts_v1_';
+
+  /// 旧版的**共享**游玩次数键：只用于「首次读取时迁移到对应源」与备份排除，
+  /// 任何地方都不要再往里写。
+  static const String awmcPlayCountsLegacy = 'awmc_play_counts_v1';
+
+  // ===== AWMC NET. 查分器（net.wmc.pub）=====
+  // 按源区分的身份标记（`awmc:<QQ>`），与 shuiyuUserId / luoxueUserId 对等。
+  // 作用见 AccountStore._resolveActiveId：共用的 cachedQQ 在异常路径下会被别的源串号。
+  static const String awmcUserId = 'awmc_user_id';
+
+  /// AWMC NET 的成绩导入 Token（用户在 net.wmc.pub 官网「个人资料」里生成）。
+  ///
+  /// 它**等同该账号的上传权限**，所以：日志、错误文案、审计记录里都不要回显它。
+  /// 备份取舍上跟 `probeLxnsImportToken` 保持一致（不在 `_cacheExactKeys` 里，
+  /// 会随备份一起导出/还原）。
+  static const String awmcNetImportToken = 'awmc_net_import_token';
 
   // ===== 同步成绩的线路选择 =====
   // 0（或缺失）= 线路1 maimai Score Hub（原有 scorehub 流程），1 = 线路2 AWMC 网关

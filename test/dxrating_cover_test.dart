@@ -235,6 +235,14 @@ void main() {
     });
 
     test('没有本地缓存：直接用随包基线，同样不联网', () async {
+      // ⚠️ 必须显式把有效期放宽，否则这条是**定时炸弹**：
+      // 随包基线的 `generatedAt` 是**构建期**写死的，`cacheTtl` 只有 7 天，
+      // 所以构建满 7 天之后基线必然被判过期、服务端逻辑会正确地触发一次联网，
+      // `loaderCalls` 变成 1，这条就红了（实测 2026-09-24 起复现，基线是 09-17 生成的）。
+      // 它要验的是「没有本地缓存 → 用随包基线、不联网」这个**逻辑**，
+      // 不该依赖"资产刚好还很新"这种会随时间失效的前提。
+      DxRatingCoverService.debugCacheTtlOverride = const Duration(days: 3650);
+
       var loaderCalls = 0;
       DxRatingCoverService.debugDxDataLoader = () async {
         loaderCalls++;

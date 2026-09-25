@@ -1,9 +1,76 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:image/image.dart' as img;
+
+/// GPU 单边纹理尺寸的安全上限。
+///
+/// 各机型实际值常见为 4096 / 8192 / 16384，取 16000 是在 16384 上留余量。
+/// 超过它的 `toImage` 会给出**空白/黑图**，正是「导出图片黑屏」的成因。
+const double kMaxCaptureTextureSize = 16000.0;
+
+/// 允许压到的最小 pixelRatio。
+///
+/// **不是 1.0**：如果下限取 1.0，那张「逻辑高度本身就超过上限」的图会被
+/// clamp 顶回超限值，保护等于失效（原来的三份内联实现都是这个毛病）。
+/// 宁可出一张略缩的图，也不要黑屏。实际导出（宽 1200/1700、高几千）远够不到
+/// 这个下限，只有病态尺寸才会碰到。
+const double kMinCapturePixelRatio = 0.5;
+
+/// [compute] 的 worker。**必须是顶层函数**（闭包不能跨 isolate 传递）。
+Uint8List _pngToJpegWorker(Map<String, dynamic> args) {
+  return ImageEncodeUtil.pngToJpeg(
+    args['bytes'] as Uint8List,
+    quality: args['quality'] as int,
+  );
+}
 
 /// 图片编码工具类
 /// 提供 PNG ↔ JPEG 转码、文件大小预估等功能
 class ImageEncodeUtil {
+  /// 把 [pngToJpeg] 挪到后台 isolate 执行。
+  ///
+  /// 为什么必须挪：`package:image` 的 `decodePng` / `copyResize` / `encodeJpg`
+  /// 都是**纯 Dart 同步**实现。B50 导出图约 3600×7400（≈27 MP），三个步骤
+  /// 串起来要十几秒，全跑在 UI isolate 上就是**界面完全冻住** ——
+  /// 用户报的「导出卡死」就是它（只有选了 JPEG 的用户会中，所以他们
+  /// 反馈两极分化）。输入输出都是 `Uint8List`，可以安全跨 isolate 传递。
+  static Future<Uint8List> pngToJpegAsync(
+    Uint8List pngBytes, {
+    required int quality,
+  }) {
+    return compute(_pngToJpegWorker, <String, dynamic>{
+      'bytes': pngBytes,
+      'quality': quality,
+    });
+  }
+
+  /// 导出截图该用的 pixelRatio：优先 [preferred]，但**保证物理尺寸不超过
+  /// [kMaxCaptureTextureSize]**。
+  ///
+  /// 为什么必须有这道闸：B50 导出图很高（50 行，约 3600×7400 @3.0），
+  /// 物理边长一旦超过机型 GPU 的最大纹理尺寸，`toImage` 就会返回**空白/黑图**
+  /// —— 这就是「部分用户导出黑屏」；而同一次分配的位图可达上百 MB，
+  /// 又会把 App 拖死。机型越差越容易中，所以表现为「有人有问题有人没有」。
+  ///
+  /// 已经有 3 个导出服务（PaiziProgress / SongInfo / PersonalizedScore）
+  /// 各自内联过同一段逻辑，这里收成一份，别再抄第 7 份。
+  static double safeCapturePixelRatio(
+    double width,
+    double height, {
+    double preferred = 3.0,
+  }) {
+    if (width <= 0 || height <= 0) return preferred;
+    var ratio = preferred;
+    if (width * ratio > kMaxCaptureTextureSize) {
+      ratio = kMaxCaptureTextureSize / width;
+    }
+    if (height * ratio > kMaxCaptureTextureSize) {
+      ratio = kMaxCaptureTextureSize / height;
+    }
+    // 下限刻意低于 1.0：见 [kMinCapturePixelRatio] 的注释
+    return ratio.clamp(kMinCapturePixelRatio, preferred);
+  }
+
   /// 根据 JPEG 质量计算缩放因子。
   ///
   /// JPEG 对 UI 截图（纯色块 + 文字）压缩效率有限，
