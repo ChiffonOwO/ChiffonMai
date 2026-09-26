@@ -1,11 +1,13 @@
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/constant/CacheKeyConstant.dart';
+import 'GuessChartSettingsStore.dart';
 
 class GuessChartCommonSettingsService {
   // 单例模式
   static final GuessChartCommonSettingsService _instance = GuessChartCommonSettingsService._internal();
   factory GuessChartCommonSettingsService() => _instance;
   GuessChartCommonSettingsService._internal();
+
+  final GuessChartSettingsStore _settingsStore = GuessChartSettingsStore();
 
   // 默认设置
   static const List<String> defaultSelectedVersions = []; // 空列表表示全部
@@ -52,63 +54,139 @@ class GuessChartCommonSettingsService {
     List<String>? peekDifficulties,
     int? playDurationSeconds,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(CacheKeyConstant.guessChartSelectedVersions, selectedVersions);
-    await prefs.setDouble(CacheKeyConstant.guessChartMasterMinDx, masterMinDx);
-    await prefs.setDouble(CacheKeyConstant.guessChartMasterMaxDx, masterMaxDx);
-    await prefs.setStringList(CacheKeyConstant.guessChartSelectedGenres, selectedGenres);
-    await prefs.setInt(CacheKeyConstant.guessChartMaxGuesses, maxGuesses);
-    await prefs.setInt(CacheKeyConstant.guessChartTimeLimit, timeLimit);
+    final values = <String, Object>{
+      CacheKeyConstant.guessChartSelectedVersions: selectedVersions,
+      CacheKeyConstant.guessChartMasterMinDx: masterMinDx,
+      CacheKeyConstant.guessChartMasterMaxDx: masterMaxDx,
+      CacheKeyConstant.guessChartSelectedGenres: selectedGenres,
+      CacheKeyConstant.guessChartMaxGuesses: maxGuesses,
+      CacheKeyConstant.guessChartTimeLimit: timeLimit,
+    };
     if (blurLevel != null) {
-      await prefs.setInt(CacheKeyConstant.guessChartBlurLevel, blurLevel);
+      values[CacheKeyConstant.guessChartBlurLevel] = blurLevel;
     }
     if (songCount != null) {
-      await prefs.setInt(CacheKeyConstant.guessChartSongCount, songCount);
+      values[CacheKeyConstant.guessChartSongCount] = songCount;
     }
     if (nonEnglishCharThreshold != null) {
-      await prefs.setInt(CacheKeyConstant.guessChartNonEnglishCharThreshold, nonEnglishCharThreshold);
+      values[CacheKeyConstant.guessChartNonEnglishCharThreshold] =
+          nonEnglishCharThreshold;
     }
     if (flashDurationMs != null) {
-      await prefs.setInt(CacheKeyConstant.guessChartFlashDuration, flashDurationMs);
+      values[CacheKeyConstant.guessChartFlashDuration] = flashDurationMs;
     }
     if (tileCount != null) {
-      await prefs.setInt(CacheKeyConstant.guessChartTileCount, tileCount);
+      values[CacheKeyConstant.guessChartTileCount] = tileCount;
     }
     if (tileRevealIntervalMs != null) {
-      await prefs.setInt(CacheKeyConstant.guessTileRevealInterval, tileRevealIntervalMs);
+      values[CacheKeyConstant.guessTileRevealInterval] = tileRevealIntervalMs;
     }
     if (peekDurationSeconds != null) {
-      await prefs.setInt(CacheKeyConstant.guessChartPeekDuration, peekDurationSeconds);
+      values[CacheKeyConstant.guessChartPeekDuration] = peekDurationSeconds;
     }
     if (peekDifficulties != null) {
-      await prefs.setStringList(CacheKeyConstant.guessChartPeekDifficulties, peekDifficulties);
+      values[CacheKeyConstant.guessChartPeekDifficulties] = peekDifficulties;
     }
     if (playDurationSeconds != null) {
-      await prefs.setInt(CacheKeyConstant.guessChartPlayDuration, playDurationSeconds);
+      values[CacheKeyConstant.guessChartPlayDuration] = playDurationSeconds;
     }
+    await _settingsStore.write(values);
   }
 
   // 加载设置
   Future<Map<String, dynamic>> loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
+    final values = await _settingsStore.read(_settingsKeys);
+    List<String> stringList(String key, List<String> fallback) {
+      final value = values[key];
+      return value is List ? value.cast<String>() : fallback;
+    }
+
+    T valueOr<T>(String key, T fallback) {
+      final value = values[key];
+      return value is T ? value : fallback;
+    }
+
     return {
-      'selectedVersions': prefs.getStringList(CacheKeyConstant.guessChartSelectedVersions) ?? defaultSelectedVersions,
-      'masterMinDx': prefs.getDouble(CacheKeyConstant.guessChartMasterMinDx) ?? defaultMasterMinDx,
-      'masterMaxDx': prefs.getDouble(CacheKeyConstant.guessChartMasterMaxDx) ?? defaultMasterMaxDx,
-      'selectedGenres': prefs.getStringList(CacheKeyConstant.guessChartSelectedGenres) ?? defaultSelectedGenres,
-      'maxGuesses': prefs.getInt(CacheKeyConstant.guessChartMaxGuesses) ?? defaultMaxGuesses,
-      'timeLimit': prefs.getInt(CacheKeyConstant.guessChartTimeLimit) ?? defaultTimeLimit,
-      'blurLevel': prefs.getInt(CacheKeyConstant.guessChartBlurLevel) ?? defaultBlurLevel,
-      'songCount': prefs.getInt(CacheKeyConstant.guessChartSongCount) ?? defaultSongCount,
-      'nonEnglishCharThreshold': prefs.getInt(CacheKeyConstant.guessChartNonEnglishCharThreshold) ?? defaultNonEnglishCharThreshold,
-      'flashDurationMs': prefs.getInt(CacheKeyConstant.guessChartFlashDuration) ?? defaultFlashDurationMs,
-      'tileCount': prefs.getInt(CacheKeyConstant.guessChartTileCount) ?? defaultTileCount,
-      'tileRevealIntervalMs': prefs.getInt(CacheKeyConstant.guessTileRevealInterval) ?? defaultTileRevealIntervalMs,
-      'peekDurationSeconds': prefs.getInt(CacheKeyConstant.guessChartPeekDuration) ?? defaultPeekDurationSeconds,
-      'peekDifficulties': prefs.getStringList(CacheKeyConstant.guessChartPeekDifficulties) ?? defaultPeekDifficulties,
-      'playDurationSeconds': prefs.getInt(CacheKeyConstant.guessChartPlayDuration) ?? defaultPlayDurationSeconds,
+      'selectedVersions': stringList(
+        CacheKeyConstant.guessChartSelectedVersions,
+        defaultSelectedVersions,
+      ),
+      'masterMinDx': valueOr(
+        CacheKeyConstant.guessChartMasterMinDx,
+        defaultMasterMinDx,
+      ),
+      'masterMaxDx': valueOr(
+        CacheKeyConstant.guessChartMasterMaxDx,
+        defaultMasterMaxDx,
+      ),
+      'selectedGenres': stringList(
+        CacheKeyConstant.guessChartSelectedGenres,
+        defaultSelectedGenres,
+      ),
+      'maxGuesses': valueOr(
+        CacheKeyConstant.guessChartMaxGuesses,
+        defaultMaxGuesses,
+      ),
+      'timeLimit': valueOr(
+        CacheKeyConstant.guessChartTimeLimit,
+        defaultTimeLimit,
+      ),
+      'blurLevel': valueOr(
+        CacheKeyConstant.guessChartBlurLevel,
+        defaultBlurLevel,
+      ),
+      'songCount': valueOr(
+        CacheKeyConstant.guessChartSongCount,
+        defaultSongCount,
+      ),
+      'nonEnglishCharThreshold': valueOr(
+        CacheKeyConstant.guessChartNonEnglishCharThreshold,
+        defaultNonEnglishCharThreshold,
+      ),
+      'flashDurationMs': valueOr(
+        CacheKeyConstant.guessChartFlashDuration,
+        defaultFlashDurationMs,
+      ),
+      'tileCount': valueOr(
+        CacheKeyConstant.guessChartTileCount,
+        defaultTileCount,
+      ),
+      'tileRevealIntervalMs': valueOr(
+        CacheKeyConstant.guessTileRevealInterval,
+        defaultTileRevealIntervalMs,
+      ),
+      'peekDurationSeconds': valueOr(
+        CacheKeyConstant.guessChartPeekDuration,
+        defaultPeekDurationSeconds,
+      ),
+      'peekDifficulties': stringList(
+        CacheKeyConstant.guessChartPeekDifficulties,
+        defaultPeekDifficulties,
+      ),
+      'playDurationSeconds': valueOr(
+        CacheKeyConstant.guessChartPlayDuration,
+        defaultPlayDurationSeconds,
+      ),
     };
   }
+
+  static const Set<String> _settingsKeys = {
+    CacheKeyConstant.guessChartSelectedVersions,
+    CacheKeyConstant.guessChartMasterMinDx,
+    CacheKeyConstant.guessChartMasterMaxDx,
+    CacheKeyConstant.guessChartSelectedGenres,
+    CacheKeyConstant.guessChartMaxGuesses,
+    CacheKeyConstant.guessChartTimeLimit,
+    CacheKeyConstant.guessChartBlurLevel,
+    CacheKeyConstant.guessChartSongCount,
+    CacheKeyConstant.guessChartNonEnglishCharThreshold,
+    CacheKeyConstant.guessChartFlashDuration,
+    CacheKeyConstant.guessChartTileCount,
+    CacheKeyConstant.guessTileRevealInterval,
+    CacheKeyConstant.guessChartPeekDuration,
+    CacheKeyConstant.guessChartPeekDifficulties,
+    CacheKeyConstant.guessChartPlayDuration,
+  };
 
   // 重置为默认设置
   Future<void> resetToDefault() async {

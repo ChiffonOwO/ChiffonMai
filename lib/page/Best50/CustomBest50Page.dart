@@ -17,6 +17,7 @@ import '../../utils/CommonWidgetUtil.dart';
 import '../../utils/CoverUtil.dart';
 import '../../utils/ExportQualitySelector.dart';
 import '../../utils/ImageEncodeUtil.dart';
+import '../../utils/ScoreInputValidator.dart';
 import '../../utils/SongFilterUtil.dart';
 import '../../utils/StringUtil.dart';
 import '../../widgets/B50GameCardWidget.dart';
@@ -38,8 +39,9 @@ class CustomBest50Page extends StatefulWidget {
 }
 
 class _CustomBest50PageState extends State<CustomBest50Page> {
-  static const double _achievementHardMax = 999.9999;
-  static const int _dxScoreHardMax = 9999;
+  // 硬上限（达成率 / DX 分数）与成绩历史的录入校验共用一份，见 ScoreInputValidator。
+  static const double _achievementHardMax = achievementHardMax;
+  static const int _dxScoreHardMax = dxScoreHardMax;
 
   final CustomBest50Store _store = CustomBest50Store();
 
@@ -133,12 +135,14 @@ class _CustomBest50PageState extends State<CustomBest50Page> {
       DiffBest50Service().calculateSingleRating(_effectiveDs(e), e.achievements);
 
   /// 达成率上限：普通曲 101%；宴会场（6 位 id）内部多张子谱相加，
-  /// 上限 = 101 × 谱面数（2 个谱面即 202%），与 SongInfoPage 的口径一致。
-  double _maxAchievementFor(Song? song) {
-    if (song == null || song.id.length != 6) return 101.0;
-    final count = song.ds.length;
-    return count <= 1 ? 101.0 : 101.0 * count;
-  }
+  /// 上限 = 101 × 谱面数（2 个谱面即 202%）。
+  ///
+  /// ⚠️ 规则本体在 [maxAchievementFor]（`lib/utils/ScoreInputValidator.dart`）：
+  /// 成绩历史的录入校验用的是同一份，别在这里另写一套。
+  double _maxAchievementFor(Song? song) => maxAchievementFor(
+        isUtage: song?.id.length == 6,
+        chartCount: song?.ds.length ?? 1,
+      );
 
   /// 非法数据：达成率超过谱面上限，或 DX 分数超过谱面上限。
   bool _isIllegal(CustomBest50Entry e) {

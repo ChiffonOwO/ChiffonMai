@@ -49,13 +49,20 @@ class HistoryLineChart extends StatelessWidget {
     final brightness = Theme.of(context).brightness;
     final scheme = Theme.of(context).colorScheme;
     final highlight = highlightIndex;
+    final hasSpots = spots.isNotEmpty;
+    final isSingleSpot = spots.length == 1;
+    final firstX = hasSpots ? spots.first.x : 0.0;
+    final lastX = hasSpots ? spots.last.x : 1.0;
+    final chartMinX = isSingleSpot ? firstX - 0.5 : firstX;
+    final chartMaxX =
+        isSingleSpot ? firstX + 0.5 : (lastX <= firstX ? firstX + 1.0 : lastX);
 
     return SizedBox(
       height: height,
       child: LineChart(
         LineChartData(
-          minX: spots.isEmpty ? 0 : spots.first.x,
-          maxX: spots.isEmpty ? 1 : spots.last.x,
+          minX: chartMinX,
+          maxX: chartMaxX,
           minY: minY,
           maxY: maxY,
           gridData: FlGridData(
@@ -105,12 +112,19 @@ class HistoryLineChart extends StatelessWidget {
             touchTooltipData: LineTouchTooltipData(
               getTooltipColor: (_) => scheme.surfaceContainerHighest,
               getTooltipItems: (touched) => touched.map((spot) {
-                final idx = spot.x.round().clamp(0, spots.length - 1);
+                var idx = 0;
+                var bestDistance = double.infinity;
+                for (var i = 0; i < spots.length; i++) {
+                  final distance = (spots[i].x - spot.x).abs();
+                  if (distance < bestDistance) {
+                    bestDistance = distance;
+                    idx = i;
+                  }
+                }
                 return LineTooltipItem(
                   tooltipLabel(idx),
                   TextStyle(
-                      fontSize: 11.5,
-                      color: AppColors.primaryText(brightness)),
+                      fontSize: 11.5, color: AppColors.primaryText(brightness)),
                 );
               }).toList(),
             ),
@@ -124,7 +138,9 @@ class HistoryLineChart extends StatelessWidget {
               dotData: FlDotData(
                 show: true,
                 checkToShowDot: (spot, _) =>
-                    highlight == null || spots.length <= 40 || spot.x == spots[highlight].x,
+                    highlight == null ||
+                    spots.length <= 40 ||
+                    spot.x == spots[highlight].x,
                 getDotPainter: (spot, percent, bar, index) {
                   final isHighlight =
                       highlight != null && spot.x == spots[highlight].x;

@@ -825,6 +825,10 @@ class _GuessChartByBlurredCoverPageState extends State<GuessChartByBlurredCoverP
     // 先取消之前可能存在的倒计时
     // use_build_context_synchronously
     final messenger = ScaffoldMessenger.of(context);
+    // Let the dialog pop animation and the save confirmation render before
+    // the full-library validation starts on the UI isolate.
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    if (!mounted) return;
     try {
       final testSong = await GuessChartByBlurredCoverService.randomSelectSong(
         selectedVersions: selectedVersions,

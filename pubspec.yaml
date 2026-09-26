@@ -18,7 +18,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # of the product and file versions while build-number is used as the build suffix.
 
 # version: 1.12.2+35
-version: 2.3.0+40
+version: 2.4.0+41
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -54,6 +54,7 @@ dependencies:
   marquee: ^2.3.0
   flutter_screenutil: ^5.2.0 # 屏幕适配
   shared_preferences: ^2.4.1 # 本地存储
+  shared_preferences_android: ^2.4.21 # 猜歌设置使用 apply() 异步写入 Android 偏好
   url_launcher: ^6.3.2
   # 网络图片缓存
   cached_network_image: ^3.3.1  

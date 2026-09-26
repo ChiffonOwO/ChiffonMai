@@ -900,6 +900,10 @@ class _GuessChartByFlashCoverPageState
     // 先取好 messenger：下面 await 之后再用 context 会踩
     // use_build_context_synchronously
     final messenger = ScaffoldMessenger.of(context);
+    // Let the dialog pop animation and the save confirmation render before
+    // the full-library validation starts on the UI isolate.
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    if (!mounted) return;
     try {
       final testSong = await GuessChartByInfoService.randomSelectSong(
         selectedVersions: selectedVersions,

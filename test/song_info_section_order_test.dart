@@ -70,8 +70,7 @@ void main() {
     final defIdx = src.indexOf('Widget _buildChartHistoryCard()');
     expect(defIdx, greaterThan(0), reason: '方法定义不见了');
     expect(callIdx, greaterThan(0), reason: '方法没有被调用');
-    expect(callIdx, greaterThan(cardTitle),
-        reason: '独立板块必须出现在「玩家最佳成绩」之后');
+    expect(callIdx, greaterThan(cardTitle), reason: '独立板块必须出现在「玩家最佳成绩」之后');
   });
 
   test('独立板块复用 ChartHistorySection，并给足卡片内边距', () {
@@ -80,8 +79,7 @@ void main() {
     expect(idx, greaterThan(0));
     final body = src.substring(idx, idx + 1300);
     expect(body.contains('ChartHistorySection('), isTrue);
-    expect(body.contains('cardStyle: true'), isTrue,
-        reason: '独立板块要有自己的卡片外观');
+    expect(body.contains('cardStyle: true'), isTrue, reason: '独立板块要有自己的卡片外观');
     expect(body.contains('emptyPadding: EdgeInsets.zero'), isTrue,
         reason: '没有历史时必须整块 0 高，不能凭空撑出一块空白');
     expect(body.contains('songId: songId'), isTrue);
@@ -102,14 +100,10 @@ void main() {
     // 而且这个间隔在函数体内不该被复制一份，避免双重留白
     // （先去掉行注释：函数注释里就写了 `SizedBox(height: 10)` 作说明）
     final idx = src.indexOf('Widget _buildChartHistoryCard()');
-    final body = src
-        .substring(idx, idx + 1300)
-        .split('\n')
-        .map((l) {
-          final c = l.indexOf('//');
-          return c < 0 ? l : l.substring(0, c);
-        })
-        .join('\n');
+    final body = src.substring(idx, idx + 1300).split('\n').map((l) {
+      final c = l.indexOf('//');
+      return c < 0 ? l : l.substring(0, c);
+    }).join('\n');
     expect(body.contains('SizedBox(height'), isFalse,
         reason: '曲线为空时整块高度 0，函数体外层不许垫固定高度');
   });
@@ -157,7 +151,8 @@ void main() {
     };
     final keys = ['Rating', '游玩次数', 'DX分数', 'DX分数达成率'];
     for (var i = 1; i < keys.length; i++) {
-      final seg = card.substring(orderedPoints[keys[i - 1]]!, orderedPoints[keys[i]]!);
+      final seg =
+          card.substring(orderedPoints[keys[i - 1]]!, orderedPoints[keys[i]]!);
       final gaps = RegExp(r'SizedBox\(height: 8\)').allMatches(seg).length;
       expect(gaps, 1,
           reason: '「${keys[i]}」上方到「${keys[i - 1]}」之间'
@@ -191,24 +186,19 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
     }
 
-    testWidgets('cardStyle=true 且无历史时：依然是 0 高、无卡片底色',
-        (tester) async {
+    testWidgets('cardStyle=true 且无历史时：显示手动录入入口', (tester) async {
+      seed(const []);
       await pump(tester, cardStyle: true);
-      expect(tester.getSize(find.byType(ChartHistorySection)).height, 0,
-          reason: '卡片外壳不能把空形态撑出高度');
-      // 该形态连 DecoratedBox 都不会建（直接 SizedBox.shrink）
-      expect(
-        find.descendant(
-          of: find.byType(ChartHistorySection),
-          matching: find.byType(DecoratedBox),
-        ),
-        findsNothing,
-      );
+      expect(find.text('添加成绩历史'), findsOneWidget);
+      expect(tester.getSize(find.byType(ChartHistorySection)).height,
+          greaterThan(0));
     });
 
     testWidgets('cardStyle 是纯外观参数：不改变空形态的高度口径', (tester) async {
+      seed(const []);
       await pump(tester, cardStyle: false);
-      expect(tester.getSize(find.byType(ChartHistorySection)).height, 0);
+      expect(tester.getSize(find.byType(ChartHistorySection)).height,
+          greaterThan(0));
     });
 
     testWidgets('有曲线时：卡片内边距真的生效（曲线不贴边）', (tester) async {

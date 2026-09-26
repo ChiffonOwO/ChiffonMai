@@ -28,6 +28,8 @@ void main() {
         reason: '四角参数（BPM/时间/COMBO/BREAK）必须关闭，否则剧透');
     expect(controller.showAchievementRate, isFalse,
         reason: '中间达成率必须关闭，否则剧透');
+    expect(controller.highlightExNotes, isTrue,
+        reason: '谱面片段必须始终开启高亮保护套');
 
     controller.dispose();
   });
@@ -41,6 +43,7 @@ void main() {
 
     expect(controller.showCornerInfo, isFalse);
     expect(controller.showAchievementRate, isFalse);
+    expect(controller.highlightExNotes, isTrue);
 
     controller.dispose();
   });

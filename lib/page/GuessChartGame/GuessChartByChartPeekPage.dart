@@ -90,6 +90,8 @@ class GuessChartByChartPeekPage extends StatefulWidget {
     );
     controller.showCornerInfo = false;
     controller.showAchievementRate = false;
+    // 谱面片段始终开启“高亮保护套”，不受谱面播放页的持久化设置影响。
+    controller.highlightExNotes = true;
     return controller;
   }
 
@@ -147,6 +149,7 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
   // 游戏结束后把播放器换成带音频的实例（复用同一份谱面），
   // 复播时可以听着音乐对答案；音频尚未就绪前保持无声
   MaiChart? _answerChart;
+  bool _answerAudioLoading = false;
   bool _answerAudioReady = false;
   bool _answerAudioFailed = false;
   String? _answerAudioPath;
@@ -238,7 +241,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
           (settings['peekDifficulties'] as List?)?.cast<String>() ?? ['4'];
       // 过滤非法值，且池子为空时退回默认，保证每局都能抽到难度
       _peekDifficulties = loadedDifficulties
-          .where((d) => GuessChartByChartPeekPage.difficultyNames.containsKey(d))
+          .where(
+              (d) => GuessChartByChartPeekPage.difficultyNames.containsKey(d))
           .toList();
       if (_peekDifficulties.isEmpty) _peekDifficulties = ['4'];
     });
@@ -292,6 +296,7 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
       _resolvedDifficulty = null;
       _unavailableReason = '';
       _answerChart = null;
+      _answerAudioLoading = false;
       _answerAudioReady = false;
       _answerAudioFailed = false;
       _answerAudioPath = null;
@@ -343,8 +348,7 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
       masterMaxDx: _masterMaxDx,
     );
 
-    _maidataContent =
-        maidataManager.getMaidata(_targetSong!.id) ?? '';
+    _maidataContent = maidataManager.getMaidata(_targetSong!.id) ?? '';
 
     if (_maidataContent.isEmpty) {
       if (mounted) {
@@ -472,8 +476,7 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
           final holdEnd = collection.time + (note.length ?? 0.0);
           if (holdEnd.isFinite) totalDuration = max(totalDuration, holdEnd);
           for (final slide in note.slidePaths) {
-            final slideEnd =
-                collection.time + slide.delay + slide.duration;
+            final slideEnd = collection.time + slide.delay + slide.duration;
             if (slideEnd.isFinite) totalDuration = max(totalDuration, slideEnd);
           }
         }
@@ -498,8 +501,7 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
       _clipEnd = min(_clipStart + clipLength, totalDuration);
 
       // 无音频：走帧时钟，天然无声；且只保留谱面（关掉四角与中间信息）
-      final controller =
-          GuessChartByChartPeekPage.buildChartOnlyController(
+      final controller = GuessChartByChartPeekPage.buildChartOnlyController(
         chart: chart,
         initialChartTime: _clipStart,
       );
@@ -550,6 +552,22 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
     final controller = _playerController;
     if (controller == null) return;
 
+    // 答案模式的按钮语义是“复播”：无论投降时停在片段的哪个位置，
+    // 都从片段起点重新开始。音频就绪时必须先换成带音频的播放器，
+    // 不能落入下面的普通 play()，否则会沿用投降前的无声播放进度。
+    if (_isGameOver) {
+      _clipFinished = false;
+      if (_answerAudioReady && _answerAudioPath != null) {
+        await _rebuildPlayerWithAudio();
+      } else {
+        await controller.seek(_clipStart);
+      }
+      _clipStarted = true;
+      await _playerController?.play();
+      if (mounted) setState(() {});
+      return;
+    }
+
     if (controller.isPlaying) {
       await controller.pause();
       if (mounted) setState(() {});
@@ -558,22 +576,10 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
 
     // 片段播完后的重播：回卷到片段起点
     if (_clipFinished || controller.chartTime >= _clipEnd) {
-      if (_isGameOver) {
-        // 答案模式：无限复播
-        _clipFinished = false;
-        if (_answerAudioReady && _answerAudioPath != null) {
-          // 重建带音频的播放器并定位到片段起点；
-          // 音频尚未定位好时短暂等待，避免带着 position 0 开播
-          await _rebuildPlayerWithAudio();
-        } else {
-          await controller.seek(_clipStart);
-        }
-      } else {
-        if (_replaysLeft <= 0) return;
-        _replaysLeft--;
-        _clipFinished = false;
-        await controller.seek(_clipStart);
-      }
+      if (_replaysLeft <= 0) return;
+      _replaysLeft--;
+      _clipFinished = false;
+      await controller.seek(_clipStart);
     }
 
     _clipStarted = true;
@@ -582,7 +588,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
   }
 
   // 复播剩余次数的显示文案
-  String get _replayLabel => _replaysLeft > 0 ? '（还可复播 $_replaysLeft 次）' : '（复播次数已用完）';
+  String get _replayLabel =>
+      _replaysLeft > 0 ? '（还可复播 $_replaysLeft 次）' : '（复播次数已用完）';
 
   // 音频就绪后重建播放器：停在片段开头等待用户播放。
   // SimaiPlayer 检测到新 controller 实例会重建内部 game，
@@ -702,9 +709,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
     List<Song> results = [];
     query = query.toLowerCase();
 
-    var filteredSongs = songs
-        .where((song) => !song.isExtra && !_isMaidataSong(song))
-        .toList();
+    var filteredSongs =
+        songs.where((song) => !song.isExtra && !_isMaidataSong(song)).toList();
 
     results.addAll(filteredSongs
         .where((song) => song.basicInfo.title.toLowerCase().contains(query)));
@@ -770,17 +776,25 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
   }
 
   // 游戏结束后的「答案模式」：复播不再限次，时间监听不再自动暂停——
-  // 可以完整播放到谱面结尾。音频通过落雪音源异步准备（LuoXueSongUtil 自带
-  // 磁盘缓存）：就绪前谱面照常无声播放（帧时钟），就绪后重建带音频的
-  // 播放器（音频 position 0 与片段起点对齐），下载失败则保持无声。
+  // 可以完整播放到谱面结尾。音频通过落雪音源准备（LuoXueSongUtil 自带
+  // 磁盘缓存）：准备期间先暂停谱面并禁用复播按钮，准备完成后再允许复播。
+  // 下载失败则保持无声。
   Future<void> _enterAnswerMode() async {
     final controller = _playerController;
     await controller?.pause();
     final song = _targetSong;
-    if (song == null || _answerChart == null) return;
+    if (song == null || _answerChart == null) {
+      if (mounted && _isGameOver) {
+        setState(() {
+          _answerAudioLoading = false;
+          _answerAudioFailed = true;
+        });
+      }
+      return;
+    }
 
-    // 异步取音频，不阻塞答案展示
-    unawaited(_prepareAnswerAudio(song));
+    // 结束时先完成音频准备；准备期间按钮保持不可点击，避免用户听到无声片段。
+    await _prepareAnswerAudio(song);
   }
 
   /// 统一的「结束本局」入口：置结束标记 + 进入答案模式（准备音频）+ 记成绩。
@@ -802,6 +816,10 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
     setState(() {
       _isGameOver = true;
       _isWon = isWon;
+      _answerAudioLoading = true;
+      _answerAudioReady = false;
+      _answerAudioFailed = false;
+      _answerAudioPath = null;
     });
     await _enterAnswerMode();
     await _recordGameResult(isWon);
@@ -812,20 +830,36 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
       final int musicId = LuoXueSongUtil.toLxnsMusicId(song.id);
       if (musicId <= 0) {
         debugPrint('[ChartPeek] 歌曲 id 异常，答案模式保持无声: ${song.id}');
-        if (mounted) setState(() => _answerAudioFailed = true);
+        if (mounted && _isGameOver) {
+          setState(() {
+            _answerAudioLoading = false;
+            _answerAudioFailed = true;
+          });
+        }
         return;
       }
       final file = await LuoXueSongUtil().getMusicFile(musicId.toString());
       if (!mounted || !_isGameOver) return;
       if (file == null) {
-        setState(() => _answerAudioFailed = true);
+        setState(() {
+          _answerAudioLoading = false;
+          _answerAudioFailed = true;
+        });
         return;
       }
       _answerAudioPath = file.path;
-      setState(() => _answerAudioReady = true);
+      setState(() {
+        _answerAudioLoading = false;
+        _answerAudioReady = true;
+      });
     } catch (e) {
       debugPrint('[ChartPeek] 答案模式音频获取失败: $e');
-      if (mounted) setState(() => _answerAudioFailed = true);
+      if (mounted && _isGameOver) {
+        setState(() {
+          _answerAudioLoading = false;
+          _answerAudioFailed = true;
+        });
+      }
     }
   }
 
@@ -894,8 +928,7 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                     song.basicInfo.artist,
                     style: TextStyle(
                         fontSize: 14,
-                        color:
-                            Theme.of(context).colorScheme.onSurfaceVariant),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1327,6 +1360,10 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
     // 先取好 messenger：下面 await 之后再用 context 会踩
     // use_build_context_synchronously
     final messenger = ScaffoldMessenger.of(context);
+    // Let the dialog pop animation and the save confirmation render before
+    // the full-library validation starts on the UI isolate.
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    if (!mounted) return;
     try {
       // 必须用本页自己的曲池判定（版本 ∩ 流派 ∩ 难度池 ∩ 定数范围）。
       // 原先这里借用了 GuessChartByInfoService.randomSelectSong —— 那是
@@ -1381,14 +1418,14 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
           List<String>.from(defaults['selectedVersions'] as List);
       tempMasterMinDx = (defaults['masterMinDx'] as num).toDouble();
       tempMasterMaxDx = (defaults['masterMaxDx'] as num).toDouble();
-      tempSelectedGenres = List<String>.from(defaults['selectedGenres'] as List);
+      tempSelectedGenres =
+          List<String>.from(defaults['selectedGenres'] as List);
       tempMaxGuesses = defaults['maxGuesses'] as int;
       tempTimeLimit = defaults['timeLimit'] as int;
       tempPeekDurationSeconds = defaults['peekDurationSeconds'] as int;
       tempPeekDifficulties =
           List<String>.from(defaults['peekDifficulties'] as List);
     }
-
 
     showDialog(
       context: context,
@@ -1492,7 +1529,9 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: GuessChartByChartPeekPage.difficultyNames.entries.map((entry) {
+                            children: GuessChartByChartPeekPage
+                                .difficultyNames.entries
+                                .map((entry) {
                               final String inote = entry.key;
                               final String label = entry.value;
                               final bool selected =
@@ -1658,7 +1697,6 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
         children: [
           CommonWidgetUtil.buildCommonBgWidget(),
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
           Column(
             children: [
               // 标题栏
@@ -1718,7 +1756,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                       '剩余时间: ${_remainingTime > 0 ? _remainingTime : 0}秒',
                                                       style: TextStyle(
                                                           fontSize:
-                                                              screenWidth * 0.04,
+                                                              screenWidth *
+                                                                  0.04,
                                                           color: _remainingTime /
                                                                       _timeLimit <=
                                                                   0.3
@@ -1726,11 +1765,13 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                               : null),
                                                     ),
                                                   Container(
-                                                    margin: const EdgeInsets.only(
-                                                        top: 8),
+                                                    margin:
+                                                        const EdgeInsets.only(
+                                                            top: 8),
                                                     child: Row(
                                                       crossAxisAlignment:
-                                                          CrossAxisAlignment.start,
+                                                          CrossAxisAlignment
+                                                              .start,
                                                       children: [
                                                         Expanded(
                                                           child: Column(
@@ -1763,7 +1804,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                             ],
                                                           ),
                                                         ),
-                                                        const SizedBox(width: 4),
+                                                        const SizedBox(
+                                                            width: 4),
                                                         IconButton(
                                                           padding:
                                                               EdgeInsets.zero,
@@ -1792,10 +1834,12 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                         fontWeight:
                                                             FontWeight.bold,
                                                         color: _isWon
-                                                            ? AppColors.successGreen(
-                                                                brightness)
-                                                            : AppColors.errorRed(
-                                                                brightness),
+                                                            ? AppColors
+                                                                .successGreen(
+                                                                    brightness)
+                                                            : AppColors
+                                                                .errorRed(
+                                                                    brightness),
                                                       ),
                                                     ),
                                                   if (_isGameOver && !_isWon)
@@ -1825,7 +1869,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                 // 本局播放难度的标签（带难度底色）
                                                 if (_resolvedDifficulty !=
                                                         null &&
-                                                    GuessChartByChartPeekPage.difficultyNames
+                                                    GuessChartByChartPeekPage
+                                                        .difficultyNames
                                                         .containsKey(
                                                             _resolvedDifficulty))
                                                   Container(
@@ -1834,7 +1879,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                         horizontal: 10,
                                                         vertical: 6),
                                                     decoration: BoxDecoration(
-                                                      color: GuessChartByChartPeekPage.difficultyColors[
+                                                      color: GuessChartByChartPeekPage
+                                                                  .difficultyColors[
                                                               _resolvedDifficulty] ??
                                                           Colors.grey,
                                                       borderRadius:
@@ -1842,7 +1888,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                               8),
                                                     ),
                                                     child: Text(
-                                                      GuessChartByChartPeekPage.difficultyNames[
+                                                      GuessChartByChartPeekPage
+                                                                  .difficultyNames[
                                                               _resolvedDifficulty!] ??
                                                           '',
                                                       style: const TextStyle(
@@ -1857,9 +1904,11 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                 // 播放/暂停/复播
                                                 ElevatedButton.icon(
                                                   onPressed:
-                                                      (!_isGameOver &&
-                                                              _clipFinished &&
-                                                              _replaysLeft <= 0)
+                                                      (_answerAudioLoading ||
+                                                              (!_isGameOver &&
+                                                                  _clipFinished &&
+                                                                  _replaysLeft <=
+                                                                      0))
                                                           ? null
                                                           : _togglePlayPause,
                                                   icon: Icon(
@@ -1872,11 +1921,13 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                   ),
                                                   label: Text(
                                                     _isGameOver
-                                                        ? (_answerAudioFailed
-                                                            ? '复播片段（音频不可用）'
-                                                            : (_answerAudioReady
-                                                                ? '复播片段（带音频）'
-                                                                : '复播片段'))
+                                                        ? (_answerAudioLoading
+                                                            ? '正在加载音频…'
+                                                            : (_answerAudioFailed
+                                                                ? '复播片段（音频不可用）'
+                                                                : (_answerAudioReady
+                                                                    ? '复播片段（带音频）'
+                                                                    : '复播片段')))
                                                         : (!_clipStarted
                                                             ? '播放片段'
                                                             : (_clipFinished
@@ -1901,20 +1952,24 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                   Container(
                                                     decoration: BoxDecoration(
                                                       borderRadius:
-                                                          BorderRadius.circular(8),
+                                                          BorderRadius.circular(
+                                                              8),
                                                       border: Border.all(
                                                           color: AppColors
                                                               .tableBorder(
                                                                   brightness)),
                                                     ),
                                                     child: TextField(
-                                                      controller: _searchController,
-                                                      onChanged: _handleSearchInput,
+                                                      controller:
+                                                          _searchController,
+                                                      onChanged:
+                                                          _handleSearchInput,
                                                       enabled: !_isGameOver,
                                                       decoration:
                                                           const InputDecoration(
                                                         hintText: '输入歌曲名称或别名',
-                                                        border: InputBorder.none,
+                                                        border:
+                                                            InputBorder.none,
                                                         contentPadding:
                                                             EdgeInsets.all(12),
                                                       ),
@@ -1925,7 +1980,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                     Container(
                                                       decoration: BoxDecoration(
                                                         borderRadius:
-                                                            BorderRadius.circular(8),
+                                                            BorderRadius
+                                                                .circular(8),
                                                         border: Border.all(
                                                             color: AppColors
                                                                 .tableBorder(
@@ -1934,17 +1990,22 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                             .colorScheme
                                                             .surface,
                                                         boxShadow: [
-                                                          AppColors.defaultShadow(
-                                                              brightness)
+                                                          AppColors
+                                                              .defaultShadow(
+                                                                  brightness)
                                                         ],
                                                       ),
-                                                      constraints: BoxConstraints(
-                                                          maxHeight:
-                                                              screenHeight * 0.3),
+                                                      constraints:
+                                                          BoxConstraints(
+                                                              maxHeight:
+                                                                  screenHeight *
+                                                                      0.3),
                                                       child: ListView.builder(
-                                                        padding: EdgeInsets.zero,
+                                                        padding:
+                                                            EdgeInsets.zero,
                                                         itemCount:
-                                                            _searchResults.length,
+                                                            _searchResults
+                                                                .length,
                                                         itemBuilder:
                                                             (context, index) {
                                                           return _buildSearchResultItem(
@@ -1959,8 +2020,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
 
                                             if (_isSearching)
                                               Container(
-                                                margin:
-                                                    const EdgeInsets.only(top: 8),
+                                                margin: const EdgeInsets.only(
+                                                    top: 8),
                                                 padding:
                                                     const EdgeInsets.all(16),
                                                 child: const Center(
@@ -1971,8 +2032,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
 
                                             // 按钮区域
                                             Container(
-                                              margin:
-                                                  const EdgeInsets.only(top: 12),
+                                              margin: const EdgeInsets.only(
+                                                  top: 12),
                                               child: Row(
                                                 mainAxisAlignment:
                                                     MainAxisAlignment.center,
@@ -1984,7 +2045,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                       IconButton(
                                                         icon: Icon(
                                                             Icons.info_outline,
-                                                            color: Theme.of(context)
+                                                            color: Theme.of(
+                                                                    context)
                                                                 .colorScheme
                                                                 .onSurface,
                                                             size: 24),
@@ -1995,7 +2057,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                       IconButton(
                                                         icon: Icon(
                                                             Icons.settings,
-                                                            color: Theme.of(context)
+                                                            color: Theme.of(
+                                                                    context)
                                                                 .colorScheme
                                                                 .onSurface,
                                                             size: 24),
@@ -2004,23 +2067,28 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                       ),
                                                       const SizedBox(width: 8),
                                                       IconButton(
-                                                        icon: Icon(Icons.refresh,
-                                                            color: Theme.of(context)
+                                                        icon: Icon(
+                                                            Icons.refresh,
+                                                            color: Theme.of(
+                                                                    context)
                                                                 .colorScheme
                                                                 .onSurface,
                                                             size: 24),
-                                                        onPressed: _startNewGame,
+                                                        onPressed:
+                                                            _startNewGame,
                                                       ),
                                                       const SizedBox(width: 8),
                                                       IconButton(
                                                         icon: Icon(
                                                           _isAscending
-                                                              ? Icons.sort_by_alpha
+                                                              ? Icons
+                                                                  .sort_by_alpha
                                                               : Icons
                                                                   .sort_by_alpha_outlined,
-                                                          color: Theme.of(context)
-                                                              .colorScheme
-                                                              .onSurface,
+                                                          color:
+                                                              Theme.of(context)
+                                                                  .colorScheme
+                                                                  .onSurface,
                                                           size: 24,
                                                         ),
                                                         onPressed: () {
@@ -2041,11 +2109,13 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                             await _endRound(
                                                                 isWon: false);
                                                           },
-                                                          child: const Text('投降'),
+                                                          child:
+                                                              const Text('投降'),
                                                         ),
                                                       if (_isGameOver)
                                                         ElevatedButton(
-                                                          onPressed: _startNewGame,
+                                                          onPressed:
+                                                              _startNewGame,
                                                           child:
                                                               const Text('新游戏'),
                                                         ),
@@ -2078,15 +2148,17 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                   padding:
                                                       const EdgeInsets.all(16),
                                                   decoration: BoxDecoration(
-                                                    color:
-                                                        AppColors.guessAnswerCardBg(
+                                                    color: AppColors
+                                                        .guessAnswerCardBg(
                                                             brightness),
                                                     borderRadius:
-                                                        BorderRadius.circular(8),
+                                                        BorderRadius.circular(
+                                                            8),
                                                   ),
                                                   child: Column(
                                                     crossAxisAlignment:
-                                                        CrossAxisAlignment.start,
+                                                        CrossAxisAlignment
+                                                            .start,
                                                     children: [
                                                       Text(
                                                         _isWon
@@ -2094,15 +2166,17 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                             : '本局答案',
                                                         style: TextStyle(
                                                           fontSize:
-                                                              screenWidth * 0.04,
+                                                              screenWidth *
+                                                                  0.04,
                                                           fontWeight:
                                                               FontWeight.bold,
                                                           color: _isWon
                                                               ? AppColors
                                                                   .successGreen(
                                                                       brightness)
-                                                              : AppColors.linkBlue(
-                                                                  brightness),
+                                                              : AppColors
+                                                                  .linkBlue(
+                                                                      brightness),
                                                         ),
                                                       ),
                                                       const SizedBox(height: 8),
@@ -2116,12 +2190,14 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                                   BoxDecoration(
                                                                 borderRadius:
                                                                     BorderRadius
-                                                                        .circular(4),
+                                                                        .circular(
+                                                                            4),
                                                               ),
                                                               child: ClipRRect(
                                                                 borderRadius:
                                                                     BorderRadius
-                                                                        .circular(4),
+                                                                        .circular(
+                                                                            4),
                                                                 child: CoverUtil
                                                                     .buildCoverWidgetWithContext(
                                                                         context,
@@ -2144,23 +2220,21 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                                         _targetSong!.type ==
                                                                                 'SD'
                                                                             ? 'ST'
-                                                                            : _targetSong!
-                                                                                .type,
+                                                                            : _targetSong!.type,
                                                                         style:
                                                                             TextStyle(
                                                                           fontSize:
-                                                                              screenWidth *
-                                                                                  0.035,
+                                                                              screenWidth * 0.035,
                                                                           fontWeight:
                                                                               FontWeight.bold,
-                                                                          color: _targetSong!.type ==
-                                                                                  'SD'
+                                                                          color: _targetSong!.type == 'SD'
                                                                               ? Colors.blue
                                                                               : Colors.orange,
                                                                         ),
                                                                       ),
                                                                       SizedBox(
-                                                                          width: 8),
+                                                                          width:
+                                                                              8),
                                                                       Expanded(
                                                                         child:
                                                                             Text(
@@ -2168,10 +2242,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                                               .basicInfo
                                                                               .title,
                                                                           style: TextStyle(
-                                                                              fontSize: screenWidth *
-                                                                                  0.035,
-                                                                              fontWeight:
-                                                                                  FontWeight.bold),
+                                                                              fontSize: screenWidth * 0.035,
+                                                                              fontWeight: FontWeight.bold),
                                                                           overflow:
                                                                               TextOverflow.ellipsis,
                                                                         ),
@@ -2188,7 +2260,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                                             .colorScheme
                                                                             .onSurfaceVariant),
                                                                     overflow:
-                                                                        TextOverflow.ellipsis,
+                                                                        TextOverflow
+                                                                            .ellipsis,
                                                                   ),
                                                                   Text(
                                                                     '${_targetSong!.ds.length > 3 ? _targetSong!.ds[3].toString() : '-'} | ${_targetSong!.ds.length > 4 ? _targetSong!.ds[4].toString() : '-'} | ${StringUtil.formatVersion2WithFlag(_targetSong!.basicInfo.from, _targetSong!.isExtra)}',
@@ -2200,7 +2273,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                                                             .colorScheme
                                                                             .onSurfaceVariant),
                                                                     overflow:
-                                                                        TextOverflow.ellipsis,
+                                                                        TextOverflow
+                                                                            .ellipsis,
                                                                   ),
                                                                 ],
                                                               ),
@@ -2255,8 +2329,8 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                                         )
                                       : Center(
                                           child: Padding(
-                                            padding:
-                                                EdgeInsets.all(screenHeight * 0.1),
+                                            padding: EdgeInsets.all(
+                                                screenHeight * 0.1),
                                             child: CircularProgressIndicator(),
                                           ),
                                         ),

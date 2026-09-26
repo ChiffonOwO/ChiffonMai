@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/AppTheme.dart';
+import '../widgets/PageTopBar.dart';
 
 /// 友情链接页面：以卡片形式展示推广同行的项目，点击通过外部浏览器打开。
 class FriendLinksPage extends StatefulWidget {
@@ -82,9 +83,7 @@ class _FriendLinksPageState extends State<FriendLinksPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
     final safeBottom = MediaQuery.of(context).padding.bottom;
-    final Color textPrimaryColor = Theme.of(context).colorScheme.onSurface;
     final Color textSecondaryColor =
         Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7);
     final Color cardBgColor =
@@ -98,78 +97,55 @@ class _FriendLinksPageState extends State<FriendLinksPage> {
         children: [
           CommonWidgetUtil.buildCommonBgWidget(),
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 顶栏：返回 + 标题
-          Positioned(
-            top: screenHeight * 0.06,
-            left: 0,
-            right: 0,
-            child: Row(
-              children: [
-                IconButton(
-                  icon: Icon(Icons.arrow_back, color: textPrimaryColor),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      '友情链接',
-                      style: TextStyle(
-                        color: textPrimaryColor,
-                        fontSize: screenWidth * 0.06,
-                        fontWeight: FontWeight.bold,
+          Column(
+            children: [
+              const PageTopBar(title: '友情链接'),
+              Expanded(
+                child: Container(
+                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
+                  decoration: BoxDecoration(
+                    color: cardBgColor,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [defaultShadow],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.all(screenWidth * 0.04),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 顶部说明
+                          Text(
+                            '这里收录了同好/同行项目的友情链接，'
+                            '点击卡片即可在浏览器中打开。',
+                            style: TextStyle(
+                              color: textSecondaryColor,
+                              fontSize: screenWidth * 0.032,
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // 友链列表（1列N行）
+                          ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            padding: EdgeInsets.zero,
+                            itemCount: _friendLinks.length,
+                            separatorBuilder: (_, __) =>
+                                SizedBox(height: screenWidth * 0.025),
+                            itemBuilder: (ctx, i) => _FriendLinkCard(
+                              link: _friendLinks[i],
+                              onOpen: _open,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 48),
-              ],
-            ),
-          ),
-
-          // 主体
-          Positioned(
-            left: screenWidth * 0.02,
-            right: screenWidth * 0.02,
-            top: screenHeight * 0.13,
-            bottom: 10 + safeBottom,
-            child: Container(
-              decoration: BoxDecoration(
-                color: cardBgColor,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [defaultShadow],
               ),
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(screenWidth * 0.04),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 顶部说明
-                    Text(
-                      '这里收录了同好/同行项目的友情链接，'
-                      '点击卡片即可在浏览器中打开。',
-                      style: TextStyle(
-                        color: textSecondaryColor,
-                        fontSize: screenWidth * 0.032,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    // 友链列表（1列N行）
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding: EdgeInsets.zero,
-                      itemCount: _friendLinks.length,
-                      separatorBuilder: (_, __) =>
-                          SizedBox(height: screenWidth * 0.025),
-                      itemBuilder: (ctx, i) =>
-                          _FriendLinkCard(link: _friendLinks[i], onOpen: _open),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            ],
           ),
         ],
       ),

@@ -59,6 +59,16 @@ class ChartHistoryStore {
   static Future<ChartBaseline?> Function(int songId, int levelIndex)?
       debugChartBaselineLoader;
 
+  /// 仅供测试：替换 Rating 记录点的删除实现（同 [debugRatingSeriesLoader]，
+  /// widget 测试里真实文件 I/O 的 await 永远不会完成）。
+  @visibleForTesting
+  static Future<bool> Function(int tMs)? debugRatingPointDeleter;
+
+  /// 仅供测试：替换单谱记录点的删除实现（同上）。
+  @visibleForTesting
+  static Future<bool> Function(int songId, int levelIndex, int tMs)?
+      debugChartPointDeleter;
+
   final Map<String, _HistoryDoc> _cache = {};
   final Map<String, Future<_HistoryDoc>> _loading = {};
   final Map<String, Future<void>> _writes = {};
@@ -162,7 +172,7 @@ class ChartHistoryStore {
       final source =
           await storageKey(sourceKey: sourceKey, accountId: accountId);
       final doc = await _load(source);
-      final t = nowMs ?? DateTime.now().millisecondsSinceEpoch;
+      final t = historySecond(nowMs ?? DateTime.now().millisecondsSinceEpoch);
       final result = appendRatingPoint(
         doc.rating,
         RatingPoint(
@@ -192,6 +202,164 @@ class ChartHistoryStore {
     }
   }
 
+  /// 手动点单独保存，不受自动采集的去重、降采样影响。
+  /// 保存失败向上抛出，让录入对话框保留内容并提示重试。
+  Future<void> recordManualRating({
+    required int rating,
+    required int tMs,
+    int best35 = 0,
+    int best15 = 0,
+    String? sourceKey,
+    String? accountId,
+  }) async {
+    if (rating <= 0 || historySecond(tMs) <= 0 || best35 < 0 || best15 < 0) {
+      throw ArgumentError('Rating 或时间无效');
+    }
+    final source = await storageKey(sourceKey: sourceKey, accountId: accountId);
+    final doc = await _load(source);
+    doc.manualRating = mergeRatingPoints([
+      ...doc.manualRating,
+      RatingPoint(
+          tMs: historySecond(tMs),
+          rating: rating,
+          best35: best35,
+          best15: best15),
+    ]);
+    doc.updatedAtMs = DateTime.now().millisecondsSinceEpoch;
+    await _persist(source, doc);
+  }
+
+  /// 手动谱面记录不修改自动采集基线；补录旧成绩不会影响下一次刷新比较。
+  Future<void> recordManualChartPoint({
+    required int songId,
+    required int levelIndex,
+    required double achievement,
+    required int dxScore,
+    required int tMs,
+    String? sourceKey,
+    String? accountId,
+  }) async {
+    if (songId <= 0 ||
+        levelIndex < 0 ||
+        !achievement.isFinite ||
+        achievement < 0 ||
+        achievement > 202 ||
+        dxScore < 0 ||
+        historySecond(tMs) <= 0) {
+      throw ArgumentError('谱面成绩或时间无效');
+    }
+    final source = await storageKey(sourceKey: sourceKey, accountId: accountId);
+    final doc = await _load(source);
+    final key = chartKeyOf(songId, levelIndex);
+    final bySecond = <int, List<num>>{
+      for (final e in doc.manualEvents[key] ?? <List<num>>[])
+        historySecond(e[0].toInt()): e,
+      historySecond(tMs): [historySecond(tMs), achievement, dxScore],
+    };
+    doc.manualEvents[key] = bySecond.values.toList()
+      ..sort((a, b) => a[0].compareTo(b[0]));
+    doc.updatedAtMs = DateTime.now().millisecondsSinceEpoch;
+    await _persist(source, doc);
+  }
+
+  // ==================== 删除 ====================
+
+  /// 删除一个 Rating 记录点（按整秒匹配，自动采集与手动补录都删）。
+  ///
+  /// 返回是否真的删掉了东西：同一秒在文件里找不到时返回 false，
+  /// 让 UI 能区分「删成功了」和「这条早就没了」。
+  Future<bool> deleteRatingPoint({
+    required int tMs,
+    String? sourceKey,
+    String? accountId,
+  }) async {
+    final second = historySecond(tMs);
+    final deleter = debugRatingPointDeleter;
+    if (deleter != null) return deleter(second);
+    final source = await storageKey(sourceKey: sourceKey, accountId: accountId);
+    final doc = await _load(source);
+    final before = doc.rating.length + doc.manualRating.length;
+    doc.rating = [
+      for (final p in doc.rating)
+        if (historySecond(p.tMs) != second) p,
+    ];
+    doc.manualRating = [
+      for (final p in doc.manualRating)
+        if (historySecond(p.tMs) != second) p,
+    ];
+    if (doc.rating.length + doc.manualRating.length == before) return false;
+    doc.updatedAtMs = DateTime.now().millisecondsSinceEpoch;
+    await _persist(source, doc);
+    debugPrint('[History] $source 删除 Rating 记录点 ${second ~/ 1000}'
+        '（剩 ${doc.rating.length + doc.manualRating.length} 个点）');
+    return true;
+  }
+
+  /// 删除某个谱面在某一秒的记录点。
+  ///
+  /// 三处都按同一秒匹配，删的就是用户在列表里看到的那一行：
+  ///   * `events`：自动采集到的变化；
+  ///   * `manualEvents`：手动补录；
+  ///   * `current`：基线（"当前成绩"）。**它必须一起删** —— 只要它有同一秒的
+  ///     时间戳，单谱曲线就会把它当成一个点再画出来（见 [_chartEvents]），
+  ///     只删事件等于没删。
+  ///
+  /// 代价说清楚：基线删掉后，下一次刷新会把当前成绩重新记成一条新事件
+  /// （对采集层来说这张谱面又变成"没采集过"）。自动采集的数据删不干净是必然的，
+  /// UI 的确认弹窗要如实提示。
+  Future<bool> deleteChartPoint({
+    required int songId,
+    required int levelIndex,
+    required int tMs,
+    String? sourceKey,
+    String? accountId,
+  }) async {
+    final second = historySecond(tMs);
+    final deleter = debugChartPointDeleter;
+    if (deleter != null) return deleter(songId, levelIndex, second);
+    final source = await storageKey(sourceKey: sourceKey, accountId: accountId);
+    final doc = await _load(source);
+    final key = chartKeyOf(songId, levelIndex);
+    var removed = false;
+
+    for (final map in [doc.events, doc.manualEvents]) {
+      final list = map[key];
+      if (list == null) continue;
+      final kept = [
+        for (final e in list)
+          if (_eventSecond(e) != second) e,
+      ];
+      if (kept.length == list.length) continue;
+      removed = true;
+      if (kept.isEmpty) {
+        map.remove(key);
+      } else {
+        map[key] = kept;
+      }
+    }
+
+    final baseline = doc.current[key];
+    if (baseline != null) {
+      // 旧数据的基线没有时间戳（长度 2），按 0 对齐 —— 页面上它也显示成"日期未知"
+      final baseSecond =
+          baseline.length > 2 ? historySecond(baseline[2].toInt()) : 0;
+      if (baseSecond == second) {
+        doc.current.remove(key);
+        removed = true;
+      }
+    }
+
+    if (!removed) return false;
+    doc.updatedAtMs = DateTime.now().millisecondsSinceEpoch;
+    await _persist(source, doc);
+    debugPrint('[History] $source 删除谱面记录点 $key @${second ~/ 1000}');
+    return true;
+  }
+
+  /// 事件行的时间戳（长度不足的坏数据算 0）。
+  static int _eventSecond(List<num> event) =>
+      event.isEmpty ? 0 : historySecond(event[0].toInt());
+
   // ==================== 读取 ====================
 
   /// Rating 曲线（按时间升序）。
@@ -201,9 +369,7 @@ class ChartHistoryStore {
     if (loader != null) return loader();
     final doc = await _load(
         await storageKey(sourceKey: sourceKey, accountId: accountId));
-    final list = List<RatingPoint>.from(doc.rating)
-      ..sort((a, b) => a.tMs.compareTo(b.tMs));
-    return list;
+    return mergeRatingPoints([...doc.rating, ...doc.manualRating]);
   }
 
   /// 某个谱面的达成率 / DX 分历史（按时间升序）。
@@ -217,9 +383,26 @@ class ChartHistoryStore {
     if (loader != null) return loader(songId, levelIndex);
     final doc = await _load(
         await storageKey(sourceKey: sourceKey, accountId: accountId));
-    final raw = doc.events[chartKeyOf(songId, levelIndex)];
-    if (raw == null) return const [];
-    return sortedEvents(raw);
+    return _chartEvents(doc, chartKeyOf(songId, levelIndex));
+  }
+
+  List<ChartHistoryEvent> _chartEvents(_HistoryDoc doc, String key) {
+    final automatic = doc.events[key] ?? const <List<num>>[];
+    final manual = doc.manualEvents[key] ?? const <List<num>>[];
+    final baseline = doc.current[key];
+    final bySecond = <int, List<num>>{
+      if (manual.isNotEmpty &&
+          baseline != null &&
+          baseline.length > 2 &&
+          baseline[2] > 0)
+        historySecond(baseline[2].toInt()): [
+          baseline[2],
+          baseline[0],
+          baseline[1]
+        ],
+      for (final e in [...automatic, ...manual]) historySecond(e[0].toInt()): e,
+    };
+    return sortedEvents(bySecond.values);
   }
 
   /// 某个谱面**当前记录到的成绩**（基线）。
@@ -254,15 +437,25 @@ class ChartHistoryStore {
         await storageKey(sourceKey: sourceKey, accountId: accountId));
     var eventCount = 0;
     int? firstEventMs;
-    doc.events.forEach((_, list) {
-      for (final raw in list) {
-        final e = ChartHistoryEvent.fromJson(raw);
-        if (e == null) continue;
+    final chartKeys = {
+      ...doc.current.keys,
+      ...doc.events.keys,
+      ...doc.manualEvents.keys
+    };
+    for (final key in chartKeys) {
+      for (final e in _chartEvents(doc, key)) {
         eventCount++;
-        final prev = firstEventMs;
-        if (prev == null || e.tMs < prev) firstEventMs = e.tMs;
+        if (e.tMs > 0 && (firstEventMs == null || e.tMs < firstEventMs)) {
+          firstEventMs = e.tMs;
+        }
       }
-    });
+    }
+    final ratings = mergeRatingPoints([...doc.rating, ...doc.manualRating]);
+    for (final point in ratings) {
+      if (point.tMs > 0 && (firstEventMs == null || point.tMs < firstEventMs)) {
+        firstEventMs = point.tMs;
+      }
+    }
     // 基线本身也是"从这天开始记录"的证据
     if (doc.current.isNotEmpty) {
       int? baselineMs;
@@ -280,9 +473,9 @@ class ChartHistoryStore {
     }
     return ChartHistorySummary(
       sourceKey: doc.source,
-      chartCount: doc.current.length,
+      chartCount: chartKeys.length,
       eventCount: eventCount,
-      ratingPointCount: doc.rating.length,
+      ratingPointCount: ratings.length,
       firstRecordedAtMs: firstEventMs ?? 0,
       updatedAtMs: doc.updatedAtMs,
     );
@@ -292,7 +485,11 @@ class ChartHistoryStore {
   Future<bool> hasAnyHistory({String? sourceKey, String? accountId}) async {
     final doc = await _load(
         await storageKey(sourceKey: sourceKey, accountId: accountId));
-    return doc.current.isNotEmpty || doc.rating.isNotEmpty;
+    return doc.current.isNotEmpty ||
+        doc.events.isNotEmpty ||
+        doc.rating.isNotEmpty ||
+        doc.manualRating.isNotEmpty ||
+        doc.manualEvents.isNotEmpty;
   }
 
   /// 清空某个数据源的历史（设置里的"清除历史记录"）。
@@ -318,6 +515,8 @@ class ChartHistoryStore {
     debugSummaryLoader = null;
     debugChartEventsLoader = null;
     debugChartBaselineLoader = null;
+    debugRatingPointDeleter = null;
+    debugChartPointDeleter = null;
     debugBypassCache = false;
   }
 
@@ -369,14 +568,15 @@ class ChartHistoryStore {
     _cache[source] = doc;
     final payload = json.encode(doc.toJson());
     final previous = _writes[source] ?? Future<void>.value();
-    final next = previous.then((_) async {
+    final next = previous.catchError((Object _) {}).then((_) async {
       try {
         final file = await _fileFor(source);
         final tmp = File('${file.path}.tmp');
         await tmp.writeAsString(payload, flush: true);
         await tmp.rename(file.path);
       } catch (e) {
-        debugPrint('[History] 历史写入失败: $e');
+        if (identical(_cache[source], doc)) _cache.remove(source);
+        rethrow;
       }
     });
     _writes[source] = next;
@@ -425,12 +625,14 @@ class ChartHistorySummary {
 
   bool get isEmpty => chartCount == 0 && ratingPointCount == 0;
 
-  /// 「从 X 年 X 月 X 日开始记录」——谱面级历史没有公开来源可回填，
+  /// 「从 X 年 X 月 X 日 HH:mm:ss 开始记录」——谱面级历史没有公开来源可回填，
   /// 只能从开启记录那天算起，UI 要如实说明。
   String get firstRecordedText {
     if (firstRecordedAtMs <= 0) return '尚未开始记录';
     final d = DateTime.fromMillisecondsSinceEpoch(firstRecordedAtMs);
-    return '${d.year} 年 ${d.month} 月 ${d.day} 日起记录';
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${d.year} 年 ${d.month} 月 ${d.day} 日 '
+        '${two(d.hour)}:${two(d.minute)}:${two(d.second)} 起记录';
   }
 }
 
@@ -451,6 +653,9 @@ class _HistoryDoc {
   Map<String, List<List<num>>> events = {};
 
   List<RatingPoint> rating = [];
+  // 新字段兼容旧文件，不升级 schema、不丢弃已有记录。
+  List<RatingPoint> manualRating = [];
+  Map<String, List<List<num>>> manualEvents = {};
 
   Map<String, dynamic> toJson() => {
         'version': ChartHistoryStore.schemaVersion,
@@ -460,6 +665,8 @@ class _HistoryDoc {
         'current': current,
         'events': events,
         'rating': rating.map((p) => p.toJson()).toList(),
+        'manualRating': manualRating.map((p) => p.toJson()).toList(),
+        'manualEvents': manualEvents,
       };
 
   static _HistoryDoc fromJson(dynamic raw, String fallbackSource) {
@@ -500,6 +707,23 @@ class _HistoryDoc {
     if (rating is List) {
       doc.rating =
           rating.map(RatingPoint.fromJson).whereType<RatingPoint>().toList();
+    }
+
+    final manualRating = raw['manualRating'];
+    if (manualRating is List) {
+      doc.manualRating = manualRating
+          .map(RatingPoint.fromJson)
+          .whereType<RatingPoint>()
+          .toList();
+    }
+    final manualEvents = raw['manualEvents'];
+    if (manualEvents is Map) {
+      manualEvents.forEach((key, value) {
+        if (value is List) {
+          doc.manualEvents[key.toString()] =
+              sortedEvents(value).map((event) => event.toJson()).toList();
+        }
+      });
     }
 
     // 防御：异常数据别把内存撑爆

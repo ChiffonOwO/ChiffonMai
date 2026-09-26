@@ -68,8 +68,6 @@ import 'CoverRecognitionPage.dart';
 import 'ScoreOcrPage.dart';
 import 'DataBackupPage.dart';
 import 'Awmc/AwmcConsolePage.dart';
-import 'AwmcNet/AwmcNetSyncFlow.dart';
-import 'Awmc/AwmcSyncFlow.dart';
 import 'DailyRecommendPage.dart';
 import '../widgets/RefreshDataDialog.dart'
     show
@@ -86,7 +84,6 @@ import '../widgets/AdvancedRefreshDataDialog.dart'
 import 'FriendComparePage.dart';
 import 'RecentCommentsPage.dart';
 import 'RecentRatingsPage.dart';
-import 'LuoXue/UpdateLuoXueScorePage.dart';
 import '../manager/DivingFishProbeManager.dart';
 import '../manager/DivingFish/DivingFishOAuthManager.dart';
 import 'package:my_first_flutter_app/utils/FavoriteFeaturesNotifier.dart';
@@ -94,16 +91,15 @@ import 'package:my_first_flutter_app/utils/FeatureFlags.dart';
 import 'package:my_first_flutter_app/utils/LoginStateNotifier.dart';
 import 'package:my_first_flutter_app/utils/UserProfileNotifier.dart';
 import '../widgets/AccountSwitchSheet.dart';
-import '../service/AccountStore.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 import '../widgets/QrQuickFillButtons.dart';
-import '../service/SyncRouteStore.dart';
 import '../service/SyncStatsService.dart';
 import '../utils/SyncRouteNotifier.dart';
 import '../utils/RefreshErrorPresenter.dart';
 import '../utils/UpdateNotifier.dart';
 import '../widgets/SyncRouteFooter.dart';
 import '../widgets/SyncStatsFooter.dart';
+import '../widgets/SyncFlowMixin.dart';
 
 // ds值与歌曲对应关系数据类已随 _calculateRatingLimits 一起抽离到
 // lib/widgets/RefreshDataDialog.dart，不再需要此处的定义。
@@ -207,7 +203,7 @@ class HomePage extends StatefulWidget {
 }
 
 /// 首页状态类：处理页面状态、存储数据、实现布局构建
-class HomePageState extends State<HomePage> {
+class HomePageState extends State<HomePage> with SyncFlowMixin {
   void showAccountManageDialog() {
     if (!mounted) return;
     _showAccountManageDialog(context);
@@ -227,9 +223,10 @@ class HomePageState extends State<HomePage> {
 
   // 缓存的QQ号（实际数据来自 UserProfileNotifier，字段保留便于本地访问）
 
-  // 「同步成绩到 AWMC NET」的进行状态：显示在收藏区那个按钮上（同「系统」hub 页）
-  bool _syncingAwmcNet = false;
-  String _awmcNetText = '';
+  /// 任意长任务进行中：收藏区那三个同步入口之间也要互斥，
+  /// 否则能同时点起两个同步互相踩缓存（「系统」hub 页一直有这个保护）。
+  @override
+  bool get anyBusy => !syncFlowsIdle;
 
   // 初始化方法，用于从本地存储加载数据
   @override
@@ -808,7 +805,7 @@ class HomePageState extends State<HomePage> {
   // 收藏品选择 tab 按钮已迁移到独立的 CollectionPickerSheet StatefulWidget
   //（避免 showModalBottomSheet.builder 多次调用时局部变量 activeTab 被重置的 bug）
 
-  SyncCallbacks get _syncCallbacks => SyncCallbacks(
+  SyncCallbacks get syncCallbacks => SyncCallbacks(
         onSaveQQ: _saveQQ,
         onRefreshAfterSync: ({
           required String qq,
@@ -832,133 +829,11 @@ class HomePageState extends State<HomePage> {
         },
       );
 
-  /// 线路2：通过 AWMC 网关同步（与「系统」hub 页共用 [AwmcSyncFlow]）。
-  ///
-  /// 首页没有按钮进度条，用顶部提示代替；两条线路的行为与 hub 页完全一致。
-  Future<void> _syncToDivingFishViaAwmc() async {
-    if (!mounted) return;
-    final outcome = await AwmcSyncFlow.run(
-      context,
-      target: AwmcSyncTarget.divingFish,
-    );
-    if (!mounted || outcome.cancelled) return;
-    Fluttertoast.showToast(
-      msg: outcome.ok
-          ? AwmcSyncFlow.successToast(AwmcSyncTarget.divingFish, outcome)
-          : (outcome.message ?? '同步失败'),
-    );
-    SyncRouteNotifier.instance.refreshStatsSoon();
-  }
-
-  /// 线路2：通过 AWMC 网关同步到落雪（同上）。
-  Future<void> _syncToLuoXueViaAwmc() async {
-    if (!mounted) return;
-    final outcome = await AwmcSyncFlow.run(
-      context,
-      target: AwmcSyncTarget.luoXue,
-    );
-    if (!mounted || outcome.cancelled) return;
-    Fluttertoast.showToast(
-      msg: outcome.ok
-          ? AwmcSyncFlow.successToast(AwmcSyncTarget.luoXue, outcome)
-          : (outcome.message ?? '同步失败'),
-    );
-    SyncRouteNotifier.instance.refreshStatsSoon();
-  }
-
-  /// 同步成绩到 AWMC NET（机台二维码直传）。
-  ///
-  /// 与「系统」hub 页共用 [AwmcNetSyncFlow]：**输入在对话框、等待进度在按钮上**。
-  /// 首页这里同样把进度打在收藏区那个按钮上（`_syncingAwmcNet`），
-  /// 不再用一个模态框把整页锁住 30 多秒。
-  Future<void> _syncToAwmcNet() async {
-    if (_syncingAwmcNet) return;
-    final outcome = await AwmcNetSyncFlow.run(
-      context,
-      onBusy: (label) {
-        if (!mounted) return;
-        setState(() {
-          _syncingAwmcNet = true;
-          _awmcNetText = label;
-        });
-      },
-      onIdle: () {
-        if (!mounted) return;
-        setState(() {
-          _syncingAwmcNet = false;
-          _awmcNetText = '';
-        });
-      },
-    );
-    if (!mounted || outcome.cancelled) return;
-    Fluttertoast.showToast(msg: AwmcNetSyncFlow.toastFor(outcome));
-  }
-
-  Future<void> _syncToDivingFish() async {
-    final prefs = await SharedPreferences.getInstance();
-    final hasJwt =
-        (prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '')
-            .isNotEmpty;
-
-    if (!hasJwt) {
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('提示'),
-          content: const Text('请先登录你的水鱼账号，再使用同步功能。'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('去登录'),
-            ),
-          ],
-        ),
-      );
-      if (ok == true && mounted) {
-        await SyncScoreDialogs.showDivingFishLoginDialog(
-            context, _syncCallbacks);
-        final prefs2 = await SharedPreferences.getInstance();
-        final hasJwt2 =
-            (prefs2.getString(CacheKeyConstant.probeDivingFishToken) ?? '')
-                .isNotEmpty;
-        if (hasJwt2 && mounted) {
-          await SyncScoreDialogs.showDivingFishSyncDialog(
-              context, _syncCallbacks);
-        }
-      }
-      return;
-    }
-
-    final bindQQ =
-        prefs.getString(CacheKeyConstant.probeDivingFishBindQQ) ?? '';
-    final cachedQQ = (await AccountStore.loadAll())['shuiyu']?.id;
-    if (bindQQ.isNotEmpty && cachedQQ != null && bindQQ != cachedQQ) {
-      if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('账号不匹配'),
-          content: Text(
-            '当前登录水鱼账号绑定的 QQ（$bindQQ）与本机缓存的 QQ（$cachedQQ）不一致。\n\n请先登出当前水鱼账号，登录正确的账号后再同步。',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('确定'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    if (!mounted) return;
-    await SyncScoreDialogs.showDivingFishSyncDialog(context, _syncCallbacks);
-  }
+  // 收藏区三个同步入口的编排（线路分发、按钮进度、统计上报）统一由 SyncFlowMixin
+  // 提供 —— 原先这里自己写了一份，导致同一功能在「系统」hub 页与收藏区表现不同：
+  // 水鱼弹模态框、落雪直接跳页且没有任何进度。
+  // 现在两边调用同一份代码：syncToDivingFishByCurrentRoute /
+  // syncToLuoXueByCurrentRoute / syncToAwmcNetWithButton。
 
   // 显示刷新数据对话框（旧版实现已抽离到 lib/widgets/RefreshDataDialog.dart，
   // 这里仅保留给其它可能的本地调用入口；首页/系统 Tab 现统一调用 showRefreshDataDialog）
@@ -2963,19 +2838,15 @@ class HomePageState extends State<HomePage> {
       }
     }
     if (item.title == '同步成绩到水鱼') {
-      // 与「系统」hub 页同一套线路记忆：线路2 走 AWMC 网关，线路1 走原有流程
-      if (SyncRouteNotifier.instance.routeOf(SyncPlatform.divingFish) ==
-          SyncRouteStore.routeAwmc) {
-        await _syncToDivingFishViaAwmc();
-      } else {
-        await _syncToDivingFish();
-      }
+      // 与「系统」hub 页同一份实现（SyncFlowMixin）：线路2 走 AWMC 网关，
+      // 线路1 走对话框输入 + 按钮上进度
+      await syncToDivingFishByCurrentRoute();
     }
     if (item.title == '账号管理') {
       _showAccountManageDialog(context);
     }
     if (item.title == '登录水鱼') {
-      await SyncScoreDialogs.showDivingFishLoginDialog(context, _syncCallbacks);
+      await SyncScoreDialogs.showDivingFishLoginDialog(context, syncCallbacks);
     }
     if (item.title == '登出水鱼账号') {
       final ok = await showDialog<bool>(
@@ -3124,17 +2995,14 @@ class HomePageState extends State<HomePage> {
       );
     }
     if (item.title == '同步成绩到落雪') {
-      if (SyncRouteNotifier.instance.routeOf(SyncPlatform.luoXue) ==
-          SyncRouteStore.routeAwmc) {
-        await _syncToLuoXueViaAwmc();
-      } else {
-        UpdateLuoXueScorePage.show(context);
-      }
+      // 与「系统」hub 页同一份实现（SyncFlowMixin）：线路1 走对话框输入 +
+      // 按钮上进度，不再跳 UpdateLuoXueScorePage（那里没有任何进度反馈）
+      await syncToLuoXueByCurrentRoute();
     }
     if (item.title == '同步成绩到 AWMC NET') {
       // AWMC NET 只有二维码这一条写入路径（与另外两个平台不同，没有线路概念）。
       // 等待进度与另外两个同步入口一样显示在**按钮**上，不锁住整个页面。
-      await _syncToAwmcNet();
+      await syncToAwmcNetWithButton();
     }
     if (item.title == '每日推荐') {
       Navigator.push(
@@ -3257,10 +3125,11 @@ class HomePageState extends State<HomePage> {
                   isFavorited: true,
                   onToggleFavorite: () => _toggleFavorite(item.title),
                   onTap: () => _handleFeatureTap(item),
-                  // 「同步成绩到 AWMC NET」的等待进度也打在按钮上：
-                  // 它一次要 30 多秒，用模态框把整页锁住太难受（与 hub 页一致）
-                  loading: item.title == '同步成绩到 AWMC NET' && _syncingAwmcNet,
-                  loadingText: _awmcNetText,
+                  // 三个同步入口的等待进度都打在**按钮**上（与「系统」hub 页一致）：
+                  // 它们各自要跑几十秒，用模态框把整页锁住太难受。
+                  // 状态由 SyncFlowMixin 提供，两边读的是同一份。
+                  loading: _syncBusyFor(item.title),
+                  loadingText: _syncTextFor(item.title),
                   // 纯统计行要贴紧按钮（线路切换器那两行不用，见 SyncStatsFooter）
                   footerLift: item.title == '同步成绩到 AWMC NET'
                       ? SyncStatsFooter.footerLift
@@ -3275,13 +3144,37 @@ class HomePageState extends State<HomePage> {
     );
   }
 
+  /// 收藏区某个同步入口是否正在跑（用来在按钮上出进度）。
+  ///
+  /// 只有这一个入口为 true 时按钮才会转；同一时刻最多一个在跑（[anyBusy] 互斥）。
+  bool _syncBusyFor(String title) {
+    if (title == '同步成绩到水鱼') return syncingDivingFish;
+    if (title == '同步成绩到落雪') return syncingLuoXue;
+    if (title == '同步成绩到 AWMC NET') return syncingAwmcNet;
+    return false;
+  }
+
+  /// 收藏区某个同步入口按钮上的进度文案。
+  String _syncTextFor(String title) {
+    if (title == '同步成绩到水鱼') return syncText;
+    if (title == '同步成绩到落雪') return luoXueText;
+    if (title == '同步成绩到 AWMC NET') return awmcNetText;
+    return '';
+  }
+
   /// 收藏区里「同步成绩」入口的附加区；其它功能返回 null（不占位置）。
   Widget? _syncFooterFor(String title) {
     if (title == '同步成绩到水鱼') {
-      return const SyncRouteFooter(platform: SyncPlatform.divingFish);
+      return SyncRouteFooter(
+        platform: SyncPlatform.divingFish,
+        enabled: !anyBusy,
+      );
     }
     if (title == '同步成绩到落雪') {
-      return const SyncRouteFooter(platform: SyncPlatform.luoXue);
+      return SyncRouteFooter(
+        platform: SyncPlatform.luoXue,
+        enabled: !anyBusy,
+      );
     }
     // AWMC NET 只有二维码直传、没有线路，所以只有统计那一行
     if (title == '同步成绩到 AWMC NET') {

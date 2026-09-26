@@ -46,6 +46,7 @@ import 'package:my_first_flutter_app/manager/DXDataManager.dart';
 import 'package:my_first_flutter_app/page/CalculatorPage.dart';
 import 'package:my_first_flutter_app/service/AWMC/AwmcPlayCountStore.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/ScoreInputValidator.dart';
 import 'package:my_first_flutter_app/utils/SongFilterUtil.dart';
 import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
 import 'package:my_first_flutter_app/widgets/ChartHistorySection.dart';
@@ -419,7 +420,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
   ///
   /// 卡片自身不给内边距：没有历史时 [ChartHistorySection] 返回 `SizedBox.shrink()`，
   /// 外壳也必须跟着收缩成 0 高度，所以 padding 只能按**渲染形态**分三档给
-  /// （空 / 一行文字 / 完整曲线），否则会在页面上凭空留一块空白。
+  /// （空 / 基线文字 / 完整曲线），否则会在页面上凭空留一块空白。
   Widget _buildChartHistoryCard() {
     final songId = int.tryParse(widget.songId) ?? 0;
     // ⚠️ 卡片**不做外层 padding**：`ChartHistorySection` 在没有历史时返回
@@ -430,11 +431,13 @@ class _SongInfoPageState extends State<SongInfoPage> {
       songId: songId,
       levelIndex: _currentDiffIndex,
       maxDxScore: _calculateMaxDxScore(songId, _currentDiffIndex),
+      // 手动录入时的达成率上限（普通曲 101%；宴会场子谱相加 → 202%）
+      maxAchievement: _calculateMaxAchievement(),
       // 有曲线时的卡片样式（垫一层 surface 底 + 圆角）
       cardStyle: true,
       // 完全没有历史 → 整块高度 0，不占位、不留白
       emptyPadding: EdgeInsets.zero,
-      // 有基线/单条记录（只有一行文字）→ 基本水平内边距
+      // 只有基线且还没有变化 → 基本水平内边距
       textPadding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
       // 有曲线 → 完整卡片内边距。
       // ⚠️ top 保持小值：**卡片之间的间距由 build 里那个 `SizedBox(height: 10)` 提供**，
@@ -7031,6 +7034,18 @@ class _SongInfoPageState extends State<SongInfoPage> {
     List<dynamic> notes = chart['notes'];
     int notesSum = notes.fold(0, (sum, note) => sum + (note as int));
     return notesSum * 3;
+  }
+
+  /// 这张谱面的**达成率上限**：普通曲 101%；宴会场（6 位 songId）一个曲目里
+  /// 有多张子谱、达成率相加，上限 = 101 × 子谱数。
+  ///
+  /// 口径与「自定义 Best50」一致（见 [maxAchievementFor]），供成绩历史的手动录入校验。
+  double _calculateMaxAchievement() {
+    final ds = _songData?['ds'];
+    return maxAchievementFor(
+      isUtage: widget.songId.length == 6,
+      chartCount: ds is List ? ds.length : 1,
+    );
   }
 
   // 计算最大DX分

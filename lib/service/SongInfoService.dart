@@ -15,6 +15,7 @@ import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 import 'package:my_first_flutter_app/utils/CurrentDataSourceNotifier.dart';
+import 'package:my_first_flutter_app/utils/ScoreInputValidator.dart';
 
 // 评论数据模型
 class CommentItem {
@@ -1161,10 +1162,31 @@ class SongInfoService {
   }
 
   // 计算理论Rating（所有谱面SSS+时的Best50 Rating）
-  static Future<int> getTheoreticalRating() async {
+  static Future<int> getTheoreticalRating() async =>
+      (await getTheoreticalRatingParts()).total;
+
+  /// 仅供测试：替换理论 Rating 的读取。
+  ///
+  /// 为什么需要：widget 测试里没有歌曲缓存（`getCachedSongs` 返回 null），
+  /// 真实计算只会得到 0，测不到"不得超过当前理论值"这条规则。
+  @visibleForTesting
+  static RatingLimits? debugTheoreticalRatingOverride;
+
+  /// 理论 Rating 的三个数：Best35 上限 / Best15 上限 / 总和。
+  ///
+  /// 总和与 [getTheoreticalRating] 完全一致（后者就是这里的 `total`）；
+  /// 拆开是因为录入校验要**分别**卡住 B35 与 B15 —— 只给总和的话，
+  /// 用户可以把 B35 填成 99999 而总和仍然"合法"。
+  ///
+  /// 口径：所有谱面按达成率 SSS+ 计（`ds × 0.224 × 100.5`），
+  /// 旧曲取前 35、新曲取前 15 求和；宴会场 / maidata 谱面 / extra 不参与。
+  /// 拿不到歌曲缓存时返回 [unknownRatingLimits]（三档全 0）。
+  static Future<RatingLimits> getTheoreticalRatingParts() async {
+    final override = debugTheoreticalRatingOverride;
+    if (override != null) return override;
     try {
       final songs = await MaimaiMusicDataManager().getCachedSongs();
-      if (songs == null) return 0;
+      if (songs == null) return unknownRatingLimits;
 
       List<Map<String, dynamic>> allSongs = [];
 
@@ -1204,10 +1226,10 @@ class SongInfoService {
       int best15 =
           newSongs.take(15).fold(0, (sum, item) => sum + (item['ra'] as int));
 
-      return best35 + best15;
+      return (best35: best35, best15: best15, total: best35 + best15);
     } catch (e) {
       debugPrint('计算理论Rating失败: $e');
-      return 0;
+      return unknownRatingLimits;
     }
   }
 

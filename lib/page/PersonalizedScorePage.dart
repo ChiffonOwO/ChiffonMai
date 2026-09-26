@@ -17,6 +17,7 @@ import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
 import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
+import 'package:my_first_flutter_app/widgets/SearchPickerDialog.dart';
 
 class PersonalizedScorePage extends StatefulWidget {
   const PersonalizedScorePage({super.key});
@@ -759,7 +760,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
   }
 
   // 显示谱师选择对话框
-  void _showCharterDialog() {
+  Future<void> _showCharterDialog() async {
     if (_charterCounts == null || _charterCounts!.isEmpty) {
       showDialog(
         context: context,
@@ -785,91 +786,24 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
     List<MapEntry<String, int>> sortedCharters = _charterCounts!.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    final TextEditingController searchController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            final String keyword = searchController.text.trim().toLowerCase();
-            final List<MapEntry<String, int>> filteredCharters = keyword.isEmpty
-                    ? sortedCharters
-                    : sortedCharters
-                        .where((e) => e.key.toLowerCase().contains(keyword))
-                        .toList();
-
-            return AlertDialog(
-              title: Text('选择谱师'),
-              content: SingleChildScrollView(
-                child: ListBody(
-                  children: [
-                    // 搜索输入框
-                    TextField(
-                      controller: searchController,
-                      decoration: InputDecoration(
-                        hintText: '搜索谱师',
-                        prefixIcon: const Icon(Icons.search, size: 20),
-                        isDense: true,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        suffixIcon: keyword.isEmpty
-                            ? null
-                            : IconButton(
-                                icon: const Icon(Icons.clear, size: 18),
-                                onPressed: () {
-                                  searchController.clear();
-                                  setDialogState(() {});
-                                },
-                              ),
-                      ),
-                      onChanged: (_) => setDialogState(() {}),
-                    ),
-                    const SizedBox(height: 8),
-                    if (filteredCharters.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Center(
-                            child: Text('没有匹配的谱师',
-                                style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant))),
-                      )
-                    else
-                      ...filteredCharters.map((entry) {
-                        return ListTile(
-                          title: Text('${entry.key} (${entry.value}谱面)'),
-                          selected: _selectedCharter == entry.key,
-                          onTap: () async {
-                            Navigator.of(context).pop();
-                            setState(() {
-                              _selectedCharter = entry.key;
-                              _cachedSongsWithStatus = null;
-                            });
-                            _saveOptions();
-                            await _loadSongsWithStatus();
-                          },
-                        );
-                      }),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  child: Text('取消'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      },
-    ).whenComplete(() {
-      searchController.dispose();
+    // 搜索框的 controller 由弹窗自己释放（见 SearchPickerDialog 的说明）：
+    // 在这里 `.whenComplete(dispose)` 会在 pop 那一刻就释放，把弹窗的退场动画炸掉。
+    final picked = await showSearchPickerDialog(
+      context,
+      title: '选择谱师',
+      hintText: '搜索谱师',
+      emptyText: '没有匹配的谱师',
+      entries: sortedCharters,
+      countSuffix: '谱面',
+      selected: _selectedCharter,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _selectedCharter = picked;
+      _cachedSongsWithStatus = null;
     });
+    _saveOptions();
+    await _loadSongsWithStatus();
   }
 
   // 显示版本选择对话框
@@ -914,7 +848,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
   }
 
   // 显示曲师选择对话框
-  void _showArtistDialog() {
+  Future<void> _showArtistDialog() async {
     if (_artistCounts == null || _artistCounts!.isEmpty) {
       showDialog(
         context: context,
@@ -940,91 +874,24 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
     List<MapEntry<String, int>> sortedArtists = _artistCounts!.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    final TextEditingController searchController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            final String keyword = searchController.text.trim().toLowerCase();
-            final List<MapEntry<String, int>> filteredArtists = keyword.isEmpty
-                    ? sortedArtists
-                    : sortedArtists
-                        .where((e) => e.key.toLowerCase().contains(keyword))
-                        .toList();
-
-            return AlertDialog(
-              title: Text('选择曲师'),
-              content: SingleChildScrollView(
-                child: ListBody(
-                  children: [
-                    // 搜索输入框
-                    TextField(
-                      controller: searchController,
-                      decoration: InputDecoration(
-                        hintText: '搜索曲师',
-                        prefixIcon: const Icon(Icons.search, size: 20),
-                        isDense: true,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        suffixIcon: keyword.isEmpty
-                            ? null
-                            : IconButton(
-                                icon: const Icon(Icons.clear, size: 18),
-                                onPressed: () {
-                                  searchController.clear();
-                                  setDialogState(() {});
-                                },
-                              ),
-                      ),
-                      onChanged: (_) => setDialogState(() {}),
-                    ),
-                    const SizedBox(height: 8),
-                    if (filteredArtists.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Center(
-                            child: Text('没有匹配的曲师',
-                                style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant))),
-                      )
-                    else
-                      ...filteredArtists.map((entry) {
-                        return ListTile(
-                          title: Text('${entry.key} (${entry.value}首)'),
-                          selected: _selectedArtist == entry.key,
-                          onTap: () async {
-                            Navigator.of(context).pop();
-                            setState(() {
-                              _selectedArtist = entry.key;
-                              _cachedSongsWithStatus = null;
-                            });
-                            _saveOptions();
-                            await _loadSongsWithStatus();
-                          },
-                        );
-                      }),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  child: Text('取消'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      },
-    ).whenComplete(() {
-      searchController.dispose();
+    // 搜索框的 controller 由弹窗自己释放（见 SearchPickerDialog 的说明）：
+    // 在这里 `.whenComplete(dispose)` 会在 pop 那一刻就释放，把弹窗的退场动画炸掉。
+    final picked = await showSearchPickerDialog(
+      context,
+      title: '选择曲师',
+      hintText: '搜索曲师',
+      emptyText: '没有匹配的曲师',
+      entries: sortedArtists,
+      countSuffix: '首',
+      selected: _selectedArtist,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _selectedArtist = picked;
+      _cachedSongsWithStatus = null;
     });
+    _saveOptions();
+    await _loadSongsWithStatus();
   }
 
   // 显示流派选择对话框

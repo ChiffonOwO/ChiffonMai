@@ -25,6 +25,23 @@ import '../../widgets/PageTopBar.dart';
 class GuessChartBySongExcerptPage extends StatefulWidget {
   const GuessChartBySongExcerptPage({super.key});
 
+  /// 片段起始秒的**纯函数**核心（便于单测，不需要真机音频）。
+  ///
+  /// 规则：在 `[0, 总时长 - 播放时长)` 里随机取一个整数秒，保证
+  /// 「起始 + 播放时长」不会超出歌曲末尾（否则片段会在中途被截断，听起来
+  /// 就像只截了前几秒）；留不出余量时退回 0。
+  ///
+  /// [random] 允许注入，方便单测断言边界而不是靠运气。
+  static int pickAudioStartTime({
+    required int totalSeconds,
+    required int playDuration,
+    Random? random,
+  }) {
+    final maxStartTime = totalSeconds - playDuration;
+    if (maxStartTime <= 0) return 0;
+    return (random ?? Random()).nextInt(maxStartTime);
+  }
+
   @override
   State<GuessChartBySongExcerptPage> createState() => _GuessChartBySongExcerptPageState();
 }
@@ -967,6 +984,10 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
     // 先取好 messenger：下面 await 之后再用 context 会踩
     // use_build_context_synchronously
     final messenger = ScaffoldMessenger.of(context);
+    // Let the dialog pop animation and the save confirmation render before
+    // the full-library validation starts on the UI isolate.
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    if (!mounted) return;
     try {
       final testResult =
           await GuessChartBySongExcerptService().randomSelectSong(
@@ -1205,37 +1226,37 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
         final file = await luoXueSongUtil.getMusicFile(_luoXueSongId!.toString());
         
         if (file != null) {
-          // 获取歌曲时长
-          final duration = await luoXueSongUtil.getSongDuration(_luoXueSongId!.toString());
-          if (duration != null) {
-            // 生成音频开始时间（每轮游戏只生成一次）
-            if (_audioStartTime == null) {
-              final maxStartTime = duration.inSeconds - _currentPlayDuration;
-              if (maxStartTime > 0) {
-                final random = Random();
-                _audioStartTime = random.nextInt(maxStartTime);
-              } else {
-                _audioStartTime = 0;
-              }
-            }
-          } else {
-            if (_audioStartTime == null) {
-              _audioStartTime = 0;
-            }
-          }
-          
           // 重新初始化播放器
           if (_audioPlayer != null) {
             await _audioPlayer!.dispose();
           }
           _audioPlayer = AudioPlayer();
-          
-          // 设置文件路径
+
+          // 由实际负责播放的实例准备文件并读取时长。之前这里另开
+          // just_audio 读取时长，读取失败就静默回退到 0 秒，导致每局都从开头播。
+          final durationEvents = _audioPlayer!.onDurationChanged.first.timeout(
+            const Duration(seconds: 3),
+          );
           await _audioPlayer!.setSource(DeviceFileSource(file.path));
-          // 确保seek到正确位置
+          final duration = await _audioPlayer!.getDuration() ??
+              await durationEvents.catchError((_) => Duration.zero);
+          if (duration <= Duration.zero) {
+            throw StateError('无法读取音频时长，不能生成随机片段起点');
+          }
+
+          // 生成音频开始时间（每轮游戏只生成一次）
+          if (_audioStartTime == null) {
+            _audioStartTime = GuessChartBySongExcerptPage.pickAudioStartTime(
+              totalSeconds: duration.inSeconds,
+              playDuration: _currentPlayDuration,
+            );
+          }
+
+          // setSource 后 seek，再 resume；不能再调用 play(source)，否则会再次
+          // setSource 并把刚定位好的位置重置为 0 秒。
+          //
           await _audioPlayer!.seek(Duration(seconds: _audioStartTime!));
-          // 开始播放
-          await _audioPlayer!.play(DeviceFileSource(file.path));
+          await _audioPlayer!.resume();
           
           // 记录播放开始时间
           final playStartTime = DateTime.now();
@@ -1321,7 +1342,9 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
       _elapsedTime = value.toInt();
     });
     // 如果播放器存在，更新播放位置
-    if (_audioPlayer != null) {
+    // _audioStartTime 只在真正播过一次之后才有值；还没播就拖进度条时它是 null，
+    // 直接 `!` 会抛 Null check operator used on a null value。
+    if (_audioPlayer != null && _audioStartTime != null) {
       _audioPlayer!.seek(Duration(seconds: _audioStartTime! + _elapsedTime));
     }
   }

@@ -204,7 +204,8 @@ void main() {
   group('事件降采样与曲线辅助', () {
     test('没超上限就原样保留', () {
       final events = [
-        for (var i = 0; i < 10; i++) <num>[1000 + i, 99 + i * 0.1, 100 + i],
+        for (var i = 0; i < 10; i++)
+          <num>[1000 + i * 1000, 99 + i * 0.1, 100 + i],
       ];
       final pruned = mergeAndPruneEvents(const [], events, max: 50);
       expect(pruned.length, 10);
@@ -229,7 +230,7 @@ void main() {
       }
     });
 
-    test('Rating 曲线：同一天只留一个点（用当天最后一次）', () {
+    test('Rating 曲线：同一天不同时间也保留变化点', () {
       final day1 = DateTime(2026, 9, 1, 10).millisecondsSinceEpoch;
       final day1Later = DateTime(2026, 9, 1, 22).millisecondsSinceEpoch;
       final day2 = DateTime(2026, 9, 2, 9).millisecondsSinceEpoch;
@@ -240,12 +241,12 @@ void main() {
       series =
           appendRatingPoint(series, RatingPoint(tMs: day1Later, rating: 16100))
               .series;
-      expect(series.length, 1);
-      expect(series.single.rating, 16100, reason: '当天以最后一次为准');
+      expect(series.length, 2);
+      expect(series.last.rating, 16100);
 
       series = appendRatingPoint(series, RatingPoint(tMs: day2, rating: 16200))
           .series;
-      expect(series.length, 2);
+      expect(series.length, 3);
       expect(series.last.rating, 16200);
     });
 
@@ -286,7 +287,7 @@ void main() {
       expect(r.series.last.rating, 15700);
     });
 
-    test('同一天内 Rating 没变：替换当天那个点，不新增', () {
+    test('同一天内 Rating 没变：不新增点，保留原时间', () {
       final morning = DateTime(2026, 9, 1, 9).millisecondsSinceEpoch;
       final evening = DateTime(2026, 9, 1, 21).millisecondsSinceEpoch;
 
@@ -295,9 +296,9 @@ void main() {
       r = appendRatingPoint(
           r.series, RatingPoint(tMs: evening, rating: 15610, recordCount: 120));
 
-      expect(r.series.length, 1, reason: '同一天只能有一个点');
-      expect(r.series.single.tMs, evening, reason: '以当天最后一次为准');
-      expect(r.series.single.recordCount, 120, reason: '明细要更新成最新的');
+      expect(r.series.length, 1, reason: 'Rating 没变不新增自动点');
+      expect(r.series.single.tMs, morning, reason: '原点时间保持不变');
+      expect(r.series.single.recordCount, 100, reason: '不新增时保留原明细');
     });
 
     test('Rating 下降也会记（换号/换源）', () {
@@ -314,7 +315,7 @@ void main() {
       expect(r.series.last.rating, 15500);
     });
 
-    test('Rating 曲线上限 365 天', () {
+    test('Rating 曲线保留较长时间范围', () {
       var series = <RatingPoint>[];
       for (var i = 0; i < 400; i++) {
         series = appendRatingPoint(
@@ -326,7 +327,7 @@ void main() {
               rating: 16000 + i),
         ).series;
       }
-      expect(series.length, 365);
+      expect(series.length, 400);
       expect(series.last.rating, 16000 + 399);
     });
 
@@ -385,6 +386,20 @@ void main() {
 
       final bad = niceAxisRange(double.nan, double.infinity);
       expect(bad.max, greaterThan(bad.min));
+    });
+
+    test('横轴秒级文案：只有一个记录点时必须退回「日」', () {
+      const day = 24 * 3600 * 1000;
+      final t = DateTime(2026, 9, 1, 14, 30, 5).millisecondsSinceEpoch;
+
+      // 单点：横轴三个刻度（fl_chart 的起点/中点/终点）都落在同一个点上，
+      // 秒级文案 19 个字符挤在一处必然互相压字并顶出画布
+      expect(showSecondPrecisionAxis(t, t, 1), isFalse);
+      expect(showSecondPrecisionAxis(t, t + 3600 * 1000, 2), isTrue,
+          reason: '同一天内的两次变化要能看出几点几分');
+      expect(showSecondPrecisionAxis(t, t + 2 * day, 2), isFalse,
+          reason: '跨度到天以后秒没有意义');
+      expect(showSecondPrecisionAxis(t, t + 3 * day, 5), isFalse);
     });
   });
 
@@ -513,7 +528,7 @@ void main() {
       expect(store.isRecordingSuppressed, isFalse, reason: '作用域结束后要复位');
     });
 
-    test('Rating：同一天替换、跨天追加，并且 0 不记', () async {
+    test('Rating：同一天按秒追加变化，并且 0 不记', () async {
       final store = ChartHistoryStore.instance;
       final day1 = DateTime(2026, 9, 1, 10).millisecondsSinceEpoch;
       await store.recordRating(
@@ -542,9 +557,123 @@ void main() {
       );
 
       final series = await store.ratingSeries(sourceKey: 'shuiyu');
-      expect(series.length, 2);
-      expect(series.first.rating, 16100, reason: '当天以最后一次为准，且 0 不记');
+      expect(series.length, 3);
+      expect(series.first.rating, 16000, reason: '同一天的变化点也要保留');
+      expect(series[1].rating, 16100);
       expect(series.last.rating, 16200);
+    });
+
+    test('手动补录保留指定秒级时间，Rating 与谱面成绩都可独立读取', () async {
+      final store = ChartHistoryStore.instance;
+      final first = DateTime(2026, 9, 1, 10, 2, 3, 456).millisecondsSinceEpoch;
+      final second = DateTime(2026, 9, 1, 10, 2, 8, 900).millisecondsSinceEpoch;
+
+      await store.recordManualRating(
+        rating: 16000,
+        tMs: first,
+        sourceKey: 'shuiyu',
+      );
+      await store.recordManualRating(
+        rating: 16000,
+        tMs: second,
+        sourceKey: 'shuiyu',
+      );
+      final ratings = await store.ratingSeries(sourceKey: 'shuiyu');
+      expect(ratings.map((p) => p.tMs), [
+        DateTime(2026, 9, 1, 10, 2, 3).millisecondsSinceEpoch,
+        DateTime(2026, 9, 1, 10, 2, 8).millisecondsSinceEpoch,
+      ]);
+
+      await store.recordManualChartPoint(
+        songId: 11312,
+        levelIndex: 3,
+        achievement: 100.1234,
+        dxScore: 3000,
+        tMs: first,
+        sourceKey: 'shuiyu',
+      );
+      final chart = await store.chartEvents(11312, 3, sourceKey: 'shuiyu');
+      expect(chart.single.tMs,
+          DateTime(2026, 9, 1, 10, 2, 3).millisecondsSinceEpoch);
+    });
+
+    test('删除 Rating 记录点：按整秒匹配，删完真的落盘', () async {
+      final store = ChartHistoryStore.instance;
+      final t1 = DateTime(2026, 9, 1, 10, 2, 3, 456).millisecondsSinceEpoch;
+      final t2 = DateTime(2026, 9, 2, 10, 2, 3).millisecondsSinceEpoch;
+
+      await store.recordRating(rating: 16000, sourceKey: 'shuiyu', nowMs: t1);
+      await store.recordRating(rating: 16100, sourceKey: 'shuiyu', nowMs: t2);
+      expect((await store.ratingSeries(sourceKey: 'shuiyu')).length, 2);
+
+      // 界面上给的是秒：同一个整秒里的毫秒差异不影响匹配
+      expect(await store.deleteRatingPoint(tMs: t2 + 900, sourceKey: 'shuiyu'),
+          isTrue);
+      final left = await store.ratingSeries(sourceKey: 'shuiyu');
+      expect(left.length, 1);
+      expect(left.single.rating, 16000, reason: '删的是那一个时间点，不是整条曲线');
+
+      // 清掉内存缓存（相当于重启）后依然是删掉的状态 → 确认写回了文件
+      ChartHistoryStore.instance.debugClearCache();
+      expect((await store.ratingSeries(sourceKey: 'shuiyu')).length, 1);
+
+      // 同一秒再删一次：文件里已经没有它了，要如实返回 false
+      expect(await store.deleteRatingPoint(tMs: t2, sourceKey: 'shuiyu'),
+          isFalse);
+    });
+
+    test('删除单谱记录点：手动补录、自动事件、基线都按同一秒清掉', () async {
+      final store = ChartHistoryStore.instance;
+      final base = DateTime(2026, 9, 1, 10).millisecondsSinceEpoch;
+      final changed = base + 3600 * 1000;
+      final manual = DateTime(2026, 9, 3, 20, 1, 2).millisecondsSinceEpoch;
+
+      await store.recordChartSnapshot(
+        userData([dfRecord(11312, 3, 100.5, 3000)]),
+        sourceKey: 'shuiyu',
+        nowMs: base,
+      );
+      await store.recordChartSnapshot(
+        userData([dfRecord(11312, 3, 100.5678, 3000)]),
+        sourceKey: 'shuiyu',
+        nowMs: changed,
+      );
+      await store.recordManualChartPoint(
+        songId: 11312,
+        levelIndex: 3,
+        achievement: 100.9,
+        dxScore: 3100,
+        tMs: manual,
+        sourceKey: 'shuiyu',
+      );
+
+      // 有手动点时基线也会被画出来，但它与自动事件同一秒 → 只算一个点
+      var events = await store.chartEvents(11312, 3, sourceKey: 'shuiyu');
+      expect(events.map((e) => e.tMs), [changed, manual]);
+
+      // 1) 删手动补录的点
+      expect(
+          await store.deleteChartPoint(
+              songId: 11312, levelIndex: 3, tMs: manual, sourceKey: 'shuiyu'),
+          isTrue);
+      events = await store.chartEvents(11312, 3, sourceKey: 'shuiyu');
+      expect(events.map((e) => e.tMs), [changed]);
+      expect(await store.chartBaseline(11312, 3, sourceKey: 'shuiyu'), isNotNull,
+          reason: '删的是手动点，成绩基线不该被动到');
+
+      // 2) 删最后一个自动点：同一秒的基线必须一起删 —— 否则曲线还会把它画出来
+      expect(
+          await store.deleteChartPoint(
+              songId: 11312, levelIndex: 3, tMs: changed, sourceKey: 'shuiyu'),
+          isTrue);
+      expect(await store.chartEvents(11312, 3, sourceKey: 'shuiyu'), isEmpty);
+      expect(await store.chartBaseline(11312, 3, sourceKey: 'shuiyu'), isNull);
+
+      // 3) 没匹配到任何东西时返回 false（UI 靠它区分"删成功"和"早就没了"）
+      expect(
+          await store.deleteChartPoint(
+              songId: 11312, levelIndex: 3, tMs: changed, sourceKey: 'shuiyu'),
+          isFalse);
     });
 
     test('文件损坏：另存 .broken 并重新开始，而不是丢掉整个 App 的历史', () async {

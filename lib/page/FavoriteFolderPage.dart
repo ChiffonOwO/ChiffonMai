@@ -61,95 +61,39 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
 
   /// 显示创建收藏夹对话框
   Future<void> _createFolder() async {
-    final nameController = TextEditingController();
+    // 输入框的 controller 由弹窗自己持有（见 [_FolderNameDialog]）：
+    // 这里**不要**再自己建 controller —— 无论 pop 那一刻就 dispose，
+    // 还是 `addPostFrameCallback` 里晚一帧 dispose，都还在弹窗的**退场动画**里，
+    // 会读到已释放的 controller 并炸出红屏。
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('新建收藏夹'),
-        content: TextField(
-          controller: nameController,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '请输入收藏夹名称',
-            border: OutlineInputBorder(),
-          ),
-          inputFormatters: [LengthLimitingTextInputFormatter(30)],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              final name = nameController.text.trim();
-              if (name.isEmpty) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('收藏夹名称不能为空')),
-                );
-                return;
-              }
-              Navigator.of(ctx).pop(name);
-            },
-            child: const Text('创建'),
-          ),
-        ],
+      builder: (_) => const _FolderNameDialog(
+        title: '新建收藏夹',
+        hintText: '请输入收藏夹名称',
+        confirmLabel: '创建',
       ),
     );
     if (result != null && result.isNotEmpty) {
       await _service.createFolder(result);
       await _loadData();
     }
-    // 延迟释放控制器，避免对话框撤销动画期间被使用
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      nameController.dispose();
-    });
   }
 
   /// 显示重命名收藏夹对话框
   Future<void> _renameFolder(FavoriteFolder folder) async {
-    final nameController = TextEditingController(text: folder.name);
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('重命名收藏夹'),
-        content: TextField(
-          controller: nameController,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '请输入新名称',
-            border: OutlineInputBorder(),
-          ),
-          inputFormatters: [LengthLimitingTextInputFormatter(30)],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              final name = nameController.text.trim();
-              if (name.isEmpty) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('收藏夹名称不能为空')),
-                );
-                return;
-              }
-              Navigator.of(ctx).pop(name);
-            },
-            child: const Text('确认'),
-          ),
-        ],
+      builder: (_) => _FolderNameDialog(
+        title: '重命名收藏夹',
+        hintText: '请输入新名称',
+        confirmLabel: '确认',
+        initialName: folder.name,
       ),
     );
     if (result != null && result.isNotEmpty) {
       await _service.renameFolder(folder.id, result);
       await _loadData();
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      nameController.dispose();
-    });
   }
 
   /// 删除收藏夹
@@ -1449,6 +1393,90 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
           ),
         );
       },
+    );
+  }
+}
+
+/// 「新建 / 重命名收藏夹」共用的输入名称弹窗：确定返回名称，取消返回 null。
+///
+/// ⚠️ 输入框的 controller 由**弹窗自己的 [State]** 持有并释放。
+/// 原来的写法是调用方建 controller、等 `showDialog` 的 future 完成后在
+/// `addPostFrameCallback` 里 dispose —— 那一帧弹窗仍在**退场动画**里（真机上
+/// 键盘收起会让它重建，`TextField` 会再读一次 controller），于是必现
+/// 「A TextEditingController was used after being disposed」；异常又发生在卸载
+/// 途中，紧接着刷出 `'_dependents.isEmpty': is not true` 与
+/// 「Tried to build dirty widget in the wrong build scope」——用户看到的就是**红屏**。
+///
+/// 交给 [State.dispose] 就**结构上**不可能提前：它只在弹窗元素真正卸载后才跑。
+/// 回归测试：`test/dialog_close_dispose_test.dart`。
+class _FolderNameDialog extends StatefulWidget {
+  const _FolderNameDialog({
+    required this.title,
+    required this.hintText,
+    required this.confirmLabel,
+    this.initialName = '',
+  });
+
+  final String title;
+  final String hintText;
+  final String confirmLabel;
+
+  /// 重命名时带出原名字；新建时为空。
+  final String initialName;
+
+  @override
+  State<_FolderNameDialog> createState() => _FolderNameDialogState();
+}
+
+class _FolderNameDialogState extends State<_FolderNameDialog> {
+  late final TextEditingController _nameController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.initialName);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  void _confirm() {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('收藏夹名称不能为空')),
+      );
+      return;
+    }
+    Navigator.of(context).pop(name);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _nameController,
+        autofocus: true,
+        decoration: InputDecoration(
+          hintText: widget.hintText,
+          border: const OutlineInputBorder(),
+        ),
+        inputFormatters: [LengthLimitingTextInputFormatter(30)],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        TextButton(
+          onPressed: _confirm,
+          child: Text(widget.confirmLabel),
+        ),
+      ],
     );
   }
 }

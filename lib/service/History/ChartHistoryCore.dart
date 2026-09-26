@@ -5,7 +5,7 @@
 /// 于是阈值、并列、降采样这些**最容易写歪**的口径可以被单测直接钉住。
 ///
 /// 数据规模估算（这是"只记变化"而不是"每次存全量"的原因）：
-///   * 全量快照：3000 条谱面 × 按天存一年 ≈ 20 MB+，其中 99% 是重复的；
+///   * 全量快照：3000 条谱面 × 按秒存一年会产生大量重复；
 ///   * 只记变化：3000 条基线 + 每年约 5 次/谱面的变化 ≈ 450 KB/年。
 library;
 
@@ -50,8 +50,7 @@ class ChartSnapshot {
   String get key => chartKeyOf(songId, levelIndex);
 
   @override
-  String toString() =>
-      'ChartSnapshot($key, ach=$achievement, dx=$dxScore)';
+  String toString() => 'ChartSnapshot($key, ach=$achievement, dx=$dxScore)';
 }
 
 /// 一张谱面**当前记录到的成绩**（也就是最近一次采集到的值）。
@@ -103,8 +102,9 @@ class ChartHistoryEvent {
 ///
 /// 记点规则见 [appendRatingPoint]：
 ///   * **Rating 没变不记新点**（所以同值不会连着出现多条）；
-///   * 同一天再刷新就替换当天那个（以最后一次为准）；
-///   * 因此一年最多 365 个点。
+///   * 同一秒再刷新就替换那个点；
+///   * Rating 没变化时仍不新增自动采集点，但手动录入可保留同值的指定时间点；
+///   * 自动采集最多保留 10000 个点；手动记录单独保存。
 class RatingPoint {
   const RatingPoint({
     required this.tMs,
@@ -223,6 +223,7 @@ ChartHistoryDiff diffChartSnapshots({
   required int nowMs,
   double achievementEpsilon = 0.0001,
 }) {
+  nowMs = historySecond(nowMs);
   final baseline = previousCurrent == null || previousCurrent.isEmpty;
   final nextCurrent = <String, List<num>>{};
   final events = <String, List<List<num>>>{};
@@ -276,7 +277,14 @@ List<List<num>> mergeAndPruneEvents(
   int keepRecent = 20,
   int olderEveryDays = 7,
 }) {
-  final all = <List<num>>[...existing, ...incoming]
+  final bySecond = <int, List<num>>{
+    for (final event in [...existing, ...incoming])
+      historySecond(_timeOf(event)): [
+        historySecond(_timeOf(event)),
+        ...event.skip(1)
+      ],
+  };
+  final all = bySecond.values.toList()
     ..sort((a, b) => _timeOf(a).compareTo(_timeOf(b)));
   if (all.length <= max) return all;
 
@@ -311,46 +319,59 @@ class RatingAppendResult {
   final bool changed;
 }
 
-/// Rating 曲线的追加规则。
-///
-/// 三条规则，缺一不可：
-///   1. **Rating 没变就不记新点** —— 曲线的意义是"Rating 什么时候变的"。
-///      `recordRating` 挂在「刷新数据」上，只要用户刷新就会调一次；
-///      不做这个判断的话，Rating 长期不变（不打了 / 一直打同一批谱面）会
-///      每天堆一个一模一样的点，实测就把同一个 15610 记了好几条。
-///   2. 同一天只留一个点（用当天最后一次刷新的值）。
-///   3. 最多保留 [maxDays] 天。
-///
-/// ⚠️ 规则 2 要排在规则 1 前面判断：同一天内 Rating 没变时，
-/// 仍然应该用新的那条把当天旧的**替换**掉（`recordCount` 等明细会更新），
-/// 只是不再新增点。
+/// 保留毫秒文件格式，新记录对齐到整秒。
+int historySecond(int ms) => ms ~/ 1000 * 1000;
+
+/// 自动采集：同秒更新，不同秒保留变化；数值没变时不新增点。
+/// 自动记录最多保留 [maxPoints] 个点，手动记录不参与裁剪。
 RatingAppendResult appendRatingPoint(
   List<RatingPoint> series,
   RatingPoint point, {
-  int maxDays = 365,
+  int maxPoints = 10000,
 }) {
-  final next = List<RatingPoint>.from(series);
+  final normalized = RatingPoint(
+    tMs: historySecond(point.tMs),
+    rating: point.rating,
+    best35: point.best35,
+    best15: point.best15,
+    recordCount: point.recordCount,
+  );
+  final next = mergeRatingPoints(series);
 
   if (next.isEmpty) {
-    next.add(point);
+    next.add(normalized);
   } else {
-    final last = next.last;
-    if (_isSameLocalDay(last.day, point.day)) {
-      // 当天重复刷新：替换当天那个点（无论 Rating 有没有变）
-      next[next.length - 1] = point;
-    } else if (last.rating == point.rating) {
-      // Rating 与上一个点相同 → 不记新点，曲线保持一段平台
+    final sameTimestamp =
+        next.lastIndexWhere((p) => historySecond(p.tMs) == normalized.tMs);
+    if (sameTimestamp >= 0) {
+      next[sameTimestamp] = normalized;
+    } else if (next.last.rating == normalized.rating) {
       return RatingAppendResult(series, changed: false);
     } else {
-      next.add(point);
+      next.add(normalized);
     }
   }
 
   next.sort((a, b) => a.tMs.compareTo(b.tMs));
-  if (next.length > maxDays) {
-    next.removeRange(0, next.length - maxDays);
+  if (next.length > maxPoints) {
+    next.removeRange(0, next.length - maxPoints);
   }
   return RatingAppendResult(next, changed: true);
+}
+
+/// 按秒合并 Rating 点，同一秒保留最后一个。
+List<RatingPoint> mergeRatingPoints(Iterable<RatingPoint> points) {
+  final bySecond = <int, RatingPoint>{
+    for (final point in points)
+      historySecond(point.tMs): RatingPoint(
+        tMs: historySecond(point.tMs),
+        rating: point.rating,
+        best35: point.best35,
+        best15: point.best15,
+        recordCount: point.recordCount,
+      ),
+  };
+  return bySecond.values.toList()..sort((a, b) => a.tMs.compareTo(b.tMs));
 }
 
 /// 「好看」的坐标轴范围与刻度间隔。
@@ -394,12 +415,37 @@ RatingAppendResult appendRatingPoint(
   return (min: niceLo, max: niceHi, interval: step);
 }
 
+/// 横轴刻度是否该精确到「时:分:秒」。
+///
+/// **只有一个记录点时必须为 false**：此时横轴根本没有跨度可言，而 fl_chart 对
+/// 任何 min/max 都会画出「起点 / 中点 / 终点」三个刻度（实测 minX=-0.5、
+/// maxX=0.5、interval=1 时给出 -0.5 / 0 / 0.5，三个都落在同一个点上）。
+/// 秒级文案 `9/18 14:30:05` 有 20 个字符，三个挤在同一处必然互相压字、还会顶出
+/// 画布 —— 只有一个点时横轴显示到「日」就够了。
+///
+/// 跨度超过 [windowMs]（默认 2 天）时秒也没有意义：一格往往是好几天。
+///
+/// 两个页面（Rating 历史页、曲目详情页的成绩历史）必须同口径，所以规则放在这里。
+bool showSecondPrecisionAxis(
+  int firstMs,
+  int lastMs,
+  int pointCount, {
+  int windowMs = 2 * 24 * 3600 * 1000,
+}) =>
+    pointCount > 1 && (lastMs - firstMs) < windowMs;
+
 /// 单谱事件 → 曲线用的点（按时间升序，去掉坏数据）。
 List<ChartHistoryEvent> sortedEvents(Iterable<dynamic> raw) {
   final list = <ChartHistoryEvent>[];
   for (final item in raw) {
     final e = ChartHistoryEvent.fromJson(item);
-    if (e != null) list.add(e);
+    if (e != null) {
+      list.add(ChartHistoryEvent(
+        tMs: historySecond(e.tMs),
+        achievement: e.achievement,
+        dxScore: e.dxScore,
+      ));
+    }
   }
   list.sort((a, b) => a.tMs.compareTo(b.tMs));
   return list;
@@ -412,7 +458,9 @@ List<ChartHistoryEvent> sortedEvents(Iterable<dynamic> raw) {
 /// UI 可以据此提示「疑似换源」，而不是让用户以为自己的成绩退了。
 bool hasRegression(List<ChartHistoryEvent> events, {double epsilon = 0.0001}) {
   for (var i = 1; i < events.length; i++) {
-    if (events[i].achievement < events[i - 1].achievement - epsilon) return true;
+    if (events[i].achievement < events[i - 1].achievement - epsilon) {
+      return true;
+    }
   }
   return false;
 }
@@ -440,9 +488,6 @@ bool hasRegression(List<ChartHistoryEvent> events, {double epsilon = 0.0001}) {
 // ==================== 内部工具 ====================
 
 int _timeOf(List<num> raw) => raw.isEmpty ? 0 : raw[0].toInt();
-
-bool _isSameLocalDay(DateTime a, DateTime b) =>
-    a.year == b.year && a.month == b.month && a.day == b.day;
 
 int? _pickInt(Map raw, List<String> keys) {
   for (final k in keys) {
