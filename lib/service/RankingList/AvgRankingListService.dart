@@ -6,6 +6,7 @@ import '../../constant/CacheTimestampConstant.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 import 'SongRankingService.dart' show parseDataSource;
+import '../../utils/CommunityProfileUtil.dart';
 
 /// 平均值排行榜的衡量指标
 enum AvgMetric {
@@ -24,6 +25,7 @@ class AvgRankItem {
   final int achievementCount;
   final int dxCount;
   final int updateTime;
+  final int avatarId;
 
   AvgRankItem({
     this.rank = 0,
@@ -35,6 +37,7 @@ class AvgRankItem {
     required this.achievementCount,
     required this.dxCount,
     this.updateTime = 0,
+    this.avatarId = CommunityProfileUtil.defaultAvatarId,
   });
 
   factory AvgRankItem.fromJson(Map<String, dynamic> json) {
@@ -57,6 +60,7 @@ class AvgRankItem {
           (json['achievementCount'] ?? json['achievement_count'] ?? 0).toInt(),
       dxCount: (json['dxCount'] ?? json['dx_count'] ?? 0).toInt(),
       updateTime: (json['updateTime'] ?? json['update_time'] ?? 0).toInt(),
+      avatarId: CommunityProfileUtil.avatarIdFromJson(json),
     );
   }
 
@@ -71,6 +75,7 @@ class AvgRankItem {
       'achievementCount': achievementCount,
       'dxCount': dxCount,
       'updateTime': updateTime,
+      'avatarId': avatarId,
     };
   }
 }

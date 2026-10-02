@@ -12,6 +12,7 @@ import '../service/SongMaidataPageService.dart';
 import '../service/DxRatingCoverService.dart';
 import '../service/SongPlayService.dart';
 import '../manager/MaidataManager.dart';
+import '../widgets/PageTopBar.dart';
 import 'ChartPlayPage.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
@@ -818,7 +819,6 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
   Widget build(BuildContext context) {
     final themeColor = Theme.of(context).colorScheme.primary;
     final brightness = Theme.of(context).brightness;
-    final textPrimaryColor = Theme.of(context).colorScheme.onSurface;
     final safeBottom = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
@@ -829,66 +829,44 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
           Column(
             children: [
-              Container(
-                padding: const EdgeInsets.fromLTRB(8, 48, 8, 4),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // 标题居中
-                    Text(
-                      '谱面代码',
-                      style: TextStyle(
-                        color: textPrimaryColor,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    // 返回按钮靠左
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: IconButton(
-                        icon: Icon(Icons.arrow_back, color: textPrimaryColor),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                      ),
-                    ),
-                    // 操作按钮靠右
-                    if (!_isLoading && _maidataContent.isNotEmpty)
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: Icon(Icons.copy, color: textPrimaryColor, size: 20),
-                              onPressed: _copyToClipboard,
-                              tooltip: '复制',
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.all(4),
-                              constraints: const BoxConstraints(),
-                            ),
-                            IconButton(
-                              icon: Icon(_isExporting ? Icons.hourglass_empty : Icons.download, color: textPrimaryColor, size: 20),
-                              onPressed: _isExporting ? null : _showExportOptions,
-                              tooltip: '导出',
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.all(4),
-                              constraints: const BoxConstraints(),
-                            ),
-                            IconButton(
-                              icon: Icon(Icons.play_circle_outline, color: textPrimaryColor, size: 20),
-                              onPressed: _navigateToChartPlay,
-                              tooltip: '渲染',
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.all(4),
-                              constraints: const BoxConstraints(),
-                            ),
-                          ],
+              // 顶部栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
+              // 与 Best50 页、其余 50 多个页面同款。
+              PageTopBar(
+                title: '谱面代码',
+                actions: (_isLoading || _maidataContent.isEmpty)
+                    ? const <Widget>[]
+                    : [
+                        IconButton(
+                          icon: const Icon(Icons.copy, size: 20),
+                          onPressed: _copyToClipboard,
+                          tooltip: '复制',
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(4),
+                          constraints: const BoxConstraints(),
                         ),
-                      ),
-                  ],
-                ),
+                        IconButton(
+                          icon: Icon(
+                            _isExporting
+                                ? Icons.hourglass_empty
+                                : Icons.download,
+                            size: 20,
+                          ),
+                          onPressed:
+                              _isExporting ? null : _showExportOptions,
+                          tooltip: '导出',
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(4),
+                          constraints: const BoxConstraints(),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.play_circle_outline, size: 20),
+                          onPressed: _navigateToChartPlay,
+                          tooltip: '渲染',
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(4),
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
               ),
               Container(
                 margin: const EdgeInsets.fromLTRB(4, 0, 4, 8),

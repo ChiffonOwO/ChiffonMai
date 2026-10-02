@@ -208,8 +208,8 @@ class HubActionTile extends StatelessWidget {
   final bool awaitingConfirm;
 
   /// 进度计数（与 [loading] 配合使用）。非 null 且 >0 时，
-  /// subtitle 改为「$current/$total」，下方追加一条 LinearProgressIndicator，
-  /// 用于「曲绘索引构建」等长任务的可视化。
+  /// subtitle 改为「(current / total)」，下方追加一条 LinearProgressIndicator，
+  /// 用于「曲绘索引构建」「maidata 全量拉取」这类长任务的可视化。
   final int? progressCurrent;
   final int? progressTotal;
 
@@ -314,7 +314,7 @@ class HubActionTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${progressCurrent!} / $progressTotal',
+                    '(${progressCurrent!} / $progressTotal)',
                     style: TextStyle(
                       fontSize: 12,
                       color: scheme.primary,

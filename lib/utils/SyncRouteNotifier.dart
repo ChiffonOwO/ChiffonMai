@@ -313,6 +313,19 @@ class SyncRouteNotifier extends ChangeNotifier {
     List<(SyncLine, SyncPlatform)> queries,
   )? debugStatsLoader;
 
+  /// 重新从 prefs 读两条线路，并通知 UI。
+  ///
+  /// 给「导入备份」用：恢复会清空并重写 `sync_route_*`，但内存里还留着旧线路，
+  /// 用户随手切一次线路就会把恢复的内容写回去。这里**只读线路**，
+  /// 不像 [ensureLoaded] 那样顺带联网拉统计（恢复流程里没必要连 Redis）。
+  Future<void> reloadRoutes() async {
+    _divingFishRoute = await SyncRouteStore.load(isDivingFish: true);
+    _luoXueRoute = await SyncRouteStore.load(isDivingFish: false);
+    _loaded = true;
+    _loading = false;
+    notifyListeners();
+  }
+
   /// 仅供测试：把线路与加载标志复位（不动 prefs）。
   @visibleForTesting
   void debugResetForTest() {

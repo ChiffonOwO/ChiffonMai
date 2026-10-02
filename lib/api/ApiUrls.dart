@@ -91,6 +91,18 @@ class ApiUrls {
   /// 否则 `ApiClient` 默认的 15s 会把一次成功的导入判成超时。
   static const String AwmcNetScoreQrApi = '$AwmcNetBaseUrl/api/score/qr';
 
+  /// 玩家 Rating 趋势（每日一条曲线点）。
+  ///
+  /// 公开端点，**不需要鉴权** —— 跟 `/dev/player/records` 不同，
+  /// 这个端点只要 QQ 就行；它只暴露**该玩家自己**在 AWMC NET 上报过的 Rating 历史，
+  /// 不暴露别人的成绩。`days` 范围 1~365，默认 30；超过 365 服务端会 422。
+  ///
+  /// 响应里 `date` 是 `"YYYY-MM-DD"`（**不带时区**，按本地 0 点处理），
+  /// 所以页面曲线会和「今日 0 点」对齐。
+  static const String AwmcNetTrendBaseUrl = 'https://net.wmc.pub';
+  static String awmcPlayerTrendUrl(String qqid, {int days = 90}) =>
+      '$AwmcNetTrendBaseUrl/api/player/$qqid/trend?days=$days';
+
   // ── 服务器状态 / 街机厅（直连） ────────────────────────────────────────
   static const String ServerStatusApi =
       'https://status.awmc.cc/api/status-page/heartbeat/maimai';
@@ -143,6 +155,25 @@ class ApiUrls {
   // Maidata 服务器地址
   static const String MaidataServerBaseUrl = 'https://chiffonmai.cloud';
   static const String MaidataServerPortUrl = 'https://chiffonmai.cloud';
+
+  // 单曲 maidata 兜底（wmc.pub）
+  //
+  // 全量 / 单曲本地缓存都没命中时，最后一道兜底：直接按 songId 拉这家的 maidata.txt。
+  // 只在内存里缓存（进程级，不持久化），重启即丢 —— 避免落盘后长期存着不再维护的副本。
+  // 用户在系统中心「maidata 管理」里可一键清空。
+  static const String WmcMaidataFallbackBaseUrl = 'https://download.wmc.pub';
+  static String wmcMaidataUrl(String songId) =>
+      '$WmcMaidataFallbackBaseUrl/s/$songId/maidata.txt';
+
+  /// 单曲音源兜底（wmc.pub）
+  ///
+  /// 落雪 (`assets2.lxns.net`) 查不到 luoXue song id 时退到这里，
+  /// 直接按 maimai songId 拼 `track.mp3`。
+  ///
+  /// ⚠️ **故意不加进系统中心「maidata 管理」**：音源不像 maidata 那样能
+  /// 批量缓存，进程级一次性下载、播完就丢；用户没要求管理入口。
+  static String wmcAudioUrl(String songId) =>
+      '$WmcMaidataFallbackBaseUrl/s/$songId/track.mp3';
 
   // 落雪 OAuth 相关地址（落雪自有 OAuth，经网关前先保持直连）
   static const String LuoXueBaseUrl = 'https://maimai.lxns.net';

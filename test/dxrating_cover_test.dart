@@ -265,6 +265,26 @@ void main() {
       }
     });
 
+    test('索引 JSON 里的 etag 能读回来（诊断"索引取自哪一版目录"）', () {
+      final withEtag = DxRatingCoverService.parseIndexJson(jsonEncode({
+        'v': 1,
+        'savedAt': DateTime.now().millisecondsSinceEpoch,
+        'images': {'1663': '3a914643'},
+        'etag': '"abc123"',
+      }));
+      expect(withEtag?.etag, '"abc123"');
+      expect(withEtag?.index.length, 1);
+
+      // 没有 etag 的老索引（随包基线就是这种）照常能读，别因此整份丢弃
+      final noEtag = DxRatingCoverService.parseIndexJson(jsonEncode({
+        'v': 1,
+        'generatedAt': '2026-09-17T06:22:14.464Z',
+        'images': {'1663': '3a914643'},
+      }));
+      expect(noEtag?.etag, isNull);
+      expect(noEtag?.index.length, 1);
+    });
+
     test('过期缓存：先用基线顶上，再尝试更新一次并落盘', () async {
       await writeCache(savedAt: DateTime.now().subtract(const Duration(days: 8)));
       // 随包基线是构建期生成的（很新），把它也算成过期，才走得到更新分支
@@ -281,10 +301,12 @@ void main() {
       expect(loaderCalls, 1);
       expect(DxRatingCoverService.instance.indexSize, 3, reason: '换成 dxdata 更新的索引');
 
-      // 落盘了：savedAt 是新的
+      // 落盘了：savedAt 是新的，并记下目录 etag（这里走 debugDxDataLoader，没有 ETag）
       final file = await DxRatingCoverService.cacheFile();
       final decoded = jsonDecode(await file.readAsString()) as Map;
       expect(decoded['v'], DxRatingCoverService.cacheVersion);
+      expect(decoded.containsKey('etag'), isTrue,
+          reason: '落盘结构里要有 etag 字段（真实路径由 DXDataManager 提供）');
       expect(
         (decoded['savedAt'] as num).toInt(),
         greaterThan(DateTime.now()
@@ -349,8 +371,8 @@ void main() {
 
   group('选哪份索引 / 要不要更新', () {
     final now = DateTime(2026, 9, 17, 12);
-    CoverIndexSource source(String tag, DateTime? at) =>
-        (index: {'1': tag}, at: at);
+    CoverIndexSource source(String tag, DateTime? at, {String? etag}) =>
+        (index: {'1': tag}, at: at, etag: etag);
 
     test('两份都有：用新的那份', () {
       final cached = source('cached', now.subtract(const Duration(days: 1)));

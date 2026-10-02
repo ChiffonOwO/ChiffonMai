@@ -603,7 +603,7 @@ class DivingFishProbeManager {
       return SyncResult.failure('同步已在进行中，请稍后重试');
     }
 
-    // 与线路2 一样顺手刷新一次游玩次数（AWMC `/v1/user/music`）。
+    // 与线路1 一样顺手刷新一次游玩次数（AWMC `/v1/user/music`）。
     // **尽力而为、绝不 await**：没令牌/超时/报错都忽略，下面的原有同步流程照走。
     // 次数算在**水鱼**名下（这条链路同步的目标就是水鱼），别落到别的账号上。
     // 详见 AwmcPlayCountStore.refreshQuietly。
@@ -1879,7 +1879,7 @@ class DivingFishProbeManager {
       return SyncResult.failure('同步已在进行中，请稍后重试');
     }
 
-    // 与线路2 一样顺手刷新一次游玩次数（AWMC `/v1/user/music`）。
+    // 与线路1 一样顺手刷新一次游玩次数（AWMC `/v1/user/music`）。
     // **尽力而为、绝不 await**：没令牌/超时/报错都忽略，下面的原有同步流程照走。
     // 次数算在**落雪**名下（这条链路同步的目标就是落雪），别落到别的账号上。
     // 详见 AwmcPlayCountStore.refreshQuietly。

@@ -45,6 +45,8 @@ import '../utils/FavoriteFeaturesNotifier.dart';
 import '../utils/FeatureFlags.dart';
 import '../utils/LoginStateNotifier.dart';
 import '../utils/UserProfileNotifier.dart';
+import '../utils/AppTheme.dart';
+import '../service/CommunityAvatarStore.dart';
 
 class SystemHubPage extends StatefulWidget {
   final VoidCallback onAccountManageTap;
@@ -54,6 +56,12 @@ class SystemHubPage extends StatefulWidget {
   @override
   State<SystemHubPage> createState() => _SystemHubPageState();
 }
+
+/// 「maidata 管理」对话框的返回值：用户选了哪个动作。
+///
+/// 只有「重新拉取全集」需要跳出对话框继续跑（进度打在按钮上）；
+/// 「清除兜底缓存」是瞬时操作，留在对话框内完成，不产生返回值。
+enum _MaidataManageAction { startRefresh }
 
 class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
   // ===== 账号 / 用户信息（昵称 / QQ 来自 UserProfileNotifier） =====
@@ -80,7 +88,9 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
   bool _refreshingAdvanced = false;
   String _refreshAdvancedText = '';
   bool _refreshingMaidata = false;
-  String _maidataText = '';
+  int _maidataProgressCompleted = 0;
+  int _maidataProgressTotal = 0;
+  String _maidataProgressText = '';
 
   // 三个同步入口的进行状态由 SyncFlowMixin 持有（同步按钮上进度 + 互斥）。
 
@@ -98,7 +108,9 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
     // 监听共享状态：首页登出水鱼账号 / 同步成功后此处也会自动刷新昵称 / QQ
     UserProfileNotifier.instance.addListener(_onUserProfileChanged);
     _onUserProfileChanged();
-    _loadCachedAvatarId();
+    CommunityAvatarStore.instance.addListener(_onAvatarChanged);
+    LoginStateNotifier.instance.addListener(_onAvatarLoginChanged);
+    unawaited(CommunityAvatarStore.instance.activate());
     _fetchAvatarIcons();
     _loadCachedPlateId();
     _fetchAvatarPlates();
@@ -113,6 +125,8 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
 
   @override
   void dispose() {
+    CommunityAvatarStore.instance.removeListener(_onAvatarChanged);
+    LoginStateNotifier.instance.removeListener(_onAvatarLoginChanged);
     UserProfileNotifier.instance.removeListener(_onUserProfileChanged);
     SyncRouteNotifier.instance.removeListener(_onSyncRouteChanged);
     super.dispose();
@@ -140,24 +154,19 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
 
   // ===== 头像 / 姓名框读写 =====
 
-  Future<void> _loadCachedAvatarId() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final cachedId = prefs.getInt('selectedAvatarId');
-      if (cachedId != null && mounted) {
-        setState(() => _selectedAvatarId = cachedId);
-      }
-    } catch (e) {
-      debugPrint('加载缓存头像ID失败: $e');
-    }
+  void _onAvatarChanged() {
+    if (mounted) setState(() => _selectedAvatarId = CommunityAvatarStore.instance.value.avatarId);
+  }
+
+  void _onAvatarLoginChanged() {
+    if (mounted) unawaited(CommunityAvatarStore.instance.activate());
   }
 
   Future<void> _saveAvatarId(int id) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('selectedAvatarId', id);
-    } catch (e) {
-      debugPrint('保存头像ID失败: $e');
+      await CommunityAvatarStore.instance.select(id);
+    } catch (_) {
+      Fluttertoast.showToast(msg: '头像未能保存，请重新选择');
     }
   }
 
@@ -214,6 +223,7 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
     }
 
     final searchController = TextEditingController();
+    final avatarPlayer = CommunityAvatarStore.instance.value.playerId;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -224,15 +234,27 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
         avatarPlates: _avatarPlates,
         selectedAvatarId: _selectedAvatarId,
         selectedPlateId: _selectedPlateId,
-        onAvatarPicked: (id) async {
-          await _saveAvatarId(id);
-          if (mounted) setState(() => _selectedAvatarId = id);
+        onAvatarPicked: (id) {
+          if (CommunityAvatarStore.instance.value.playerId != avatarPlayer) {
+            if (ctx.mounted) Navigator.of(ctx).pop();
+            Fluttertoast.showToast(msg: '账号已切换，请重新选择头像');
+            return;
+          }
+          final changed = id != _selectedAvatarId;
+          if (mounted && changed) setState(() => _selectedAvatarId = id);
           if (ctx.mounted) Navigator.of(ctx).pop();
+          // 先反馈选择，落盘在后台继续，避免等待 Android commit()。
+          if (changed) {
+            unawaited(_saveAvatarId(id));
+          } else if (CommunityAvatarStore.instance.value.pending) {
+            unawaited(CommunityAvatarStore.instance.retry());
+          }
         },
-        onPlatePicked: (id) async {
-          await _savePlateId(id);
-          if (mounted) setState(() => _selectedPlateId = id);
+        onPlatePicked: (id) {
+          final changed = id != _selectedPlateId;
+          if (mounted && changed) setState(() => _selectedPlateId = id);
           if (ctx.mounted) Navigator.of(ctx).pop();
+          if (changed) unawaited(_savePlateId(id));
         },
       ),
     ).then((_) => searchController.dispose());
@@ -344,9 +366,18 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
     }
   }
 
-  /// 刷新 maidata：确认后进度直接显示在按钮上（不再弹转圈对话框）。
-  Future<void> _refreshMaidata() async {
+  /// maidata 管理对话框：重新拉取 chiffonmai.cloud 全集 + 清除 wmc.pub 兜底缓存。
+  ///
+  /// 对话框**只负责收集意图**并列出当前两块缓存的用量；用户选了「重新拉取」
+  /// 之后它立刻关闭，进度改由 [_refreshMaidata] 打在「maidata 管理」按钮上
+  /// —— 与同页的 `_refreshData` / `_advancedRefreshData` 同一套约定。
+  /// 「清除兜底缓存」是瞬时操作，仍留在对话框里（也就还能在弹窗内提示结果）。
+  Future<void> _showMaidataManageDialog() async {
     if (anyBusy) return;
+    final manager = MaidataManager();
+    await manager.initialize();
+    if (!mounted) return;
+
     final isOnline = await ConnectivityService().hasConnection();
     if (!mounted) return;
     if (!isOnline) {
@@ -355,44 +386,121 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
       );
       return;
     }
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('确认刷新 maidata'),
-        content: const Text('将清除所有 maidata 缓存并从服务器重新拉取全部数据，耗时可能较长。\n\n确定要刷新吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('确认刷新'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
 
+    final action = await showDialog<_MaidataManageAction>(
+      context: context,
+      builder: (ctx) {
+        final cachedCount = manager.cachedCount;
+        final wmcCount = manager.wmcFallbackCacheCount;
+
+        return AlertDialog(
+          title: const Text('maidata 管理'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _maidataStatRow(
+                label: '全量缓存（chiffonmai.cloud）',
+                value: '$cachedCount 首',
+              ),
+              const SizedBox(height: 4),
+              _maidataStatRow(
+                label: 'wmc.pub 兜底缓存（内存）',
+                value: '$wmcCount 首',
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                icon: const Icon(Icons.cloud_download_outlined),
+                label: const Text('从 chiffonmai.cloud 重新拉取全集'),
+                onPressed: () => Navigator.of(ctx).pop(
+                  _MaidataManageAction.startRefresh,
+                ),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.cleaning_services_outlined),
+                label: const Text('清除 wmc.pub 兜底缓存'),
+                onPressed: wmcCount == 0
+                    ? null
+                    : () {
+                        manager.clearWmcFallbackCache();
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(
+                            content: Text('已清除 wmc.pub 兜底缓存'),
+                          ),
+                        );
+                      },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (action != _MaidataManageAction.startRefresh || !mounted) return;
+    await _refreshMaidata(manager);
+  }
+
+  /// 重新拉取全量 maidata，进度显示在「maidata 管理」按钮上（含 `current / total`）。
+  Future<void> _refreshMaidata(MaidataManager manager) async {
     setState(() {
       _refreshingMaidata = true;
-      _maidataText = '正在刷新 maidata...';
+      _maidataProgressCompleted = 0;
+      _maidataProgressTotal = 0;
+      _maidataProgressText = '正在从 chiffonmai.cloud 拉取...';
     });
     try {
-      await MaidataManager().fetchAndCacheFullMaidata();
+      await manager.fetchAndCacheFullMaidata(
+        onProgress: (current, total) {
+          if (!mounted) return;
+          setState(() {
+            _maidataProgressCompleted = current;
+            _maidataProgressTotal = total;
+            // 总数未定时（各流派文件夹列表还没回齐）只报已发现数量。
+            _maidataProgressText = total > 0
+                ? '$current / $total'
+                : '已发现 $current 首，正在统计总量...';
+          });
+        },
+      );
       if (!mounted) return;
       Fluttertoast.showToast(msg: 'maidata 刷新完成');
     } catch (e) {
       debugPrint('刷新 maidata 失败：$e');
-      if (mounted) Fluttertoast.showToast(msg: 'maidata 刷新失败：$e');
+      if (!mounted) return;
+      Fluttertoast.showToast(msg: '刷新失败：$e');
     } finally {
       if (mounted) {
         setState(() {
           _refreshingMaidata = false;
-          _maidataText = '';
+          _maidataProgressCompleted = 0;
+          _maidataProgressTotal = 0;
+          _maidataProgressText = '';
         });
       }
     }
+  }
+
+  Widget _maidataStatRow({required String label, required String value}) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+      ],
+    );
   }
 
   Future<void> _checkUpdate() async {
@@ -443,6 +551,7 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
   // 与首页「收藏的功能」区的那份逐渐走歪。现在统一由 SyncFlowMixin 提供：
   //   syncToDivingFishByCurrentRoute / syncToLuoXueByCurrentRoute / syncToAwmcNetWithButton
   // 按钮上的进度文案从 syncingDivingFish / luoXueText 等 getter 读。
+  // 线路1 = AWMC 网关、线路2 = maimai Score Hub（详见 SyncRouteStore）。
 
   void _loginDivingFish() {
     SyncScoreDialogs.showDivingFishLoginDialog(context, syncCallbacks);
@@ -505,6 +614,11 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
             hero: _MeProfileBanner(
               selectedAvatarId: _selectedAvatarId,
               nickname: _userNickname,
+              avatarStatus: CommunityAvatarStore.instance.value.message,
+              avatarStatusLevel:
+                  CommunityAvatarStore.instance.value.level,
+              onRetryAvatar: CommunityAvatarStore.instance.value.pending
+                  ? () => unawaited(CommunityAvatarStore.instance.retry()) : null,
               onPickTap: _showCollectionPicker,
             ),
             children: [
@@ -619,14 +733,24 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
                     disabled: _refreshing,
                   ),
                   HubActionTile(
-                    title: '刷新 maidata',
-                    subtitle: '手动刷新所有 maidata 缓存',
-                    icon: Icons.cleaning_services_outlined,
-                    isFavorited: _isFavorited('刷新 maidata'),
-                    onToggleFavorite: () => _toggleFavorite('刷新 maidata'),
-                    onTap: _refreshMaidata,
+                    title: 'maidata 管理',
+                    subtitle: '重新拉取 chiffonmai.cloud 集 · 清除 wmc.pub 兜底缓存',
+                    icon: Icons.tune_rounded,
+                    isFavorited: _isFavorited('maidata管理'),
+                    onToggleFavorite: () => _toggleFavorite('maidata管理'),
+                    onTap: _showMaidataManageDialog,
+                    // 拉取进度打在按钮上（对话框选完即关，不再在里面显示进度）。
+                    // 总数要等各流派文件夹列表回齐才确定，在那之前只有转圈。
                     loading: _refreshingMaidata,
-                    loadingText: _maidataText,
+                    loadingText: _maidataProgressText,
+                    progressCurrent:
+                        _refreshingMaidata && _maidataProgressTotal > 0
+                            ? _maidataProgressCompleted
+                            : null,
+                    progressTotal: _refreshingMaidata && _maidataProgressTotal > 0
+                        ? _maidataProgressTotal
+                        : null,
+                    disabled: anyBusy && !_refreshingMaidata,
                   ),
                   // 「AWMC 网关」入口：默认隐藏（FeatureFlags.awmcGateway），
                   // 代码一行没删；要启用时改那个开关即可。
@@ -798,17 +922,41 @@ class _MeProfileBanner extends StatelessWidget {
   final int selectedAvatarId;
   final String nickname;
   final VoidCallback onPickTap;
+  final String avatarStatus;
+  final AvatarSyncLevel avatarStatusLevel;
+  final VoidCallback? onRetryAvatar;
 
   const _MeProfileBanner({
     required this.selectedAvatarId,
     required this.nickname,
     required this.onPickTap,
+    required this.avatarStatus,
+    this.avatarStatusLevel = AvatarSyncLevel.localOnly,
+    this.onRetryAvatar,
   });
+
+  /// 头像同步状态的主色：绿=已同步正常，蓝=正在同步，
+  /// 黄=仅本机/待同步（需用户处理），红=同步异常。
+  Color _statusColor(Brightness brightness) {
+    switch (avatarStatusLevel) {
+      case AvatarSyncLevel.synced:
+        return AppColors.successGreen(brightness);
+      case AvatarSyncLevel.syncing:
+        return AppColors.linkBlue(brightness);
+      case AvatarSyncLevel.pending:
+      case AvatarSyncLevel.localOnly:
+        return AppColors.warningOrange(brightness);
+      case AvatarSyncLevel.error:
+        return AppColors.errorRed(brightness);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
     final displayName = nickname.isNotEmpty ? nickname : kUnsetNicknameLabel;
+    final statusColor = _statusColor(brightness);
 
     return Material(
       color: Colors.transparent,
@@ -903,8 +1051,19 @@ class _MeProfileBanner extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
+                    GestureDetector(
+                      onTap: onRetryAvatar,
+                      child: Text(avatarStatus,
+                        style: TextStyle(
+                            color: statusColor,
+                            fontSize: 11,
+                            fontWeight: avatarStatusLevel ==
+                                    AvatarSyncLevel.synced
+                                ? FontWeight.w600
+                                : FontWeight.normal)),
+                    ),
                     Text(
-                      '登录水鱼后同步你的成绩数据',
+                      '可按需在下方获取/同步成绩数据',
                       style: TextStyle(
                         color: scheme.onSurfaceVariant,
                         fontSize: 12,

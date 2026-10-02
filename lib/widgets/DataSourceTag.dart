@@ -92,35 +92,74 @@ DataSourceStyle dataSourceStyleOf(String? key, Brightness brightness) {
 
 /// 排行榜里的数据源小标签（圆角小胶囊）。
 class DataSourceTag extends StatelessWidget {
+  /// 默认文字大小（排行榜列表里的尺寸）。
+  static const double defaultFontSize = 10;
+
+  /// 胶囊的上下内边距。`build` 与 [heightFor] 共用一份，
+  /// 否则「量出来的高」和「画出来的高」早晚会对不上。
+  static const double verticalPadding = 2;
+
   /// 数据源 key：`'shuiyu'` / `'luoxue'` / `'awmc'`。
   final String? dataSource;
 
-  /// 文字大小，默认 10（排行榜列表里的尺寸）。
+  /// 文字大小，默认 [defaultFontSize]（排行榜列表里的尺寸）。
   final double fontSize;
 
   const DataSourceTag({
     super.key,
     required this.dataSource,
-    this.fontSize = 10,
+    this.fontSize = defaultFontSize,
   });
+
+  /// 与 [build] 里那个 `Text` **完全一致**的有效样式。
+  ///
+  /// 必须自己合并环境 `DefaultTextStyle`（`Text` 内部就是这么合并的）：标签只写了
+  /// `fontSize`，**行高是从 Material 的 `bodyMedium` 继承来的** —— 换主题或调字体后
+  /// 行高会变，只拿字面量算就会算错。
+  static TextStyle textStyleFor(BuildContext context, double fontSize) =>
+      DefaultTextStyle.of(context).style.merge(
+        TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold),
+      );
+
+  /// 标签渲染出来的**总高**（一行文字 + 上下内边距）。
+  ///
+  /// [text] 要传**真正会显示的那串字**（水鱼 / 落雪 / AWMC / 未知）：字体缺字时
+  /// 中文与拉丁字母走的回退字体不同，度量不一定一样。
+  static double heightFor(
+    BuildContext context,
+    String text, {
+    double fontSize = defaultFontSize,
+  }) {
+    final defaultStyle = DefaultTextStyle.of(context);
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: textStyleFor(context, fontSize)),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      // 与 `Text` 的兜底一致（顺带说明：`Text` 并**不**继承 DefaultTextStyle 的
+      // strutStyle，所以这里也不传）。
+      textHeightBehavior: defaultStyle.textHeightBehavior ??
+          DefaultTextHeightBehavior.maybeOf(context),
+      maxLines: 1,
+    )..layout();
+    final textHeight = painter.height;
+    painter.dispose();
+    return textHeight + verticalPadding * 2;
+  }
 
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final style = dataSourceStyleOf(dataSource, brightness);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 6, vertical: verticalPadding),
       decoration: BoxDecoration(
         color: style.background,
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         style.label,
-        style: TextStyle(
-          fontSize: fontSize,
-          color: style.foreground,
-          fontWeight: FontWeight.bold,
-        ),
+        style: textStyleFor(context, fontSize).copyWith(color: style.foreground),
       ),
     );
   }

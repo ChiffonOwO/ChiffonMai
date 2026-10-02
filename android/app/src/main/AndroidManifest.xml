@@ -29,8 +29,26 @@
     -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!--
+      ⚠️ 保持 false（= 不参与 Android 的「预测性返回」），不要改回 true。
+
+      历史：这里曾经是 true（模板/文档都推荐"支持返回手势预览"）。但实测有设备
+      反馈「用返回手势返回上一级时 App 无法交互 / 卡死」：页面从四个角向内缩，
+      缩完返回上一级，有概率整个 App 点不动。那是 Flutter 的预测性返回转场
+      （`PredictiveBackPageTransitionsBuilder`，本版本 Android 的默认转场）——
+      框架在手势一开始就替系统认领这次手势、按手指进度自己画缩放，然后**必须**
+      等到平台发 commit / cancel 才退出该状态；手势事件与路由 pop 是异步竞态，
+      对不上时页面会停在缩了一半的位置且事件被 Navigator 的 AbsorbPointer 吞掉。
+      按键返回走的是另一条路（`backEvent.isButtonEvent == true`，框架不认领），
+      所以只有手势会中招 —— 与反馈完全一致。
+
+      置 false 后返回统一走传统的 `onBackPressed` 路径（Flutter 处理了这条路径，
+      功能不受影响，只是没有系统级的返回预览动画）。Dart 侧还有一半配套改动：
+      `AppTheme._backGestureSafeTransitions()` 把 Android 页面转场显式钉在
+      `FadeForwardsPageTransitionsBuilder` 上 —— 两处都要在，缺一个都还会认领手势。
+    -->
     <application
-        android:enableOnBackInvokedCallback="true"
+        android:enableOnBackInvokedCallback="false"
         android:usesCleartextTraffic="true"
         android:label="ChiffonMai"
         android:name="${applicationName}"

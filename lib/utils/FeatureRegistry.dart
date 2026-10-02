@@ -13,6 +13,7 @@ class FeatureRegistry {
   static List<ButtonCategory> allCategories(bool isDivingFishLoggedIn) => [
     ButtonCategory(name: '曲库与数据', items: [
       const ButtonItem(icon: Icons.music_note, title: '乐曲查询', subtitle: '按歌名、别名、谱师和标签搜索'),
+      const ButtonItem(icon: Icons.flag_rounded, title: '国服更新对照', subtitle: '看日服已上、国服还没上的曲目'),
       const ButtonItem(icon: Icons.score, title: '成绩查询', subtitle: '浏览全部游玩记录与筛选结果'),
       const ButtonItem(icon: Icons.wysiwyg_rounded, title: '牌子进度', subtitle: '查看各版本与目标牌子'),
       const ButtonItem(icon: Icons.grading_rounded, title: '个性化成绩查询', subtitle: '按等级或谱师查看成绩'),

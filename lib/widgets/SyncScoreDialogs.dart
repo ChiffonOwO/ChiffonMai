@@ -521,7 +521,7 @@ class SyncScoreDialogs {
     // 本次同步尝试的耗时 / 成败（Redis，尽力而为）。    //
     // 为什么上报放在对话框里：这个对话框自己跑完整个「抓取 → 刷新本地」流程，
     // 成功信号只有它内部有（调用方拿到的返回值是好友码）。放在这里，
-    // 从首页 / 我的 / 系统 hub 任一入口打开都会算进同一份「线路1 · 水鱼」统计。
+    // 从首页 / 我的 / 系统 hub 任一入口打开都会算进同一份「线路2 · 水鱼」统计。
     // 口径（取消 / 缺绑定不算样本）见 [SyncAttemptTracker]。
     final attempt = SyncAttemptTracker(
       line: SyncLine.scoreHub,

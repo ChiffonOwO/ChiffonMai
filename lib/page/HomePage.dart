@@ -60,6 +60,7 @@ import 'DsRangeRecommendPage.dart';
 import 'RecommendByTagsPage.dart';
 import 'SingleRatingCalculatorPage.dart';
 import 'SongSearchPage.dart';
+import 'UnionUpdateComparePage.dart';
 import 'UserScoreSearchPage.dart';
 import 'AboutAppPage.dart';
 import 'SupportDeveloperPage.dart';
@@ -131,7 +132,7 @@ class _InitInterval {
 ///
 /// 回归测试：`test/home_greeting_test.dart`。
 class HomeGreetingText extends StatelessWidget {
-  /// 用户昵称；空串表示还没登录（这时显示「请登录水鱼账号」）。
+  /// 用户昵称；空串表示还没登录（这时显示「请前往系统页获取账号数据」）。
   final String nickname;
 
   /// 允许缩到的最小字号。再小就不好看了，改用省略号。
@@ -145,7 +146,8 @@ class HomeGreetingText extends StatelessWidget {
     final base = theme.textTheme.headlineSmall
         ?.copyWith(fontWeight: FontWeight.w800);
     final baseSize = base?.fontSize ?? 24;
-    final text = nickname.trim().isEmpty ? '请登录水鱼账号' : '欢迎回来，$nickname';
+    final text =
+        nickname.trim().isEmpty ? '请前往系统页获取账号数据' : '欢迎回来，$nickname';
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -2561,6 +2563,12 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
         MaterialPageRoute(builder: (context) => SongSearchPage()),
       );
     }
+    if (item.title == '国服更新对照') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const UnionUpdateComparePage()),
+      );
+    }
     if (item.title == '刷新数据') {
       await _openRefreshData();
     }
@@ -2838,8 +2846,8 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
       }
     }
     if (item.title == '同步成绩到水鱼') {
-      // 与「系统」hub 页同一份实现（SyncFlowMixin）：线路2 走 AWMC 网关，
-      // 线路1 走对话框输入 + 按钮上进度
+      // 与「系统」hub 页同一份实现（SyncFlowMixin）：线路1 走 AWMC 网关，
+      // 线路2 走对话框输入 + 按钮上进度
       await syncToDivingFishByCurrentRoute();
     }
     if (item.title == '账号管理') {
@@ -2995,7 +3003,7 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
       );
     }
     if (item.title == '同步成绩到落雪') {
-      // 与「系统」hub 页同一份实现（SyncFlowMixin）：线路1 走对话框输入 +
+      // 与「系统」hub 页同一份实现（SyncFlowMixin）：线路2 走对话框输入 +
       // 按钮上进度，不再跳 UpdateLuoXueScorePage（那里没有任何进度反馈）
       await syncToLuoXueByCurrentRoute();
     }

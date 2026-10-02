@@ -47,6 +47,13 @@ class _FriendLinksPageState extends State<FriendLinksPage> {
       iconType: FriendLinkIconType.music,
       iconBg: Color(0xFF5C6BC0),
     ),
+    _FriendLink(
+      name: 'MaiScan Rev',
+      desc: '一个通过封面快速查询的离线本地maimai曲库',
+      url: 'https://github.com/PojavAnge/MaiScan-Rev',
+      iconType: FriendLinkIconType.github,
+      iconBg: Color(0xFFEF6C00),
+    ),
   ];
 
   Future<void> _open(String url) async {

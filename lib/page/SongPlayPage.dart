@@ -20,6 +20,7 @@ import '../entity/Portable/PortableSong.dart';
 import '../service/Portable/PortablePlayerController.dart';
 import '../service/Portable/PortableSongLibrary.dart';
 import '../utils/CommonWidgetUtil.dart';
+import '../utils/PortablePlayerScope.dart';
 import '../widgets/PageTopBar.dart';
 import 'Portable/PortableNowPlayingPage.dart';
 
@@ -55,7 +56,17 @@ class _SongPlayPageState extends State<SongPlayPage> {
   @override
   void initState() {
     super.initState();
+    // 从 SongInfoPage 点「播放音乐」进来的：把随身听悬浮球压住，避免它突然冒出来。
+    // 不影响播放、不影响通知栏、不影响切歌；页面一 pop 这层就撤掉，球回来。
+    PortablePlayerScope.isSongInfoPlayback.value = true;
     WidgetsBinding.instance.addPostFrameCallback((_) => _resolveAndPlay());
+  }
+
+  @override
+  void dispose() {
+    // 撤掉悬浮球抑制：球按 `_player.currentSong != null` 自然显示（如果还在放）
+    PortablePlayerScope.isSongInfoPlayback.value = false;
+    super.dispose();
   }
 
   Future<void> _resolveAndPlay() async {

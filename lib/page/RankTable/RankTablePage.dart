@@ -4,6 +4,7 @@ import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/service/RankTable/RankTableService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/page/RankTable/RankTableDetailPage.dart';
+import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
 
 class RankListPage extends StatefulWidget {
   const RankListPage({super.key});
@@ -36,10 +37,8 @@ class _RankListPageState extends State<RankListPage> {
     _borderRadiusSmall = 8.0 * _scaleFactor;
     _textSizeM = 12.0 * _scaleFactor;
 
-    final textPrimaryColor = Theme.of(context).colorScheme.onSurface;
     final cardBgColor = Theme.of(context).colorScheme.surface;
     final cardShadow = AppColors.defaultShadow(brightness);
-
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
@@ -49,32 +48,9 @@ class _RankListPageState extends State<RankListPage> {
           
           Column(
             children: [
-              Container(
-                padding: EdgeInsets.fromLTRB(_paddingM, 48, _paddingM, _paddingS),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '段位表',
-                          style: TextStyle(
-                            color: textPrimaryColor,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 48),
-                  ],
-                ),
-              ),
+              // 标题栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
+              // 与 Best50 页、其余 50 多个页面同款。
+              PageTopBar(title: '段位表'),
               
               Expanded(
                 child: Container(

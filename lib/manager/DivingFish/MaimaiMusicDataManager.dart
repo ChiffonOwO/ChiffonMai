@@ -36,6 +36,17 @@ class MaimaiMusicDataManager {
     };
   }
 
+  /// 丢弃内存里的曲库副本，下次 [getCachedSongs] 重新从 prefs 读。
+  ///
+  /// 给「导入备份」用：恢复会把 `cached_songs` 清掉，但内存里往往还留着
+  /// 恢复前的旧列表——于是 `hasCachedData()`（读 prefs）已经是 false，
+  /// 而 [getCachedSongs]（读内存）还返回满曲库，两个口径打架，页面表现会
+  /// 自相矛盾。恢复后必须让两侧一起失效。
+  void invalidateCache() {
+    _cachedSongs = null;
+    _cachedSongIndex = null;
+  }
+
   Song? findSongByTitleAndType(String title, String type) {
     for (final song in _cachedSongs ?? const <Song>[]) {
       if (song.basicInfo.title == title && song.type == type) return song;

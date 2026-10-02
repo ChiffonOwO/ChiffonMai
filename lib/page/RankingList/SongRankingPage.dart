@@ -8,7 +8,7 @@ import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/service/SongInfoService.dart';
 import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
-import 'package:my_first_flutter_app/widgets/DataSourceTag.dart';
+import 'package:my_first_flutter_app/widgets/CommunityAvatar.dart';
 
 class SongRankingPage extends StatefulWidget {
   final String songId;
@@ -58,6 +58,19 @@ class _SongRankingPageState extends State<SongRankingPage> {
   String _currentPlayerId = '';
   bool _showInvalidScoreWarning = false;
   bool _dontShowAgain = false;
+
+  /// 数值区（达成率 / DX 分数 + 同步时间）的**上限**宽度。
+  ///
+  /// 这里以前是写死的 `SizedBox(width: 130)`：数值和同步时间都右对齐，靠不满的
+  /// 那一截左边**全是空白**，而昵称却要为这点空白提前打成省略号 ——
+  /// DX 分数那一列数字很短（`3199`），浪费最明显。
+  ///
+  /// 现在改成「按内容宽度收缩、上限不变」：省下的宽度全部让给昵称。留上限是兜底，
+  /// 免得异常提示 / 超长时间文案反过来把昵称挤没。
+  static const double _valueColumnMaxWidth = 130;
+
+  /// 底部「当前玩家」固定条的数值区上限（比列表行宽一点，原来写死 150）。
+  static const double _currentUserValueColumnMaxWidth = 150;
 
   @override
   void initState() {
@@ -560,35 +573,34 @@ class _SongRankingPageState extends State<SongRankingPage> {
           SizedBox(width: 12),
 
           Expanded(
-            child: Row(
-              children: [
-                // 数据源标识（配色/取名统一在 DataSourceTag）
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: DataSourceTag(dataSource: entry.dataSource),
-                ),
-                Expanded(
-                  child: Text(
-                    entry.playerName,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.w500,
-                      color: isCurrentUser ? AppColors.linkBlue(brightness) : null,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
+            child: CommunityPlayerIdentity(
+              avatarId: entry.avatarId,
+              dataSource: entry.dataSource,
+              name: entry.playerName,
+              // 头像高度对齐「玩家名 + 数据源标签」两行文字的总高
+              // （单曲排行榜 / DX 分数排行榜共用这一行）
+              avatarMatchesTextHeight: true,
+              nameStyle: TextStyle(
+                fontSize: 14,
+                fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.w500,
+                color: isCurrentUser ? AppColors.linkBlue(brightness) : null,
+              ),
             ),
           ),
+          const SizedBox(width: 8),
 
-          SizedBox(
-            width: 130,
+          // 数值区按内容收缩（上限 [_valueColumnMaxWidth]），不再固定占满 130dp：
+          // 右对齐靠不满的那一截空白本来就没人用，现在让给昵称。
+          ConstrainedBox(
+            constraints:
+                const BoxConstraints(maxWidth: _valueColumnMaxWidth),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // DX分数排行榜显示星星等级
                     if (widget.rankingType == RankingType.dxScore)
@@ -648,8 +660,13 @@ class _SongRankingPageState extends State<SongRankingPage> {
                   ],
                 ),
                 // 同步时间
+                //
+                // 单行 + 省略号：数值区现在是「按内容收缩」的，没有固定宽度兜着，
+                // 超长的绝对时间（`2024-01-01 12:00`）必须自己截断而不是换行把行撑高。
                 Text(
                   _formatUpdateTime(entry.updateTime),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 10,
                     color: AppColors.greyHint(brightness),
@@ -976,36 +993,30 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                         SizedBox(width: 12),
 
                                         Expanded(
-                                          child: Row(
-                                            children: [
-                                              // 数据源标识（配色/取名统一在 DataSourceTag）
-                                              Padding(
-                                                padding:
-                                                    const EdgeInsets.only(right: 6),
-                                                child: DataSourceTag(
-                                                    dataSource:
-                                                        _currentUserEntry!
-                                                            .dataSource),
-                                              ),
-                                              Expanded(
-                                                child: Text(
-                                                  _currentUserEntry!.playerName,
-                                                  style: TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: AppColors.linkBlue(brightness),
-                                                  ),
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            ],
+                                          child: CommunityPlayerIdentity(
+                                            avatarId: _currentUserEntry!.avatarId,
+                                            dataSource: _currentUserEntry!.dataSource,
+                                            name: _currentUserEntry!.playerName,
+                                            avatarMatchesTextHeight: true,
+                                            nameStyle: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.linkBlue(brightness),
+                                            ),
                                           ),
                                         ),
+                                        const SizedBox(width: 8),
 
-                                        SizedBox(
-                                          width: 150,
+                                        // 与列表行同款：按内容收缩（上限
+                                        // [_currentUserValueColumnMaxWidth]），
+                                        // 省下的宽度让给昵称。
+                                        ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                              maxWidth:
+                                                  _currentUserValueColumnMaxWidth),
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.end,
+                                            mainAxisSize: MainAxisSize.min,
                                             children: [
                                               // 如果成绩异常，显示警告信息
                                               if (_showInvalidScoreWarning)
@@ -1028,6 +1039,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                               else
                                                 Row(
                                                   mainAxisAlignment: MainAxisAlignment.end,
+                                                  mainAxisSize: MainAxisSize.min,
                                                   children: [
                                                     // DX分数排行榜显示星星等级
                                                     if (widget.rankingType == RankingType.dxScore)
@@ -1089,6 +1101,8 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                               if (!_showInvalidScoreWarning)
                                                 Text(
                                                   _formatUpdateTime(_currentUserEntry!.updateTime),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
                                                   style: TextStyle(
                                                     fontSize: 10,
                                                     color: AppColors.greyHint(brightness),

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/AppConstants.dart';
+import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
 
 class RoomJoinPage extends StatefulWidget {
   const RoomJoinPage({super.key});
@@ -63,36 +64,9 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
           // 页面内容
           Column(
             children: [
-              // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(paddingM, 48, paddingM, paddingS),
-                child: Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '加入房间',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 占位，保持标题居中
-                    SizedBox(width: 48),
-                  ],
-                ),
-              ),
+              // 标题栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
+              // 与 Best50 页、其余 50 多个页面同款。
+              PageTopBar(title: '加入房间'),
 
               // 主内容区域 - 白色区域，使用 Expanded 占据剩余空间
               Expanded(

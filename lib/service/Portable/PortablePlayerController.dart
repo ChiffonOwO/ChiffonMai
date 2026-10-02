@@ -154,6 +154,10 @@ class PortablePlayerController extends ChangeNotifier {
   /// 正在自动跳过的目标曲目，避免同一次失败触发两次跳过。
   bool _autoSkipping = false;
 
+  /// 单曲播放时，落雪 URL 失败过一次就记下来：本曲已试过 wmc 兜底，不要再递归。
+  /// 切歌时由 [playAt] 复位。
+  bool _triedWmcFallback = false;
+
   /// 绑定播放器监听（在 main 里调一次即可，重复调用无副作用）。
   void init() {
     if (_initialized) return;
@@ -255,13 +259,63 @@ class PortablePlayerController extends ChangeNotifier {
   /// 只靠 `playAt` 的 try/catch 会表现为「点了行内转圈一下然后就安静了，
   /// 什么提示都没有」—— 真机上极难排查。
   void _handleSourceFailure(Object error) {
-    final title = currentSong?.title ?? '当前曲目';
+    final song = currentSong;
+    final title = song?.title ?? '当前曲目';
     debugPrint('[Portable] 音源加载失败 $title: $error');
+
+    // 单曲播放（队列里只有这一首）：先试一次 wmc.pub 兜底，再走 skip。
+    // 多首队列：直接 skip（避免打乱用户期望的连续播放顺序，wmc 兜底是单曲专属）。
+    if (song != null && _queue.length == 1 && !_triedWmcFallback) {
+      _triedWmcFallback = true;
+      debugPrint('[Portable] 单曲失败 → 试 wmc 兜底: ${song.wmcAudioUrl}');
+      _emit(PortablePlayerEvent(
+        '《$title》落雪音源失败，尝试 wmc 兜底…',
+        isError: true,
+      ));
+      unawaited(_retryWithWmcFallback(song));
+      return;
+    }
+
     _emit(PortablePlayerEvent(
       '《$title》音源加载失败，已跳过',
       isError: true,
     ));
     unawaited(_autoSkipAfterFailure());
+  }
+
+  /// 单曲失败兜底：把当前曲换成 wmc URL 重播一次。失败的话回退到 skip。
+  Future<void> _retryWithWmcFallback(PortableSong song) async {
+    try {
+      final wmcSource = AudioSource.uri(
+        Uri.parse(song.wmcAudioUrl),
+        tag: MediaItem(
+          id: song.portableKey,
+          title: song.title,
+          artist: song.artist.isEmpty ? '未知艺术家' : song.artist,
+          album: song.genre.isEmpty ? 'ChiffonMai 随身听' : song.genre,
+          artUri: Uri.parse(_notificationArtUri(song)),
+          extras: <String, dynamic>{
+            'lxnsId': song.lxnsId,
+            'divingFishId': song.divingFishId,
+            'fallback': 'wmc',
+          },
+        ),
+      );
+      final playlist = ConcatenatingAudioSource(
+        children: <AudioSource>[wmcSource],
+        useLazyPreparation: true,
+      );
+      await _player.setAudioSource(
+        playlist,
+        preload: false,
+        initialIndex: 0,
+        initialPosition: Duration.zero,
+      );
+      unawaited(_player.play().catchError((Object e) => _handleSourceFailure(e)));
+    } catch (e) {
+      debugPrint('[Portable] wmc 兜底也失败: $e');
+      _handleSourceFailure(e);
+    }
   }
 
   Future<void> _autoSkipAfterFailure() async {
@@ -318,6 +372,8 @@ class PortablePlayerController extends ChangeNotifier {
     final song = _queue[index];
 
     _setLoading(true);
+    // 切到新歌 → 清掉「本首已试 wmc」标记，下次失败又可以试一次
+    _triedWmcFallback = false;
     try {
       // 先预热通知栏曲绘（见 [preloadNotificationArt] 的注释），再起播。
       // 放在 setAudioSource 之前是因为它是纯本地/网络图片下载，与音频无关，

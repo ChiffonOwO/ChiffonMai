@@ -230,6 +230,17 @@ class ChartPlaySettingsStore {
     return _settings;
   }
 
+  /// 强制重新从本地读取（用于「导入备份」后让新设置立刻生效）。
+  ///
+  /// 与 [load] 的区别：**不做 `_loaded` 短路**。[load] 只读一次并长期缓存，
+  /// 恢复备份后内存里还是旧设置；而 [persist] 是整体写回，用户下一次改侧边栏
+  /// 就会把恢复的内容盖掉，所以必须先失效再重读。
+  Future<ChartPlaySettings> reload() {
+    _loaded = false;
+    _loading = null;
+    return load();
+  }
+
   /// 把当前设置套用到控制器。
   void applyTo(SimaiPlayerController controller) {
     _settings.apply(controller);

@@ -70,6 +70,15 @@ class ChartPackageHistoryStore {
   /// 内存中的当前列表（未 [load] 时为空）
   List<ChartPackageHistoryEntry> get entries => List.unmodifiable(_entries);
 
+  /// 丢弃内存里的历史记录，下次 [load] 时重新从 prefs 读。
+  ///
+  /// 给「导入备份」用。注意与 [clear] 的区别：这里**不动归档文件**，
+  /// 只让内存副本失效（[clear] 会连文件一起删，那是用户主动清空才该做的事）。
+  void invalidateCache() {
+    _entries = [];
+    _loaded = false;
+  }
+
   Future<void> load() async {
     if (_loaded) return;
     try {

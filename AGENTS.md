@@ -89,7 +89,7 @@ final file = await ExportPathUtil.writeExportFile(
 
 ---
 
-## 5. 谱面播放页（ChartPlayPage）两个坑
+## 5. 谱面播放页（ChartPlayPage）三个坑
 
 ### 5.1 高刷新率
 
@@ -104,6 +104,41 @@ Flutter 引擎**从不**调用 Android 的 `Surface.setFrameRate()`（[flutter/f
 - 控制器是 `ChangeNotifier`，侧边栏每改一次都会 `notifyListeners` → 挂监听 + 600ms 防抖落盘
 - **防抖只推迟写盘，不推迟记录**：改动要同步 `remember()` 进内存，否则中途重建控制器会读到过期值
 - **`_loadChart()` 必须先 `await ChartPlaySettingsStore().load()` 再建控制器**，否则会拿默认值建控制器、退出时再写回默认值，**把用户设置静默清空**
+
+### 5.3 必须锁竖屏 —— 否则返回手势不会派发 back 事件
+
+**真机反馈**：在 `ChartPlayPage` 里旋转到横屏后，手机**从屏幕边缘右滑的返回手势不再生效**，但 AppBar 左上角的返回按钮和硬件返回键都还能用。
+
+**根因**：第三方包 `simai_flutter` 的 `SimaiPlayerPage` 在横屏会自动进全屏（见 `simai_player.dart:1664-1672`），调用：
+
+```dart
+await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+```
+
+`immersiveSticky` 对应的 Android 行为是 `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`——Android 系统**把所有屏幕边缘的滑动都吃掉用来临时显示状态栏/导航栏**，**根本不会当作 back gesture 派发**给 App。这跟 § 6.3 的预测性返回竞态是**不同**的问题：
+
+| | § 6.3 的卡死 | § 5.3 的返回手势 |
+|---|---|---|
+| 触发条件 | 框架 `_PredictiveBackGestureDetector` 与路由 pop 异步竞态 | Android 系统层 `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE` 把滑动吃掉 |
+| 修复位置 | manifest + AppTheme 两处都要 | 必须在用户层绕过 immersive 模式 |
+| 表现 | 部分时间卡死 | 一直没用 |
+
+**修复**（`lib/page/ChartPlayPage.dart`）：`initState` 里锁竖屏、`dispose` 里恢复全部方向，让 `SimaiPlayerPage` 永远走非全屏分支：
+
+```dart
+// initState
+SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
+// dispose
+SystemChrome.setPreferredOrientations([
+  DeviceOrientation.portraitUp,
+  DeviceOrientation.portraitDown,
+  DeviceOrientation.landscapeLeft,
+  DeviceOrientation.landscapeRight,
+]);
+```
+
+**不要给 `ChartPlayPage` 加横屏支持**。横屏游玩体验重要，但**返回手势必须能用**是更高的优先级 —— 而两者在 `SimaiPlayerPage` 当前实现下不能兼得。如果以后要加横屏，只能在用户层自己实现 back gesture 检测（`Listener` + 自定义 `GestureRecognizer`），不能再依赖系统手势。
 
 ---
 
@@ -129,6 +164,31 @@ android:launchMode="singleTask"   <!-- 全局单实例，后续启动走 onNewIn
 | `com.example.app/display` | 屏幕刷新率（`setHighRefreshRate` / `restoreRefreshRate` / `queryRefreshRate`） |
 
 `on_file` 通道的投递规则：**只有 Dart 已注册监听（`dartImportReady`）时才实时投递并清空 pending**，否则保留 pending 等 Dart 来取。消费 intent 后要清掉 action/data/extra，否则 Activity 重建时系统会重放 `getIntent()` 导致重复弹导入框。
+
+### 6.3 返回手势：必须关掉「预测性返回」（两处，缺一不可）
+
+真机反馈：**用返回手势返回上一级时 App 有概率卡死** —— 页面从四个角向内缩，缩完返回上一级，有时正常、有时整个 App 点不动。
+
+那个「向内缩」是 Flutter 的预测性返回转场（`PredictiveBackSharedElementPageTransition`：缩到 0.90 + 32px 圆角 + 右下位移）。本版本 Flutter 把 Android 的**默认**转场换成了 `PredictiveBackPageTransitionsBuilder`（`page_transitions_theme.dart` 的 `_defaultBuilders`），它给每条路由装一个 `_PredictiveBackGestureDetector`：
+
+- 手势一开始框架就替系统「认领」（`WidgetsBinding.handleStartBackGesture` 返回 true），页面由框架按手指进度缩放；
+- 框架**必须**等到平台发 commit / cancel 才退出该状态，而它与路由 pop 是异步竞态（pop 时路由连同 detector 一起释放，binding 的观察者列表却要到下一次手势开始才清空）；
+- 竞态输了就停在缩了一半的位置，事件被 Navigator 的 `AbsorbPointer` 吞掉 → 「卡死」。
+- **按键返回不中招**：`backEvent.isButtonEvent == true` 时框架不认领 —— 所以只有手势路径出问题，与反馈一致。
+
+两处配置**都要在**，少一个都还会认领手势：
+
+```xml
+<!-- android/app/src/main/AndroidManifest.xml -->
+android:enableOnBackInvokedCallback="false"
+```
+
+```dart
+// lib/utils/AppTheme.dart：三套主题都钉在 FadeForwardsPageTransitionsBuilder
+pageTransitionsTheme: _backGestureSafeTransitions(),
+```
+
+`FadeForwardsPageTransitionsBuilder` 正是框架在「没有手势」时的回落分支，所以普通 push / 返回按钮 / 手势提交后的观感**完全不变**。回归测试：`test/page_transitions_test.dart`。
 
 ---
 
@@ -187,10 +247,7 @@ android:launchMode="singleTask"   <!-- 全局单实例，后续启动走 onNewIn
 
 **当前开发环境没有连接安卓设备，任何改动都无法真机验证。**
 
-### 默认：只跑 analyze，不要构建 APK
-
-用户已明确要求：**改完只需要跑 `flutter analyze`，不需要 `flutter build apk`**。
-打包耗时几分钟且用户自己会构建，每次改动都构建纯属浪费。
+### 默认：你直接改代码就好，不用主动flutter analyze。如果有报错我会告诉你，然后只分析本轮编辑的文件即可。
 
 ```powershell
 flutter analyze --no-pub          # 必须零 error
@@ -204,7 +261,7 @@ flutter analyze --no-pub          # 必须零 error
 
 所以：
 
-- 只改 Dart → 跑 analyze 即可，**不要构建**
+- 只改 Dart → 按照要求决定是否跑 `flutter analyze`，**不要构建**
 - 改了 `android/**/*.kt` 或 `AndroidManifest.xml` → **必须 `flutter build apk --release`**，
   否则等于没验证（而且要如实告诉用户这一点）
 
@@ -223,6 +280,146 @@ build/app/intermediates/merged_manifests/release/processReleaseManifest/AndroidM
 
 ## 10. 其它
 
-- release 构建目前用 debug 签名（`android/app/build.gradle.kts`），所以 `flutter build apk --release` 可直接安装。
-- `applicationId` = `com.example.my_first_flutter_app`，但 App 显示名是 `ChiffonMai`。
+- release 构建用**正式 keystore** 签名：`android/key.properties` + `android/app/chiffonmai-release.jks`，两者都已被 `android/.gitignore` 忽略。**缺 `key.properties` 时 `assembleRelease` / `bundleRelease` 会直接失败**——绝不退回 debug 签名：debug keystore 是每台机器各自的，用它签出来的包一旦装机就永远无法覆盖更新，应用商店也不收。keystore 与口令**必须离线备份**，丢了等于这个 App 再也无法更新。
+- `applicationId` = `cloud.chiffonmai.app`（原为 `com.example.my_first_flutter_app`，为 APP 备案 / 上架而改）；`namespace` 仍保持 `com.example.my_first_flutter_app`——它只决定 R 类与资源解析，跟 App 身份无关，不动它是为了不挪 `MainActivity.kt` 的包目录。App 显示名仍是 `ChiffonMai`。
+  - ⚠️ **applicationId 是 App 的永久身份**：APP 备案的「安卓平台软件包名称」填的就是它，**备案通过后再改要走变更备案**；改包名还会让老用户装成第二个 App、本地数据（账号/设置/收藏夹）不迁移。
+  - 改 applicationId 时要同步改 `lib/page/GlobalArcadeMapPage.dart` 的 `userAgentPackageName`。
+  - **MethodChannel 名**（`com.example.app/*`）与**通知渠道 ID**（`com.example.my_first_flutter_app.channel.*`）**不是包名**，不要跟着改：前者要 Kotlin + Dart 两边同步改，后者一改就等于新建通知渠道、用户的渠道设置会被重置。
 - 排查性能问题用 **profile 构建**：它和 release 一样是 AOT，但保留了 `simai_flutter` 每秒一条的 `SimaiPerf:` 帧耗时日志（120fps 预算 = 8.33ms/帧）。
+
+---
+
+## 11. 顶部标题栏：必须用 `PageTopBar`
+
+**不要自己拼 `Container + Row + IconButton(arrow_back) + Expanded(Center(Text(title))) + SizedBox` 的顶部栏**——那是一份在 60+ 个页面里**手动复制**出来的"模板"（背景里的 `padding: EdgeInsets.fromLTRB(_, 48, _, _)` 把状态栏偏移**写死**），带来三个问题：
+
+1. **状态栏高度写死**——真机有刘海/打孔的设备上偏小或偏大，跟 `AppBar` 自带 `SafeArea` 的行为不一致；
+2. **标题字体不统一**——裸 `Text(... fontSize: screenWidth * 0.06)`，既不走 `AppTheme.font`（思源黑体），字号又跟视口绑定、跨设备忽大忽小；
+3. **每加一个页面就抄一份**——50+ 个文件里堆了十几份近似但有差别的版本，谁改谁漂移。
+
+**统一入口**：[lib/widgets/PageTopBar.dart](lib/widgets/PageTopBar.dart)
+
+```dart
+// 标准用法
+PageTopBar(title: '段位表'),
+
+// 需要右侧操作按钮
+PageTopBar(
+  title: 'Rating 排行榜',
+  actions: [IconButton(...)],
+),
+
+// 返回不是直接 pop（例如要二次确认）
+PageTopBar(
+  title: '多人猜歌',
+  onBack: _showLeaveRoomConfirmDialog,
+),
+```
+
+放进 `Scaffold.body` 的 `Column` 首位即可，`Scaffold.backgroundColor` 用透明让背景组件透出来：
+
+```dart
+Scaffold(
+  backgroundColor: Colors.transparent,
+  body: Stack(children: [
+    CommonWidgetUtil.buildCommonBgWidget(),
+    CommonWidgetUtil.buildCommonChiffonBgWidget(context),
+    Column(children: [
+      PageTopBar(title: '...'),     // ← 顶部栏
+      Expanded(child: ...),          // ← 主体
+    ]),
+  ]),
+)
+```
+
+`PageTopBar` 内部就是一层 `Material AppBar`，自带：
+
+- 标准 `AppBar.primary` 行为：状态栏高度按真机自适应，不再写死 48；
+- 思源黑体（`AppTheme.font`）20 / bold / `colorScheme.primary` / 居中；
+- `Semantics(header)` 与 `AnnotatedRegion<SystemUiOverlayStyle>`；
+- 标准返回按钮（`Navigator.maybePop`，路由不可 pop 时按钮**不消失**，与各页一直以来的行为一致）。
+
+**标题字体默认 20 / `colorScheme.primary` / 居中，不要单独传 `fontSize:` 覆盖** —— 详见 [lib/page/RankingList/RatingRankListPage.dart:2165-2168](lib/page/RankingList/RatingRankListPage.dart) 的注释（之前有人传 `fontSize: 24`，结果这一页标题比别人粗一圈，与"统一标题字体"的目标相悖，已被去掉）。
+
+### 故意手写的少数例外（不要迁移）
+
+| 文件 | 原因 |
+|---|---|
+| [lib/page/CoverRecognitionPage.dart:812-835](lib/page/CoverRecognitionPage.dart) 与 [lib/page/ScoreOcrPage.dart:2861](lib/page/ScoreOcrPage.dart) 的裁剪工具栏 | **深色全屏图片裁剪 UI**（`Colors.black87` 底 + 白字），跟标准标题栏观感完全不同 |
+| [lib/page/FavoriteFolderPage.dart:497-504](lib/page/FavoriteFolderPage.dart) 的 `_buildBatchAppBar()` | **批量操作工具栏**（取消 / 已选 N 项 / 移动 / 删除），不是标题栏 |
+| [lib/page/CalculatorPage.dart:250](lib/page/CalculatorPage.dart) 的双行标题（"计算工具" + 副标题） | `PageTopBar` 只支持单行标题，可选：用 `bottom: PreferredSize(...)` 挂副标题，或保留现状 |
+
+> `HomePage` / `AppShell` / `HubComponents.HubPageScaffold` 这些是首页 Dashboard / 主壳 / 复用枢纽布局，**本身就不是页面级标题栏**，跟本约定无关。
+
+### 核查方式
+
+在 `lib/page/` 下找还残留的手写模板（`top=48`/`top=46` 是最显眼的指纹）：
+
+```powershell
+Get-ChildItem lib/page -Recurse -File -Include *.dart |
+  Select-String -Pattern "EdgeInsets\.fromLTRB\([^,]+,\s*4[0-9]" |
+  Select-Object -Unique Path
+```
+
+> ⚠️ **不要**写成 `Select-String -Path "lib\*.dart","lib\**\*.dart"`——PowerShell 的 `**` 不是"递归"（见 § 1 备注），会**静默漏掉** `lib/page/RankTable/...`、`lib/page/Multiplayer/...`、`lib/page/KaleidXScope/...` 这类两层以上目录。
+
+**期望结果**：命中只剩 [lib/page/FavoriteFolderPage.dart:498](lib/page/FavoriteFolderPage.dart)（批量工具栏，已在上面列为故意手写）。
+
+
+
+## 12. 角色说话风格：Chiffon
+
+### 核心人设
+- 出身糕点世家的大小姐，教养良好，举止优雅。
+- 声音与气质：温和、柔软、有教养，带一点天然。
+- 对可爱、小巧的事物没有抵抗力，对年幼者容易流露照顾欲。
+- 核心公式：优雅 + 温柔 + 天然 + 温和说教。
+- 优雅不等于傲慢，不要写成高高在上的“本小姐”腔。
+
+### 语气规则
+- 默认使用礼貌、得体的表达，可适度使用敬语。
+- 语气柔软、从容，不急促、不尖锐、不粗鲁。
+- 常用缓和词：呀、呢、哦、吧、好吗、可以吗、差不多……
+- 提醒或批评时，用“温柔告诫”，而不是严厉训斥。
+- 坚持立场时仍保持礼貌，但态度要明确。
+- 对他人保持关怀感，像有教养的大小姐在自然照顾人。
+- 可以偶尔流露天然、不谙世事的一面，但不要显得愚蠢。
+
+### 标志性句式
+- 温柔告诫：「淘气可不行哦？」
+- 温和制止：「我们差不多该停下了吧？」
+- 关怀询问：「没事吧？需要我帮忙吗？」
+- 天然回应：「哎呀，是这样吗？」
+- 对可爱事物：「真是小巧又可爱呢。」
+- 鼓励与教学：「没关系哦，慢慢来就好。我来教你吧。」
+
+### 对话示例
+用户：我点你的立绘了。  
+戚风：哎呀，淘气可不行哦？
+
+用户：我们再玩一会儿吧。  
+戚风：我们差不多该停下了吧？明天也要好好准备呀。
+
+用户：这个我不太会。  
+戚风：没关系哦。我来教你吧，慢慢来就好。
+
+用户：这个点心好小。  
+戚风：真是小巧又可爱呢。
+
+### 禁止事项
+- 不要使用粗俗、攻击性、网络喷子式表达。
+- 不要用过于强硬、命令式的口气。
+- 不要过度卖萌或幼儿化。
+- 不要变成冷漠、机械的客服腔。
+- 不要丢掉大小姐的教养和优雅。
+- 不要写成傲慢、刻薄、居高临下的语气。
+
+### 执行优先级
+1. 保持礼貌优雅。
+2. 体现温柔关怀。
+3. 必要时进行温和说教或制止。
+4. 偶尔流露天然与不谙世事。
+
+
+## 13. 注释
+非必要时不要使用全英文注释，保持中文注释。此外在修改文件时如果遇到全英文注释可以顺手汉化。

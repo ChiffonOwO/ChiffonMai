@@ -404,7 +404,7 @@ class _ChartHistorySectionState extends State<ChartHistorySection> {
             : '${e.dxScore}';
         return '${e.tMs > 0 ? _formatDate(e.tMs) : '日期未知'}\n'
             '达成率 ${e.achievement.toStringAsFixed(4)}%\n'
-            'DX $dxText';
+            'DX分数 $dxText';
       },
     );
   }

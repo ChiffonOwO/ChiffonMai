@@ -11,6 +11,7 @@ import '../utils/CommonWidgetUtil.dart';
 import '../utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 import '../widgets/PageTopBar.dart';
+import '../widgets/CommunityAvatar.dart';
 
 /// 最近评论页面：展示最近50条评论，每页10条，Redis+MySQL二级缓存
 class RecentCommentsPage extends StatefulWidget {
@@ -463,11 +464,15 @@ class _RecentCommentsPageState extends State<RecentCommentsPage> {
                   // 用户
                   Row(
                     children: [
-                      Icon(Icons.person_outline, size: 10, color: AppColors.greyHint(brightness, shade: 600)),
-                      const SizedBox(width: 2),
-                      Text(
-                        comment.nickname ?? '匿名用户',
-                        style: TextStyle(fontSize: 10, color: AppColors.greyHint(brightness, shade: 600)),
+                      CommunityAvatar(avatarId: comment.avatarId, size: 20),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          comment.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 10, color: AppColors.greyHint(brightness, shade: 600)),
+                        ),
                       ),
                     ],
                   ),

@@ -6,6 +6,7 @@ import 'UserScoreSearchPage.dart';
 import 'PersonalizedScorePage.dart';
 import 'PaiziProgressPage.dart';
 import 'Collection/CollectionSearchPage.dart';
+import 'UnionUpdateComparePage.dart';
 
 class LibraryHubPage extends StatefulWidget {
   const LibraryHubPage({super.key});
@@ -37,7 +38,7 @@ class _LibraryHubPageState extends State<LibraryHubPage> {
             title: '曲库入口',
             icon: Icons.search_rounded,
             subtitle: '搜索与浏览舞萌曲库',
-            badgeCount: 1,
+            badgeCount: 2,
             children: [
               HubActionTile(
                 title: '乐曲查询',
@@ -46,6 +47,14 @@ class _LibraryHubPageState extends State<LibraryHubPage> {
                 isFavorited: _isFavorited('乐曲查询'),
                 onToggleFavorite: () => _toggleFavorite('乐曲查询'),
                 onTap: () => _open(context, const SongSearchPage()),
+              ),
+              HubActionTile(
+                title: '国服更新对照',
+                subtitle: '看日服已上、国服还没上的曲目',
+                icon: Icons.flag_rounded,
+                isFavorited: _isFavorited('国服更新对照'),
+                onToggleFavorite: () => _toggleFavorite('国服更新对照'),
+                onTap: () => _open(context, const UnionUpdateComparePage()),
               ),
             ],
           ),

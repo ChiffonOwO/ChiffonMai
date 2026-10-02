@@ -137,6 +137,8 @@ class _PortablePlayerBallState extends State<PortablePlayerBall>
     // build 的返回值：外层是 Positioned.fill，中间夹一层非 Positioned 的 widget
     // 会报 "Incorrect use of ParentDataWidget"）
     PortablePlayerScope.isLibraryPageOpen.addListener(_onPlayerChanged);
+    // 同理：SongInfoPage 的「播放音乐」流程压住悬浮球时也要刷一下。
+    PortablePlayerScope.isSongInfoPlayback.addListener(_onPlayerChanged);
     _positionSub = _player.positionStream.listen((_) {
       if (mounted && _player.isPlaying) setState(() {});
     });
@@ -147,6 +149,7 @@ class _PortablePlayerBallState extends State<PortablePlayerBall>
   @override
   void dispose() {
     PortablePlayerScope.isLibraryPageOpen.removeListener(_onPlayerChanged);
+    PortablePlayerScope.isSongInfoPlayback.removeListener(_onPlayerChanged);
     _positionSub?.cancel();
     _player.removeListener(_onPlayerChanged);
     _pulse.dispose();
@@ -241,6 +244,11 @@ class _PortablePlayerBallState extends State<PortablePlayerBall>
     // ValueListenableBuilder）——球的宿主是 `main.dart` 的 MaterialApp.builder，
     // 它需要自己决定显不显示，宿主越薄越不容易忘。
     if (PortablePlayerScope.isLibraryPageOpen.value) {
+      return const SizedBox.shrink();
+    }
+    // SongInfoPage 的「播放音乐」流程压住球：用户没主动进随身听，
+    // 球突然冒出来会很突兀；不压的话他会以为随身听被「强制打开」了。
+    if (PortablePlayerScope.isSongInfoPlayback.value) {
       return const SizedBox.shrink();
     }
     final song = _player.currentSong;

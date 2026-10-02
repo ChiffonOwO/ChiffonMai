@@ -9,6 +9,7 @@ import '../utils/CurrentDataSourceNotifier.dart';
 import '../utils/LoginStateNotifier.dart';
 import '../utils/UserProfileNotifier.dart';
 import 'AccountStore.dart';
+import 'CommunityAvatarStore.dart';
 import 'AWMC/AwmcPlayCountStore.dart';
 import 'History/ChartHistoryStore.dart';
 import 'PaiziProgressService.dart';
@@ -40,6 +41,7 @@ class AccountSwitchService {
     revision++;
     _invalidateRecords();
     await CurrentDataSourceNotifier.instance.set(source);
+    await CommunityAvatarStore.instance.activate();
     await UserProfileNotifier.load();
     await LoginStateNotifier.load();
   }

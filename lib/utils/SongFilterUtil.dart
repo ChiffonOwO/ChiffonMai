@@ -42,12 +42,43 @@ class SongFilterUtil {
     bool? isExtraFlag,
     List<dynamic>? cids,
   }) {
-    if (songId.length == 6) return true;
-    if (cids != null && cids.isNotEmpty) {
-      if (cids.every((cid) => (cid as num?)?.toInt() == 0)) return true;
-    }
+    if (isUtageSong(songId)) return true;
+    if (isMaidataSong(cids)) return true;
     if (isExtraFlag == true) return true;
     return false;
+  }
+
+  /// 宴会场谱面：6 位及以上的 songId。
+  ///
+  /// 项目里各处写的都是「6 位数」，这里取 `>= 6`：真数据里宴会 id 正好 6 位，
+  /// 万一出现 7 位以上的脏数据，按宴会场处理也比当成常规曲安全
+  /// （当成常规曲会污染「最大 id = 最新曲」这类判定）。
+  static bool isUtageSong(String songId) => songId.length >= 6;
+
+  /// 理论 Rating 计算要强制排除的曲目 id 白名单。
+  ///
+  /// 背景：#11879 在部分数据源里被当成常规曲收录，但它的定数异常偏高，
+  /// 一旦参与理论 Rating（全谱 SSS+ 的 Best35 / Best15 上限），
+  /// 会把上限整体顶高，让「录入值不得超过理论值」这条校验失去意义。
+  ///
+  /// ⚠️ 这是**需要人工维护的白名单**：如果以后再有同类曲目，往这里加。
+  /// 理论 Rating 与依赖它的录入校验必须共用这一份，否则两边口径会走偏。
+  static const Set<String> theoreticalRatingExcludedIds = {
+    '11879',
+  };
+
+  /// [songId] 是否在理论 Rating 的强制排除名单里。
+  static bool isTheoreticalRatingExcluded(String songId) =>
+      theoreticalRatingExcludedIds.contains(songId);
+
+  /// maidata 追加曲：`cids` 全为 0（没有官方曲绘 id）。
+  ///
+  /// [isExtraRaw] 的第 2 条规则单独抽出来，给「国服更新对照」那种需要
+  /// **分辨成因**的调用方用 —— 在那里「union 独有」和「maidata 追加」
+  /// 是两种完全不同的东西，不能都当成 extra 一锅端。
+  static bool isMaidataSong(List<dynamic>? cids) {
+    if (cids == null || cids.isEmpty) return false;
+    return cids.every((cid) => (cid as num?)?.toInt() == 0);
   }
 
   /// 统计猜歌设置里的「可选版本 / 可选流派」。

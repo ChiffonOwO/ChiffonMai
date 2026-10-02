@@ -10,6 +10,8 @@ import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/entity/KaleidXScope/KaleidXScopeGate.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/widgets/KaleidXScopeSourceNotice.dart';
+import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
 
 class KaleidXScopeInfoPagePURPLE extends StatefulWidget {
   const KaleidXScopeInfoPagePURPLE({
@@ -774,8 +776,6 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
     final brightness = Theme.of(context).brightness;
     _initSizeParams(context);
 
-    final double titleFontSize = 24.0 * (MediaQuery.of(context).size.width / 375.0);
-
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
@@ -784,31 +784,10 @@ class _KaleidXScopeInfoPagePURPLEState extends State<KaleidXScopeInfoPagePURPLE>
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
           Column(
             children: [
-              Container(
-                padding: EdgeInsets.fromLTRB(_paddingL, _paddingXL, _paddingL, _paddingS),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          _getGateTitle(),
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: titleFontSize,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: _paddingXL),
-                  ],
-                ),
+              // 标题栏（统一走 PageTopBar，标题随之变成 20 / primary / 居中）
+              PageTopBar(
+                title: _getGateTitle(),
+                bottom: const KaleidXScopeSourceNotice(),
               ),
               Expanded(
                 child: Container(

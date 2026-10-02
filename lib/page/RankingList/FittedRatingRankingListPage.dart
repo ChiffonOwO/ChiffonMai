@@ -5,8 +5,9 @@ import '../../service/RankingList/FittedRatingRankingListService.dart';
 import '../../utils/AppDesignTokens.dart';
 import '../../utils/AppTheme.dart';
 import '../../widgets/PageTopBar.dart';
-import '../../widgets/DataSourceTag.dart';
+import '../../widgets/CommunityAvatar.dart';
 import '../../utils/CurrentDataSourceNotifier.dart';
+import '../../utils/RankingRowExtent.dart';
 
 class FittedRatingRankingListPage extends StatefulWidget {
   final FittedMode initialMode;
@@ -37,8 +38,8 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
   // 滚动控制器
   final ScrollController _scrollController = ScrollController();
 
-  // 近似每行高度（用于跳转到当前用户）
-  static const double _rowExtent = 84.0;
+  /// 行高实测器（定位按钮要精确落位）：列表用 `prototypeItem` 把每行都排成它的高度。
+  final RankingRowExtent _rowExtent = RankingRowExtent();
 
   @override
   void initState() {
@@ -107,11 +108,9 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
     final userIndex =
         _rankList.indexWhere((item) => item.playerId == _currentUserId);
     if (userIndex != -1) {
-      _scrollController.animateTo(
-        userIndex * _rowExtent,
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-      );
+      // 精确落位：行高由 [RankingRowExtent] 实测，不再写 `index * 84` 那种估算
+      // （真实行高只有 67，估高每行多 17dp，到第 40 名就滑过头 680dp）。
+      _rowExtent.scrollRowToTop(_scrollController, userIndex);
     }
   }
 
@@ -182,10 +181,6 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
         FittedMode.b => '模式B：按官方 Best35/Best15 替换拟合定数重算',
         FittedMode.c => '模式C：非新曲取前35，新曲取前15',
       };
-
-  /// 数据源标签。配色/取名统一在 [DataSourceTag] 里（原因见 AvgScoreRankingListPage）。
-  Widget _buildDataSourceTag(String dataSource) =>
-      DataSourceTag(dataSource: dataSource);
 
   Widget _buildRankBadge(int rank, {required Brightness brightness}) {
     if (rank == 1) {
@@ -291,25 +286,23 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
             child: Center(child: _buildRankBadge(item.rank, brightness: brightness)),
           ),
 
-          // 数据源标识
-          _buildDataSourceTag(item.dataSource),
-
-          const SizedBox(width: 12),
-
-          // 昵称
           Expanded(
-            child: Text(
-              item.playerName.isEmpty ? '未知玩家' : item.playerName,
-              style: TextStyle(
+            child: CommunityPlayerIdentity(
+              avatarId: item.avatarId,
+              dataSource: item.dataSource,
+              name: item.playerName.isEmpty ? '未知玩家' : item.playerName,
+              // 头像高度对齐「玩家名 + 数据源标签」两行文字的总高
+              avatarMatchesTextHeight: true,
+              nameStyle: TextStyle(
                 fontSize: 14,
                 fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.w500,
                 color: isCurrentUser
                     ? AppColors.primaryText(brightness)
                     : AppColors.secondaryText(brightness),
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
+          const SizedBox(width: 8),
 
           // 估值信息
           SizedBox(
@@ -320,6 +313,25 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
       ),
     );
   }
+
+  /// 定位用的「原型行」：内容最全的一行（第 1 名那 28dp 奖杯 + 拟合值 + 差值小字）。
+  /// 列表会先把它排一遍，再让每一行都用它的高度 —— 于是「第 index 行」的偏移
+  /// 就是 `index × 行高`，见 [RankingRowExtent]。
+  Widget _buildRowPrototype(Brightness brightness) => KeyedSubtree(
+        key: _rowExtent.key,
+        child: _buildRankItem(_prototypeRankItem, brightness: brightness),
+      );
+
+  FittedRankItem get _prototypeRankItem => FittedRankItem(
+        rank: 1,
+        playerId: '',
+        playerName: '',
+        dataSource: RefreshDataSource.shuiyu.key,
+        mode: _currentMode.name,
+        fittedRating: 17000,
+        officialRating: 16800,
+        diff: 200,
+      );
 
   Widget _buildEmptyState(Brightness brightness) {
     return Center(
@@ -509,6 +521,9 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
                         // 内边距垫在列表最上面，而状态栏已被 `PageTopBar` 占掉 ——
                         // 结果就是「第一名那行上方多出一块空白」（实测 24dp）。
                         padding: EdgeInsets.zero,
+                        // 每行都排成原型行的高度：定位按钮才能用
+                        // `index × 行高` 精确落位（行高不再靠 84 这种估算）
+                        prototypeItem: _buildRowPrototype(brightness),
                         itemCount: _rankList.length,
                         itemBuilder: (context, index) {
                           final item = _rankList[index];
@@ -543,25 +558,22 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
                     ),
                   ),
 
-                  // 数据源标识
-                  _buildDataSourceTag(_currentUserRankItem!.dataSource),
-
-                  const SizedBox(width: 12),
-
-                  // 昵称
                   Expanded(
-                    child: Text(
-                      _currentUserRankItem!.playerName.isEmpty
+                    child: CommunityPlayerIdentity(
+                      avatarId: _currentUserRankItem!.avatarId,
+                      dataSource: _currentUserRankItem!.dataSource,
+                      name: _currentUserRankItem!.playerName.isEmpty
                           ? '未知玩家'
                           : _currentUserRankItem!.playerName,
-                      style: TextStyle(
+                      avatarMatchesTextHeight: true,
+                      nameStyle: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                         color: AppColors.primaryText(brightness),
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(width: 8),
 
                   // 估值信息
                   SizedBox(

@@ -717,7 +717,9 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
         TileLayer(
           urlTemplate: 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
           subdomains: const ['1', '2', '3', '4'],
-          userAgentPackageName: 'com.example.my_first_flutter_app',
+          // 必须与 android/app/build.gradle.kts 的 applicationId 一致：
+          // 高德瓦片服务按 UA 区分调用方，写错等于以别人的身份请求。
+          userAgentPackageName: 'cloud.chiffonmai.app',
         ),
         MarkerLayer(markers: _buildMarkers()),
       ],

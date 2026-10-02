@@ -16,4 +16,13 @@ class PortablePlayerScope {
   /// 随身听（曲库列表）页是否正在显示。
   static final ValueNotifier<bool> isLibraryPageOpen =
       ValueNotifier<bool>(false);
+
+  /// 当前播放是不是从 [SongInfoPage] 的「播放音乐」触发的。
+  ///
+  /// 为 true 时 [PortablePlayerBall]（悬浮球）隐藏 —— 用户没主动进随身听，
+  /// 球突然冒出来会很突兀；但**不**影响播放本身、不影响通知栏、不影响切歌。
+  ///
+  /// 由 [SongPlayPage] 在 `initState` / `dispose` 里置位与复位。
+  static final ValueNotifier<bool> isSongInfoPlayback =
+      ValueNotifier<bool>(false);
 }

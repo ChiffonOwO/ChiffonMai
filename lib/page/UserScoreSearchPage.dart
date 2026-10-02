@@ -10,6 +10,7 @@ import 'SongInfoPage.dart';
 import '../utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/widgets/B50GameCardWidget.dart';
 import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
+import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
 
 class UserScoreSearchPage extends StatefulWidget {
   const UserScoreSearchPage({Key? key}) : super(key: key);
@@ -947,36 +948,9 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
           // 页面内容
           Column(
             children: [
-              // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(16, 46, 16, 8),
-                child: Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '成绩查询',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 占位，保持标题居中
-                    SizedBox(width: 48),
-                  ],
-                ),
-              ),
+              // 标题栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
+              // 与 Best50 页、其余 50 多个页面同款。
+              PageTopBar(title: '成绩查询'),
               
               // 主内容区域
               Expanded(

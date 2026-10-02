@@ -63,14 +63,27 @@ class ApiClient {
         .timeout(timeout);
   }
 
+  /// HEAD：只要响应头，不要正文。
+  ///
+  /// 目前用于 dxdata 目录的新鲜度探测（`HEAD /dxdata` 会返回 ETag 与
+  /// Content-Length，但不加载也不返回 4MB 正文），所以它比 [get] 便宜几个数量级。
+  static Future<http.Response> head(
+    Uri url, {
+    Map<String, String>? headers,
+    Duration timeout = _defaultTimeout,
+  }) {
+    return _client
+        .head(url, headers: _mergeHeaders(url, headers))
+        .timeout(timeout);
+  }
+
   static Future<http.Response> post(
     Uri url, {
     Map<String, String>? headers,
     Object? body,
     Encoding? encoding,
     Duration timeout = _defaultTimeout,
-  }) {
-    return _client
+  }) {    return _client
         .post(url,
             headers: _mergeHeaders(url, headers),
             body: body,

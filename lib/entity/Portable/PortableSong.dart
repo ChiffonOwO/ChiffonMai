@@ -9,6 +9,8 @@
  * 三个 id 的关系是**实测**出来的，不是推测，详见
  * [PortableSongMapService] 顶部注释与 `test/portable_song_map_test.dart`。
  */
+import '../../api/ApiUrls.dart';
+
 class PortableSong {
   /// 落雪曲目 id（`song/list` 里的 `id`）。
   ///
@@ -50,6 +52,12 @@ class PortableSong {
   /// 音源 URL（**点击歌曲行时才使用**，不要在列表渲染阶段请求它）。
   String get audioUrl =>
       'https://assets2.lxns.net/maimai/music/$audioId.mp3';
+
+  /// wmc.pub 兜底 URL：落雪 (`assets2.lxns.net`) 拉 404 时尝试这一条。
+  ///
+  /// URL 用的是 maimai 原 songId（[divingFishId] 字符串形式），不是落雪这边的取余 id。
+  /// 单曲播放失败时（`_handleSourceFailure`）会按这个 URL 重试一次。
+  String get wmcAudioUrl => ApiUrls.wmcAudioUrl(divingFishId);
 
   /// 本地曲绘 assets 用的 id（= [audioId]，因为本地 assets 按落雪 id 命名）。
   int get coverAssetId => audioId;

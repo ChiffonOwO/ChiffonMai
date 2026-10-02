@@ -111,9 +111,9 @@ mixin SyncFlowMixin<T extends StatefulWidget> on State<T> {
 
   // ===== 水鱼 =====
 
-  /// 同步成绩到水鱼（线路1）：输入（二维码 / 排行榜选项）在对话框完成，
-  /// 点「开始同步」后对话框立即关闭，抓取 → 推送 → 刷新本地数据的进度
-  /// 全部显示在按钮上。
+  /// 同步成绩到水鱼（线路2 maimai Score Hub）：输入（二维码 / 排行榜选项）
+  /// 在对话框完成，点「开始同步」后对话框立即关闭，抓取 → 推送 → 刷新本地数据
+  /// 的进度全部显示在按钮上。
   ///
   /// 调用方负责按当前线路决定走这个还是 [syncToDivingFishViaAwmc]。
   Future<void> syncToDivingFishWithButton() async {
@@ -230,7 +230,7 @@ mixin SyncFlowMixin<T extends StatefulWidget> on State<T> {
     }
   }
 
-  /// 线路2 同步到水鱼：二维码 + 网关令牌 → `/v1/user/music` + `/v1/update-fish`。
+  /// 线路1（AWMC 网关）同步到水鱼：二维码 + 网关令牌 → `/v1/user/music` + `/v1/update-fish`。
   Future<void> syncToDivingFishViaAwmc() async {
     if (anyBusy) return;
     final outcome = await AwmcSyncFlow.run(
@@ -252,7 +252,7 @@ mixin SyncFlowMixin<T extends StatefulWidget> on State<T> {
 
   // ===== 落雪 =====
 
-  /// 同步成绩到落雪（线路1）：输入在对话框完成，进度显示在按钮上。
+  /// 同步成绩到落雪（线路2 maimai Score Hub）：输入在对话框完成，进度显示在按钮上。
   Future<void> syncToLuoXueWithButton() async {
     if (anyBusy) return;
     final input = await showLuoXueSyncInputDialog(context);
@@ -285,7 +285,7 @@ mixin SyncFlowMixin<T extends StatefulWidget> on State<T> {
     }
   }
 
-  /// 线路2 同步到落雪：二维码 + 网关令牌 → `/v1/user/music` + `/v1/update-lx`。
+  /// 线路1（AWMC 网关）同步到落雪：二维码 + 网关令牌 → `/v1/user/music` + `/v1/update-lx`。
   Future<void> syncToLuoXueViaAwmc() async {
     if (anyBusy) return;
     final outcome = await AwmcSyncFlow.run(

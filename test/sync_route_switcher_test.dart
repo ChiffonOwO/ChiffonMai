@@ -17,38 +17,41 @@ void main() {
 
   Widget host(Widget child) => MaterialApp(home: Scaffold(body: child));
 
-  testWidgets('切换器显示两条线路与当前线路名', (tester) async {
+  testWidgets('切换器显示两条线路，且线路1=AWMC、线路2=Score Hub', (tester) async {
     await tester.pumpWidget(host(SyncRouteSwitcher(
-      value: SyncRouteStore.routeScoreHub,
+      value: SyncRouteStore.routeAwmc,
       onChanged: (_) {},
     )));
 
     expect(find.text('线路'), findsOneWidget);
     expect(find.text('线路1'), findsOneWidget);
     expect(find.text('线路2'), findsOneWidget);
-    expect(find.text('maimai Score Hub'), findsOneWidget);
+    expect(find.text('AWMC 网关'), findsOneWidget,
+        reason: '值 1 对应显示的线路1，右侧名称必须是 AWMC 网关');
 
     await tester.pumpWidget(host(SyncRouteSwitcher(
-      value: SyncRouteStore.routeAwmc,
+      value: SyncRouteStore.routeScoreHub,
       onChanged: (_) {},
     )));
     await tester.pumpAndSettle();
-    expect(find.text('AWMC 网关'), findsOneWidget);
+    expect(find.text('maimai Score Hub'), findsOneWidget,
+        reason: '值 0 对应显示的线路2，右侧名称必须是 maimai Score Hub');
+    expect(find.text('AWMC 网关'), findsNothing);
   });
 
-  testWidgets('点线路2 回调 1；enabled=false 时点不动', (tester) async {
+  testWidgets('点线路2 回调 0（Score Hub）；enabled=false 时点不动', (tester) async {
     final picked = <int>[];
     await tester.pumpWidget(host(SyncRouteSwitcher(
-      value: SyncRouteStore.routeScoreHub,
+      value: SyncRouteStore.routeAwmc,
       onChanged: picked.add,
     )));
 
     await tester.tap(find.text('线路2'));
     await tester.pumpAndSettle();
-    expect(picked, [SyncRouteStore.routeAwmc]);
+    expect(picked, [SyncRouteStore.routeScoreHub]);
 
     await tester.pumpWidget(host(SyncRouteSwitcher(
-      value: SyncRouteStore.routeScoreHub,
+      value: SyncRouteStore.routeAwmc,
       onChanged: picked.add,
       enabled: false,
     )));
@@ -60,7 +63,7 @@ void main() {
 
   testWidgets('HubActionTile.footer：渲染在 tile 下方，点它不触发 onTap', (tester) async {
     var tileTaps = 0;
-    var route = SyncRouteStore.routeScoreHub;
+    var route = SyncRouteStore.routeAwmc;
 
     await tester.pumpWidget(host(StatefulBuilder(
       builder: (context, setState) => HubActionTile(
@@ -76,13 +79,13 @@ void main() {
     )));
 
     expect(find.text('线路1'), findsOneWidget);
-    expect(find.text('maimai Score Hub'), findsOneWidget);
+    expect(find.text('AWMC 网关'), findsOneWidget);
 
     // 切线路：只改线路，不触发 tile
     await tester.tap(find.text('线路2'));
     await tester.pumpAndSettle();
-    expect(route, SyncRouteStore.routeAwmc);
-    expect(find.text('AWMC 网关'), findsOneWidget);
+    expect(route, SyncRouteStore.routeScoreHub);
+    expect(find.text('maimai Score Hub'), findsOneWidget);
     expect(tileTaps, 0, reason: '切线路绝不能顺手把同步跑起来');
 
     // 点标题：走 tile 自己的 onTap

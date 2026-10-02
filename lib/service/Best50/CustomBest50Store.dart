@@ -109,6 +109,18 @@ class CustomBest50Store {
 
   List<CustomBest50Entry?> get entries => List<CustomBest50Entry?>.unmodifiable(_entries);
 
+  /// 丢弃内存里的 50 个卡位，下次读取时重新从 prefs 载入。
+  ///
+  /// 给「导入备份」用：保存是整体写回（[_persist] 写满 50 位），
+  /// 恢复后若内存里还留着旧卡位，下一次改动就会把恢复内容整体覆盖掉。
+  void invalidateCache() {
+    for (var i = 0; i < slotCount; i++) {
+      _entries[i] = null;
+    }
+    _loaded = false;
+    _loading = null;
+  }
+
   Future<void> load() {
     if (_loaded) return Future.value();
     return _loading ??= _doLoad();

@@ -5,6 +5,7 @@ import '../api/ApiUrls.dart';
 import '../api/DeveloperToken.dart';
 import '../constant/CacheKeyConstant.dart';
 import '../constant/CacheTimestampConstant.dart';
+import '../utils/SongFilterUtil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
@@ -16,6 +17,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 import 'package:my_first_flutter_app/utils/CurrentDataSourceNotifier.dart';
 import 'package:my_first_flutter_app/utils/ScoreInputValidator.dart';
+import '../utils/CommunityProfileUtil.dart';
 
 // 评论数据模型
 class CommentItem {
@@ -28,6 +30,10 @@ class CommentItem {
   final String? nickname;
   final String content;
   final String? createdAt;
+  final int avatarId;
+
+  String get displayName =>
+      nickname?.trim().isNotEmpty == true ? nickname!.trim() : '匿名用户';
 
   CommentItem({
     required this.id,
@@ -39,6 +45,7 @@ class CommentItem {
     this.nickname,
     required this.content,
     this.createdAt,
+    this.avatarId = CommunityProfileUtil.defaultAvatarId,
   });
 
   factory CommentItem.fromJson(Map<String, dynamic> json) {
@@ -52,6 +59,7 @@ class CommentItem {
       nickname: json['nickname'],
       content: json['content'] ?? '',
       createdAt: json['createdAt'] ?? json['created_at'],
+      avatarId: CommunityProfileUtil.avatarIdFromJson(json),
     );
   }
 
@@ -66,6 +74,7 @@ class CommentItem {
       'nickname': nickname,
       'content': content,
       'createdAt': createdAt,
+      'avatarId': avatarId,
     };
   }
 }
@@ -1179,7 +1188,9 @@ class SongInfoService {
   /// 用户可以把 B35 填成 99999 而总和仍然"合法"。
   ///
   /// 口径：所有谱面按达成率 SSS+ 计（`ds × 0.224 × 100.5`），
-  /// 旧曲取前 35、新曲取前 15 求和；宴会场 / maidata 谱面 / extra 不参与。
+  /// 旧曲取前 35、新曲取前 15 求和；宴会场 / maidata 谱面 / extra 不参与，
+  /// 另外 [SongFilterUtil.theoreticalRatingExcludedIds] 里的曲目强制排除
+  /// （见该常量的注释）。
   /// 拿不到歌曲缓存时返回 [unknownRatingLimits]（三档全 0）。
   static Future<RatingLimits> getTheoreticalRatingParts() async {
     final override = debugTheoreticalRatingOverride;
@@ -1196,7 +1207,12 @@ class SongInfoService {
         List<dynamic> cids = song.cids;
 
         bool isMaidataSong = cids.isNotEmpty && cids.every((cid) => cid == 0);
-        if (songId >= 100000 || isMaidataSong || song.isExtra) continue;
+        if (songId >= 100000 ||
+            isMaidataSong ||
+            song.isExtra ||
+            SongFilterUtil.isTheoreticalRatingExcluded(song.id)) {
+          continue;
+        }
 
         for (int levelIndex = 0;
             levelIndex < song.charts.length;

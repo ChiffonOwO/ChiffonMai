@@ -1,7 +1,8 @@
 // PC50（个性化 Best50 → 游玩次数前 50）的服务测试。
 //
 // 数据链路：成绩记录（`user_play_data`，水鱼/落雪同步）× 游玩次数
-// （`awmc_play_counts_v1`，**同步成绩的线路2 · AWMC 网关**写入）。
+// （`awmc_play_counts_v1`，**走 AWMC 网关 `/v1/user/music` 写入：
+//   线路1 的同步，或线路2 的静默刷新**）。
 // 这里钉的是口径：次数从哪来、缺次数怎么办、extra 怎么办、并列怎么排。
 import 'dart:convert';
 
@@ -46,7 +47,8 @@ Map<String, dynamic> record(String songId, int levelIndex, int ra) => {
       'dxScore': 3000,
     };
 
-/// 写入曲库 / 成绩 / 游玩次数三个缓存；[counts] 为 null 表示没同步过线路2。
+/// 写入曲库 / 成绩 / 游玩次数三个缓存；[counts] 为 null 表示本机还没有
+/// 游玩次数缓存（没走过 AWMC 通道）。
 void seed({
   required List<Map<String, dynamic>> songs,
   required List<Map<String, dynamic>> records,
@@ -171,7 +173,7 @@ void main() {
     expect(records.single['song_id'], 8);
   });
 
-  test('从未同步过线路2（没有次数缓存）时返回 null', () async {
+  test('本机没有游玩次数缓存（没走过 AWMC 通道）时返回 null', () async {
     seed(
       songs: allSongs(),
       records: [record('8', 3, 300)],

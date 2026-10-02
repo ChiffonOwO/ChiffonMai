@@ -69,7 +69,7 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
     {'value': 'difficulty_50', 'label': '难度50'},
     {'value': 'best_n', 'label': 'Best N'},
     {'value': 'all_50', 'label': 'ALL50'},
-    // 游玩次数最高的 50 张谱面；次数来自「同步成绩」的线路2（AWMC 网关）——
+    // 游玩次数最高的 50 张谱面；次数来自「同步成绩」的线路1（AWMC 网关）——
     // 详见 PersonalizedBest50Service.getPC50Data
     {'value': 'pc_50', 'label': 'PC50'},
   ];
@@ -1532,9 +1532,9 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
             ),
             SizedBox(height: 8),
             Text(
-              // PC50 的次数只有线路2（AWMC 网关）会拉，缺数据时不能只说「刷新数据」
+              // PC50 的次数只有线路1（AWMC 网关）会拉，缺数据时不能只说「刷新数据」
               _selectedType == 'pc_50'
-                  ? '游玩次数来自「同步成绩」的线路2 · AWMC 网关，\n请先在那里同步一次成绩'
+                  ? '游玩次数来自「同步成绩」的 AWMC 网关，\n请先在那里同步一次成绩'
                   : '请返回首页点击"刷新数据"按钮获取',
               style: TextStyle(
                 fontSize: 14,

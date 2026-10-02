@@ -202,6 +202,71 @@ class ChartHistoryStore {
     }
   }
 
+  /// 批量回填 Rating 历史 —— 主要给「从 AWMC NET 同步趋势」按钮用。
+  ///
+  /// 与 [recordRating] 的差异（**重要，看完再用**）：
+  ///   * [recordRating] 是「逐点增量」：每次只跟当前序列最后一个点比，相同就跳过。
+  ///     假设旧序列 `[100, 110]`，再 `recordRating(110)` 仍然会写一个新点（序列
+  ///     变 `[100, 110, 110]`）——单点 API 不看后面有没有重复。
+  ///   * 本方法是**整批去重**：合并 + 按时间排序 + 跨整个序列的「和前一个 rating
+  ///     相同则跳过」压扁，一次落盘。
+  ///
+  /// 行为差异在「批量回填」场景里**正是想要的效果**：比如 AWMC NET 给的
+  /// 90 天序列尾部恰好等于旧序列最后一个 rating（连续若干天没打），合并后
+  /// 尾部应该只剩一条，不应该冒一长串同值的尾巴 —— 单点 API 做不到。
+  ///
+  /// ⚠️ **不去重 AWMC 与手动的「同一秒」冲突**：同秒的新点会覆盖旧的（按时间戳），
+  /// 不主动判断「哪个更新」。如果用户在同步窗口里还手动录了同秒点，会被
+  /// 这次回填覆盖。
+  ///
+  /// 返回**真正写入的点条数**（合并去重后的净值），方便 UI 显示「回填 N 条」。
+  Future<int> recordRatingSeries({
+    required List<RatingPoint> newPoints,
+    String? sourceKey,
+    String? accountId,
+  }) async {
+    if (isRecordingSuppressed) return 0;
+    // 过滤 rating <= 0 的脏数据（接口端也保证过；本地再兜一层）
+    final valid = <RatingPoint>[
+      for (final p in newPoints)
+        if (p.rating > 0) p,
+    ];
+    if (valid.isEmpty) return 0;
+
+    try {
+      final source =
+          await storageKey(sourceKey: sourceKey, accountId: accountId);
+      final doc = await _load(source);
+
+      // 1) 同秒去重：新点覆盖旧点（与 [appendRatingPoint] 单点行为一致）
+      final bySecond = <int, RatingPoint>{
+        for (final p in doc.rating) historySecond(p.tMs): p,
+        for (final p in valid) historySecond(p.tMs): p,
+      };
+      final merged = bySecond.values.toList()
+        ..sort((a, b) => a.tMs.compareTo(b.tMs));
+
+      // 2) 跨整个序列压扁「连续同 rating」尾巴
+      final pruned = <RatingPoint>[];
+      for (final p in merged) {
+        if (pruned.isEmpty || pruned.last.rating != p.rating) {
+          pruned.add(p);
+        }
+      }
+
+      final added = pruned.length - doc.rating.length;
+      doc.rating = pruned;
+      doc.updatedAtMs = DateTime.now().millisecondsSinceEpoch;
+      await _persist(source, doc);
+      debugPrint(
+          '[History] $source 批量回填 Rating：入 ${valid.length} / 净增 $added（现 ${pruned.length} 个点）');
+      return added;
+    } catch (e) {
+      debugPrint('[History] 批量回填 Rating 失败（忽略）: $e');
+      return 0;
+    }
+  }
+
   /// 手动点单独保存，不受自动采集的去重、降采样影响。
   /// 保存失败向上抛出，让录入对话框保留内容并提示重试。
   Future<void> recordManualRating({
@@ -210,8 +275,7 @@ class ChartHistoryStore {
     int best35 = 0,
     int best15 = 0,
     String? sourceKey,
-    String? accountId,
-  }) async {
+    String? accountId,  }) async {
     if (rating <= 0 || historySecond(tMs) <= 0 || best35 < 0 || best15 < 0) {
       throw ArgumentError('Rating 或时间无效');
     }

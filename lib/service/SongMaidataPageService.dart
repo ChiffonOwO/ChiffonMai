@@ -243,6 +243,15 @@ class SongMaidataPageService {
       return cachedContent;
     }
 
+    // 3) wmc.pub 兜底（内存缓存 + 网络拉取，最后一道）
+    final wmcContent = await MaidataManager().getMaidataFromWmcFallback(songId);
+    if (wmcContent != null) {
+      debugPrint('[DEBUG][Maidata] 使用 wmc.pub 兜底内容, songId=$songId');
+      List<String> inoteList = _parseInoteList(wmcContent);
+      onInoteParsed(inoteList);
+      return wmcContent;
+    }
+
     // 没有 fallback：不做 title → index.json → shortId 替换，不做目录扫描。
     debugPrint('[DEBUG][Maidata] 严格匹配未命中，返回 null');
     return null;

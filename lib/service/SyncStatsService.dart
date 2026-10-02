@@ -8,11 +8,11 @@ import '../api/DeveloperToken.dart';
 
 /// 同步成绩走的**通道**（前两个就是 `SyncRouteStore` 里可选的两条线路）。
 enum SyncLine {
-  /// 线路1：maimai Score Hub（scorehub 探针）。
-  scoreHub(key: 'scorehub', label: '线路1 · maimai Score Hub'),
+  /// 线路1：AWMC 网关（机台二维码 + `gw_` 令牌直连 api.wmc.pub）。
+  awmc(key: 'awmc', label: 'AWMC 网关'),
 
-  /// 线路2：AWMC 网关。
-  awmc(key: 'awmc', label: '线路2 · AWMC 网关'),
+  /// 线路2：maimai Score Hub（scorehub 探针流程）。
+  scoreHub(key: 'scorehub', label: 'maimai Score Hub'),
 
   /// **不是线路**：机台二维码直传（目前只有 AWMC NET 用）。
   ///

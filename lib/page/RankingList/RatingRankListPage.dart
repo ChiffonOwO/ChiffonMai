@@ -4,8 +4,9 @@ import '../../service/RankingList/RatingRankListService.dart';
 import '../../utils/AppTheme.dart';
 import '../../utils/ColorUtil.dart';
 import '../../widgets/PageTopBar.dart';
-import '../../widgets/DataSourceTag.dart';
+import '../../widgets/CommunityAvatar.dart';
 import '../../utils/CurrentDataSourceNotifier.dart';
+import '../../utils/RankingRowExtent.dart';
 
 class RatingRankListPage extends StatefulWidget {
   const RatingRankListPage({super.key});
@@ -51,6 +52,9 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
 
   // 滚动控制器
   final ScrollController _scrollController = ScrollController();
+
+  /// 行高实测器（定位按钮要精确落位）：列表用 `prototypeItem` 把每行都排成它的高度。
+  final RankingRowExtent _rowExtent = RankingRowExtent();
 
   @override
   void initState() {
@@ -125,15 +129,12 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
     }
 
     // 查找当前用户在列表中的索引
-    int userIndex = _rankList.indexWhere((item) => item.userId == _currentUserId);
-
+    final userIndex =
+        _rankList.indexWhere((item) => item.userId == _currentUserId);
     if (userIndex != -1) {
-      // 滚动到当前用户位置，带有动画
-      _scrollController.animateTo(
-        userIndex * 72.0, // 假设每个列表项高度约为72
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-      );
+      // 精确落位：行高由 [RankingRowExtent] 实测，不再写 `index * 72` 那种估算
+      // （估高每行多 7dp，到第 40 名就滑过头 280dp，自己的行跑到屏幕上方）。
+      _rowExtent.scrollRowToTop(_scrollController, userIndex);
     }
   }
 
@@ -227,23 +228,21 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
             ),
           ),
 
-          // 数据源标识（配色/取名统一在 DataSourceTag）
-          DataSourceTag(dataSource: item.dataSource),
-
-          const SizedBox(width: 12),
-
-          // 昵称
           Expanded(
-            child: Text(
-              item.nickname ?? '未知玩家',
-              style: TextStyle(
+            child: CommunityPlayerIdentity(
+              avatarId: item.avatarId,
+              dataSource: item.dataSource,
+              name: item.nickname ?? '未知玩家',
+              // 头像高度对齐「玩家名 + 数据源标签」两行文字的总高
+              avatarMatchesTextHeight: true,
+              nameStyle: TextStyle(
                 fontSize: 14,
                 fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.w500,
                 color: isCurrentUser ? AppColors.primaryText(brightness) : AppColors.secondaryText(brightness),
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
+          const SizedBox(width: 8),
 
           // Rating 信息
           SizedBox(
@@ -289,6 +288,24 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
       ),
     );
   }
+
+  /// 定位用的「原型行」：内容最全的一行（第 1 名那 28dp 奖杯 + 总 Rating 徽章 +
+  /// B35/B15 两行小字）。列表会先把它排一遍，再让每一行都用它的高度 ——
+  /// 于是「第 index 行」的偏移就是 `index × 行高`，见 [RankingRowExtent]。
+  Widget _buildRowPrototype(Brightness brightness) => KeyedSubtree(
+        key: _rowExtent.key,
+        child: _buildRankItem(_prototypeRankItem, brightness: brightness),
+      );
+
+  RankItem get _prototypeRankItem => RankItem(
+        rank: 1,
+        userId: '',
+        dataSource: RefreshDataSource.shuiyu.key,
+        originalId: '',
+        totalRating: 17000,
+        best35Rating: 12000,
+        best15Rating: 5000,
+      );
 
   Widget _buildRankBadge(int rank, {required Brightness brightness}) {
     if (rank == 1) {
@@ -515,6 +532,9 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
                         // 当成内边距垫在**列表最上面** —— 而状态栏已经被 `PageTopBar`
                         // 占掉了，结果就是「第一名那一行上方多出一块空白」（实测 24dp）。
                         padding: EdgeInsets.zero,
+                        // 每行都排成原型行的高度：定位按钮才能用
+                        // `index × 行高` 精确落位（行高不再靠 72 这种估算）
+                        prototypeItem: _buildRowPrototype(brightness),
                         itemCount: _rankList.length,
                         itemBuilder: (context, index) {
                           final item = _rankList[index];
@@ -543,24 +563,20 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
                     ),
                   ),
 
-                  // 数据源标识（配色/取名统一在 DataSourceTag）
-                  DataSourceTag(
-                      dataSource: _currentUserRankItem!.dataSource),
-
-                  const SizedBox(width: 12),
-
-                  // 昵称
                   Expanded(
-                    child: Text(
-                      _currentUserRankItem!.nickname ?? '未知玩家',
-                      style: TextStyle(
+                    child: CommunityPlayerIdentity(
+                      avatarId: _currentUserRankItem!.avatarId,
+                      dataSource: _currentUserRankItem!.dataSource,
+                      name: _currentUserRankItem!.nickname ?? '未知玩家',
+                      avatarMatchesTextHeight: true,
+                      nameStyle: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                         color: AppColors.primaryText(brightness),
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(width: 8),
 
                   // Rating 信息
                   SizedBox(

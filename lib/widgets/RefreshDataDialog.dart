@@ -28,6 +28,7 @@ import '../manager/SongAliasManager.dart';
 import '../service/History/ChartHistoryStore.dart';
 import '../service/AccountStore.dart';
 import '../service/AccountSwitchService.dart';
+import '../service/CommunityNicknameSyncService.dart';
 import '../service/ConnectivityService.dart';
 import '../service/PaiziProgressService.dart';
 import '../service/PersonalizedScoreService.dart';
@@ -893,6 +894,14 @@ Future<void> _saveUserData({
     best15TotalRA: best15TotalRA,
     cachedQQ: cachedQQ,
   ));
+
+  // Sync the fresh upstream name independently of ranking participation,
+  // anonymity and Rating changes. Never submit the cached startup nickname.
+  final playerId = prefs.getString(source.userIdCacheKey);
+  if (playerId != null && playerId.startsWith('${source.key}:')) {
+    unawaited(CommunityNicknameSyncService.syncFreshNickname(
+        playerId: playerId, nickname: nickname));
+  }
 
   // 顺手记一个 Rating 历史点（曲线用的就是界面显示的这一份，口径天然一致）。
   // 不 await：采集失败绝不影响刷新流程；同一天重复刷新只会替换当天那个点。

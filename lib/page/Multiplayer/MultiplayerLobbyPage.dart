@@ -8,6 +8,7 @@ import 'package:my_first_flutter_app/page/Multiplayer/GameRoomPage.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/RoomEntity.dart';
+import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
 
 class MultiplayerLobbyPage extends StatefulWidget {
   const MultiplayerLobbyPage({super.key, this.manager});
@@ -208,32 +209,9 @@ class _MultiplayerLobbyPageState extends State<MultiplayerLobbyPage> {
 
           Column(
             children: [
-              Container(
-                padding: EdgeInsets.fromLTRB(paddingM, 48, paddingM, paddingL),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          '多人游戏',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 48),
-                  ],
-                ),
-              ),
+              // 标题栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
+              // 与 Best50 页、其余 50 多个页面同款。
+              PageTopBar(title: '多人游戏'),
 
               Expanded(
                 child: Container(

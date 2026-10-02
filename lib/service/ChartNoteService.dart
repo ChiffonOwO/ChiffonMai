@@ -14,6 +14,15 @@ class ChartNoteService {
   List<ChartNote> _notes = [];
   bool _loaded = false;
 
+  /// 丢弃内存里的笔记副本，下次读取时重新从 prefs 载入。
+  ///
+  /// 给「导入备份」用：这类 Store 的保存是**整体写回**（[_saveNotes] 写整个列表），
+  /// 若恢复后内存里还留着旧列表，用户下一次存笔记就会把刚导入的数据整体覆盖掉。
+  void invalidateCache() {
+    _notes = [];
+    _loaded = false;
+  }
+
   /// 从本地加载所有笔记
   Future<List<ChartNote>> loadNotes() async {
     if (_loaded) return List.unmodifiable(_notes);

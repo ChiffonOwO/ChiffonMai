@@ -23,6 +23,7 @@ import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
+import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
 import 'package:my_first_flutter_app/utils/GameSeedUtil.dart';
 import 'package:my_first_flutter_app/utils/LuoXueSongUtil.dart';
 import 'package:my_first_flutter_app/widgets/TileRevealImage.dart';
@@ -3838,34 +3839,12 @@ class _GameRoomPageState extends State<GameRoomPage> {
           // 页面内容
           Column(
             children: [
-              // 标题栏
-              Container(
-                padding: EdgeInsets.fromLTRB(paddingM, 48, paddingM, paddingS),
-                child: Row(
-                  children: [
-                    // 返回按钮
-                    IconButton(
-                      tooltip: '离开房间',
-                      icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-                      onPressed: _showLeaveRoomConfirmDialog,
-                    ),
-                    // 标题
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          _currentRoom?.gameType.name ?? '多人猜歌',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: screenWidth * 0.05,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 占位，保持标题居中
-                    SizedBox(width: 48),
-                  ],
-                ),
+              // 标题栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
+              // 与 Best50 页、其余 50 多个页面同款。
+              // 返回按钮走 onBack：离开房间前需要二次确认，不能直接 pop。
+              PageTopBar(
+                title: _currentRoom?.gameType.name ?? '多人猜歌',
+                onBack: _showLeaveRoomConfirmDialog,
               ),
 
               // 房主变更提示

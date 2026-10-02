@@ -14,6 +14,15 @@ class FavoriteFolderService {
   List<FavoriteFolder> _folders = [];
   bool _loaded = false;
 
+  /// 丢弃内存里的收藏夹副本，下次读取时重新从 prefs 载入。
+  ///
+  /// 给「导入备份」用：保存是整体写回（[_saveFolders] 写整个列表），
+  /// 恢复后若内存里还留着旧列表，下一次改动就会把恢复内容整体覆盖掉。
+  void invalidateCache() {
+    _folders = [];
+    _loaded = false;
+  }
+
   /// 从本地加载所有收藏夹
   Future<List<FavoriteFolder>> loadFolders() async {
     if (_loaded) return List.unmodifiable(_folders);

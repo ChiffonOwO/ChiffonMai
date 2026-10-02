@@ -26,6 +26,7 @@ import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 import '../../widgets/PageTopBar.dart';
 import '../../service/AccountStore.dart';
 import '../../service/AccountSwitchService.dart';
+import '../../utils/SongFilterUtil.dart';
 
 class B50Page extends StatefulWidget {
   final Map<String, dynamic>? b50Data;
@@ -279,9 +280,14 @@ class _B50PageState extends State<B50Page> {
       // 过滤条件：
       // 1. 过滤掉id为6位数的歌曲（songId >= 100000，宴会场谱面）
       // 2. 过滤掉从maidata追加的歌曲（cids全为0）
+      // 3. 过滤掉 SongFilterUtil.theoreticalRatingExcludedIds 白名单里
+      //    强制不参与理论 Rating 的曲目（如 #11879）
       bool isMaidataSong = cids.isNotEmpty && cids.every((cid) => cid == 0);
       bool isExtra = song['is_extra'] == true;
-      if (songId >= 100000 || isMaidataSong || isExtra) {
+      if (songId >= 100000 ||
+          isMaidataSong ||
+          isExtra ||
+          SongFilterUtil.isTheoreticalRatingExcluded(song['id'].toString())) {
         continue;
       }
 

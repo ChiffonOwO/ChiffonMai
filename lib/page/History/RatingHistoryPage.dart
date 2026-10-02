@@ -1,6 +1,8 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import '../../service/AccountStore.dart';
+import '../../service/History/AwmcNetTrendService.dart';
 import '../../service/History/ChartHistoryCore.dart';
 import '../../service/History/ChartHistoryStore.dart';
 import '../../service/SongInfoService.dart';
@@ -50,6 +52,9 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
   bool _loading = true;
   List<RatingPoint> _all = const [];
   ChartHistorySummary? _summary;
+
+  /// 从 AWMC NET 拉趋势的进行中标志。用来锁按钮、避免重复点击。
+  bool _awmcSyncing = false;
 
   /// 当前理论 Rating / B35 / B15：手动录入的**上限**（不得超过）。
   ///
@@ -169,6 +174,95 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
     }
   }
 
+  /// 「从 AWMC NET 同步 Rating 趋势」按钮回调。
+  ///
+  /// 只在 [RefreshDataSource.awmc] 数据源下出现（其他源没有 AWMC NET 账号 → 没意义）。
+  /// 流程：取该源的 QQ → 拉 `/api/player/{qq}/trend` → 用
+  /// [ChartHistoryStore.recordRatingSeries] 批量并入 → 重新加载页面。
+  ///
+  /// ⚠️ **批量写入会按整秒压扁「连续同 rating」尾巴** —— 与单点 [recordRating] 的
+  /// 行为不同；详见 `recordRatingSeries` 注释。回填完后如果曲线尾巴出现意外变化，
+  /// 不要奇怪，那本来就是预期行为。
+  Future<void> _syncFromAwmcNet() async {
+    if (_awmcSyncing) return;
+    if (CurrentDataSourceNotifier.instance.value != RefreshDataSource.awmc) return;
+
+    // QQ 必须从**当前源**的账号存档拿，不能用活动槽里的 cachedQQ（详见
+    // RefreshDataDialog._fetchCurrentAwmcNetQQ 注释）
+    final metas = await AccountStore.loadAll();
+    final awmcQQ = metas[RefreshDataSource.awmc.key]?.id ?? '';
+    if (awmcQQ.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('AWMC NET 还没绑定 QQ，请先在「同步成绩到 AWMC NET」入口绑定')),
+        );
+      }
+      return;
+    }
+
+    setState(() => _awmcSyncing = true);
+    try {
+      // 默认拉 90 天：与 [_rangeDays] 默认值一致；用户切到「近 30 天 / 全部」再点的话，
+      // 不会把存量数据删掉（回填是**增量合并**，不是覆盖），所以拉窗口拉大点反而
+      // 把背景画得长一点。
+      final result = await fetchAwmcNetTrend(qqid: awmcQQ, days: 90);
+      if (!mounted) return;
+
+      if (result.points.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('AWMC NET 上 QQ $awmcQQ 近 90 天没有任何 Rating 记录'),
+        ));
+        return;
+      }
+
+      // 接口端的 `rating` 已经按 B35+B15 算好，直接存进 [RatingPoint]。
+      // B35 / B15 / recordCount 三个字段接口不给，留 0（手动补录时仍可填）。
+      final newPoints = result.points
+          .map((p) => RatingPoint(
+                tMs: p.tMs,
+                rating: p.rating,
+                best35: 0,
+                best15: 0,
+                recordCount: p.recordCount,
+              ))
+          .toList(growable: false);
+
+      final sourceKey = await ChartHistoryStore.storageKey();
+      final added =
+          await ChartHistoryStore.instance.recordRatingSeries(
+        newPoints: newPoints,
+        sourceKey: sourceKey,
+      );
+      if (!mounted) return;
+
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(added > 0
+            ? '已从 AWMC NET 同步 Rating 趋势，新增 $added 条'
+            : 'AWMC NET 没有新数据点（${result.points.length} 条都已记录过）'),
+      ));
+    } on AwmcNetTrendException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('同步失败：${e.message}')),
+        );
+      }
+    } catch (e) {
+      debugPrint('[RatingHistory] 从 AWMC NET 同步趋势失败：$e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('同步失败：$e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _awmcSyncing = false);
+      }
+    }
+  }
+
   /// 按时间范围裁剪（0 = 全部）。
   List<RatingPoint> get _visible {
     if (_rangeDays <= 0 || _all.isEmpty) return _all;
@@ -234,6 +328,7 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
   Widget _buildSourceBar(Brightness brightness) {
     final source = CurrentDataSourceNotifier.instance.value;
     final summary = _summary;
+    final showAwmcSync = source == RefreshDataSource.awmc;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -258,6 +353,19 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
                 ),
               ),
               const Spacer(),
+              // 仅 AWMC NET 数据源出现：拉取该 QQ 的 Rating 趋势并并入本地缓存。
+              if (showAwmcSync)
+                IconButton(
+                  tooltip: '从 AWMC NET 同步 Rating 趋势',
+                  icon: _awmcSyncing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.cloud_sync_outlined),
+                  onPressed: _awmcSyncing ? null : _syncFromAwmcNet,
+                ),
               IconButton(
                 tooltip: '添加历史记录',
                 icon: const Icon(Icons.add_chart_outlined),
@@ -278,9 +386,14 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
             ),
           const SizedBox(height: 4),
           Text(
-            '水鱼 / 落雪 / AWMC NET 按账号分别记录历史。'
-            '${summary?.firstRecordedText ?? ''}'
-            '（历史只能从现在开始攒：水鱼与落雪都不提供历史成绩接口）',
+            // 文案根据数据源动态化：AWMC 有趋势接口，可以回填；其他源只能从今天起攒。
+            showAwmcSync
+                ? '水鱼 / 落雪 / AWMC NET 按账号分别记录历史。'
+                    '${summary?.firstRecordedText ?? ''}'
+                    '（AWMC NET 数据源下可点右上角「云同步」按钮回填历史趋势）'
+                : '水鱼 / 落雪 / AWMC NET 按账号分别记录历史。'
+                    '${summary?.firstRecordedText ?? ''}'
+                    '（历史只能从现在开始攒：水鱼与落雪都不提供历史成绩接口）',
             style: TextStyle(
               fontSize: 11.5,
               color: AppColors.secondaryText(brightness),

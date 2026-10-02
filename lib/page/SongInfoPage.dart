@@ -35,6 +35,7 @@ import 'package:my_first_flutter_app/entity/FavoriteFolder.dart';
 import 'package:my_first_flutter_app/service/FavoriteFolderService.dart';
 import 'package:my_first_flutter_app/service/RankingList/SongRankingService.dart';
 import 'package:my_first_flutter_app/service/BiliSearchService.dart';
+import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/service/BiliRedisService.dart';
 import 'package:my_first_flutter_app/service/SongInfo/SongScoreShareService.dart';
 import 'package:my_first_flutter_app/service/SongInfo/SongInfoExportToImgService.dart';
@@ -50,6 +51,7 @@ import 'package:my_first_flutter_app/utils/ScoreInputValidator.dart';
 import 'package:my_first_flutter_app/utils/SongFilterUtil.dart';
 import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
 import 'package:my_first_flutter_app/widgets/ChartHistorySection.dart';
+import 'package:my_first_flutter_app/widgets/CommunityAvatar.dart';
 
 class SongInfoPage extends StatefulWidget {
   final String songId;
@@ -758,7 +760,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
     }
   }
 
-  // 加载参考时长（从落雪音频获取）
+  // 加载参考时长（从落雪音频获取；落雪失败时尝试 wmc 兜底）
+  //
+  // 优先级：本地 Redis 缓存 > 落雪 (assets2.lxns.net) > wmc.pub
+  // 任意一条路拿到 mp3，都走 [AudioPlayer.getDuration] 读时长，再走
+  // [BiliRedisService.saveReferenceDuration] 上传到 Redis 缓存 30 天。
   Future<void> _loadReferenceDuration() async {
     if (_referenceDurationLoading) return;
     _referenceDurationLoading = true;
@@ -781,9 +787,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
         return;
       }
 
-      // 2. Redis 未命中，通过落雪获取
+      // 2. 解析落雪 song id（与之前一样）
       final songType = _songData!['type'] ?? '';
-
       final songPlayService = SongPlayService();
       String? luoXueSongId;
 
@@ -802,48 +807,39 @@ class _SongInfoPageState extends State<SongInfoPage> {
       luoXueSongId ??=
           await songPlayService.findLuoXueSongId(songTitle, songType);
 
-      if (luoXueSongId == null) {
+      // 3. 落雪 → wmc 兜底：拿到一个 mp3 本地路径就停手
+      String? localMp3 = await _downloadAudioForDuration(
+        source: 'luoXue',
+        url: luoXueSongId != null
+            ? 'https://assets2.lxns.net/maimai/music/$luoXueSongId.mp3'
+            : null,
+        cacheFileName: luoXueSongId != null ? '$luoXueSongId.mp3' : null,
+      );
+      if (localMp3 == null) {
+        // 落雪走不通（luoXueSongId 解析失败 / 下载非 200） → 试 wmc.pub 兜底
+        debugPrint('[RefDuration] 落雪失败，尝试 wmc.pub 兜底: $songId');
+        localMp3 = await _downloadAudioForDuration(
+          source: 'wmc',
+          url: ApiUrls.wmcAudioUrl(songId),
+          cacheFileName: 'wmc_$songId.mp3',
+        );
+      }
+
+      if (localMp3 == null) {
+        debugPrint('[RefDuration] 落雪 + wmc 两条路都没拿到音频');
         setState(() {
           _referenceDurationLoading = false;
         });
         return;
       }
 
-      final audioUrl =
-          'https://assets2.lxns.net/maimai/music/$luoXueSongId.mp3';
-
-      final directory = await getApplicationDocumentsDirectory();
-      final cacheDir = Directory('${directory.path}/music_cache');
-      if (!cacheDir.existsSync()) {
-        cacheDir.createSync(recursive: true);
-      }
-      final cachedFilePath = '${cacheDir.path}/$luoXueSongId.mp3';
-
-      // 检查本地文件缓存
-      final cachedFile = File(cachedFilePath);
-      if (!cachedFile.existsSync()) {
-        // 下载音频文件
-        final httpClient = HttpClient();
-        final request = await httpClient.getUrl(Uri.parse(audioUrl));
-        final response = await request.close();
-
-        if (response.statusCode == HttpStatus.ok) {
-          final sink = cachedFile.openWrite();
-          await sink.addStream(response);
-          await sink.close();
-        } else {
-          setState(() {
-            _referenceDurationLoading = false;
-          });
-          return;
-        }
-      }
-
-      // 使用 AudioPlayer 获取时长
+      // 4. 用 AudioPlayer 取时长
       final audioPlayer = AudioPlayer();
-      await audioPlayer.setSource(DeviceFileSource(cachedFilePath));
+      await audioPlayer.setSource(DeviceFileSource(localMp3));
 
       final duration = await audioPlayer.getDuration();
+      audioPlayer.dispose();
+
       if (duration != null && mounted) {
         final seconds = duration.inSeconds;
         setState(() {
@@ -851,7 +847,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
           _referenceDurationLoading = false;
         });
 
-        // 3. 保存到 Redis（30天）
+        // 5. 保存到 Redis（30 天）—— 不管走的是落雪还是 wmc，存的都是同一份数据
         BiliRedisService().saveReferenceDuration(
           songId: songId,
           songTitle: songTitle,
@@ -862,8 +858,6 @@ class _SongInfoPageState extends State<SongInfoPage> {
           _referenceDurationLoading = false;
         });
       }
-
-      audioPlayer.dispose();
     } catch (e) {
       debugPrint('加载参考时长失败: $e');
       if (mounted) {
@@ -872,6 +866,44 @@ class _SongInfoPageState extends State<SongInfoPage> {
         });
       }
     }
+  }
+
+  /// 参考时长用的音频下载：仅当本地无缓存时联网拉，落盘到 music_cache。
+  /// 返回本地 mp3 路径；拿不到就返回 null（让调用方继续试兜底）。
+  Future<String?> _downloadAudioForDuration({
+    required String source, // 'luoXue' 或 'wmc'，仅 debug 用
+    required String? url,
+    required String? cacheFileName,
+  }) async {
+    if (url == null || cacheFileName == null) return null;
+
+    final directory = await getApplicationDocumentsDirectory();
+    final cacheDir = Directory('${directory.path}/music_cache');
+    if (!cacheDir.existsSync()) {
+      cacheDir.createSync(recursive: true);
+    }
+    final cachedFilePath = '${cacheDir.path}/$cacheFileName';
+    final cachedFile = File(cachedFilePath);
+
+    if (cachedFile.existsSync()) return cachedFilePath;
+
+    try {
+      final httpClient = HttpClient();
+      final request = await httpClient.getUrl(Uri.parse(url));
+      final response = await request.close();
+      if (response.statusCode == HttpStatus.ok) {
+        final sink = cachedFile.openWrite();
+        await sink.addStream(response);
+        await sink.close();
+        debugPrint('[RefDuration] $source 落盘成功: $cachedFilePath');
+        return cachedFilePath;
+      } else {
+        debugPrint('[RefDuration] $source 下载非 200: ${response.statusCode}, url=$url');
+      }
+    } catch (e) {
+      debugPrint('[RefDuration] $source 下载失败: $e, url=$url');
+    }
+    return null;
   }
 
   // 格式化参考时长显示
@@ -3067,7 +3099,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                                       .songId),
                                                                   _currentDiffIndex,
                                                                   userRecord[
-                                                                      'dxScore'])),
+                                                                      'dxScore']),
+                                                              Theme.of(context).brightness),
                                                             ),
                                                           ),
                                                         ],
@@ -3106,7 +3139,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                                       .songId),
                                                                   _currentDiffIndex,
                                                                   userRecord[
-                                                                      'dxScore'])),
+                                                                      'dxScore']),
+                                                              Theme.of(context).brightness),
                                                         ),
                                                       ),
                                                     ),
@@ -4861,27 +4895,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: isOwn
-                              ? AppColors.linkBlue(brightness).withOpacity(0.1)
-                              : brightness == Brightness.dark
-                                  ? Colors.grey.shade700
-                                  : Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: Icon(
-                          Icons.person,
-                          size: 20,
-                          color: isOwn
-                              ? AppColors.linkBlue(brightness)
-                              : brightness == Brightness.dark
-                                  ? Colors.grey[400]!
-                                  : Colors.grey.shade600,
-                        ),
-                      ),
+                      CommunityAvatar(avatarId: comment.avatarId, size: 36),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -4889,13 +4903,16 @@ class _SongInfoPageState extends State<SongInfoPage> {
                           children: [
                             Row(
                               children: [
-                                Text(
-                                  comment.nickname ??
-                                      '${comment.dataSource}:${comment.originalId}',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(context).colorScheme.onSurface,
+                                Flexible(
+                                  child: Text(
+                                    comment.displayName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context).colorScheme.onSurface,
+                                    ),
                                   ),
                                 ),
                                 if (isOwn) ...[
@@ -7200,8 +7217,16 @@ class _SongInfoPageState extends State<SongInfoPage> {
     return '\u2726 $nextStar -$diff';
   }
 
-  // 获取星星颜色
-  Color _getStarsColor(String stars) {
+  // 获取星星颜色。
+  //
+  // 评级越高越「重」：黄/橙/绿；★ 0 走中性灰（与同行的 `DX分数达成率` label
+  // 同样的颜色源 `onSurfaceVariant`，保持浅色模式下能看见）。
+  //
+  // ⚠️ **0 星这条在浅色模式下专门修了**：
+  // 原来写死 `Colors.grey`（=`Colors.grey[500]`=`#9E9E9E`），在 `Colors.white`
+  // 的卡片底上几乎看不见；而且 `default` 分支兜底是 `Colors.white` —— 纯白叠
+  // 纯白，无论何时都看不见，是个**潜伏 bug**。这里统一改成跟主题走。
+  Color _getStarsColor(String stars, Brightness brightness) {
     switch (stars) {
       case '\u2726 6':
       case '\u2726 5.5':
@@ -7214,9 +7239,12 @@ class _SongInfoPageState extends State<SongInfoPage> {
       case '\u2726 1':
         return Colors.green.shade300;
       case '\u2726 0':
-        return Colors.grey;
       default:
-        return Colors.white;
+        // `★ 0` 跟 `default` 走同一个灰：保证浅色下也跟得上 `onSurfaceVariant`
+        // 的对比度，深色下不会糊在暗底上。
+        return brightness == Brightness.dark
+            ? Colors.grey.shade400
+            : Colors.grey.shade700;
     }
   }
 

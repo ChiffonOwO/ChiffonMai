@@ -119,6 +119,43 @@ class AppTheme {
 
   // ========== ThemeData 构建 ==========
 
+  /// 页面转场：**显式指定，不要用框架默认值**（默认值 = 预测性返回）。
+  ///
+  /// ## 为什么必须显式指定
+  ///
+  /// 这个 Flutter 版本把 Android 的默认转场换成了
+  /// `PredictiveBackPageTransitionsBuilder`（见 `page_transitions_theme.dart`
+  /// 的 `_defaultBuilders`）。它会往**每一条路由**里塞一个
+  /// `_PredictiveBackGestureDetector`：返回手势一开始，框架就替系统"认领"这次
+  /// 手势（`WidgetsBinding.handleStartBackGesture` 返回 true），于是
+  ///   * 页面不再由系统画预览，而是**框架按手指进度自己缩放** —— 就是用户看到的
+  ///     「页面从四个角向内缩」（缩到 0.90 + 32px 圆角 + 右下位移）；
+  ///   * 框架**必须**等到平台发来 commit / cancel 才能退出这个状态。手势事件与
+  ///     路由 pop 之间是异步竞态（pop 过程中路由连同它的 detector 一起被释放，
+  ///     而 binding 里的观察者列表要到下一次手势开始才清空），一旦对不上，
+  ///     页面就停在缩了一半的位置、事件也被 Navigator 的 AbsorbPointer 吞掉 ——
+  ///     用户看到的就是「**返回手势之后 App 无法交互 / 卡死**」，而且
+  ///     **只在手势路径上出现**：按键返回时 `backEvent.isButtonEvent == true`，
+  ///     框架不认领，所以从来没出过事；「有概率」正是竞态的特征。
+  ///
+  /// ## 为什么换成 `FadeForwardsPageTransitionsBuilder`
+  ///
+  /// 它**就是框架自己在"没有手势"时的回落分支**：`PredictiveBackPageTransitionsBuilder
+  /// .buildTransitions` 里 `route.popGestureInProgress == false` 时走的就是它。
+  /// 所以普通 push / 返回按钮 / 手势提交之后的观感**一模一样**，只是不再参与
+  /// 预测性返回的手势认领（配合 AndroidManifest 里
+  /// `enableOnBackInvokedCallback="false"` 一起生效）。
+  ///
+  /// 回归测试：`test/page_transitions_test.dart`。
+  static PageTransitionsTheme _backGestureSafeTransitions() {
+    final builders = Map<TargetPlatform, PageTransitionsBuilder>.of(
+      const PageTransitionsTheme().builders,
+    );
+    builders[TargetPlatform.android] =
+        const FadeForwardsPageTransitionsBuilder();
+    return PageTransitionsTheme(builders: builders);
+  }
+
   static ThemeData lightTheme({Color? seedColor}) {
     final scheme = buildLightColorScheme(seedColor: seedColor);
     return ThemeData(
@@ -126,6 +163,7 @@ class AppTheme {
       brightness: Brightness.light,
       colorScheme: scheme,
       scaffoldBackgroundColor: Colors.transparent,
+      pageTransitionsTheme: _backGestureSafeTransitions(),
       cardTheme: CardThemeData(
         color: scheme.surfaceContainerLow,
         elevation: 0,
@@ -199,6 +237,7 @@ class AppTheme {
       brightness: Brightness.dark,
       colorScheme: scheme,
       scaffoldBackgroundColor: const Color(0xFF121220),
+      pageTransitionsTheme: _backGestureSafeTransitions(),
       cardTheme: CardThemeData(
         color: scheme.surfaceContainerLow,
         elevation: 0,
@@ -272,6 +311,7 @@ class AppTheme {
       brightness: Brightness.dark,
       colorScheme: scheme,
       scaffoldBackgroundColor: Colors.black,
+      pageTransitionsTheme: _backGestureSafeTransitions(),
       cardTheme: CardThemeData(
         color: scheme.surfaceContainerLow,
         elevation: 0,

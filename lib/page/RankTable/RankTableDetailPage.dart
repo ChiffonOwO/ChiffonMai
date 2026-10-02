@@ -7,6 +7,7 @@ import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
+import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
 
 class RankDetailPage extends StatefulWidget {
   final String rankName;
@@ -212,33 +213,9 @@ class _RankDetailPageState extends State<RankDetailPage> {
           
           Column(
             children: [
-              Container(
-                padding: EdgeInsets.fromLTRB(_paddingM, 48, _paddingM, _paddingS),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back, color: textPrimaryColor),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          widget.rankName,
-                          style: TextStyle(
-                            color: textPrimaryColor,
-                            fontSize: screenWidth * 0.06,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 48),
-                  ],
-                ),
-              ),
-              
+              // 标题栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
+              // 与 Best50 页、其余 50 多个页面同款。
+              PageTopBar(title: widget.rankName),
               Expanded(
                 child: Container(
                   margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL),

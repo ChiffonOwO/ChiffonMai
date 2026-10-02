@@ -126,6 +126,13 @@ class MaidataManager {
   /// songId → URL 映射缓存，避免增量刷新时重新抓取目录列表
   Map<String, String> _idToUrlMap = {};
 
+  /// 单曲 maidata 内存兜底：本地全量/单曲缓存都没命中时，从
+  /// [ApiUrls.wmcMaidataUrl] 拉一份回来塞这里。
+  /// **只在内存**——进程死掉即丢；用户可以在系统中心「maidata 管理」里清空。
+  /// 原因：单首曲子的兜底来源不在自家服务器上，长期落盘可能会跟上游漂移，
+  /// 下次启动重新按需拉一次更稳。
+  final Map<String, String> _wmcFallbackCache = {};
+
   /// 全量缓存文件路径（应用私有目录，不占 SharedPreferences 的 XML 空间）
   Future<File> _getCacheFile() async {
     final dir = await getApplicationDocumentsDirectory();
@@ -228,7 +235,19 @@ class MaidataManager {
     }
   }
 
-  Future<void> fetchAndCacheFullMaidata() async {
+  /// 全量拉取 maidata 并落盘。
+  ///
+  /// [onProgress] 分两个阶段：
+  ///   * 阶段 1（发现）：7 个流派的文件夹列表并行返回，此时总数还不存在，
+  ///     逐个流派上报「已发现数」且 `total` 为 0。板块目录本身要好几秒，
+  ///     不做这一档的话按钮上会一直空着，看起来像没点动。
+  ///   * 阶段 2（下载）：总数已确定，按「已下载 / 总数」上报。
+  ///
+  /// 文件数上千、`concurrency` 又是 100，按每批结束上报即可，不必逐文件回调，
+  /// 再叠一层 250ms 节流，避免高频 `setState` 把整页拖垮。
+  Future<void> fetchAndCacheFullMaidata({
+    void Function(int current, int total)? onProgress,
+  }) async {
     debugPrint('[DEBUG][MaidataManager] 开始获取全量maidata.txt...');
 
     final List<String> genrePaths = [
@@ -243,15 +262,62 @@ class MaidataManager {
 
     _cachedMaidata.clear();
 
-    // 流水线模式：每个流派获取到文件夹列表后立即开始下载 maidata.txt，
-    // 而不是等所有流派列表都返回后再统一下载。重叠网络IO。
     const int concurrency = 100;
     int totalFetched = 0;
     final Map<String, String> newUrlMap = {}; // 重建 songId→URL 映射
 
-    final allGenreResults = await Future.wait(
+    // 阶段 2 的「已下载 / 总数」。声明在 [report] 之前，供其闭包引用。
+    int urlsDiscovered = 0;
+    int urlsTotal = 0;
+
+    // 进度上报。**先累计、后节流显示**：计数本身永远是最新值，
+    // 被节流掉的只是「回调次数」。
+    //
+    // 这一点不能反过来写：阶段 2 是 7 个流派**并行**下载，若在累加之前就
+    // 按 250ms 提前 return，那第一个流派刷满窗口之后，其余流派紧接着完成的
+    // 几批连 `urlsDiscovered` 都不会加，按钮上的数字就卡住不动了。
+    int lastProgressMs = 0;
+    void report({bool force = false}) {
+      final callback = onProgress;
+      if (callback == null) return;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (!force && now - lastProgressMs < 250) return;
+      lastProgressMs = now;
+      callback(urlsDiscovered, urlsTotal);
+    }
+
+    // ── 阶段 1：先并行拿到各流派的文件夹列表，汇总出**准确的总文件数** ──
+    //
+    // 原实现是「每个流派的列表一到手就开始下载它自己的文件」的流水线，
+    // 重叠了这部分 IO；但那样总数是随各流派陆续返回而增长的：进度会先报成
+    // 300/120（超过 100%），再跳成 300/5000。
+    // 收益（省下几次目录请求的等待）远小于「进度看起来是错的」的代价，
+    // 所以改成两阶段 —— 目录请求本身仍是并行的。
+    int foldersFound = 0;
+    final genreFolders = await Future.wait(
       genrePaths.map((genrePath) async {
         final folders = await _getFoldersInPath(genrePath);
+        // 总数还没确定，先按「已发现」给个反馈，免得按钮上一直空着
+        foldersFound += folders.length;
+        if (onProgress != null) {
+          onProgress(foldersFound, 0);
+        }
+        return (genrePath, folders);
+      }),
+    );
+
+    urlsTotal = genreFolders.fold<int>(
+      0,
+      (sum, entry) => sum + entry.$2.length,
+    );
+
+    // ── 阶段 2：总数已定，并行下载 ──
+    report(force: true);
+
+    final allGenreResults = await Future.wait(
+      genreFolders.map((entry) async {
+        final genrePath = entry.$1;
+        final folders = entry.$2;
         if (folders.isEmpty) return <(String, String)>[];
 
         final urls = folders.map((f) => '$genrePath/$f/maidata.txt').toList();
@@ -269,12 +335,17 @@ class MaidataManager {
               results.add(r);
               // 记录 songId→URL 映射，供增量刷新使用
               newUrlMap[r.$1] = batch[j];
+              urlsDiscovered++;
             }
           }
+          report();
         }
         return results;
       }),
     );
+
+    // 收尾补报一次：最后几批可能被 250ms 节流吃掉，没这一步按钮上会停在中间数字。
+    report(force: true);
 
     // 汇总所有流派结果写入缓存
     for (final genreResults in allGenreResults) {
@@ -703,4 +774,50 @@ class MaidataManager {
       debugPrint('[DEBUG][MaidataManager] 清空缓存失败: $e');
     }
   }
+
+  // ============== 单曲兜底（wmc.pub，内存级） ==============
+
+  /// 兜底来源：本地全量/单曲缓存都没命中时，从 wmc.pub 拉一份。
+  /// 先查内存，再发请求；命中即写入内存缓存。
+  /// 返回清理后的 maidata 文本（跟 [getMaidata] 一样去掉了 `[DX]`/`[SD]`/`[宴]`/尾 `$`）。
+  Future<String?> getMaidataFromWmcFallback(String songId) async {
+    final cached = _wmcFallbackCache[songId];
+    if (cached != null) {
+      debugPrint('[MaidataManager] wmc 兜底命中内存, songId=$songId');
+      return _cleanMaidataContent(cached);
+    }
+    try {
+      final url = ApiUrls.wmcMaidataUrl(songId);
+      debugPrint('[MaidataManager] wmc 兜底请求: $url');
+      final response = await ApiClient.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final content = _decodeContent(response.bodyBytes);
+        // 必须能解析出 shortId 才算命中，否则当成垃圾丢掉
+        if (_extractSongId(content) == songId) {
+          _wmcFallbackCache[songId] = content;
+          debugPrint('[MaidataManager] wmc 兜底命中, songId=$songId, '
+              '内存缓存共 ${_wmcFallbackCache.length} 首');
+          return _cleanMaidataContent(content);
+        } else {
+          debugPrint('[MaidataManager] wmc 兜底返回但 shortId 不匹配, songId=$songId');
+        }
+      } else {
+        debugPrint('[MaidataManager] wmc 兜底非 200, songId=$songId, '
+            'status=${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('[MaidataManager] wmc 兜底请求失败, songId=$songId: $e');
+    }
+    return null;
+  }
+
+  /// 清空 wmc 兜底缓存（用户在系统中心「maidata 管理」里点按钮）。
+  void clearWmcFallbackCache() {
+    final n = _wmcFallbackCache.length;
+    _wmcFallbackCache.clear();
+    debugPrint('[MaidataManager] 已清空 wmc 兜底缓存，共 $n 首');
+  }
+
+  /// 内存里现存的 wmc 兜底曲数（只用于 UI 显示状态）。
+  int get wmcFallbackCacheCount => _wmcFallbackCache.length;
 }

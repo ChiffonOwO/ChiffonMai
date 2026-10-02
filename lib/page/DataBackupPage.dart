@@ -18,7 +18,17 @@ class _DataBackupPageState extends State<DataBackupPage> {
 
   bool _isExporting = false;
   bool _isImporting = false;
+
+  /// 已经确认、正在往 prefs 里写的那一段。
+  ///
+  /// 恢复是「先清空再逐键写入」，几百个键会明显卡一下。**这一段必须一直挂着
+  /// loading 且禁用按钮**：既不给用户「点了没反应、是不是卡死了」的错觉，
+  /// 也避免他连点两次、让两轮写入交错在同一份 prefs 上。
+  bool _isRestoring = false;
   String? _lastExportPath;
+
+  /// 任一导入/导出在进行中：两个按钮都要禁用，避免互相踩。
+  bool get _busy => _isExporting || _isImporting;
 
   @override
   Widget build(BuildContext context) {
@@ -91,7 +101,7 @@ class _DataBackupPageState extends State<DataBackupPage> {
                           subtitle: '将当前所有本地数据导出为 JSON 文件',
                           buttonText: _isExporting ? '导出中...' : '导出备份文件',
                           isLoading: _isExporting,
-                          onPressed: _handleExport,
+                          onPressed: _busy ? null : _handleExport,
                           color: AppColors.successGreen(brightness),
                         ),
 
@@ -134,13 +144,16 @@ class _DataBackupPageState extends State<DataBackupPage> {
                           icon: Icons.file_download,
                           title: '导入备份',
                           subtitle: '从 JSON 文件恢复之前备份的数据',
-                          buttonText: _isImporting ? '导入中...' : '选择备份文件',
-                          isLoading: _isImporting,
-                          onPressed: _handleImport,
+                          buttonText: _isRestoring
+                              ? '正在恢复数据...'
+                              : (_isImporting ? '导入中...' : '选择备份文件'),
+                          isLoading: _isImporting || _isRestoring,
+                          onPressed: _busy ? null : _handleImport,
                           color: AppColors.warningOrange(brightness),
                           warningText:
                               '⚠ 导入会先清空当前所有本地数据，再写入备份内容；\n'
-                              '　 备份里没有的项目（含各类缓存）会被一并抹掉。',
+                              '　 备份里没有的项目（含各类缓存）会被一并抹掉。\n'
+                              '　 恢复过程中请不要退出页面。',
                         ),
                       ],
                     ),
@@ -160,7 +173,7 @@ class _DataBackupPageState extends State<DataBackupPage> {
     required String subtitle,
     required String buttonText,
     required bool isLoading,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
     required Color color,
     String? warningText,
   }) {
@@ -412,16 +425,30 @@ class _DataBackupPageState extends State<DataBackupPage> {
       );
 
       if (confirm == true) {
-        final count = await _service.restoreData(backup['data']);
-        if (mounted) {
-          Fluttertoast.showToast(
-            msg: '数据恢复成功！共恢复 $count 项数据。\n请重启应用以确保数据完全生效。',
-            toastLength: Toast.LENGTH_LONG,
-          );
+        // 恢复期间一直挂 loading 并禁用按钮：这一段要逐键写 prefs，会明显卡一下，
+        // 不给反馈的话用户会以为「导入卡死」，还可能连点触发第二轮写入。
+        if (mounted) setState(() => _isRestoring = true);
+        try {
+          final count = await _service.restoreData(backup['data']);
+          // 把恢复到内存的各个单例重新读一遍：这些 Store 的保存都是整体写回，
+          // 不重载的话用户恢复后随手改一下，就会用旧值把刚导入的数据盖掉。
+          await _service.reloadAfterRestore();
+          if (mounted) {
+            Fluttertoast.showToast(
+              msg: '数据恢复成功！共恢复 $count 项数据。\n建议重启应用以确保完全生效。',
+              toastLength: Toast.LENGTH_LONG,
+            );
+          }
+        } finally {
+          if (mounted) setState(() => _isRestoring = false);
         }
-      }    } catch (e) {
+      }
+    } catch (e) {
       if (mounted) {
-        setState(() => _isImporting = false);
+        setState(() {
+          _isImporting = false;
+          _isRestoring = false;
+        });
         Fluttertoast.showToast(
           msg: '导入失败: ${e.toString().replaceFirst("Exception: ", "")}',
           toastLength: Toast.LENGTH_LONG,

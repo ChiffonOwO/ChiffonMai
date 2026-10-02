@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/constant/CacheKeyConstant.dart';
 import 'package:my_first_flutter_app/service/AccountStore.dart';
@@ -11,6 +13,7 @@ import 'package:my_first_flutter_app/service/History/ChartHistoryStore.dart';
 import 'package:my_first_flutter_app/service/PersonalizedScoreService.dart';
 import 'package:my_first_flutter_app/utils/CurrentDataSourceNotifier.dart';
 import 'package:my_first_flutter_app/utils/UserProfileNotifier.dart';
+import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -41,6 +44,7 @@ void main() {
   }
 
   setUp(() async {
+    ApiClient.debugClient = MockClient((_) async => http.Response('{}', 503));
     SharedPreferences.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();
     history = Directory.systemTemp.createTempSync('account_isolation_');
@@ -52,7 +56,9 @@ void main() {
     await AccountSwitchService.ensureMigrated();
   });
 
-  tearDown(() {
+  tearDown(() async {
+    await Future<void>.delayed(Duration.zero);
+    ApiClient.debugClient = null;
     expect(AccountSwitchService.isBusy, isFalse);
     ChartHistoryStore.instance.debugClearCache();
     ChartHistoryStore.debugDirectoryOverride = null;

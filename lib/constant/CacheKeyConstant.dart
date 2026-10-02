@@ -229,7 +229,8 @@ class CacheKeyConstant {
   static const String awmcNetImportToken = 'awmc_net_import_token';
 
   // ===== 同步成绩的线路选择 =====
-  // 0（或缺失）= 线路1 maimai Score Hub（原有 scorehub 流程），1 = 线路2 AWMC 网关
+  // 0 = 线路2 maimai Score Hub（原有 scorehub 流程），1 = 线路1 AWMC 网关
+  // 整数值沿用历史命名不换（详见 SyncRouteStore 顶部注释）。
   static const String syncRouteDivingFish = 'sync_route_diving_fish';
   static const String syncRouteLuoXue = 'sync_route_luoxue';
 

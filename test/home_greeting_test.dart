@@ -147,14 +147,14 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('没登录时显示「请登录水鱼账号」', (tester) async {
+  testWidgets('没登录时显示「请前往系统页获取账号数据」', (tester) async {
     await tester.binding.setSurfaceSize(const Size(360, 720));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(header(''));
     await tester.pump();
 
-    expect(find.textContaining('请登录水鱼账号'), findsOneWidget);
+    expect(find.textContaining('请前往系统页获取账号数据'), findsOneWidget);
     expect(find.textContaining('欢迎回来'), findsNothing);
   });
 }

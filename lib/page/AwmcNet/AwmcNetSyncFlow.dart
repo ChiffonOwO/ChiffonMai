@@ -34,7 +34,7 @@ class AwmcNetSyncOutcome {
 
 /// 「同步成绩到 AWMC NET」的完整流程：**输入在对话框、等待进度在按钮上**。
 ///
-/// 与另外两个同步入口（[AwmcSyncFlow] / 线路1 的 `executeDivingFishSync`）保持同一
+/// 与另外两个同步入口（[AwmcSyncFlow] / 线路2 的 `executeDivingFishSync`）保持同一
 /// 交互：输入对话框收起之后才开始跑，所以按钮可以安心切成「转圈 + 进度文案」，
 /// 用户也不会被一个模态框锁住 30 多秒。
 ///
@@ -67,7 +67,7 @@ class AwmcNetSyncFlow {
     //
     //    AWMC NET 查分器没有逐谱面次数（只有 `/api/player/{qq}` 的账号总计），
     //    唯一来源是 AWMC 网关的 `/v1/user/music`（4 Token）—— 而它正好需要
-    //    我们手上这张机台二维码。所以跟线路1 一样顺手拉一次：
+    //    我们手上这张机台二维码。所以跟线路2 一样顺手拉一次：
     //    **尽力而为、绝不 await、失败不弹提示**，别影响真正的导入。
     //
     //    ⚠️ 必须显式写 `source: awmc`：三类账号（水鱼 / 落雪 / AWMC NET）的
@@ -78,7 +78,7 @@ class AwmcNetSyncFlow {
     );
 
     // 3. 近 100 次统计：二维码直传自成一个槽位（`direct:awmc`），
-    //    不能混进线路1/线路2 —— 它一次要 30 多秒，会把网关那条的平均拉高。
+    //    不能混进线路2/线路1 —— 它一次要 30 多秒，会把网关那条的平均拉高。
     //    校验没过 / 用户取消的分支在上面就 return 了，所以不会被算成失败样本。
     final attempt = SyncAttemptTracker(
       line: SyncLine.direct,

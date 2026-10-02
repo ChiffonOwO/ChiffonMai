@@ -26,26 +26,26 @@ void main() {
   });
 
   group('线路记忆', () {
-    test('初次加载读 prefs，默认线路1', () async {
+    test('初次加载 prefs 为空 → 默认线路1（AWMC 网关）', () async {
       await SyncRouteNotifier.instance.ensureLoaded();
       expect(SyncRouteNotifier.instance.routeOf(SyncPlatform.divingFish),
-          SyncRouteStore.routeScoreHub);
+          SyncRouteStore.routeAwmc);
       expect(SyncRouteNotifier.instance.routeOf(SyncPlatform.luoXue),
-          SyncRouteStore.routeScoreHub);
+          SyncRouteStore.routeAwmc);
     });
 
-    test('用户上次选过线路2 → 加载时读回来', () async {
+    test('用户存过的线路2（Score Hub，值 0）→ 加载时原样读回来', () async {
       SharedPreferences.setMockInitialValues({
-        CacheKeyConstant.syncRouteDivingFish: 1,
+        CacheKeyConstant.syncRouteDivingFish: 0,
       });
       SyncRouteNotifier.instance.debugResetForTest();
       SyncRouteNotifier.instance.debugStatsLoader = (_) async => {};
       await SyncRouteNotifier.instance.ensureLoaded();
       expect(SyncRouteNotifier.instance.routeOf(SyncPlatform.divingFish),
-          SyncRouteStore.routeAwmc);
-      // 落雪没存过 → 仍是线路1（两条线路各自记忆）
-      expect(SyncRouteNotifier.instance.routeOf(SyncPlatform.luoXue),
           SyncRouteStore.routeScoreHub);
+      // 落雪没存过 → 默认线路1（两条线路各自记忆）
+      expect(SyncRouteNotifier.instance.routeOf(SyncPlatform.luoXue),
+          SyncRouteStore.routeAwmc);
     });
 
     test('切换线路会落盘 + 通知监听者', () async {
@@ -108,7 +108,7 @@ void main() {
       expect(stats.avgText, '2.0s');
     });
 
-    test('切到线路2 后取的是 AWMC 那一份统计', () async {
+    test('默认线路1（AWMC）；切到线路2 后取 Score Hub 那一份统计', () async {
       const hubStats = SyncStats(
         count: 10,
         successCount: 9,
@@ -134,14 +134,14 @@ void main() {
         '${SyncLine.awmc.key}:${SyncPlatform.divingFish.key}': awmcStats,
       });
 
-      // 默认线路1 → 看到 Score Hub 的统计
-      expect(SyncRouteNotifier.instance.statsFor(SyncPlatform.divingFish)!.count,
-          10);
-
-      await SyncRouteNotifier.instance
-          .setRoute(SyncPlatform.divingFish, SyncRouteStore.routeAwmc);
+      // 默认线路1（AWMC）→ 看到 AWMC 的统计
       expect(SyncRouteNotifier.instance.statsFor(SyncPlatform.divingFish)!.count,
           20);
+
+      await SyncRouteNotifier.instance
+          .setRoute(SyncPlatform.divingFish, SyncRouteStore.routeScoreHub);
+      expect(SyncRouteNotifier.instance.statsFor(SyncPlatform.divingFish)!.count,
+          10);
       // 落雪不在这个 map 里 → null
       expect(SyncRouteNotifier.instance.statsFor(SyncPlatform.luoXue), isNull);
     });
@@ -173,9 +173,9 @@ void main() {
       });
 
       expect(SyncRouteNotifier.instance.statsFor(SyncPlatform.awmc)!.count, 42);
-      // 用户把水鱼切到线路2 也不该影响 AWMC NET 那一份
+      // 用户把水鱼切到线路2（Score Hub）也不该影响 AWMC NET 那一份
       await SyncRouteNotifier.instance
-          .setRoute(SyncPlatform.divingFish, SyncRouteStore.routeAwmc);
+          .setRoute(SyncPlatform.divingFish, SyncRouteStore.routeScoreHub);
       expect(SyncRouteNotifier.instance.statsFor(SyncPlatform.awmc)!.count, 42);
       expect(SyncRouteNotifier.instance.statsFor(SyncPlatform.awmc)!.avgText,
           '36.0s');
@@ -210,19 +210,19 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('maimai Score Hub'), findsNWidgets(2));
-      // 水鱼那个切到线路2
+      expect(find.text('AWMC 网关'), findsNWidgets(2));
+      // 水鱼那个切到线路2（Score Hub）
       await tester.tap(find.text('线路2').first);
       await tester.pumpAndSettle();
 
-      // 两个 footer 里水鱼那个变成 AWMC 网关，落雪仍是 maimai Score Hub
+      // 两个 footer 里水鱼那个变成 maimai Score Hub，落雪仍是 AWMC 网关
       expect(find.text('AWMC 网关'), findsOneWidget);
       expect(find.text('maimai Score Hub'), findsOneWidget);
       expect(SyncRouteNotifier.instance.routeOf(SyncPlatform.divingFish),
-          SyncRouteStore.routeAwmc);
+          SyncRouteStore.routeScoreHub);
 
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getInt(CacheKeyConstant.syncRouteDivingFish), 1);
+      expect(prefs.getInt(CacheKeyConstant.syncRouteDivingFish), 0);
       expect(prefs.getInt(CacheKeyConstant.syncRouteLuoXue), isNull);
     });
 
@@ -259,15 +259,18 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('10样本'), findsOneWidget);
-      expect(find.textContaining('平均12.3s'), findsOneWidget);
+      // 默认线路1（AWMC）→ 看到 AWMC 的统计
+      expect(find.textContaining('20样本'), findsOneWidget);
+      expect(find.textContaining('平均5.0s'), findsOneWidget);
+      expect(find.textContaining('成功50%'), findsOneWidget);
 
       await tester.tap(find.text('线路2'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('20样本'), findsOneWidget);
-      expect(find.textContaining('平均5.0s'), findsOneWidget);
-      expect(find.textContaining('成功50%'), findsOneWidget);
+      // 切到线路2（Score Hub）→ 换成 Score Hub 的统计
+      expect(find.textContaining('10样本'), findsOneWidget);
+      expect(find.textContaining('平均12.3s'), findsOneWidget);
+      expect(find.textContaining('成功90%'), findsOneWidget);
     });
   });
 }

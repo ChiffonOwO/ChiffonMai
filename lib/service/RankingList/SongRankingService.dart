@@ -5,6 +5,7 @@ import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 import '../../utils/CurrentDataSourceNotifier.dart';
+import '../../utils/CommunityProfileUtil.dart';
 
 enum RankingType {
   achievementRate,
@@ -20,6 +21,7 @@ class RankingEntry {
   final String? fc;
   final String dataSource;
   final int updateTime;
+  final int avatarId;
 
   RankingEntry({
     required this.rank,
@@ -30,6 +32,7 @@ class RankingEntry {
     this.fc,
     required this.dataSource,
     required this.updateTime,
+    this.avatarId = CommunityProfileUtil.defaultAvatarId,
   });
 
   factory RankingEntry.fromJson(Map<String, dynamic> json) {
@@ -42,6 +45,7 @@ class RankingEntry {
       fc: json['fc'],
       dataSource: json['dataSource'] ?? parseDataSource(json['playerId'] ?? ''),
       updateTime: json['updateTime'] ?? 0,
+      avatarId: CommunityProfileUtil.avatarIdFromJson(json),
     );
   }
 }

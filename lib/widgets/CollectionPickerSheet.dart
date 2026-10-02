@@ -33,11 +33,107 @@ class _CollectionPickerSheetState extends State<CollectionPickerSheet> {
   // 状态放到 State 字段里，跟 sheet 实例生命周期绑定
   int _activeTab = 0; // 0=头像, 1=姓名框
 
+  /// 头像网格每行几列：默认 4 列，可用下方步进器在 3~10 之间调。
+  ///
+  /// 为什么有上下限：少于 3 列一屏看不了几个头像（默认 4 列已经比原来的 3 列密），
+  /// 多于 10 列时单个头像比网格间隙还小，只剩一片糊在一起的小图。
+  /// 姓名框 tab 不受它影响 —— 那是 6:1 的长条 banner，必须一行一个。
+  static const int _kDefaultAvatarColumns = 4;
+  static const int _kMinAvatarColumns = 3;
+  static const int _kMaxAvatarColumns = 10;
+  int _avatarColumns = _kDefaultAvatarColumns;
+
+  void _setAvatarColumns(int value) {
+    final next = value.clamp(_kMinAvatarColumns, _kMaxAvatarColumns);
+    if (next == _avatarColumns) return;
+    setState(() => _avatarColumns = next);
+  }
+
   void _switchTab(int tab) {
     setState(() {
       _activeTab = tab;
       widget.searchController.clear();
     });
+  }
+
+  /// 列数多时把网格间隙收窄：10 列时 8dp 间隙要吃掉 72dp（约两个半格子），
+  /// 头像会缩得比间隙还小，看着像一堆孤立的点。
+  double get _avatarGridGap => _avatarColumns >= 7 ? 4 : 8;
+
+  /// 「每行 N 列」的 +/− 步进器（头像 tab 专用）。
+  ///
+  /// 用 IconButton 而不是自绘按钮：`onPressed: null` 时它**自己**会变灰且点不动，
+  /// 触达区域、水波纹、tooltip 语义（无障碍）也都是现成的。
+  Widget _buildColumnStepper(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '每行',
+          style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+        ),
+        const SizedBox(width: 6),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: scheme.outlineVariant),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildStepperButton(
+                icon: Icons.remove,
+                tooltip: '减少每行头像数',
+                // 到下限就禁用（click 不会再进 _setAvatarColumns）
+                onPressed: _avatarColumns > _kMinAvatarColumns
+                    ? () => _setAvatarColumns(_avatarColumns - 1)
+                    : null,
+              ),
+              // 数字框至少 26dp 宽：个位数变两位数时两边按钮不会跟着抖。
+              // 用 minWidth 而不是死宽度 —— 系统字号放大到 2 倍时「10」需要更宽，
+              // 死宽度会把字切掉。
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 26),
+                child: Center(
+                  child: Text(
+                    '$_avatarColumns',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                ),
+              ),
+              _buildStepperButton(
+                icon: Icons.add,
+                tooltip: '增加每行头像数',
+                onPressed: _avatarColumns < _kMaxAvatarColumns
+                    ? () => _setAvatarColumns(_avatarColumns + 1)
+                    : null,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStepperButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback? onPressed,
+  }) {
+    return IconButton(
+      icon: Icon(icon, size: 18),
+      tooltip: tooltip,
+      onPressed: onPressed,
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints.tightFor(width: 34, height: 32),
+    );
   }
 
   Widget _buildTabButton({
@@ -120,17 +216,34 @@ class _CollectionPickerSheetState extends State<CollectionPickerSheet> {
       ),
       child: Column(
         children: [
-          // 标题栏 + 关闭按钮
+          // 标题栏 + 头像列数步进器 + 关闭按钮
+          //
+          // 步进器放标题这一行（而不是网格上方单独一行）：弹窗高度只有屏幕的 65%，
+          // 少一行就多给头像区域 ~40dp —— 那一行刚好能多显示半排头像。
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Row(
               children: [
-                Text('选择收藏品',
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primaryText(brightness))),
-                const Spacer(),
+                // ⚠️ 必须是 Expanded（不是 Flexible + Spacer）：
+                // 两者都带 flex，自由宽度会被**对半分**，标题只拿到一半
+                // （360dp 屏上约 27dp），于是「选择收藏品」被压成「选择…」——
+                // 明明右边还有空。Expanded 是唯一的 flex 子项，能吃掉**全部**剩余
+                // 宽度把按钮顶到最右；同时 maxLines/ellipsis 仍然兜住极窄屏 / 大字号的
+                // 溢出（那时才该省略）。
+                Expanded(
+                  child: Text('选择收藏品',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryText(brightness))),
+                ),
+                // 姓名框是 6:1 的长条 banner，固定一行一个，不显示列数步进器
+                if (_activeTab == 0) ...[
+                  _buildColumnStepper(context),
+                  const SizedBox(width: 4),
+                ],
                 IconButton(
                   icon: const Icon(Icons.close),
                   onPressed: () => Navigator.of(context).pop(),
@@ -198,7 +311,7 @@ class _CollectionPickerSheetState extends State<CollectionPickerSheet> {
               ),
             ),
           ),
-          // 搜索结果数量
+          // 搜索结果数量（只在搜索时出现，平时不占高度 —— 列数步进器已经挪到标题那行了）
           if (keyword.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -235,10 +348,10 @@ class _CollectionPickerSheetState extends State<CollectionPickerSheet> {
                     padding: const EdgeInsets.all(12),
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       // 姓名框是长条形 banner 图片，使用 1 列 + 宽高比 6:1 避免被裁切/拉伸
-                      // 头像保持 3 列正方形网格
-                      crossAxisCount: _activeTab == 0 ? 3 : 1,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
+                      // 头像列数由上方「每行」步进器决定（默认 4，可在 3~10 之间调）
+                      crossAxisCount: _activeTab == 0 ? _avatarColumns : 1,
+                      crossAxisSpacing: _activeTab == 0 ? _avatarGridGap : 8,
+                      mainAxisSpacing: _activeTab == 0 ? _avatarGridGap : 8,
                       childAspectRatio: _activeTab == 0 ? 1 : 6,
                     ),
                     itemCount: filteredItems.length,

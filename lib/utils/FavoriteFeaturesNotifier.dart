@@ -36,6 +36,9 @@ class FavoriteFeaturesNotifier {
   /// 表现为「星标莫名其妙没了」。加载时顺手替换掉。
   static const Map<String, String> _renamedTitles = {
     '成绩截图 OCR': '结算画面识别',
+    // 「maidata 管理」原名「刷新 maidata」。迁移键写没空格的，跟新键一致，
+    // 这样旧用户原来收藏的星标会自动落到新标题上。
+    '刷新 maidata': 'maidata管理',
   };
 
   /// 从 SharedPreferences 加载收藏列表（应用启动时调用一次）。

@@ -1453,20 +1453,21 @@ class PersonalizedBest50Service {
 
   /// PC50：游玩次数（`playCount`）最高的 50 张**谱面**（一张谱面 = 曲目 + 难度）。
   ///
-  /// `playCount` 是机台真实数据，App 里只有一个来源：**同步成绩的线路2
-  /// （AWMC 网关）** —— 它会先调 `/v1/user/music` 把 `(musicId, level) → playCount`
-  /// 落进 [AwmcPlayCountStore]。所以这里是「用户成绩记录 × 游玩次数缓存」的连接：
+  /// `playCount` 是机台真实数据，App 里只有一个来源：**AWMC 网关的
+  /// `/v1/user/music`** —— 线路1 同步时必拉，线路2 / AWMC NET 同步时顺带静默刷新。
+  /// 拿到后把 `(musicId, level) → playCount` 落进 [AwmcPlayCountStore]。
+  /// 所以这里是「用户成绩记录 × 游玩次数缓存」的连接：
   ///
   ///   * **以成绩记录为基准**：卡片要显示达成率 / RA / 星级，没有成绩的谱面没法展示
   ///     （游玩次数缓存里那些「有次数但本地没成绩」的谱面因此不会出现）；
-  ///   * **只保留查得到 playCount 的记录**：没同步过线路2 就是空；
+  ///   * **只保留查得到 playCount 的记录**：本机没有次数缓存就是空；
   ///   * extra（宴会场 / maidata 追加 / union 独有）不参与，与其它模式口径一致；
   ///   * 按 `playCount` 降序取前 50，并把 `playCount` 写回记录供卡片显示。
   Future<Map<String, dynamic>?> getPC50Data() async {
     try {
       await AwmcPlayCountStore.ensureLoaded();
       if (!AwmcPlayCountStore.hasData) {
-        debugPrint('PC50：还没有游玩次数缓存（需要先用线路2 · AWMC 网关同步一次成绩）');
+        debugPrint('PC50：还没有游玩次数缓存（需要先用线路1 · AWMC 网关同步一次成绩）');
         return null;
       }
 

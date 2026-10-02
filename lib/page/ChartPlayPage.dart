@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:media_scanner/media_scanner.dart';
 import 'package:path_provider/path_provider.dart';
@@ -11,6 +12,7 @@ import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/PlayerThemeScope.dart';
 import 'package:my_first_flutter_app/utils/RefreshRateUtil.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
+import 'package:my_first_flutter_app/api/ApiUrls.dart';
 
 class ChartPlayPage extends StatefulWidget {
   final String maidataContent;
@@ -61,6 +63,11 @@ class _ChartPlayPageState extends State<ChartPlayPage>
     // 谱面播放对帧率敏感：Flutter 引擎不会主动向系统要高刷，
     // 不投这一票就会一直在「几秒 120 → 掉 60」之间反复。
     RefreshRateUtil.requestMax();
+    // 锁竖屏：见 AGENTS.md § 5.3。SimaiPlayerPage 在横屏会自动进入
+    // SystemUiMode.immersiveSticky，那个模式会把屏幕边缘右滑全部吃掉用来
+    // 显示系统栏，导致返回手势永远不会派发 back 事件给 App —— 锁竖屏让它
+    // 永远走非全屏分支，返回手势才能用。
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     // 提前把上次的侧边栏设置读进内存，等控制器建好就能直接套用
     ChartPlaySettingsStore().load();
     _loadChart();
@@ -301,6 +308,7 @@ class _ChartPlayPageState extends State<ChartPlayPage>
       return;
     }
 
+    // 第一站：落雪音源（按 songId / title+type 找 luoXue song id）。
     try {
       final songPlayService = SongPlayService();
       String? luoXueSongId;
@@ -325,12 +333,18 @@ class _ChartPlayPageState extends State<ChartPlayPage>
       if (luoXueSongId != null) {
         _audioUrl = 'https://assets2.lxns.net/maimai/music/$luoXueSongId.mp3';
         debugPrint("Loaded audio URL: $_audioUrl");
-      } else {
-        debugPrint("No audio found for song: ${widget.songTitle}");
+        return;
       }
+      debugPrint("No luoXue audio found for song: ${widget.songTitle}");
     } catch (e) {
-      debugPrint("Error loading audio URL: $e");
+      debugPrint("Error loading audio URL from luoXue: $e");
     }
+
+    // 第二站（兜底）：wmc.pub —— luoXue 没命中就直接按 songId 拼 track.mp3。
+    // 不在这里落盘不缓存：单曲一次性下载、播完即丢，进程级生命周期就够。
+    // 也不加进系统中心「maidata 管理」（用户明确说了音源兜底不用管）。
+    _audioUrl = ApiUrls.wmcAudioUrl(widget.songId);
+    debugPrint("Fallback audio URL (wmc.pub): $_audioUrl");
   }
 
   Future<void> _loadBackgroundImage() async {
@@ -421,6 +435,13 @@ E
     PlayerThemeScope.forceDarkTheme.value = false;
     // 离开播放页就把刷新率交还系统，避免整个 App 一直顶着高刷耗电
     RefreshRateUtil.restore();
+    // 解除 initState 里的竖屏锁，让其它页面（视频播放等）能正常横屏
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     // 先把设置读出来写下去，再拆控制器——saveFrom 需要读控制器的当前值。
     // 这里不能 await，但 saveFrom 是同步跑到第一个 await 才挂起的，
     // capture 一定发生在 dispose 之前。

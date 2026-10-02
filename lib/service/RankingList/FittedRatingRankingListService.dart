@@ -6,6 +6,7 @@ import '../../constant/CacheTimestampConstant.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 import 'SongRankingService.dart' show parseDataSource;
+import '../../utils/CommunityProfileUtil.dart';
 
 /// 拟合总Rating排行榜的模式（对应服务端 fitted-ranking 的 mode 参数）
 enum FittedMode {
@@ -29,6 +30,7 @@ class FittedRankItem {
   final int officialRating;
   final int diff;
   final int updateTime;
+  final int avatarId;
 
   FittedRankItem({
     this.rank = 0,
@@ -40,6 +42,7 @@ class FittedRankItem {
     required this.officialRating,
     required this.diff,
     this.updateTime = 0,
+    this.avatarId = CommunityProfileUtil.defaultAvatarId,
   });
 
   factory FittedRankItem.fromJson(Map<String, dynamic> json) {
@@ -60,6 +63,7 @@ class FittedRankItem {
           _toInt(json['officialRating'] ?? json['official_rating'] ?? 0),
       diff: _toInt(json['diff'] ?? 0),
       updateTime: _toInt(json['updateTime'] ?? json['update_time'] ?? 0),
+      avatarId: CommunityProfileUtil.avatarIdFromJson(json),
     );
   }
 
@@ -81,6 +85,7 @@ class FittedRankItem {
       'officialRating': officialRating,
       'diff': diff,
       'updateTime': updateTime,
+      'avatarId': avatarId,
     };
   }
 }

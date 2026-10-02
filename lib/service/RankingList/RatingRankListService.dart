@@ -6,6 +6,7 @@ import '../../constant/CacheTimestampConstant.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 import 'package:my_first_flutter_app/utils/CurrentDataSourceNotifier.dart';
+import '../../utils/CommunityProfileUtil.dart';
 
 class RatingRankListService {
   // 缓存有效期：从常量文件读取（分钟转秒）
@@ -260,6 +261,7 @@ class RankItem {
   final int best35Rating;
   final int best15Rating;
   final String? updatedAt;
+  final int avatarId;
 
   RankItem({
     this.rank = 0,
@@ -271,6 +273,7 @@ class RankItem {
     required this.best35Rating,
     required this.best15Rating,
     this.updatedAt,
+    this.avatarId = CommunityProfileUtil.defaultAvatarId,
   });
 
   factory RankItem.fromJson(Map<String, dynamic> json) {
@@ -284,6 +287,7 @@ class RankItem {
       best35Rating: json['best35Rating'] ?? json['best35_rating'] ?? 0,
       best15Rating: json['best15Rating'] ?? json['best15_rating'] ?? 0,
       updatedAt: json['updatedAt'] ?? json['updated_at'],
+      avatarId: CommunityProfileUtil.avatarIdFromJson(json),
     );
   }
 
@@ -298,6 +302,7 @@ class RankItem {
       'best35Rating': best35Rating,
       'best15Rating': best15Rating,
       'updatedAt': updatedAt,
+      'avatarId': avatarId,
     };
   }
 }

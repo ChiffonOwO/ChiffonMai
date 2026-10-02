@@ -8,6 +8,7 @@
 | 功能 | 文件 | 说明 |
 | :--- | :--- | :--- |
 | 乐曲查询 | `lib/page/SongSearchPage.dart` | 检索舞萌曲库，可按名称/曲师/别名/标签/定数筛选 |
+| 国服更新对照 | `lib/page/UnionUpdateComparePage.dart` | 以水鱼最新曲为前沿（排除国服超前上线曲目），标出 union 独有（日服已上、国服未上）的曲目 |
 | 成绩查询 | `lib/page/UserScoreSearchPage.dart` | 查看个人游玩数据与历史成绩 |
 | 牌子进度 | `lib/page/PaiziProgressPage.dart` | 极/将/神/裏極等牌子达成情况，可导出长图 |
 | 个性化成绩查询 | `lib/page/PersonalizedScorePage.dart` | 按等级 / 谱师定制查询 |
@@ -67,9 +68,9 @@
 | :--- | :--- | :--- |
 | 刷新数据 | `lib/page/HomePage.dart` | 刷新当前页数据 |
 | 刷新 maidata | 同上 | 手动刷新所有 maidata 缓存 |
-| 同步成绩到水鱼 | 同上 | 机台 QR / DXNet Bot（**线路1 maimai Score Hub**） |
-| 同步成绩到落雪 | 同上 | 机台 QR（**线路1 maimai Score Hub**） |
-| 同步线路切换 | `lib/widgets/SyncRouteFooter.dart` | 水鱼 / 落雪各自独立记忆 线路1 maimai Score Hub / 线路2 AWMC 网关；hub 页与首页收藏区共用一份状态（`lib/utils/SyncRouteNotifier.dart`） |
+| 同步成绩到水鱼 | 同上 | 机台 QR / DXNet Bot（**线路2 maimai Score Hub**） |
+| 同步成绩到落雪 | 同上 | 机台 QR（**线路2 maimai Score Hub**） |
+| 同步线路切换 | `lib/widgets/SyncRouteFooter.dart` | 水鱼 / 落雪各自独立记忆 线路1 AWMC 网关 / 线路2 maimai Score Hub；hub 页与首页收藏区共用一份状态（`lib/utils/SyncRouteNotifier.dart`） |
 | 同步统计 | `lib/service/SyncStatsService.dart` | 近 100 次的平均耗时与成功率（Redis），跟随上面的线路切换 |
 | 登录水鱼 / 登出 | 同上 | OAuth / ImportToken |
 | 服务器状态 | `lib/page/MaimaiServerStatusPage.dart` | AWMC 状态查询 |
@@ -102,7 +103,7 @@
 | 凭据 | 令牌（本机保存 / 构建内置）+ 每次操作当场输入的二维码 | `lib/service/AWMC/AwmcStore.dart` |
 | 连通性/用量 | health、quota、usage、失败率、api-tokens（不计费） | `lib/service/AWMC/AwmcApiService.dart` |
 | 只读查询 | preview / data / region / music / charge / item-list / kaleidx-scope / game-event | 同上 |
-| 第三方同步（线路2） | `/v1/user/music` → `update-lx` / `update-fish` | `lib/page/Awmc/AwmcSyncFlow.dart` |
+| 第三方同步（线路1） | `/v1/user/music` → `update-lx` / `update-fish` | `lib/page/Awmc/AwmcSyncFlow.dart` |
 | 游玩次数缓存 | (musicId, level, playCount) 内存 + prefs | `lib/service/AWMC/AwmcPlayCountStore.dart` |
 | 响应实体 | `/v1/user/music` 的响应结构 | `lib/entity/AWMC/AwmcUserMusic.dart` |
 | 写入 | `music/upsert`、`music/delete`、`charge`、`ticket/clear` | `lib/page/Awmc/AwmcScoreWritePage.dart` |
@@ -116,22 +117,22 @@
 
 | 线路 | 走法 | 需要什么 |
 | :--- | :--- | :--- |
-| **线路1 maimai Score Hub** | 原有 scorehub 探针流程（chiffonmai.cloud → 水鱼 / 落雪） | 水鱼登录态 / 落雪 API Key |
-| **线路2 AWMC 网关** | 机台二维码直连 `api.wmc.pub` | AWMC 令牌 + 本机已缓存的第三方凭据 |
+| **线路1 AWMC 网关** | 机台二维码直连 `api.wmc.pub` | AWMC 令牌 + 本机已缓存的第三方凭据 |
+| **线路2 maimai Score Hub** | 原有 scorehub 探针流程（maimai.bakapiano.com → 水鱼 / 落雪） | 水鱼登录态 / 落雪 API Key |
 
-线路2 的流程（`AwmcSyncFlow`）：
+线路1 的流程（`AwmcSyncFlow`）：
 
-1. **直接复用线路1 的对话框**（`showDivingFishSyncInputDialog` /
+1. **直接复用线路2 的对话框**（`showDivingFishSyncInputDialog` /
    `showLuoXueSyncInputDialog`），一行文案都不多写——两个线路看到的界面完全一样；
 2. 凭据读本机缓存，不再让用户重复输入：水鱼用
-   `probe_diving_fish_import_token`（线路1 登录/绑定时写入），
-   落雪用 `probe_lxns_import_token`（线路1 落雪对话框在用户填写时落盘）；
+   `probe_diving_fish_import_token`（线路2 登录/绑定时写入），
+   落雪用 `probe_lxns_import_token`（线路2 落雪对话框在用户填写时落盘）；
 3. `POST /v1/user/music`（4 Token，顺便刷新「游玩次数」缓存）→
    `POST /v1/update-lx` 或 `/v1/update-fish`（5 Token），共 9 Token。
 
-> ⚠️ 对话框里的「参与排行榜 / 显示昵称」**只对线路1 生效**：
+> ⚠️ 对话框里的「参与排行榜 / 显示昵称」**只对线路2（Score Hub）生效**：
 > 官方 `/api/docs` 明确 `/v1/update-fish` 与 `/v1/update-lx` 只接收
-> `qrcode` + `token`/`key`。由于界面与线路1 完全相同，这里不再单独加提示文案，
+> `qrcode` + `token`/`key`。由于界面与线路2 完全相同，这里不再单独加提示文案，
 > 差异记在本文档里。
 
 **`/v1/user/music` 的实测口径**（实体见 `AwmcUserMusic.dart`）：
@@ -143,8 +144,9 @@
 
 `AwmcPlayCountStore` 把 `(musicId, level) → playCount` 存内存 + prefs
 （键 `awmc_play_counts_v1`，属于可重新拉取的缓存，**不进备份**——它与账号绑定）。
-刷新的时机：线路2 同步、AWMC 控制台的「成绩列表」查询、成绩写入页的
-「读取现有成绩」——都复用同一份响应，不额外花 Token。
+刷新的时机：线路1 同步、AWMC 控制台的「成绩列表」查询、成绩写入页的
+「读取现有成绩」——都复用同一份响应，不额外花 Token。线路2 的同步也会
+**顺手静默刷新**一次（走 AWMC 令牌，失败静默忽略）。
 
 渲染位置：`lib/page/SongInfoPage.dart` 的「玩家最佳成绩」板块，
 **`Rating: xxx` 下面单起一行**显示 `游玩次数: N`；该难度没有记录时整行不显示
@@ -178,10 +180,10 @@ chiffonmai:sync_stats:<line>:<platform>     # line: scorehub|awmc, platform: fis
   反之亦然；
 * 4 个组合的统计只拉一次（`ensureLoaded()` 幂等），谁先加载完另一边直接复用，
   不会两个页面各拉一遍；
-* 两个页面的点击都按**当前线路**分发（线路1 → 原有 scorehub 流程 / 线路2 →
-  `AwmcSyncFlow`），不存在「显示线路1 却走了线路2」的可能。
+* 两个页面的点击都按**当前线路**分发（线路1 → `AwmcSyncFlow` /
+  线路2 → 原有 scorehub 流程），不存在「显示线路1 却走了线路2」的可能。
 
-> 线路1 水鱼的样本在**对话框内部**上报（`SyncScoreDialogs.showDivingFishSyncDialog`）：
+> 线路2 水鱼的样本在**对话框内部**上报（`SyncScoreDialogs.showDivingFishSyncDialog`）：
 > 只有它知道最终是 `completed` / `failed` / `cancelled`（调用方拿到的是好友码）。
 > 放在对话框里，从首页 / 我的 / 系统 hub 任一入口打开都算进同一份统计；
 > hub 页按钮流在「缺 ImportToken → 转交对话框」时**不再**记那条失败样本，
@@ -191,7 +193,7 @@ chiffonmai:sync_stats:<line>:<platform>     # line: scorehub|awmc, platform: fis
 * Redis 连不上 → 显示「统计不可用」（而不是冒充「暂无记录」）；
 * 用户主动取消同步**不计样本**（算失败会拉低成功率、误导看统计的人），
   「只是还没绑定 ImportToken」同理（紧接着会重来一次）；
-* 线路1 水鱼/落雪的耗时含抓取 + 推送全程；线路2 的耗时含
+* 线路2 水鱼/落雪的耗时含抓取 + 推送全程；线路1 的耗时含
   `/v1/user/music` + `update-*` 两次调用；
 * 统计是**尽力而为**：写失败只丢一条样本，绝不影响同步本身。
 
@@ -203,7 +205,7 @@ chiffonmai:sync_stats:<line>:<platform>     # line: scorehub|awmc, platform: fis
 口径细节：
 * Redis 连不上 → 显示「统计不可用」（而不是冒充「暂无记录」）；
 * 用户主动取消同步**不计样本**（算失败会拉低成功率、误导看统计的人）；
-* 线路1 水鱼/落雪的耗时含抓取 + 推送全程；线路2 的耗时含
+* 线路2 水鱼/落雪的耗时含抓取 + 推送全程；线路1 的耗时含
   `/v1/user/music` + `update-*` 两次调用；
 * 统计是**尽力而为**：写失败只丢一条样本，绝不影响同步本身。
 

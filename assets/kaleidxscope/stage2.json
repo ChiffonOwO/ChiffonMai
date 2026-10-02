@@ -1,0 +1,341 @@
+{
+  "formatVersion": 1,
+  "sourceUrl": "https://kaleidxscope.awmc.team/index.html",
+  "sourceRepository": "https://github.com/AWMC-TEAM/KALEIDXSCOPE",
+  "sourceCommit": "5c0baff2795502b2b9b8b1baa8845c09e1917c74",
+  "updatedAt": "2026-10-01",
+  "scheduleStatus": "estimated",
+  "songTitles": {
+    "1736": "プリズム△▽リズム",
+    "1819": "AFTER PANDORA",
+    "10835": "Believe the Rainbow",
+    "11309": "前衛的Landscape",
+    "11310": "Trick tear",
+    "11311": "躯樹の墓守",
+    "11392": "Metamorphosism",
+    "11393": "白花の天使",
+    "11394": "World's end loneliness",
+    "11395": "Jouez Avec Moi?",
+    "11534": "The Great Banquet",
+    "11535": "Redemption",
+    "11536": "Ether Second",
+    "11537": "Straight into the lights",
+    "11739": "184億回のマルチトニック",
+    "11740": "果ての空、僕らが見た光。",
+    "11744": "Deicide",
+    "11745": "氷滅の135小節",
+    "11749": "有明/Ariake",
+    "11752": "雨露霜雪",
+    "11753": "宙天",
+    "11808": "Feel The Luv",
+    "11809": "Åntinomiε",
+    "11813": "忙シー日",
+    "11814": "FLΛME/FRΦST",
+    "11815": "IMBRUED:FLUX",
+    "11816": "砂の函",
+    "11817": "Amereistr",
+    "11818": "World's end BLACKBOX",
+    "11820": "Xaleid◆scopiX",
+    "11821": "Ref:rain (for 7th Heaven)",
+    "11879": "Xaleid◆scopiX (2)"
+  },
+  "gates": [
+    {
+      "color": "prism",
+      "name": "プリズムタワー",
+      "displayName": "07 棱镜塔",
+      "doorName": "プリズムタワー",
+      "sourceUrl": "https://kaleidxscope.awmc.team/PRISMKALEIDXSCOPE/index.html",
+      "songs": {
+        "gate": [],
+        "track1": [
+          11310,
+          11309,
+          11395,
+          11393,
+          11392,
+          11534,
+          11535,
+          11536,
+          11815,
+          11816
+        ],
+        "track2": [
+          11311,
+          11394,
+          11537,
+          11817
+        ],
+        "track3": [
+          11818
+        ]
+      },
+      "challenges": [
+        {
+          "name": "棱镜塔挑战条件（来源推算）",
+          "phases": [
+            {
+              "startDate": "2026-10-01",
+              "endDate": "2026-10-03",
+              "difficulty": "MASTER",
+              "lifeTarget": 1
+            },
+            {
+              "startDate": "2026-10-04",
+              "endDate": "2026-10-06",
+              "difficulty": "MASTER",
+              "lifeTarget": 10
+            },
+            {
+              "startDate": "2026-10-07",
+              "endDate": "2026-10-09",
+              "difficulty": "MASTER",
+              "lifeTarget": 30
+            },
+            {
+              "startDate": "2026-10-10",
+              "endDate": "2026-10-13",
+              "difficulty": "MASTER",
+              "lifeTarget": 50
+            },
+            {
+              "startDate": "2026-10-14",
+              "endDate": "2026-10-20",
+              "difficulty": "EXPERT",
+              "lifeTarget": 100
+            },
+            {
+              "startDate": "2026-10-21",
+              "endDate": null,
+              "difficulty": "BASIC",
+              "lifeTarget": 999
+            }
+          ]
+        }
+      ],
+      "specialSongs": [],
+      "frameImageUrl": null,
+      "frameCollectionId": null,
+      "frameCollectionType": null,
+      "prerequisite": "通关蓝、白、紫、黑、黄、红六门；完成 7sRef 区域 4 第 27 格（2000km）使棱镜塔出现。",
+      "keyRequirement": "六门全部通关后取得挑战资格。",
+      "track1Desc": "从 7sRef 区域 1–4 的课题曲池随机选择，排除 ヨミビトシラズ。",
+      "track2Desc": "从 7sRef 各区域完美挑战曲池随机选择。",
+      "track3Desc": "固定 World's end BLACKBOX（DX，ID 11818）。",
+      "guideNote": "Stage 2 · Phase #7。通关后进入 Phase #???（ERROR），再通关 ERROR 后出现希望之门。\n来源站将国行放宽日期标为推算，以下时间表不是官方确认值；以游戏内实际条件为准。开放时间为 2026-10-01 10:00（北京时间），后续条件预计在对应日期 04:00 切换。"
+    },
+    {
+      "color": "error",
+      "name": "■■■の扉",
+      "displayName": "08 乱码之门 · ERROR",
+      "doorName": "■■■の扉",
+      "sourceUrl": "https://kaleidxscope.awmc.team/ERRORKALEIDXSCOPE/index.html",
+      "songs": {
+        "gate": [],
+        "track1": [
+          11739,
+          11744,
+          11752,
+          11808,
+          11813,
+          11817
+        ],
+        "track2": [
+          11740,
+          11745,
+          11749,
+          11753,
+          11809,
+          11814,
+          11818
+        ],
+        "track3": [
+          11879
+        ]
+      },
+      "challenges": [],
+      "specialSongs": [],
+      "frameImageUrl": null,
+      "frameCollectionId": null,
+      "frameCollectionType": null,
+      "prerequisite": "通关棱镜塔（Phase #7）后立即出现隐藏相位 Phase #??? : ERROR。",
+      "keyRequirement": "无需另找钥匙；本相位出现后，通关前不能从列表重选。",
+      "track1Desc": "从 PRiSM / PRiSM PLUS 区域完美挑战曲随机选择。",
+      "track2Desc": "从六门和棱镜塔已解锁的课题曲随机选择。",
+      "track3Desc": "固定乱码特殊谱面 Xaleid◆scopiX (2)（DX，ID 11879），与最终相 ID 11820 不同。",
+      "guideNote": "本页含剧情剧透。前两首选曲时不显示历史成绩；第三首的歌曲信息被乱码遮蔽，出现从 2:38 开始的红色倒计时。倒计时结束后进入异常配置和剧情蓝屏，随后提示「サイゴノキボウ ヲミツケテ」，引导希望之门。未通关最终曲时，结算显示 D / 0.0000%，最终曲不进入拍照或 DX NET 游玩记录。来源未给出本相位独立 LIFE 放宽表，故不套用其它门的推算表。"
+    },
+    {
+      "color": "hope",
+      "name": "希望の扉",
+      "displayName": "09 希望之门",
+      "doorName": "希望の扉",
+      "sourceUrl": "https://kaleidxscope.awmc.team/HOPKALEIDXSCOPE/index.html",
+      "songs": {
+        "gate": [],
+        "track1": [
+          1736
+        ],
+        "track2": [
+          10835
+        ],
+        "track3": [
+          1819
+        ]
+      },
+      "challenges": [
+        {
+          "name": "希望之门挑战条件（来源推算）",
+          "phases": [
+            {
+              "startDate": "2026-10-01",
+              "endDate": "2026-10-03",
+              "difficulty": "MASTER",
+              "lifeTarget": 1
+            },
+            {
+              "startDate": "2026-10-04",
+              "endDate": "2026-10-06",
+              "difficulty": "MASTER",
+              "lifeTarget": 10
+            },
+            {
+              "startDate": "2026-10-07",
+              "endDate": "2026-10-09",
+              "difficulty": "MASTER",
+              "lifeTarget": 30
+            },
+            {
+              "startDate": "2026-10-10",
+              "endDate": "2026-10-13",
+              "difficulty": "MASTER",
+              "lifeTarget": 50
+            },
+            {
+              "startDate": "2026-10-14",
+              "endDate": "2026-10-20",
+              "difficulty": "EXPERT",
+              "lifeTarget": 100
+            },
+            {
+              "startDate": "2026-10-21",
+              "endDate": null,
+              "difficulty": "BASIC",
+              "lifeTarget": 999
+            }
+          ]
+        }
+      ],
+      "specialSongs": [],
+      "frameImageUrl": null,
+      "frameCollectionId": null,
+      "frameCollectionType": null,
+      "prerequisite": "先通关棱镜塔，再通关 Phase #???（ERROR）。",
+      "keyRequirement": "国行直接出现希望之门，无需 DX PASS 实体卡。",
+      "track1Desc": "固定 プリズム△▽リズム（标准谱面，ID 1736）。",
+      "track2Desc": "固定 Believe the Rainbow（DX，ID 10835）。",
+      "track3Desc": "固定 AFTER PANDORA（标准谱面，ID 1819，曲师：削除）。",
+      "guideNote": "来源站入口编号为 09，游戏内阶段为 Stage 2 · Phase #8；三首均为固定曲目，不进行随机选曲。\n来源站将国行放宽日期标为推算，以下时间表不是官方确认值；以游戏内实际条件为准。开放时间为 2026-10-01 10:00（北京时间），后续条件预计在对应日期 04:00 切换。"
+    },
+    {
+      "color": "final",
+      "name": "KALEIDXSCOPE FINAL SEQUENCE",
+      "displayName": "10 最终相 · KALEIDXSCOPE",
+      "doorName": "KALEIDXSCOPE FINAL SEQUENCE",
+      "sourceUrl": "https://kaleidxscope.awmc.team/FINALKALEIDXSCOPE/index.html",
+      "songs": {
+        "gate": [],
+        "track1": [
+          11820
+        ],
+        "track2": [],
+        "track3": []
+      },
+      "challenges": [
+        {
+          "name": "最终相挑战条件（来源推算）",
+          "phases": [
+            {
+              "startDate": "2026-10-01",
+              "endDate": "2026-10-02",
+              "difficulty": "Re:MASTER",
+              "lifeTarget": 1,
+              "target": 1
+            },
+            {
+              "startDate": "2026-10-03",
+              "endDate": "2026-10-04",
+              "difficulty": "Re:MASTER",
+              "lifeTarget": 5,
+              "target": 5
+            },
+            {
+              "startDate": "2026-10-05",
+              "endDate": "2026-10-05",
+              "difficulty": "Re:MASTER",
+              "lifeTarget": 10,
+              "target": 10
+            },
+            {
+              "startDate": "2026-10-06",
+              "endDate": "2026-10-06",
+              "difficulty": "Re:MASTER",
+              "lifeTarget": 30,
+              "target": 30
+            },
+            {
+              "startDate": "2026-10-07",
+              "endDate": "2026-10-10",
+              "difficulty": "MASTER",
+              "lifeTarget": 30,
+              "target": 30
+            },
+            {
+              "startDate": "2026-10-11",
+              "endDate": "2026-10-12",
+              "difficulty": "MASTER",
+              "lifeTarget": 50,
+              "target": 50
+            },
+            {
+              "startDate": "2026-10-13",
+              "endDate": "2026-10-14",
+              "difficulty": "MASTER",
+              "lifeTarget": 100,
+              "target": 100
+            },
+            {
+              "startDate": "2026-10-15",
+              "endDate": "2026-10-21",
+              "difficulty": "EXPERT",
+              "lifeTarget": 100,
+              "target": 999
+            },
+            {
+              "startDate": "2026-10-22",
+              "endDate": null,
+              "difficulty": "BASIC",
+              "lifeTarget": 999,
+              "target": 999
+            }
+          ]
+        }
+      ],
+      "specialSongs": [
+        {
+          "songId": 11821,
+          "role": "reward"
+        }
+      ],
+      "frameImageUrl": null,
+      "frameCollectionId": null,
+      "frameCollectionType": null,
+      "prerequisite": "通关希望之门（Phase #8）后直接解锁。",
+      "keyRequirement": "国行无需额外 DX PASS 实体卡。",
+      "track1Desc": "单曲 Xaleid◆scopiX（DX，ID 11820，曲师：xi）；初始课题为 Re:MASTER，定数 15.0。",
+      "track2Desc": null,
+      "track3Desc": null,
+      "guideNote": "最终相只有一首课题曲，不是三首课程。前半按通常方式扣 LIFE；中途暂停并回满 LIFE 后进入后半，后半所有非 Critical Perfect 判定也扣 LIFE。通关后播放 ALL COMPLETE，解锁搭档 Ris 与 Ref:rain (for 7th Heaven)。放宽表的双数值表示前半 / 后半 LIFE。\n来源站将国行放宽日期标为推算，以下时间表不是官方确认值；以游戏内实际条件为准。开放时间为 2026-10-01 10:00（北京时间），后续条件预计在对应日期 04:00 切换。"
+    }
+  ]
+}

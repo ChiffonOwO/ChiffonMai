@@ -157,4 +157,61 @@ void main() {
           reason: '第 ${at}ms 处的停顿不能有前置空隙（实测 ${gap.toStringAsFixed(1)}px）');
     }
   });
+
+  /// `HubActionTile` 的进度计数格式。
+  ///
+  /// 钉住两件事：文案是带括号的 `(current / total)`，以及进度条本身会出现。
+  /// 括号是使用方明确要求的格式（「在按钮上显示进度（xxx / xxx）」），
+  /// 而 `progressTotal` 为 0 时必须**退回转圈**而不是显示 `(0 / 0)`。
+  group('HubActionTile 进度计数', () {
+    Widget host({
+      int? current,
+      int? total,
+      bool loading = true,
+    }) {
+      return MaterialApp(
+        home: Scaffold(
+          body: HubActionTile(
+            title: 'maidata 管理',
+            subtitle: '重新拉取 chiffonmai.cloud 集',
+            icon: Icons.tune_rounded,
+            onTap: () {},
+            loading: loading,
+            loadingText: '正在从 chiffonmai.cloud 拉取...',
+            progressCurrent: current,
+            progressTotal: total,
+          ),
+        ),
+      );
+    }
+
+    testWidgets('有总数时显示「(current / total)」+ 进度条', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(host(current: 300, total: 5000));
+
+      expect(find.text('(300 / 5000)'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      // 进入进度模式后 loadingText 让位，不再同时出现两行文案
+      expect(find.text('正在从 chiffonmai.cloud 拉取...'), findsNothing);
+
+      final bar = tester.widget<LinearProgressIndicator>(
+        find.byType(LinearProgressIndicator),
+      );
+      expect(bar.value, closeTo(300 / 5000, 1e-9));
+    });
+
+    testWidgets('总数未知（0）时退回 loadingText + 转圈，不显示 (0 / 0)',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(host(current: 1234, total: 0));
+
+      expect(find.text('(1234 / 0)'), findsNothing);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
+  });
 }

@@ -9,8 +9,8 @@ import 'package:path_provider/path_provider.dart';
 import '../entity/DXRating/DXDataEntity.dart';
 import '../manager/DXDataManager.dart';
 
-/// 一份索引（`基础 songId → imageName`）及其生成时间。
-typedef CoverIndexSource = ({Map<String, String> index, DateTime? at});
+/// 一份索引（`基础 songId → imageName`）、生成时间，以及它取自哪一版目录。
+typedef CoverIndexSource = ({Map<String, String> index, DateTime? at, String? etag});
 
 /// 曲绘的**最后一道网络兜底**：dxrating（shama）曲绘图。
 ///
@@ -33,9 +33,15 @@ typedef CoverIndexSource = ({Map<String, String> index, DateTime? at});
 ///   2. **本地更新**：运行时若基线过期，尽力更新一次并落盘（`dxrating_cover_index_v1.json`），
 ///      之后优先用这份更新的；
 ///   3. 两份索引都在 [cacheTtl] 内时**完全不联网**；
-///   4. 曲绘图走 `dxRatingCoverCacheManager`（独立磁盘缓存，30 天 / 1000 张）；
-///   5. 索引里查不到的 songId **不构造 URL**（返回 null），
+///   4. 需要更新时先让 `DXDataManager` 用 **HEAD + ETag** 判断目录变了没有
+///      （见那里的注释）：没变就**零正文下载**，直接用手里的目录重建索引；
+///   5. 曲绘图走 `dxRatingCoverCacheManager`（独立磁盘缓存，30 天 / 1000 张）；
+///   6. 索引里查不到的 songId **不构造 URL**（返回 null），
 ///      避免拿注定 404 的地址去敲服务器。
+///
+/// ⚠️ 刻意**不**挂进「刷新数据」流程（试过又撤了）：那一刻用户正在等，
+/// 而这条链最多要下 4MB（慢网下 HEAD 也可能卡很久），会明显拖慢刷新。
+/// 索引更新只在曲绘真的没图时（惰性）发生，且 ETag 一致时零下载。
 class DxRatingCoverService {
   DxRatingCoverService._();
 
@@ -172,26 +178,48 @@ class DxRatingCoverService {
     // 过期 / 两份都没有 → 一个会话一次的机会去更新
     if (!allowNetwork || _networkAttempted) return;
     _networkAttempted = true;
+    await _updateIndex();
+  }
+
+  /// 重建索引：目录变了没有交给 `DXDataManager` 用 HEAD + ETag 判断。
+  ///
+  /// 于是有三种结局，代价依次上升：
+  ///   * 目录没变（ETag 一致 / 304）→ **零正文下载**，直接用手里这份目录重建；
+  ///   * 本地连副本都没有 → 下 4MB；
+  ///   * 拿不到 ETag（HEAD 被墙/异常）→ 退回普通 GET。
+  /// 目录没变时这里连网络都不用碰：`DXDataManager` 的磁盘副本就够重建。
+  Future<bool> _updateIndex() async {
     try {
       final loader = debugDxDataLoader;
-      final data =
-          loader != null ? await loader() : await DXDataManager().load();
+      final DXDataEntity? data;
+      String? sourceEtag;
+      if (loader != null) {
+        data = await loader();
+      } else {
+        final manager = DXDataManager();
+        await manager.checkForUpdate(force: true);
+        data = manager.data;
+        sourceEtag = manager.etag;
+      }
       if (data == null) {
         debugPrint('[DxCover] dxdata 拉取失败，继续用现有索引（${_index.length} 条）');
-        return;
+        return false;
       }
       final fresh = buildIndex(data);
       if (fresh.isEmpty) {
         debugPrint('[DxCover] dxdata 没有可用的 imageName，保留现有索引');
-        return;
+        return false;
       }
       _index = fresh;
       _indexLoaded = true;
       _satisfied = true;
-      await _writeLocalIndex(fresh);
-      debugPrint('[DxCover] 索引已更新：${fresh.length} 条');
+      await _writeLocalIndex(fresh, etag: sourceEtag);
+      debugPrint('[DxCover] 索引已更新：${fresh.length} 条'
+          '（目录 etag=${sourceEtag ?? '未知'}）');
+      return true;
     } catch (e) {
       debugPrint('[DxCover] 索引更新失败（忽略）: $e');
+      return false;
     }
   }
 
@@ -265,7 +293,10 @@ class DxRatingCoverService {
       final at = atMs != null
           ? DateTime.fromMillisecondsSinceEpoch(atMs)
           : (atText is String ? DateTime.tryParse(atText) : null);
-      return (index: index, at: at);
+      // etag = 这份索引取自哪一版目录（诊断用；「要不要更新」由 DXDataManager
+      // 用它自己的 ETag 判断，不依赖这里）
+      final etag = decoded['etag'];
+      return (index: index, at: at, etag: etag is String ? etag : null);
     } catch (e) {
       debugPrint('[DxCover] 解析索引失败（忽略）: $e');
       return null;
@@ -283,13 +314,15 @@ class DxRatingCoverService {
     }
   }
 
-  Future<void> _writeLocalIndex(Map<String, String> index) async {
+  Future<void> _writeLocalIndex(Map<String, String> index,
+      {String? etag}) async {
     try {
       final file = await cacheFile();
       await file.writeAsString(jsonEncode({
         'v': cacheVersion,
         'savedAt': DateTime.now().millisecondsSinceEpoch,
         'count': index.length,
+        'etag': etag,
         'images': index,
       }));
     } catch (e) {
