@@ -4,6 +4,7 @@ import '../../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../../manager/DivingFish/UserPlayDataManager.dart';
 import '../../utils/StringUtil.dart';
 import 'DiffBest50Service.dart';
+import '../../utils/SongFilterUtil.dart';
 
 /// 理想 Best50：对全部游玩记录做「非 SSS+ 升一档」（升到上一档的下限），
 /// 重算 RA 后重新取 B35 + B15，并给出相对原榜的新进榜歌曲。
@@ -55,6 +56,8 @@ class IdealBest50Service {
     final origRaByKey = <String, int>{};
 
     for (final r in records) {
+      // 宴会场谱面没有正式 Rating，不能因为缓存里带有高分就进入 Ideal Best50。
+      if (SongFilterUtil.isUtageSong(r.songId.toString())) continue;
       final isNew = isNewById[r.songId.toString()] ?? false;
       final idealAch = bumpTier(r.achievements.toDouble());
       final idealRa = calc.calculateSingleRating(r.ds, idealAch);

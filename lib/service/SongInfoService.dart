@@ -13,8 +13,8 @@ import 'package:my_first_flutter_app/manager/DivingFish/DiffMusicDataManager.dar
 import 'package:my_first_flutter_app/manager/LuoXue/CollectionsManager.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
+import 'package:my_first_flutter_app/utils/ExternalLaunchUtil.dart';
 import 'package:my_first_flutter_app/utils/CurrentDataSourceNotifier.dart';
 import 'package:my_first_flutter_app/utils/ScoreInputValidator.dart';
 import '../utils/CommunityProfileUtil.dart';
@@ -529,15 +529,11 @@ class SongInfoService {
         'bilibili://search?keyword=${Uri.encodeComponent(searchQuery)}');
 
     // 尝试打开B站应用
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-    } else {
+    if (!await ExternalLaunchUtil.open(url)) {
       // 如果无法打开B站应用，尝试在浏览器中打开
       final webUrl = Uri.parse(
           'https://search.bilibili.com/all?keyword=${Uri.encodeComponent(searchQuery)}');
-      if (await canLaunchUrl(webUrl)) {
-        await launchUrl(webUrl);
-      }
+      await ExternalLaunchUtil.open(webUrl);
     }
   }
 

@@ -18,7 +18,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # of the product and file versions while build-number is used as the build suffix.
 
 # version: 1.12.2+35
-version: 2.5.0+43
+version: 2.6.0+45
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -31,6 +31,8 @@ environment:
 # versions available, run `flutter pub outdated`.
 dependencies:
   flutter:
+    sdk: flutter
+  flutter_localizations:
     sdk: flutter
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -48,13 +50,13 @@ dependencies:
   # 基础依赖：扫描文件并通知系统更新
   media_scanner: ^2.2.0
   # 图表库
-  syncfusion_flutter_charts: ^20.1.61
   fl_chart: ^1.1.1
   archive: ^4.0.9
   marquee: ^2.3.0
   flutter_screenutil: ^5.2.0 # 屏幕适配
   shared_preferences: ^2.4.1 # 本地存储
   shared_preferences_android: ^2.4.21 # 猜歌设置使用 apply() 异步写入 Android 偏好
+  flutter_secure_storage: ^9.2.4 # 登录令牌与导入密钥使用系统安全存储
   url_launcher: ^6.3.2
   # 网络图片缓存
   cached_network_image: ^3.3.1  
@@ -77,6 +79,7 @@ dependencies:
   kana_kit: ^2.1.1
   jp_transliterate: ^1.0.5
   simai_flutter: ^0.4.1
+  flame: 1.37.0
   redis: ^4.0.0
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
@@ -89,7 +92,7 @@ dependencies:
   safe_text: ^2.1.5
   image_picker: ^1.1.2
   image: ^4.5.3
-  mobile_scanner: ^7.2.0
+  mobile_scanner: 7.2.0
   geolocator: ^14.0.2
   geocoding: ^5.0.0
   charset: ^2.0.1
@@ -183,4 +186,4 @@ flutter_launcher_icons:
   ios: true      # 开启iOS图标生成
   image_path: "assets/icon.png"  # 基础图标路径（2048×2048px）
   adaptive_icon_background: "#FFFFFF"      # Android 自适应图标背景色（可选）
-  adaptive_icon_foreground: "assets/icon.png"  # Android 自适应图标前景（可选）
+  adaptive_icon_foreground: "assets/icon.png"  # Android 自适应图标前景（可选）`r`n

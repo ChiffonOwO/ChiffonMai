@@ -1,3 +1,4 @@
+import '../widgets/AnimatedChoiceBar.dart';
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 
@@ -5,12 +6,19 @@ import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 class ExportQualityResult {
   /// JPEG 质量值 (0-100)，null 表示 PNG 无损
   final int? jpegQuality;
+
   /// 显示标签
   final String label;
+
+  /// Best50 导出时是否采用雷霆模式（单列 50 行或单行 50 列）。
+  final bool thunderMode;
+  final bool thunderVertical;
 
   const ExportQualityResult({
     required this.jpegQuality,
     required this.label,
+    this.thunderMode = false,
+    this.thunderVertical = true,
   });
 
   /// 预设选项列表
@@ -48,10 +56,16 @@ class ExportQualitySelector {
   static Future<ExportQualityResult?> show(
     BuildContext context, {
     required int estimatedPngSize,
+    String? exportingLabel,
+    bool enableThunderMode = false,
+    bool initialThunderMode = false,
+    bool initialThunderVertical = true,
   }) async {
     int? selectedIndex = 0; // 默认选中 PNG
+    var thunderMode = initialThunderMode;
+    var thunderVertical = initialThunderVertical;
 
-    final result = await showModalBottomSheet<int>(
+    final result = await showModalBottomSheet<_ExportSelection>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
@@ -85,8 +99,7 @@ class ExportQualitySelector {
                   ),
                   // 标题
                   const Padding(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                     child: Text(
                       '选择导出质量',
                       style: TextStyle(
@@ -95,6 +108,18 @@ class ExportQualitySelector {
                       ),
                     ),
                   ),
+                  if (exportingLabel != null &&
+                      exportingLabel.trim().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                      child: Text(
+                        '当前正在导出：$exportingLabel',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
                   const Divider(),
                   // 选项列表
                   ...List.generate(
@@ -105,50 +130,88 @@ class ExportQualitySelector {
                           estimatedPngSize, preset.jpegQuality);
                       final isSelected = selectedIndex == i;
 
-                      return ListTile(
-                        selected: isSelected,
-                        selectedTileColor:
-                            Theme.of(context).colorScheme.primaryContainer,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        leading: Icon(
-                          isSelected
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_unchecked,
-                          color: isSelected
-                              ? Theme.of(context).colorScheme.primary
-                              : Colors.grey[500],
-                        ),
-                        title: Text(
-                          preset.label,
-                          style: TextStyle(
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                            fontSize: 16,
-                          ),
-                        ),
-                        subtitle: Text(
-                          '预计大小: $estimatedSize',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isSelected
-                                ? Theme.of(context).colorScheme.primary
-                                : Colors.grey[600],
-                          ),
-                        ),
-                        trailing: isSelected
-                            ? Icon(
-                                Icons.check_circle,
-                                color:
-                                    Theme.of(context).colorScheme.primary,
-                              )
-                            : null,
-                        onTap: () => setState(() => selectedIndex = i),
-                      );
+                      return AnimatedContainer(
+                          duration: const Duration(milliseconds: 240),
+                          decoration: BoxDecoration(
+                              color: isSelected
+                                  ? Theme.of(context)
+                                      .colorScheme
+                                      .primaryContainer
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8)),
+                          child: ListTile(
+                            selected: isSelected,
+                            selectedTileColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            leading: FadeContent(
+                                child: Icon(
+                              key: ValueKey(isSelected),
+                              isSelected
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_unchecked,
+                              color: isSelected
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                            )),
+                            title: Text(
+                              preset.label,
+                              style: TextStyle(
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                fontSize: 16,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '预计大小: $estimatedSize',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: isSelected
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                              ),
+                            ),
+                            trailing: isSelected
+                                ? Icon(
+                                    Icons.check_circle,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
+                                  )
+                                : null,
+                            onTap: () => setState(() => selectedIndex = i),
+                          ));
                     },
                   ),
+                  if (enableThunderMode) ...[
+                    const Divider(),
+                    SwitchListTile(
+                      value: thunderMode,
+                      onChanged: (value) => setState(() => thunderMode = value),
+                      title: const Text('雷霆模式'),
+                      subtitle: const Text('将歌曲卡片改为单列 50 行或单行 50 列，适合超长图片'),
+                    ),
+                    if (thunderMode)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: SegmentedButton<bool>(
+                          segments: const [
+                            ButtonSegment<bool>(
+                                value: true, label: Text('单列 50 行')),
+                            ButtonSegment<bool>(
+                                value: false, label: Text('单行 50 列')),
+                          ],
+                          selected: {thunderVertical},
+                          onSelectionChanged: (values) =>
+                              setState(() => thunderVertical = values.first),
+                        ),
+                      ),
+                  ],
                   const Divider(),
                   // 底部按钮
                   Padding(
@@ -158,10 +221,9 @@ class ExportQualitySelector {
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: () => Navigator.pop(ctx, -1),
+                            onPressed: () => Navigator.pop(ctx, null),
                             style: OutlinedButton.styleFrom(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 14),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
                             child: const Text(
                               '取消',
@@ -172,11 +234,16 @@ class ExportQualitySelector {
                         const SizedBox(width: 16),
                         Expanded(
                           child: FilledButton(
-                            onPressed: () =>
-                                Navigator.pop(ctx, selectedIndex),
+                            onPressed: () => Navigator.pop(
+                              ctx,
+                              _ExportSelection(
+                                selectedIndex: selectedIndex!,
+                                thunderMode: thunderMode,
+                                thunderVertical: thunderVertical,
+                              ),
+                            ),
                             style: FilledButton.styleFrom(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 14),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
                             child: const Text(
                               '确认导出',
@@ -195,11 +262,17 @@ class ExportQualitySelector {
       },
     );
 
-    if (result == null || result < 0) {
+    if (result == null) {
       return null; // 用户取消
     }
 
-    return ExportQualityResult.presets[result];
+    final preset = ExportQualityResult.presets[result.selectedIndex];
+    return ExportQualityResult(
+      jpegQuality: preset.jpegQuality,
+      label: preset.label,
+      thunderMode: result.thunderMode,
+      thunderVertical: result.thunderVertical,
+    );
   }
 
   /// 获取预估文件大小的显示文本
@@ -211,4 +284,16 @@ class ExportQualitySelector {
         ImageEncodeUtil.estimateJpegSize(pngSize, jpegQuality);
     return ImageEncodeUtil.formatFileSize(estimatedJpegSize);
   }
+}
+
+class _ExportSelection {
+  final int selectedIndex;
+  final bool thunderMode;
+  final bool thunderVertical;
+
+  const _ExportSelection({
+    required this.selectedIndex,
+    required this.thunderMode,
+    required this.thunderVertical,
+  });
 }

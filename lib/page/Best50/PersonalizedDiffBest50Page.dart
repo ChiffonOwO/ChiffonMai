@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import '../../service/Best50/PersonalizedDiffBest50Service.dart';
@@ -18,7 +17,7 @@ import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 import 'package:my_first_flutter_app/utils/TextStyleUtil.dart';
 import '../../widgets/B50GameCardWidget.dart';
-import '../../widgets/PageTopBar.dart';
+import '../../widgets/BackgroundPageScaffold.dart';
 
 class PersonalizedDiffBest50Page extends StatefulWidget {
   const PersonalizedDiffBest50Page({super.key});
@@ -282,6 +281,8 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
       final quality = await ExportQualitySelector.show(
         context,
         estimatedPngSize: ImageEncodeUtil.estimatePngSize(songCount: _diffSongs.length),
+        exportingLabel: '个性化拟合 Best50',
+        enableThunderMode: true,
       );
       if (quality == null) return;
 
@@ -310,6 +311,8 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
         _diffSongs,
         _maimaiMusicData,
         jpegQuality: quality.jpegQuality,
+        thunderMode: quality.thunderMode,
+        thunderVertical: quality.thunderVertical,
       );
 
       // 关闭加载指示器
@@ -379,37 +382,18 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
     cardPadding = screenWidth * 0.02;
     fontSizeBase = screenWidth * 0.035;
 
-    final double borderRadiusSmall = 8.0;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '个性化拟合Best50查询',
       resizeToAvoidBottomInset: false,
-      body: Stack(
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
+      ),
+      child: Stack(
         children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏
-              PageTopBar(
-                title: '个性化拟合Best50查询',
-              ),
-
-              // 内容区域 - 卡片占满可用高度，空状态内容居中显示
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [AppColors.defaultShadow(brightness)],
-                  ),
-                  padding: EdgeInsets.all(screenWidth * 0.03),
-                  child: Column(
+          // 内容区域 - 卡片占满可用高度，空状态内容居中显示
+          Padding(
+            padding: EdgeInsets.all(screenWidth * 0.03),
+            child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // 标签选择按钮（始终在顶部）
@@ -462,10 +446,7 @@ class _PersonalizedDiffBest50PageState extends State<PersonalizedDiffBest50Page>
                           ),
                         ),
                     ],
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
 
           // 加载中遮罩（覆盖在卡片之上）

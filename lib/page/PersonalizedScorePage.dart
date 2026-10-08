@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/SmoothLinearProgressIndicator.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/services.dart';
@@ -7,18 +8,16 @@ import 'package:my_first_flutter_app/service/PersonalizedScoreService.dart';
 import 'package:my_first_flutter_app/service/PersonalizedScoreConvertToImgService.dart';
 import 'package:my_first_flutter_app/constant/LoadingTipsConstant.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
-import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
 import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 import 'package:my_first_flutter_app/widgets/SearchPickerDialog.dart';
-import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/BackgroundPageScaffold.dart';
 
 class PersonalizedScorePage extends StatefulWidget {
   const PersonalizedScorePage({super.key});
@@ -363,35 +362,13 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
     _textSizeL = 14.0 * _scaleFactor;
     _coverSize = 56.0 * _scaleFactor;
 
-    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
-              // 与 Best50 页、其余 50 多个页面同款。
-              PageTopBar(title: '个性化成绩查询'),
-
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(_borderRadiusSmall),
-                    boxShadow: [
-                      AppConstants.defaultShadow(brightness),
-                    ],
-                  ),
-                  child: _isLoading
+    return BackgroundPageScaffold(
+      title: '个性化成绩查询',
+      resizeToAvoidBottomInset: false,
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
+      ),
+      child: _isLoading
                       ? Center(child: CircularProgressIndicator())
                       : SingleChildScrollView(
                           padding: EdgeInsets.all(_paddingM),
@@ -437,12 +414,6 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                             ],
                           ),
                         ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -1742,6 +1713,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
       final quality = await ExportQualitySelector.show(
         context,
         estimatedPngSize: ImageEncodeUtil.estimatePngSize(songCount: songCount, cardsPerRow: 12),
+        exportingLabel: '个性化成绩',
       );
       if (quality == null) return;
 
@@ -1783,7 +1755,7 @@ class _PersonalizedScorePageState extends State<PersonalizedScorePage> {
                       ],
                     ),
                     SizedBox(height: 16.0),
-                    LinearProgressIndicator(
+                    SmoothLinearProgressIndicator(
                       value: _progressValue > 0 ? _progressValue : null,
                       backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                       valueColor: AlwaysStoppedAnimation(Theme.of(context).colorScheme.primary),

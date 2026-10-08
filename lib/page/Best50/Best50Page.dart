@@ -6,7 +6,6 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
@@ -23,10 +22,11 @@ import '../../utils/TextStyleUtil.dart';
 import '../../entity/DivingFish/RecordItem.dart';
 import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
-import '../../widgets/PageTopBar.dart';
+import '../../widgets/BackgroundPageScaffold.dart';
 import '../../service/AccountStore.dart';
 import '../../service/AccountSwitchService.dart';
 import '../../utils/SongFilterUtil.dart';
+import '../../widgets/SmoothLinearProgressIndicator.dart';
 
 class B50Page extends StatefulWidget {
   final Map<String, dynamic>? b50Data;
@@ -489,32 +489,20 @@ class _B50PageState extends State<B50Page> {
     final brightness = Theme.of(context).brightness;
 
     if (_isLoading) {
-      return Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
+      return const BackgroundPageScaffold(
+        title: 'Best50 查询',
+        resizeToAvoidBottomInset: false,
+        child: Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_b50Data == null || (_dxSongs.isEmpty && _sdSongs.isEmpty)) {
-      // 空状态：与 DiffBest50Page 风格完全一致
-      // （common bg widget + 同样的顶部栏 + 同样的居中提示）
-      return Scaffold(
-        backgroundColor: Colors.transparent,
-        resizeToAvoidBottomInset: false,
-        body: Stack(
-          children: [
-            CommonWidgetUtil.buildCommonBgWidget(),
-            CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-            Column(
-              children: [
-                // 顶部栏：与 DiffBest50Page 同款（左侧返回按钮 + 居中标题）
-                PageTopBar(
-                  title: 'Best50 查询',
-                ),
-                Expanded(
-                  child: Center(
+      // 空状态与正常内容共用背景和顶部栏。
+      return BackgroundPageScaffold(
+      title: 'Best50 查询',
+      resizeToAvoidBottomInset: false,
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -543,40 +531,14 @@ class _B50PageState extends State<B50Page> {
                       ],
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
+    );
     }
 
-    final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
-    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: _isTheoreticalMode ? '理论Rating Best50' : 'Best50查询',
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          Column(
-            children: [
-              // 顶部栏统一走公共组件（标题是三元表达式，直接传进去）
-              PageTopBar(
-                title: _isTheoreticalMode ? '理论Rating Best50' : 'Best50查询',
-              ),
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
-                  ),
-                  child: SingleChildScrollView(
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: SingleChildScrollView(
                     padding:
                         EdgeInsets.all(MediaQuery.of(context).size.width * 0.03),
                     child: Column(
@@ -607,12 +569,6 @@ class _B50PageState extends State<B50Page> {
                       ],
                     ),
                   ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -1222,22 +1178,14 @@ class _B50PageState extends State<B50Page> {
                         SizedBox(width: 8.0),
                         Expanded(
                           flex: 6,
-                          child: Container(
-                            height: 20.0,
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(10.0),
-                            ),
-                            child: FractionallySizedBox(
-                              widthFactor: percentage / 100,
-                              alignment: Alignment.centerLeft,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: barColor,
-                                  borderRadius: BorderRadius.circular(10.0),
-                                ),
-                              ),
-                            ),
+                          child: SmoothLinearProgressIndicator(
+                            value: (percentage / 100).clamp(0.0, 1.0),
+                            minHeight: 20.0,
+                            color: barColor,
+                            backgroundColor: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(10.0),
                           ),
                         ),
                         SizedBox(width: 8.0),
@@ -1886,7 +1834,7 @@ class _B50PageState extends State<B50Page> {
 
       // Show quality selector first
       final estimatedPngSize = ImageEncodeUtil.estimatePngSize(songCount: 50, hasHeader: true, hasUserInfo: !_isTheoreticalMode);
-      final quality = await ExportQualitySelector.show(context, estimatedPngSize: estimatedPngSize);
+      final quality = await ExportQualitySelector.show(context, estimatedPngSize: estimatedPngSize, exportingLabel: _isTheoreticalMode ? '拟合 Best50' : 'Best50', enableThunderMode: true);
       if (quality == null) return; // user cancelled
 
       showDialog(
@@ -1912,6 +1860,8 @@ class _B50PageState extends State<B50Page> {
         _maimaiMusicData,
         isTheoreticalMode: _isTheoreticalMode,
         jpegQuality: quality.jpegQuality,
+        thunderMode: quality.thunderMode,
+        thunderVertical: quality.thunderVertical,
       );
 
       // 先关闭"导出中"对话框

@@ -2,15 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../utils/CommonWidgetUtil.dart';
-import '../utils/AppTheme.dart';
+import '../utils/ExternalLaunchUtil.dart';
 import '../widgets/PageTopBar.dart';
 
-/// 关于本APP页面
-///
-/// 自上而下的顺序：app 图标 → app 名称 → 版本号 → 简介 → 特别致谢 → 开发者。
-/// 其余（核心功能表、安装方式、隐私说明、许可证、免责声明等）已移除。
+/// 关于页：品牌介绍、维护者与致谢分组直接布局在主题背景上。
 class AboutAppPage extends StatefulWidget {
   const AboutAppPage({super.key});
 
@@ -45,10 +41,9 @@ class _AboutAppPageState extends State<AboutAppPage> {
       'ChiffonMai 是一款专为 舞萌DX 2026（maimai DX 2026）玩家打造的一站式移动端工具类应用，'
       '聚合了曲库查询、成绩统计、Rating 计算、曲目推荐等多种实用功能，助力玩家提升游玩体验。';
 
-  /// 特别致谢（排名不分先后）
+  /// 特别致谢（排名不分先后）。
   ///
-  /// 文案规则：统一用「提供 xxx」，不写「提供的 xxx」——「提供」在这里是动词，
-  /// 加「的」会把它变成定语，读起来像名词短语，跟后半句的动词不顺。
+  /// 创作与支持、数据与服务分组由页面分别截取，捐献名单单独维护。
   static const List<_Credit> _credits = [
     _Credit('Xn1xUfguF1GiNg', '为本 APP 提供背景图和戚风小狐狸（真的非常可爱）',
         'https://huajia.163.com/main/profile/RrwM5xQB'),
@@ -57,17 +52,20 @@ class _AboutAppPageState extends State<AboutAppPage> {
     _Credit('MYD', '提供用于测试开发的个人游玩数据'),
     _Credit('乐观的熊猫', '提议开发 ChiffonMai，为本项目诞生提供最初契机',
         'https://space.bilibili.com/438391224'),
+    _Credit('迪拉熊重度依赖', '为本APP在前端细节与交互体验上提供的诸多宝贵建议'),
     _Credit('水鱼查分器', '提供曲目数据库和玩家游玩记录数据库',
         'https://www.diving-fish.com/maimaidx/prober/'),
     _Credit('DXRating.net', '提供谱面标签数据库和别名数据库', 'https://dxrating.net'),
     _Credit('Yuri-YuzuChaN', '提供别名数据库',
         'https://github.com/Yuri-YuzuChaN/maimaiDX'),
-    _Credit('落雪咖啡屋', '提供收藏品数据库、歌曲音源支持、曲目数据库和玩家游玩记录数据库',
-        'https://maimai.lxns.net'),
+    _Credit(
+        '落雪咖啡屋', '提供收藏品数据库、歌曲音源支持、曲目数据库和玩家游玩记录数据库', 'https://maimai.lxns.net'),
     _Credit('Neskol', '提供谱面转换支持',
         'https://github.com/Neskol/Maichart-Converts/tree/master'),
     _Credit('status.awmc.cc', '提供舞萌服务器状态查询支持',
         'https://status.awmc.cc/status/maimai'),
+    _Credit('mai.chongxi.us', '提供舞萌服务器状态信息',
+        'https://mai.chongxi.us/'),
     _Credit('AWMC NET.', '提供水鱼查分器同步支持、落雪查分器同步支持和对本项目开发的经济支持',
         'https://net.wmc.pub/'),
     _Credit('Bakapiano', '提供水鱼查分器和落雪查分器成绩同步支持',
@@ -75,6 +73,13 @@ class _AboutAppPageState extends State<AboutAppPage> {
     _Credit('k4641321', '提供落雪查分器成绩同步支持',
         'https://github.com/k4641321/chusearchsong_flutter/tree/main'),
     _Credit('Union', '提供曲目数据库', 'https://union.godserver.cn/'),
+  ];
+
+  /// 捐献支持名单。
+  static const List<_Credit> _donationCredits = [
+    _Credit('Pokcet', '感谢对本项目的捐献支持'),
+    _Credit('ListaQwQ', '感谢对本项目的捐献支持'),
+    _Credit('迪拉熊重度依赖', '感谢对本项目的捐献支持'),
   ];
 
   String _version = '';
@@ -103,8 +108,7 @@ class _AboutAppPageState extends State<AboutAppPage> {
     final uri = Uri.tryParse(url);
     if (uri == null) return;
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (await ExternalLaunchUtil.open(uri)) {
         return;
       }
     } catch (e) {
@@ -118,8 +122,7 @@ class _AboutAppPageState extends State<AboutAppPage> {
   Future<void> _openEmail() async {
     final uri = Uri(scheme: 'mailto', path: _email);
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (await ExternalLaunchUtil.open(uri)) {
         return;
       }
     } catch (e) {
@@ -131,57 +134,74 @@ class _AboutAppPageState extends State<AboutAppPage> {
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
-    final Color textPrimaryColor = Theme.of(context).colorScheme.onSurface;
-    final Color cardBgColor =
-        Theme.of(context).colorScheme.surface.withValues(alpha: 0.9);
-    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
+    final scheme = Theme.of(context).colorScheme;
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
+          // 异步背景图显示前先铺主题底色，避免进入页面时闪黑。
+          Positioned.fill(child: ColoredBox(color: scheme.surface)),
           CommonWidgetUtil.buildCommonBgWidget(),
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
           Column(
             children: [
-              // 标题栏统一走公共组件（原来这里抄了一份 25 行的 Row）
-              const PageTopBar(title: '关于本APP'),
-
+              const PageTopBar(
+                title: '关于',
+                barBackground: Colors.transparent,
+                titleAlign: PageTopBarTitleAlign.start,
+              ),
               Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: cardBgColor,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [defaultShadow],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.all(screenWidth * 0.04),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 自上而下：app 图标 → app 名称 → 版本号 → 简介
-                          //           → 特别致谢 → 开发者
-                          _buildAppIconAndName(screenWidth, textPrimaryColor),
-                          SizedBox(height: screenWidth * 0.02),
-                          _buildVersionLine(textPrimaryColor),
-                          SizedBox(height: screenWidth * 0.06),
-
-                          _buildIntroSection(screenWidth, textPrimaryColor),
-                          SizedBox(height: screenWidth * 0.06),
-
-                          _buildCreditsSection(screenWidth, textPrimaryColor),
-                          SizedBox(height: screenWidth * 0.06),
-
-                          _buildDeveloperSection(screenWidth, textPrimaryColor),
-                        ],
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.zero,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 760),
+                      child: Padding(
+                        padding:
+                            EdgeInsets.fromLTRB(20, 12, 20, 28 + safeBottom),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildAppHeader(),
+                            const SizedBox(height: 36),
+                            _buildSectionTitle('维护者', 'ChiffonMai 背后的开发者。'),
+                            _buildDeveloperSection(),
+                            const SizedBox(height: 32),
+                            _buildSectionTitle('特别致谢', '感谢每一位给予帮助的伙伴，排名不分先后。'),
+                            _buildCreditGroup(
+                              title: '创作与支持',
+                              icon: Icons.favorite_outline_rounded,
+                              credits: _credits.take(6).toList(),
+                              personal: true,
+                            ),
+                            const SizedBox(height: 24),
+                            _buildCreditGroup(
+                              title: '捐献致谢',
+                              icon: Icons.volunteer_activism_outlined,
+                              credits: _donationCredits,
+                              personal: true,
+                            ),
+                            const SizedBox(height: 24),
+                            _buildCreditGroup(
+                              title: '数据与服务',
+                              icon: Icons.hub_outlined,
+                              credits: _credits.skip(6).toList(),
+                              personal: false,
+                            ),
+                            const SizedBox(height: 28),
+                            Text(
+                              '感谢每一份支持，让 ChiffonMai 不断成长。',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.5,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -194,246 +214,269 @@ class _AboutAppPageState extends State<AboutAppPage> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // 各区块
-  // ---------------------------------------------------------------------------
-
-  Widget _buildSectionTitle(String title, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Text(
-        title,
-        style: TextStyle(
-          color: color,
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-
-  /// 致谢名单
-  Widget _buildCreditsSection(double screenWidth, Color color) {
-    final subtitleColor = color.withValues(alpha: 0.55);
+  /// 品牌信息直接排在背景上，仅版本号和功能标签有局部填充。
+  Widget _buildAppHeader() {
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('🎉 特别致谢', color),
-        Text(
-          '排名不分先后',
-          style: TextStyle(fontSize: 12, color: subtitleColor),
-        ),
-        const SizedBox(height: 12),
-        ...List.generate(_credits.length, (i) {
-          final credit = _credits[i];
-          final tappable = credit.url != null;
-          return Padding(
-            padding: EdgeInsets.only(bottom: i == _credits.length - 1 ? 0 : 14),
-            child: InkWell(
-              onTap: tappable ? () => _openUrl(credit.url!) : null,
-              borderRadius: BorderRadius.circular(6),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            credit.name,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: tappable
-                                  ? Theme.of(context).colorScheme.primary
-                                  : color,
-                              decoration: tappable
-                                  ? TextDecoration.underline
-                                  : TextDecoration.none,
-                              decorationColor:
-                                  Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                        if (tappable) ...[
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.open_in_new,
-                            size: 12,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      credit.desc,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        height: 1.45,
-                        color: subtitleColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }),
-      ],
-    );
-  }
-
-  /// App 图标 + 名称（居中，页面最顶部）
-  Widget _buildAppIconAndName(double screenWidth, Color color) {
-    final iconSize = screenWidth * 0.22;
-    return Center(
-      child: Column(
-        children: [
-          _AndroidLauncherIcon(size: iconSize),
-          const SizedBox(height: 12),
-          Text(
-            'ChiffonMai',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 版本号（紧随 app 名称）
-  Widget _buildVersionLine(Color color) {
-    return Center(
-      child: Text(
-        _version.isEmpty ? '版本读取中…' : '当前版本 $_version',
-        style: TextStyle(fontSize: 13, color: color.withValues(alpha: 0.6)),
-      ),
-    );
-  }
-
-  /// 简介
-  Widget _buildIntroSection(double screenWidth, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('简介', color),
-        Text(
-          _intro,
-          style: TextStyle(fontSize: 13, height: 1.6, color: color),
-        ),
-      ],
-    );
-  }
-
-  /// 开发者 + B站 / GitHub / 邮箱
-  Widget _buildDeveloperSection(double screenWidth, Color color) {
-    final subtitleColor = color.withValues(alpha: 0.6);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('开发者', color),
         Row(
           children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor:
-                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
-              child: Icon(
-                Icons.person,
-                size: 20,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              _developerName,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: color,
+            const _AndroidLauncherIcon(size: 64),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'ChiffonMai',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -.6,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '陪伴每一次舞萌出勤',
+                    style:
+                        TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
+                  ),
+                ],
               ),
             ),
           ],
         ),
+        const SizedBox(height: 18),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: scheme.primaryContainer.withValues(alpha: .85),
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Text(
+            _version.isEmpty ? '版本读取中…' : '版本 $_version',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: scheme.onPrimaryContainer,
+            ),
+          ),
+        ),
         const SizedBox(height: 16),
-        _buildContactTile(
-          icon: Icons.play_circle_fill,
-          label: 'B 站',
-          value: '@ChiffonOwO',
-          onTap: () => _openUrl(_bilibiliUrl),
-          color: color,
-          subtitleColor: subtitleColor,
-        ),
-        _buildContactTile(
-          icon: Icons.code,
-          label: 'GitHub',
-          value: 'ChiffonOwO',
-          onTap: () => _openUrl(_githubUrl),
-          color: color,
-          subtitleColor: subtitleColor,
-        ),
-        _buildContactTile(
-          icon: Icons.email_outlined,
-          label: '邮箱',
-          value: _email,
-          onTap: _openEmail,
-          color: color,
-          subtitleColor: subtitleColor,
+        Text(
+          _intro,
+          style:
+              TextStyle(fontSize: 13.5, height: 1.7, color: scheme.onSurface),
         ),
       ],
     );
   }
 
-  Widget _buildContactTile({
-    required IconData icon,
-    required String label,
-    required String value,
-    required VoidCallback onTap,
-    required Color color,
-    required Color subtitleColor,
-  }) {
-    final primary = Theme.of(context).colorScheme.primary;
+  Widget _buildSectionTitle(String title, String subtitle) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-          child: Row(
-            children: [
-              Icon(icon, size: 20, color: primary),
-              const SizedBox(width: 12),
-              Text(
-                label,
-                style: TextStyle(fontSize: 14, color: color),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  value,
-                  textAlign: TextAlign.right,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: subtitleColor,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Icon(Icons.chevron_right, size: 18, color: subtitleColor),
-            ],
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Semantics(
+          header: true,
+          child: Text(title,
+              style: TextStyle(
+                fontSize: 23,
+                fontWeight: FontWeight.w800,
+                color: scheme.onSurface,
+              )),
+        ),
+        const SizedBox(height: 4),
+        Text(subtitle,
+            style: TextStyle(
+                fontSize: 13, height: 1.5, color: scheme.onSurfaceVariant)),
+      ]),
+    );
+  }
+
+  /// 局部主题色块代替整页白色容器，圆角与参考图中的人物区域保持一致。
+  Widget _buildDeveloperSection() {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.secondaryContainer.withValues(alpha: .65),
+      borderRadius: BorderRadius.circular(26),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            CircleAvatar(
+              radius: 25,
+              backgroundColor: scheme.primaryContainer,
+              child: Icon(Icons.person_outline_rounded,
+                  size: 28, color: scheme.onPrimaryContainer),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(_developerName,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSecondaryContainer,
+                      )),
+                  const SizedBox(height: 3),
+                  Text('开发与维护',
+                      style: TextStyle(
+                          fontSize: 13, color: scheme.onSecondaryContainer)),
+                ])),
+          ]),
+          const SizedBox(height: 14),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            _buildContactButton(Icons.play_circle_outline_rounded, 'B 站',
+                () => _openUrl(_bilibiliUrl)),
+            _buildContactButton(
+                Icons.code_rounded, 'GitHub', () => _openUrl(_githubUrl)),
+            _buildContactButton(Icons.email_outlined, '邮箱', _openEmail),
+          ]),
+          const SizedBox(height: 8),
+          SelectableText(_email,
+              style:
+                  TextStyle(fontSize: 12, color: scheme.onSecondaryContainer)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildContactButton(IconData icon, String label, VoidCallback onTap) {
+    final scheme = Theme.of(context).colorScheme;
+    return TextButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+      style: TextButton.styleFrom(
+        minimumSize: const Size(48, 44),
+        foregroundColor: scheme.primary,
+        backgroundColor: scheme.surface.withValues(alpha: .45),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        shape: const StadiumBorder(),
+      ),
+    );
+  }
+
+  Widget _buildCreditGroup({
+    required String title,
+    required IconData icon,
+    required List<_Credit> credits,
+    required bool personal,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Row(children: [
+          Icon(icon, size: 17, color: scheme.primary),
+          const SizedBox(width: 7),
+          Text(title,
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: scheme.primary)),
+        ]),
+      ),
+      for (var i = 0; i < credits.length; i++)
+        Padding(
+          padding: EdgeInsets.only(bottom: i == credits.length - 1 ? 0 : 4),
+          child: _buildCreditRow(
+            credits[i],
+            personal: personal,
+            radius: BorderRadius.vertical(
+              top: Radius.circular(i == 0 ? 24 : 6),
+              bottom: Radius.circular(i == credits.length - 1 ? 24 : 6),
+            ),
           ),
+        ),
+    ]);
+  }
+
+  Widget _buildCreditRow(
+    _Credit credit, {
+    required bool personal,
+    required BorderRadius radius,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final tappable = credit.url != null;
+    return Material(
+      color: scheme.secondaryContainer.withValues(alpha: .6),
+      borderRadius: radius,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: tappable ? () => _openUrl(credit.url!) : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            CircleAvatar(
+              radius: 22,
+              backgroundColor:
+                  personal ? scheme.primaryContainer : scheme.tertiaryContainer,
+              child: Icon(
+                _creditIcon(credit, personal: personal),
+                size: 22,
+                color: personal
+                    ? scheme.onPrimaryContainer
+                    : scheme.onTertiaryContainer,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(credit.name,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSecondaryContainer,
+                      )),
+                  const SizedBox(height: 5),
+                  Text(credit.desc,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.5,
+                        color: scheme.onSecondaryContainer,
+                      )),
+                ])),
+            if (tappable) ...[
+              const SizedBox(width: 10),
+              Icon(Icons.open_in_new_rounded, size: 19, color: scheme.primary),
+            ],
+          ]),
         ),
       ),
     );
+  }
+
+  /// 创作与支持、捐献名单使用统一默认头像；服务类致谢按链接性质区分图标。
+  IconData _creditIcon(_Credit credit, {required bool personal}) {
+    if (personal) return Icons.person_rounded;
+
+    final url = credit.url?.toLowerCase() ?? '';
+    final name = credit.name.toLowerCase();
+    if (url.contains('github.com')) return Icons.code_rounded;
+    if (url.contains('bilibili.com') || url.contains('huajia.163.com')) {
+      return Icons.play_circle_outline_rounded;
+    }
+    if (url.contains('status.') || url.contains('mai.chongxi.us')) {
+      return Icons.monitor_heart_outlined;
+    }
+    if (url.contains('diving-fish.com') ||
+        url.contains('lxns.net') ||
+        url.contains('union.godserver.cn') ||
+        name.contains('查分器') ||
+        name.contains('曲目数据库')) {
+      return Icons.storage_rounded;
+    }
+    if (url.contains('dxrating.net')) return Icons.insights_outlined;
+    if (url.contains('wmc.pub')) return Icons.cloud_sync_outlined;
+    return Icons.language_rounded;
   }
 }
 

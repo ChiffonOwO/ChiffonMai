@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import '../widgets/SmoothLinearProgressIndicator.dart';
 import '../utils/AppDesignTokens.dart';
 import '../widgets/MarqueeText.dart';
 
 /// Hub 页面通用组件库：Section、ActionTile、Scaffold。
-/// UI 设计原则：留白克制、卡片浮起感、主题色仅作点缀。
+/// UI 设计原则：留白克制、平面分组、主题色仅作点缀。
 
 /// 「快捷入口」那种方形小按钮（图标 + 标题 + 副标题）。
 ///
@@ -31,7 +32,7 @@ class HubQuickAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Material(
-      color: scheme.surfaceContainerLow,
+      color: Colors.transparent,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -48,8 +49,8 @@ class HubQuickAction extends StatelessWidget {
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w700, fontSize: 12)),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
             const SizedBox(height: 3),
             // 副标题统一是四个字（窄屏每格只有 40dp 左右可用宽度，
             // 「Rating 构成」这种会直接变成省略号），省略号只作为兜底
@@ -150,8 +151,7 @@ class HubSection extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         subtitle!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        softWrap: true,
                         style: Theme.of(context)
                             .textTheme
                             .bodySmall
@@ -167,9 +167,7 @@ class HubSection extends StatelessWidget {
         // ===== 内容卡片 =====
         DecoratedBox(
           decoration: BoxDecoration(
-            color: scheme.surfaceContainerLow,
-            borderRadius:
-                BorderRadius.circular(AppDesignTokens.radiusMedium),
+            borderRadius: BorderRadius.circular(AppDesignTokens.radiusMedium),
             border: Border.all(color: scheme.outlineVariant),
           ),
           child: Column(children: children),
@@ -186,8 +184,10 @@ class HubActionTile extends StatelessWidget {
   final VoidCallback onTap;
   final Color? iconColor;
   final bool dense;
+
   /// 是否已收藏（为 null 时不显示星标）
   final bool? isFavorited;
+
   /// 收藏切换回调
   final VoidCallback? onToggleFavorite;
 
@@ -208,10 +208,14 @@ class HubActionTile extends StatelessWidget {
   final bool awaitingConfirm;
 
   /// 进度计数（与 [loading] 配合使用）。非 null 且 >0 时，
-  /// subtitle 改为「(current / total)」，下方追加一条 LinearProgressIndicator，
+  /// subtitle 改为「(current / total)」，下方追加一条 SmoothLinearProgressIndicator，
   /// 用于「曲绘索引构建」「maidata 全量拉取」这类长任务的可视化。
   final int? progressCurrent;
   final int? progressTotal;
+
+  /// 百分比任务的进度（0～1）；没有数值的等待阶段显示不定进度。
+  final bool showProgress;
+  final double? progressValue;
 
   /// 可选：贴在 tile 下方的附加内容（例如「同步成绩」的线路切换器）。
   /// 它是独立的一行，点击不会触发本 tile 的 [onTap]。
@@ -237,6 +241,9 @@ class HubActionTile extends StatelessWidget {
   /// 可选：标题颜色。默认跟随主题（未禁用时用 `onSurface`）。
   final Color? titleColor;
 
+  /// 可选：单独调整标题字号，避免少数较长标题频繁换行。
+  final double titleFontSize;
+
   const HubActionTile({
     super.key,
     required this.title,
@@ -253,10 +260,13 @@ class HubActionTile extends StatelessWidget {
     this.awaitingConfirm = false,
     this.progressCurrent,
     this.progressTotal,
+    this.showProgress = false,
+    this.progressValue,
     this.footer,
     this.footerLift = 0,
     this.leading,
     this.titleColor,
+    this.titleFontSize = 14.5,
   }) : assert(footerLift >= 0 && footerLift <= 10,
             'footerLift 只能是 0~10：底部内边距一共就 10，再多就贴死了');
 
@@ -270,9 +280,10 @@ class HubActionTile extends StatelessWidget {
     final Color activeTint =
         awaitingConfirm ? scheme.error : (iconColor ?? scheme.primary);
     // 是否进入「带进度条」模式：loading 状态下若给了 progressTotal，
-    // 用 LinearProgressIndicator + 计数替代默认 spinner/loadingText。
+    // 用 SmoothLinearProgressIndicator + 计数替代默认 spinner/loadingText。
     final bool _hasProgress =
         loading && (progressTotal ?? 0) > 0 && progressCurrent != null;
+    final hasProgressBar = loading && (_hasProgress || showProgress);
     final tile = ListTile(
       contentPadding: EdgeInsets.symmetric(
         horizontal: 14,
@@ -297,23 +308,24 @@ class HubActionTile extends StatelessWidget {
           ),
       title: Text(
         title,
-        maxLines: 1,
+        maxLines: 2,
+        softWrap: true,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontWeight: FontWeight.w600,
-          fontSize: 14.5,
+          fontSize: titleFontSize,
           color: _isInactive
               ? scheme.onSurface.withValues(alpha: 0.6)
               : (awaitingConfirm ? scheme.error : titleColor),
         ),
       ),
-      subtitle: _hasProgress
+      subtitle: hasProgressBar
           ? Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  if (_hasProgress) Text(
                     '(${progressCurrent!} / $progressTotal)',
                     style: TextStyle(
                       fontSize: 12,
@@ -321,16 +333,23 @@ class HubActionTile extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  if (!_hasProgress)
+                    _MarqueeSubtitle(
+                      text: loadingText ?? subtitle,
+                      color: scheme.primary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
                   const SizedBox(height: 4),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(2),
-                    child: LinearProgressIndicator(
-                      value: (progressCurrent! /
-                              progressTotal!)
-                          .clamp(0.0, 1.0),
+                    child: SmoothLinearProgressIndicator(
+                      value:
+                          _hasProgress
+                              ? (progressCurrent! / progressTotal!).clamp(0.0, 1.0)
+                              : progressValue?.clamp(0.0, 1.0),
                       minHeight: 4,
-                      backgroundColor:
-                          scheme.primary.withValues(alpha: 0.12),
+                      backgroundColor: scheme.primary.withValues(alpha: 0.12),
                       color: scheme.primary,
                     ),
                   ),
@@ -347,7 +366,7 @@ class HubActionTile extends StatelessWidget {
               ),
             ),
       trailing: loading
-          ? _hasProgress
+          ? hasProgressBar
               ? const SizedBox(width: 20, height: 20) // 进度条替代 spinner
               : SizedBox(
                   width: 20,
@@ -453,7 +472,8 @@ class UpdateAvailableIcon extends StatelessWidget {
 }
 
 /// 星标按钮：仅 UI，点击行为由父组件通过 onTap 控制
-class _StarToggleButton extends StatelessWidget {  final bool isFavorited;
+class _StarToggleButton extends StatelessWidget {
+  final bool isFavorited;
   final VoidCallback onTap;
 
   const _StarToggleButton({
@@ -565,13 +585,11 @@ class HubPageScaffold extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineSmall
-                            ?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.2,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.2,
+                                ),
                       ),
                       const SizedBox(height: 3),
                       Text(

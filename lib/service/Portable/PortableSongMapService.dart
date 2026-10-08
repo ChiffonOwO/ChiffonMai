@@ -100,7 +100,8 @@ class DivingFishSongIndex {
   Song? matchByIdAndTitle(int id, String lxnsTitle) {
     final song = byId[id];
     if (song == null) return null;
-    if (normalizePortableTitle(song.title) == normalizePortableTitle(lxnsTitle)) {
+    if (normalizePortableTitle(song.title) ==
+        normalizePortableTitle(lxnsTitle)) {
       return song;
     }
     return null;
@@ -204,6 +205,7 @@ PortableMapResult mapOneLuoXueSong(
           ? dfSong.basicInfo.genre.trim()
           : lxnsSong.genre.trim(),
       bpm: dfSong.basicInfo.bpm > 0 ? dfSong.basicInfo.bpm : lxnsSong.bpm,
+      difficultyConstants: dfSong.ds,
       hasDx: hasDx,
     ),
   );
@@ -289,6 +291,7 @@ class PortableLibraryResult {
                   'artist': s.artist,
                   'genre': s.genre,
                   'bpm': s.bpm,
+                  'difficultyConstants': s.difficultyConstants,
                   'hasDx': s.hasDx,
                 })
             .toList(),
@@ -315,6 +318,12 @@ class PortableLibraryResult {
           artist: '${item['artist'] ?? ''}',
           genre: '${item['genre'] ?? ''}',
           bpm: item['bpm'] is int ? item['bpm'] as int : 0,
+          difficultyConstants: item['difficultyConstants'] is List
+              ? (item['difficultyConstants'] as List)
+                  .whereType<num>()
+                  .map((value) => value.toDouble())
+                  .toList()
+              : const <double>[],
           hasDx: item['hasDx'] == true,
         ));
       }

@@ -788,7 +788,10 @@ double calculateMinAchievements(double ds, int targetRa, double currentAchieveme
  * Best55 部分兼顾推分和基础
  * Best15 部分专注于推分
  */
-Future<Map<String, List<RecommendationResult>>> recommendSongs() async {
+Future<Map<String, List<RecommendationResult>>> recommendSongs({
+  double? minDsOverride,
+  double? maxDsOverride,
+}) async {
   final revision = AccountSwitchService.revision;
   // 定义兜底返回值，确保异常时也能返回规范格式
   final defaultResult = {
@@ -859,12 +862,20 @@ Future<Map<String, List<RecommendationResult>>> recommendSongs() async {
     double best55maxDs = 0.0;
     (best55minDs, best55maxDs) = 
         getDifficultyRange(best55minRating, best55maxRating);
+    if (minDsOverride != null && maxDsOverride != null) {
+      best55minDs = minDsOverride;
+      best55maxDs = maxDsOverride;
+    }
     debugPrint('Best55 定数范围: $best55minDs - $best55maxDs');
 
     double best15minDs = 0.0;
     double best15maxDs = 0.0;
     (best15minDs, best15maxDs) = 
         getDifficultyRange(best15minRating, best15maxRating);
+    if (minDsOverride != null && maxDsOverride != null) {
+      best15minDs = minDsOverride;
+      best15maxDs = maxDsOverride;
+    }
     debugPrint('Best15 定数范围: $best15minDs - $best15maxDs');
 
     // 并行计算推荐结果，提高性能

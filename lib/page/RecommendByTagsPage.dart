@@ -1,19 +1,17 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/service/RecommendByTagsService.dart';
+import 'package:my_first_flutter_app/service/RatingRecommendService.dart';
 import 'package:my_first_flutter_app/entity/RecommendationResult.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../constant/CacheKeyConstant.dart';
+import 'package:flutter/services.dart';
 import '../constant/LoadingTipsConstant.dart';
-import '../widgets/PageTopBar.dart';
+import '../widgets/BackgroundPageScaffold.dart';
 
 class RecommendByTags extends StatefulWidget {
   const RecommendByTags({super.key});
@@ -36,6 +34,14 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   ScrollController _scrollController = ScrollController(); // 滚动控制器
   bool _isDisposed = false; // 页面是否已销毁，用于取消正在进行的异步操作
   StreamSubscription<String>? _tipSubscription; // 加载提示的流订阅
+  String _rangeMode = 'rating';
+  int _targetRating = 0;
+  double _minDs = 1.0;
+  double _maxDs = 15.0;
+  bool _rangeSettingsLoaded = false;
+  late final TextEditingController _ratingController;
+  late final TextEditingController _minDsController;
+  late final TextEditingController _maxDsController;
 
   Color _getBackgroundColor(int diffIndex, int difficultyCount) {
     if (difficultyCount <= 2) {
@@ -102,6 +108,9 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   @override
   void initState() {
     super.initState();
+    _ratingController = TextEditingController();
+    _minDsController = TextEditingController();
+    _maxDsController = TextEditingController();
     _initializeLoadingTip();
     // 延迟一小段时间再开始获取推荐结果，确保页面能够完全加载并显示加载动画
     // 这样可以避免在首页点击标签时出现卡顿
@@ -121,6 +130,9 @@ class _RecommendByTagsState extends State<RecommendByTags> {
     // 但会一直活到进程结束）。与项目里其它页面的做法保持一致。
     LoadingTipsConstant.stopAutoSwitch();
     _scrollController.dispose();
+    _ratingController.dispose();
+    _minDsController.dispose();
+    _maxDsController.dispose();
     super.dispose();
   }
 
@@ -143,41 +155,24 @@ class _RecommendByTagsState extends State<RecommendByTags> {
   Future<void> _fetchRecommendations() async {
     try {
       if (!mounted || _isDisposed) return;
+      if (!_rangeSettingsLoaded) {
+        _targetRating = await RatingRecommendService().getUserTotalRating();
+        _applyRatingRange();
+        _rangeSettingsLoaded = true;
+      }
       setState(() {
         _isLoading = true;
         _errorMessage = null;
       });
       
-      // 先尝试从缓存读取推荐结果
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final cachedResult = prefs.getString(CacheKeyConstant.recommendationResults);
-        if (cachedResult != null) {
-          final resultMap = json.decode(cachedResult);
-          final best55 = (resultMap['Best55'] as List).map((item) => RecommendationResult.fromJson(item)).toList();
-          final best15 = (resultMap['Best15'] as List).map((item) => RecommendationResult.fromJson(item)).toList();
-          
-          if (!mounted || _isDisposed) return;
-          setState(() {
-            _recommendations = {
-              'Best55': best55,
-              'Best15': best15,
-            };
-            _isLoading = false;
-            _errorMessage = null;
-          });
-          debugPrint('从缓存读取推荐结果成功');
-          return;
-        }
-      } catch (e) {
-        debugPrint('从缓存读取推荐结果失败: $e');
-      }
-      
       // 记录开始时间
       final startTime = DateTime.now();
       
       // 直接异步执行推荐算法，让UI先显示加载状态
-      final result = await recommendSongs();
+      final result = await recommendSongs(
+        minDsOverride: _minDs,
+        maxDsOverride: _maxDs,
+      );
       
       // 计算已用时间
       final elapsedTime = DateTime.now().difference(startTime).inMilliseconds;
@@ -189,7 +184,7 @@ class _RecommendByTagsState extends State<RecommendByTags> {
       
       if (!mounted || _isDisposed) return;
       setState(() {
-        _recommendations = result;
+        _recommendations = _prioritizeByRange(result);
         _isLoading = false;
         _errorMessage = null; // 成功时清除错误信息
       });
@@ -205,94 +200,194 @@ class _RecommendByTagsState extends State<RecommendByTags> {
     }
   }
 
+  void _applyRatingRange() {
+    final range = RatingRecommendService().calculateDsRange(_targetRating);
+    _minDs = range['min']!;
+    _maxDs = range['max']!;
+    _ratingController.text = _targetRating.toString();
+    _minDsController.text = _minDs.toStringAsFixed(1);
+    _maxDsController.text = _maxDs.toStringAsFixed(1);
+  }
+
+  void _applyManualRange() {
+    final minValue = double.tryParse(_minDsController.text);
+    final maxValue = double.tryParse(_maxDsController.text);
+    if (minValue == null || maxValue == null || minValue > maxValue) return;
+    setState(() {
+      _minDs = minValue.clamp(1.0, 15.0);
+      _maxDs = maxValue.clamp(_minDs, 15.0);
+    });
+  }
+
+  Map<String, List<RecommendationResult>> _prioritizeByRange(
+      Map<String, List<RecommendationResult>> source) {
+    final result = <String, List<RecommendationResult>>{};
+    for (final entry in source.entries) {
+      final items = [...entry.value];
+      items.sort((a, b) {
+        final aIn = a.ds >= _minDs && a.ds <= _maxDs;
+        final bIn = b.ds >= _minDs && b.ds <= _maxDs;
+        if (aIn != bIn) return aIn ? -1 : 1;
+        return b.similarity.compareTo(a.similarity);
+      });
+      result[entry.key] = items;
+    }
+    return result;
+  }
+
+  Widget _buildRangeSettings(Brightness brightness) {
+    final scheme = Theme.of(context).colorScheme;
+    final fieldDecoration = InputDecoration(
+      isDense: true,
+      filled: true,
+      fillColor: scheme.surface,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: scheme.outlineVariant),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: scheme.outlineVariant),
+      ),
+    );
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Icon(Icons.tune_rounded, size: 19, color: scheme.primary),
+          const SizedBox(width: 8),
+          const Expanded(
+              child: Text('推荐范围', style: TextStyle(fontWeight: FontWeight.w700))),
+          Text('范围内谱面优先',
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+        ]),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            FilledButton.tonalIcon(
+              style: FilledButton.styleFrom(
+                backgroundColor: scheme.primaryContainer,
+                foregroundColor: scheme.onPrimaryContainer,
+              ),
+              icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+              label: Text('当前：${_rangeMode == 'rating' ? '目标Rating' : '定数区间'}'),
+              onPressed: () {
+                setState(() {
+                  _rangeMode = _rangeMode == 'rating' ? 'ds' : 'rating';
+                  if (_rangeMode == 'rating') _applyRatingRange();
+                });
+                _fetchRecommendations();
+              },
+            ),
+            FilledButton.tonalIcon(
+              style: FilledButton.styleFrom(
+                backgroundColor: scheme.primaryContainer,
+                foregroundColor: scheme.onPrimaryContainer,
+              ),
+              icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+              label: Text('当前：$_currentTab推荐'),
+              onPressed: () => setState(() {
+                _currentTab = _currentTab == 'Best55' ? 'Best15' : 'Best55';
+                _currentPage = 1;
+              }),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (_rangeMode == 'rating')
+          Row(children: [
+            Expanded(
+              child: TextField(
+                controller: _ratingController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: fieldDecoration.copyWith(
+                  labelText: '目标 Rating',
+                  prefixIcon: const Icon(Icons.star_outline, size: 19),
+                ),
+                onSubmitted: (_) {
+                  _targetRating = int.tryParse(_ratingController.text) ?? 0;
+                  _applyRatingRange();
+                  _fetchRecommendations();
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              tooltip: '按目标 Rating 重新计算',
+              onPressed: () {
+                _targetRating = int.tryParse(_ratingController.text) ?? 0;
+                _applyRatingRange();
+                _fetchRecommendations();
+              },
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+          ])
+        else
+          Row(children: [
+            Expanded(
+              child: TextField(
+                controller: _minDsController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: fieldDecoration.copyWith(labelText: '最低定数'),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text('至', style: TextStyle(color: scheme.onSurfaceVariant)),
+            ),
+            Expanded(
+              child: TextField(
+                controller: _maxDsController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: fieldDecoration.copyWith(labelText: '最高定数'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              tooltip: '按定数区间重新计算',
+              onPressed: () {
+                _applyManualRange();
+                _fetchRecommendations();
+              },
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+          ]),
+        const SizedBox(height: 7),
+        Text(
+          _rangeMode == 'rating'
+              ? '当前定数范围：${_minDs.toStringAsFixed(1)} ~ ${_maxDs.toStringAsFixed(1)}'
+              : '当前定数范围：${_minDs.toStringAsFixed(1)} ~ ${_maxDs.toStringAsFixed(1)}',
+          style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+        ),
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
     
-    final double borderRadiusSmall = 8.0;
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false, // 防止键盘弹出时调整布局
-      body: Stack(
+    return BackgroundPageScaffold(
+      title: '根据标签推荐',
+      resizeToAvoidBottomInset: false,
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
+      ),
+      child: Column(
         children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏
-              PageTopBar(
-                title: '根据标签推荐',
-              ),
-
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [AppColors.defaultShadow(brightness)],
-                  ),
-                  child: Column(
-                    children: [
-                      // 切换按钮
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: screenWidth * 0.04, // 水平 padding 为屏幕宽度的4%
-                          vertical: screenHeight * 0.01, // 垂直 padding 为屏幕高度的1%
-                        ),
-                        decoration: BoxDecoration(
-                          border: Border(bottom: BorderSide(color: AppColors.tableBorder(brightness))),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  _currentTab = 'Best55';
-                                  _currentPage = 1; // 切换标签时重置页码
-                                });
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _currentTab == 'Best55'
-                                    ? Theme.of(context).colorScheme.onSurface
-                                    : Theme.of(context).colorScheme.surface,
-                                foregroundColor: _currentTab == 'Best55'
-                                    ? (brightness == Brightness.dark ? const Color(0xFF1E1E2E) : Colors.white)
-                                    : Theme.of(context).colorScheme.onSurface,
-                              ),
-                              child: const Text('Best55推荐'),
-                            ),
-                            SizedBox(width: screenWidth * 0.04), // 间距为屏幕宽度的4%
-                            ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  _currentTab = 'Best15';
-                                  _currentPage = 1; // 切换标签时重置页码
-                                });
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _currentTab == 'Best15'
-                                    ? Theme.of(context).colorScheme.onSurface
-                                    : Theme.of(context).colorScheme.surface,
-                                foregroundColor: _currentTab == 'Best15'
-                                    ? (brightness == Brightness.dark ? const Color(0xFF1E1E2E) : Colors.white)
-                                    : Theme.of(context).colorScheme.onSurface,
-                              ),
-                              child: const Text('Best15推荐'),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _buildRangeSettings(brightness),
                       
                       // 内容区域
                       Expanded(
@@ -377,12 +472,6 @@ class _RecommendByTagsState extends State<RecommendByTags> {
                           ),
                           child: _buildPagination(),
                         ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );

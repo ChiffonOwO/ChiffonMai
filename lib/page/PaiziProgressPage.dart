@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/SmoothLinearProgressIndicator.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/services.dart';
@@ -9,18 +10,16 @@ import 'package:my_first_flutter_app/constant/LoadingTipsConstant.dart';
 import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/manager/LuoXue/CollectionsManager.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CollectionsImageUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
-import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/page/Collection/CollectionInfoPage.dart';
 import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
-import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/BackgroundPageScaffold.dart';
 
 // 根据 formatVersion2 的顺序定义首字顺序
 const List<String> _firstCharOrder = [
@@ -309,35 +308,13 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
     _textSizeL = 14.0 * _scaleFactor;
     _coverSize = 56.0 * _scaleFactor;
 
-    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
-              // 与 Best50 页、其余 50 多个页面同款。
-              PageTopBar(title: '牌子进度'),
-
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(_borderRadiusSmall),
-                    boxShadow: [
-                      AppConstants.defaultShadow(brightness),
-                    ],
-                  ),
-                  child: _isLoading
+    return BackgroundPageScaffold(
+      title: '牌子进度',
+      resizeToAvoidBottomInset: false,
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
+      ),
+      child: _isLoading
                       ? Center(child: CircularProgressIndicator())
                       : SingleChildScrollView(
                           padding: EdgeInsets.all(_paddingM),
@@ -383,12 +360,6 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                             ],
                           ),
                         ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -1400,6 +1371,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
       final quality = await ExportQualitySelector.show(
         context,
         estimatedPngSize: ImageEncodeUtil.estimatePngSize(songCount: songCount, cardsPerRow: 12),
+        exportingLabel: '牌子进度',
       );
       if (quality == null) return;
 
@@ -1447,7 +1419,7 @@ class _PaiziProgressPageState extends State<PaiziProgressPage> {
                       ],
                     ),
                     SizedBox(height: 16.0),
-                    LinearProgressIndicator(
+                    SmoothLinearProgressIndicator(
                       value: _progressValue > 0 ? _progressValue : null,
                       backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                       valueColor: AlwaysStoppedAnimation(Theme.of(context).colorScheme.primary),

@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-/// MaimaiHub 结算画面识别结果
+/// maimai Score Hub 结算画面识别结果
 ///
 /// 对应 `POST /api/v1/me/ocr/recognize` 的响应（字段与 ocr-api 的 Pydantic 模型
 /// `BatchRecognitionResponse` / `RecognitionItem` / `ScoreCandidate` 一一对应）：
@@ -43,7 +43,12 @@ class MaimaiHubOcrBatch {
     if (raw is List) {
       for (final e in raw) {
         if (e is Map) {
-          items.add(MaimaiHubOcrItem.fromJson(Map<String, dynamic>.from(e)));
+          try {
+            items.add(MaimaiHubOcrItem.fromJson(Map<String, dynamic>.from(e)));
+          } catch (error) {
+            // 单张结果格式异常时保留同批其它图片，不让整批 OCR 结果丢失。
+            debugPrint('忽略格式异常的 OCR 结果: $error');
+          }
         }
       }
     }
@@ -107,8 +112,12 @@ class MaimaiHubOcrItem {
     if (rawCandidates is List) {
       for (final e in rawCandidates) {
         if (e is Map) {
-          candidates.add(
-              MaimaiHubOcrCandidate.fromJson(Map<String, dynamic>.from(e)));
+          try {
+            candidates.add(
+                MaimaiHubOcrCandidate.fromJson(Map<String, dynamic>.from(e)));
+          } catch (error) {
+            debugPrint('忽略格式异常的 OCR 曲名候选: $error');
+          }
         }
       }
     }

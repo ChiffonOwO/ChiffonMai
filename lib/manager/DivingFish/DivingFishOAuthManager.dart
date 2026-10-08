@@ -1,13 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
+import 'package:my_first_flutter_app/utils/ExternalLaunchUtil.dart';
 
 /// 水鱼账号 OAuth 绑定流程封装。
 /// 后端（server.js /api/prober）持有 client_secret，App 只负责发起绑定与打开授权链接。
 class DivingFishOAuthManager {
-  static final DivingFishOAuthManager _instance = DivingFishOAuthManager._internal();
+  static final DivingFishOAuthManager _instance =
+      DivingFishOAuthManager._internal();
   factory DivingFishOAuthManager() => _instance;
   DivingFishOAuthManager._internal();
 
@@ -37,7 +38,7 @@ class DivingFishOAuthManager {
     final url = await startBinding(qq);
     if (url.isEmpty) return false;
     final uri = Uri.parse(url);
-    return await launchUrl(uri, mode: LaunchMode.externalApplication);
+    return ExternalLaunchUtil.open(uri);
   }
 
   /// 查询该 QQ 是否已授权本应用（后端换票探测）。

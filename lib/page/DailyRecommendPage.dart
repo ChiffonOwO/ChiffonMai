@@ -3,10 +3,9 @@ import 'package:my_first_flutter_app/service/DailyRecommendService.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'SongInfoPage.dart';
-import '../widgets/PageTopBar.dart';
+import '../widgets/BackgroundPageScaffold.dart';
 
 class DailyRecommendPage extends StatefulWidget {
   const DailyRecommendPage({super.key});
@@ -123,22 +122,11 @@ class _DailyRecommendPageState extends State<DailyRecommendPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final textPrimaryColor = Theme.of(context).colorScheme.onSurface;
-    final cardBgColor = Theme.of(context).colorScheme.surface;
-    final cardShadow = AppColors.defaultShadow(brightness);
-    final safeBottom = MediaQuery.of(context).padding.bottom;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          Column(
-            children: [
-              PageTopBar(
-                title: '当日谱面推荐',
-                actions: [
+
+    return BackgroundPageScaffold(
+      title: '当日谱面推荐',
+      actions: [
   IconButton(
                         icon: Icon(Icons.refresh, color: textPrimaryColor),
                         tooltip: '换一批',
@@ -146,10 +134,9 @@ class _DailyRecommendPageState extends State<DailyRecommendPage> {
                             _isLoading ? null : () => _loadRecommendations(forceRefresh: true),
                       ),
 ],
-              ),
-
-              Expanded(
-                child: _isLoading
+      resizeToAvoidBottomInset: false,
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: _isLoading
                     ? Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -192,14 +179,7 @@ class _DailyRecommendPageState extends State<DailyRecommendPage> {
                               ],
                             ),
                           )
-                        : Container(
-                            margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                            decoration: BoxDecoration(
-                              color: cardBgColor,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [cardShadow],
-                            ),
-                            child: SingleChildScrollView(
+                        : SingleChildScrollView(
                               padding: const EdgeInsets.all(20),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -371,12 +351,6 @@ class _DailyRecommendPageState extends State<DailyRecommendPage> {
                                 ],
                               ),
                             ),
-                          ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

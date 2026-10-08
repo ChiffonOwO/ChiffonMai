@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
-import '../widgets/PageTopBar.dart';
+import '../widgets/BackgroundPageScaffold.dart';
+import '../widgets/PageSection.dart';
 
 class SingleRatingCalculator extends StatefulWidget {
   const SingleRatingCalculator({super.key});
@@ -201,373 +201,376 @@ class _SingleRatingCalculatorState extends State<SingleRatingCalculator> {
     final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
-    
+
     // 计算尺寸参数
     final innerPadding = screenWidth * 0.04; // 内部padding为屏幕宽度的4%
     final smallSpacing = screenHeight * 0.01; // 小间距为屏幕高度的1%
     final mediumSpacing = screenHeight * 0.02; // 中间距为屏幕高度的2%
     final borderRadius = screenWidth * 0.02; // 边框圆角为屏幕宽度的2%
-    
+
     // 字体大小
     final subtitleFontSize = screenWidth * 0.045; // 副标题字体大小为屏幕宽度的4.5%
     final bodyFontSize = screenWidth * 0.04; // 正文字体大小为屏幕宽度的4%
     final smallFontSize = screenWidth * 0.035; // 小字体大小为屏幕宽度的3.5%
     final buttonFontSize = screenWidth * 0.045; // 按钮字体大小为屏幕宽度的4.5%
-    
-    // 自定义常量
-    final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '单曲Rating计算',
       resizeToAvoidBottomInset: false,
-      body: GestureDetector(
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
+      ),
+      child: GestureDetector(
         onTap: () {
           FocusScope.of(context).unfocus();
         },
-        child: Stack(
-          children: [
-            // 背景
-            CommonWidgetUtil.buildCommonBgWidget(),
-            CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-            // 页面内容
-            Column(
-              children: [
-                // 标题栏
-                PageTopBar(
-                  title: '单曲Rating计算',
-                ),
-
-                // 主内容区域
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.01),
-                    child: Column(
-                      children: [
-                        // 第一个白色区域：输入和结果
-                        Container(
-                          margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(borderRadiusSmall),
-                            boxShadow: [defaultShadow],
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.01),
+          child: Column(
+            children: [
+              // 输入与结果直接布局在背景上。
+              Container(
+                margin: const EdgeInsets.fromLTRB(4, 0, 4, 16),
+                child: Padding(
+                  padding: EdgeInsets.all(innerPadding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // 歌曲定数输入
+                      Text(
+                        '歌曲定数（1.0-15.0）',
+                        style: TextStyle(
+                          fontSize: subtitleFontSize,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.linkBlue(brightness),
+                        ),
+                      ),
+                      SizedBox(height: smallSpacing),
+                      TextField(
+                        controller: _difficultyController,
+                        keyboardType: TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d{0,1}'),
                           ),
-                          child: Padding(
-                            padding: EdgeInsets.all(innerPadding),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                // 歌曲定数输入
-                                Text(
-                                  '歌曲定数（1.0-15.0）',
-                                  style: TextStyle(
-                                    fontSize: subtitleFontSize,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.linkBlue(brightness),
-                                  ),
-                                ),
-                                SizedBox(height: smallSpacing),
-                                TextField(
-                                  controller: _difficultyController,
-                                  keyboardType: TextInputType.numberWithOptions(decimal: true),
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,1}')),
-                                  ],
-                                  decoration: InputDecoration(
-                                    border: OutlineInputBorder(),
-                                    hintText: '请输入歌曲定数',
-                                    contentPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.03, vertical: screenHeight * 0.01),
-                                  ),
-                                ),
-                                if (_difficultyError != null)
-                                  Padding(
-                                    padding: EdgeInsets.only(top: smallSpacing * 0.5),
-                                    child: Text(
-                                      _difficultyError!,
-                                      style: TextStyle(
-                                        fontSize: smallFontSize,
-                                        color: AppColors.errorRed(brightness),
-                                      ),
-                                    ),
-                                  ),
-                                SizedBox(height: mediumSpacing),
-
-                                // 达成率输入
-                                Text(
-                                  '达成率（%）',
-                                  style: TextStyle(
-                                    fontSize: subtitleFontSize,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.linkBlue(brightness),
-                                  ),
-                                ),
-                                SizedBox(height: smallSpacing),
-                                TextField(
-                                  controller: _completionController,
-                                  keyboardType: TextInputType.numberWithOptions(decimal: true),
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,4}')),
-                                  ],
-                                  decoration: InputDecoration(
-                                    border: OutlineInputBorder(),
-                                    hintText: '请输入达成率',
-                                    contentPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.03, vertical: screenHeight * 0.01),
-                                  ),
-                                ),
-                                if (_completionError != null)
-                                  Padding(
-                                    padding: EdgeInsets.only(top: smallSpacing * 0.5),
-                                    child: Text(
-                                      _completionError!,
-                                      style: TextStyle(
-                                        fontSize: smallFontSize,
-                                        color: AppColors.errorRed(brightness),
-                                      ),
-                                    ),
-                                  ),
-                                SizedBox(height: mediumSpacing),
-
-                                // 预留的深色结果区域
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[800],
-                                    borderRadius: BorderRadius.circular(borderRadius),
-                                  ),
-                                  padding: EdgeInsets.all(innerPadding),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      Text('计算结果',
-                                        style: TextStyle(
-                                          fontSize: subtitleFontSize,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                      SizedBox(height: mediumSpacing),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text('评级:', style: TextStyle(color: Colors.white, fontSize: bodyFontSize)),
-                                          Text(
-                                            _showResults ? _rating : '-',
-                                            style: TextStyle(
-                                              fontSize: subtitleFontSize,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      SizedBox(height: smallSpacing),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text('乘数:', style: TextStyle(color: Colors.white, fontSize: bodyFontSize)),
-                                          Text(
-                                            _showResults ? _multiplier.toString() : '-',
-                                            style: TextStyle(
-                                              fontSize: subtitleFontSize,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      SizedBox(height: smallSpacing),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text('单曲Rating:', style: TextStyle(color: Colors.white, fontSize: bodyFontSize)),
-                                          Text(
-                                            _showResults ? _singleRating.toString() : '-',
-                                            style: TextStyle(
-                                              fontSize: subtitleFontSize,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      // 等效定数推算
-                                      if (_showResults && _singleRating > 0) ...[
-                                        SizedBox(height: mediumSpacing),
-                                        Divider(color: Colors.white30, height: 1),
-                                        SizedBox(height: smallSpacing),
-                                        Text(
-                                          '等效定数对照',
-                                          style: TextStyle(
-                                            fontSize: subtitleFontSize,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white70,
-                                          ),
-                                        ),
-                                        SizedBox(height: smallSpacing),
-                                        ..._buildEquivalentRows(),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                SizedBox(height: mediumSpacing),
-
-                                // 计算按钮 - 放到第一个白色区域的最下方
-                                ElevatedButton(
-                                  onPressed: _calculateSingleRating,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue,
-                                    foregroundColor: Colors.white,
-                                    padding: EdgeInsets.symmetric(vertical: screenHeight * 0.02),
-                                    textStyle: TextStyle(
-                                      fontSize: buttonFontSize,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(borderRadius),
-                                    ),
-                                    elevation: 5,
-                                  ),
-                                  child: const Text('计算Rating'),
-                                ),
-                              ],
+                        ],
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(),
+                          hintText: '请输入歌曲定数',
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: screenWidth * 0.03,
+                            vertical: screenHeight * 0.01,
+                          ),
+                        ),
+                      ),
+                      if (_difficultyError != null)
+                        Padding(
+                          padding: EdgeInsets.only(top: smallSpacing * 0.5),
+                          child: Text(
+                            _difficultyError!,
+                            style: TextStyle(
+                              fontSize: smallFontSize,
+                              color: AppColors.errorRed(brightness),
                             ),
                           ),
                         ),
+                      SizedBox(height: mediumSpacing),
 
-                        // 第二个白色区域：评级对照表
-                        Container(
-                          margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(borderRadiusSmall),
-                            boxShadow: [defaultShadow],
+                      // 达成率输入
+                      Text(
+                        '达成率（%）',
+                        style: TextStyle(
+                          fontSize: subtitleFontSize,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.linkBlue(brightness),
+                        ),
+                      ),
+                      SizedBox(height: smallSpacing),
+                      TextField(
+                        controller: _completionController,
+                        keyboardType: TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d{0,4}'),
                           ),
-                          child: Padding(
-                            padding: EdgeInsets.all(innerPadding),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                // 计算公式
-                                Text(
-                                  '单曲Rating = 定数 * 乘数 * 达成率',
-                                  style: TextStyle(
-                                    fontSize: subtitleFontSize,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.linkBlue(brightness),
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                Text(
-                                  '（保留整数部分）',
-                                  style: TextStyle(
-                                    fontSize: subtitleFontSize,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.linkBlue(brightness),
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                SizedBox(height: mediumSpacing),
-
-                                // 表格
-                                Table(
-                                  border: TableBorder.all(color: AppColors.tableBorder(brightness)),
-                                  children: [
-                                    // 表头
-                                    TableRow(
-                                      children: [
-                                        TableCell(
-                                          child: Padding(
-                                            padding: EdgeInsets.all(smallSpacing * 2),
-                                            child: Text(
-                                              '完成度',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: smallFontSize,
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          ),
-                                        ),
-                                        TableCell(
-                                          child: Padding(
-                                            padding: EdgeInsets.all(smallSpacing * 2),
-                                            child: Text(
-                                              '评级',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: smallFontSize,
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          ),
-                                        ),
-                                        TableCell(
-                                          child: Padding(
-                                            padding: EdgeInsets.all(smallSpacing * 2),
-                                            child: Text(
-                                              '乘数',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: smallFontSize,
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    // 表格内容
-                                    ...maimaiRatingMultiplier.map((item) {
-                                      return TableRow(
-                                        children: [
-                                          TableCell(
-                                            child: Padding(
-                                              padding: EdgeInsets.all(smallSpacing * 2),
-                                              child: Text(
-                                                item['completion'].toString(),
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(fontSize: smallFontSize),
-                                              ),
-                                            ),
-                                          ),
-                                          TableCell(
-                                            child: Padding(
-                                              padding: EdgeInsets.all(smallSpacing * 2),
-                                              child: Text(
-                                                item['rating'],
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(fontSize: smallFontSize),
-                                              ),
-                                            ),
-                                          ),
-                                          TableCell(
-                                            child: Padding(
-                                              padding: EdgeInsets.all(smallSpacing * 2),
-                                              child: Text(
-                                                item['multiplier'].toString(),
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(fontSize: smallFontSize),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      );
-                                    }).toList(),
-                                  ],
-                                ),
-                              ],
+                        ],
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(),
+                          hintText: '请输入达成率',
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: screenWidth * 0.03,
+                            vertical: screenHeight * 0.01,
+                          ),
+                        ),
+                      ),
+                      if (_completionError != null)
+                        Padding(
+                          padding: EdgeInsets.only(top: smallSpacing * 0.5),
+                          child: Text(
+                            _completionError!,
+                            style: TextStyle(
+                              fontSize: smallFontSize,
+                              color: AppColors.errorRed(brightness),
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      SizedBox(height: mediumSpacing),
+
+                      // 预留的深色结果区域
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey[800],
+                          borderRadius: BorderRadius.circular(borderRadius),
+                        ),
+                        padding: EdgeInsets.all(innerPadding),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              '计算结果',
+                              style: TextStyle(
+                                fontSize: subtitleFontSize,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(height: mediumSpacing),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '评级:',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: bodyFontSize,
+                                  ),
+                                ),
+                                Text(
+                                  _showResults ? _rating : '-',
+                                  style: TextStyle(
+                                    fontSize: subtitleFontSize,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: smallSpacing),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '乘数:',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: bodyFontSize,
+                                  ),
+                                ),
+                                Text(
+                                  _showResults ? _multiplier.toString() : '-',
+                                  style: TextStyle(
+                                    fontSize: subtitleFontSize,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: smallSpacing),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '单曲Rating:',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: bodyFontSize,
+                                  ),
+                                ),
+                                Text(
+                                  _showResults ? _singleRating.toString() : '-',
+                                  style: TextStyle(
+                                    fontSize: subtitleFontSize,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            // 等效定数推算
+                            if (_showResults && _singleRating > 0) ...[
+                              SizedBox(height: mediumSpacing),
+                              Divider(color: Colors.white30, height: 1),
+                              SizedBox(height: smallSpacing),
+                              Text(
+                                '等效定数对照',
+                                style: TextStyle(
+                                  fontSize: subtitleFontSize,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              SizedBox(height: smallSpacing),
+                              ..._buildEquivalentRows(),
+                            ],
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: mediumSpacing),
+
+                      // 计算按钮位于输入区域下方。
+                      ElevatedButton(
+                        onPressed: _calculateSingleRating,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(
+                            vertical: screenHeight * 0.02,
+                          ),
+                          textStyle: TextStyle(
+                            fontSize: buttonFontSize,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(borderRadius),
+                          ),
+                          elevation: 5,
+                        ),
+                        child: const Text('计算Rating'),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ],
+              ),
+
+              // 对照表改为平面分组，避免在页面背景上再叠一层浮起卡片。
+              PageSection(
+                surface: false,
+                margin: const EdgeInsets.fromLTRB(4, 0, 4, 16),
+                padding: EdgeInsets.all(innerPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // 计算公式
+                    Text(
+                      '单曲Rating = 定数 * 乘数 * 达成率',
+                      style: TextStyle(
+                        fontSize: subtitleFontSize,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.linkBlue(brightness),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    Text(
+                      '（保留整数部分）',
+                      style: TextStyle(
+                        fontSize: subtitleFontSize,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.linkBlue(brightness),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: mediumSpacing),
+
+                    // 表格
+                    Table(
+                      border: TableBorder.all(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                      children: [
+                        // 表头
+                        TableRow(
+                          children: [
+                            TableCell(
+                              child: Padding(
+                                padding: EdgeInsets.all(smallSpacing * 2),
+                                child: Text(
+                                  '完成度',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: smallFontSize,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                            TableCell(
+                              child: Padding(
+                                padding: EdgeInsets.all(smallSpacing * 2),
+                                child: Text(
+                                  '评级',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: smallFontSize,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                            TableCell(
+                              child: Padding(
+                                padding: EdgeInsets.all(smallSpacing * 2),
+                                child: Text(
+                                  '乘数',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: smallFontSize,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        // 表格内容
+                        ...maimaiRatingMultiplier.map((item) {
+                          return TableRow(
+                            children: [
+                              TableCell(
+                                child: Padding(
+                                  padding: EdgeInsets.all(smallSpacing * 2),
+                                  child: Text(
+                                    item['completion'].toString(),
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontSize: smallFontSize),
+                                  ),
+                                ),
+                              ),
+                              TableCell(
+                                child: Padding(
+                                  padding: EdgeInsets.all(smallSpacing * 2),
+                                  child: Text(
+                                    item['rating'],
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontSize: smallFontSize),
+                                  ),
+                                ),
+                              ),
+                              TableCell(
+                                child: Padding(
+                                  padding: EdgeInsets.all(smallSpacing * 2),
+                                  child: Text(
+                                    item['multiplier'].toString(),
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontSize: smallFontSize),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

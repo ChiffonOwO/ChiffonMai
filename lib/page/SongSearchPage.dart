@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/service/SongSearchService.dart';
+import 'package:my_first_flutter_app/service/SongSearchHistoryStore.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
@@ -8,10 +9,9 @@ import 'package:my_first_flutter_app/entity/DXRating/MaiTagsModel.dart';
 import 'dart:async';
 
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
-import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/BackgroundPageScaffold.dart';
 import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
 import 'package:my_first_flutter_app/constant/GenreListConstant.dart';
 
@@ -30,6 +30,10 @@ class _SongSearchPageState extends State<SongSearchPage> {
   String? _errorMessage;
   TextEditingController _searchController = TextEditingController();
   Timer? _searchTimer;
+  final _historyStore = SongSearchHistoryStore();
+  List<String> _searchHistory = [];
+  bool _showSearchHistory = false;
+  int _searchGeneration = 0;
 
   // 只按歌名搜索开关
   bool _searchByTitleOnly = false;
@@ -59,13 +63,13 @@ class _SongSearchPageState extends State<SongSearchPage> {
   List<int> _selectedTagIds = [];
   String? _selectedCharter;
   String? _selectedArtist;
-  
+
   // 标签数据
   Map<int, String> _tagIdToNameMap = {};
   Map<int, (String, int)> _tagIdToInfoMap = {};
   List<TagGroupItem> _tagGroups = [];
   bool _isLoadingTags = false;
-  
+
   // 歌曲标签信息缓存
   Map<String, List<String>> _songTagInfoCache = {};
   MaiTagsEntity? _cachedTagsEntity;
@@ -89,6 +93,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
     super.initState();
     _loadTagData();
     _loadFilterLists();
+    unawaited(_loadSearchHistory());
   }
 
   // 加载谱师和曲师列表
@@ -155,6 +160,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
 
   // 执行搜索
   Future<void> _performSearch(String query) async {
+    query = query.trim();
+    final generation = ++_searchGeneration;
+    if (!mounted) return;
     // 检查是否所有筛选条件都为空
     bool allFiltersEmpty = query.isEmpty &&
         _minLevelController.text.isEmpty &&
@@ -195,7 +203,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
         results = await MaimaiMusicDataManager().getCachedSongs() ?? [];
       } else {
         // 当输入框不为空时，执行搜索
-        results = await SongSearchService.searchSongs(query, titleOnly: _searchByTitleOnly);
+        results = await SongSearchService.searchSongs(query,
+            titleOnly: _searchByTitleOnly);
       }
 
       // 应用筛选条件
@@ -282,7 +291,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
           return _selectedVersions.contains(song.basicInfo.from);
         }).toList();
         // 额外歌曲（union独有）不参与版本筛选结果
-        filteredResults = filteredResults.where((song) => !song.isExtra).toList();
+        filteredResults =
+            filteredResults.where((song) => !song.isExtra).toList();
       }
 
       // 应用流派筛选
@@ -295,8 +305,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
       // 应用谱师筛选（歌曲的任意谱面包含所选谱师即可）
       if (_selectedCharter != null) {
         filteredResults = filteredResults.where((song) {
-          return song.charts.any(
-              (chart) => chart.charter == _selectedCharter);
+          return song.charts.any((chart) => chart.charter == _selectedCharter);
         }).toList();
       }
 
@@ -311,42 +320,43 @@ class _SongSearchPageState extends State<SongSearchPage> {
       if (_selectedTagIds.isNotEmpty) {
         debugPrint('=== 标签筛选开始 ===');
         debugPrint('所选标签ID: $_selectedTagIds');
-        
+
         // 获取标签数据
         final maiTagsManager = MaiTagsManager();
         final tagsEntity = await maiTagsManager.getTags();
-        
+
         // 缓存标签数据供后续使用
         _cachedTagsEntity = tagsEntity;
-        
+
         if (tagsEntity != null) {
           debugPrint('标签数据加载成功，tagSongs数量: ${tagsEntity.tagSongs.length}');
-          
+
           // 预构建高效的搜索映射：(songId, sheetType, sheetDifficulty) -> List<tagId>
           Map<String, Set<int>> tagMap = {};
           for (var tagSong in tagsEntity.tagSongs) {
-            String key = '${tagSong.songId}|${tagSong.sheetType}|${tagSong.sheetDifficulty}';
+            String key =
+                '${tagSong.songId}|${tagSong.sheetType}|${tagSong.sheetDifficulty}';
             if (!tagMap.containsKey(key)) {
               tagMap[key] = {};
             }
             tagMap[key]!.add(tagSong.tagId);
           }
           debugPrint('构建了 ${tagMap.length} 个谱面的标签映射');
-          
+
           // 构建所选标签的集合
           Set<int> selectedTagSet = Set.from(_selectedTagIds);
-          
+
           // 获取标签名称映射
           final tagIdToNameMap = await maiTagsManager.getTagIdToNameMap();
-          
+
           // 清空并重建歌曲标签信息缓存
           _songTagInfoCache.clear();
-          
+
           int matchCount = 0;
           filteredResults = filteredResults.where((song) {
             // 获取歌曲标题和类型
             final String songTitle = song.basicInfo.title;
-            
+
             // 根据歌曲类型确定sheetType（支持std, dx, utage）
             String sheetType;
             if (song.type == 'DX') {
@@ -357,20 +367,20 @@ class _SongSearchPageState extends State<SongSearchPage> {
             } else {
               sheetType = 'std';
             }
-            
+
             // 为当前歌曲构建标签信息
             List<String> tagInfoList = [];
-            
+
             // 遍历所有难度，检查是否有匹配的标签（根据难度索引确定难度名称）
             for (int i = 0; i < song.level.length; i++) {
               // 根据难度索引确定难度名称
               String sheetDifficulty = _getDifficultyByIndex(i);
               String difficultyDisplayName = _getDifficultyDisplayName(i);
-              
+
               // 构建查找键
               String key = '$songTitle|$sheetType|$sheetDifficulty';
               Set<int>? tagIds = tagMap[key];
-              
+
               if (tagIds != null && tagIds.isNotEmpty) {
                 // 构建该难度的标签信息（只显示用户所选的标签）
                 List<String> tagNames = [];
@@ -382,16 +392,18 @@ class _SongSearchPageState extends State<SongSearchPage> {
                     }
                   }
                 }
-                
+
                 if (tagNames.isNotEmpty) {
-                  tagInfoList.add('${difficultyDisplayName}：${tagNames.join('、')}');
+                  tagInfoList
+                      .add('${difficultyDisplayName}：${tagNames.join('、')}');
                 }
-                
+
                 // 检查是否有交集
                 for (int tagId in selectedTagSet) {
                   if (tagIds.contains(tagId)) {
                     matchCount++;
-                    debugPrint('匹配成功: 歌曲[$songTitle], 类型[$sheetType], 难度[$sheetDifficulty], 标签ID[$tagId]');
+                    debugPrint(
+                        '匹配成功: 歌曲[$songTitle], 类型[$sheetType], 难度[$sheetDifficulty], 标签ID[$tagId]');
                     // 缓存标签信息
                     _songTagInfoCache[songTitle] = tagInfoList;
                     return true;
@@ -399,24 +411,25 @@ class _SongSearchPageState extends State<SongSearchPage> {
                 }
               }
             }
-            
+
             // 即使不匹配筛选条件，也缓存标签信息
             if (tagInfoList.isNotEmpty) {
               _songTagInfoCache[songTitle] = tagInfoList;
             }
-            
+
             return false;
           }).toList();
-          
+
           debugPrint('标签筛选完成，匹配到 $matchCount 首歌曲');
         } else {
           debugPrint('标签数据加载失败！');
           filteredResults = [];
         }
-        
+
         debugPrint('=== 标签筛选结束 ===');
       }
 
+      if (!mounted || generation != _searchGeneration) return;
       setState(() {
         _allSearchResults = filteredResults;
         _totalItems = filteredResults.length;
@@ -425,7 +438,16 @@ class _SongSearchPageState extends State<SongSearchPage> {
         _updateCurrentPageResults(); // 更新当前页结果
         _isSearching = false;
       });
+      if (query.isNotEmpty) {
+        try {
+          final items = await _historyStore.remember(query);
+          if (mounted) setState(() => _searchHistory = items);
+        } catch (e) {
+          debugPrint('保存搜索历史失败: $e');
+        }
+      }
     } catch (e) {
+      if (!mounted || generation != _searchGeneration) return;
       setState(() {
         _errorMessage = '搜索失败：$e';
         _isSearching = false;
@@ -455,6 +477,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
 
   // 防抖搜索
   void _debouncedSearch(String query) {
+    _searchGeneration++;
+    setState(() {});
     // 取消之前的定时器
     _searchTimer?.cancel();
 
@@ -471,6 +495,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
 
   // 防抖筛选
   void _debouncedFilter() {
+    _searchGeneration++;
     // 取消之前的定时器
     _searchTimer?.cancel();
 
@@ -482,6 +507,93 @@ class _SongSearchPageState extends State<SongSearchPage> {
   }
 
   // 构建定数筛选组件
+  Future<void> _loadSearchHistory() async {
+    try {
+      final items = await _historyStore.load();
+      if (mounted) setState(() => _searchHistory = items);
+    } catch (e) {
+      debugPrint('读取搜索历史失败: $e');
+    }
+  }
+
+  void _submitSearch(String query) {
+    _searchTimer?.cancel();
+    setState(() => _showSearchHistory = false);
+    unawaited(_performSearch(query));
+  }
+
+  void _repeatSearch(String query) {
+    _searchController.value = TextEditingValue(
+      text: query,
+      selection: TextSelection.collapsed(offset: query.length),
+    );
+    FocusScope.of(context).unfocus();
+    _submitSearch(query);
+  }
+
+  Future<void> _changeHistory({String? remove, bool clear = false}) async {
+    try {
+      final items = clear
+          ? await _historyStore.clear()
+          : await _historyStore.remove(remove!);
+      if (mounted) setState(() => _searchHistory = items);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('搜索历史更新失败，请重试')),
+        );
+      }
+    }
+  }
+
+  Widget _buildSearchHistory() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.history, size: 18),
+            const SizedBox(width: 6),
+            const Expanded(child: Text('搜索历史')),
+            TextButton(
+              onPressed: () => _changeHistory(clear: true),
+              child: const Text('清空'),
+            ),
+          ]),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: _searchHistory.map((query) => InputChip(
+              label: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width * 0.65,
+                ),
+                child: Text(query, maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+              onPressed: () => _repeatSearch(query),
+              onDeleted: () => _changeHistory(remove: query),
+              deleteButtonTooltipMessage: '删除这条搜索历史',
+              backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+            )).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterExpansion({
+    required bool visible,
+    required Widget child,
+  }) {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeInOutCubic,
+      alignment: Alignment.topCenter,
+      child: visible ? child : const SizedBox.shrink(),
+    );
+  }
+
   Widget _buildLevelFilter(double screenWidth, double screenHeight) {
     // 生成已选内容文本
     String selectedLevelText = '';
@@ -524,7 +636,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
                               selectedLevelText,
                               style: TextStyle(
                                 fontSize: screenWidth * 0.03,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                               ),
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
@@ -542,8 +656,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
             ),
           ),
         ),
-        if (_showLevelFilter)
-          Container(
+        _buildFilterExpansion(
+          visible: _showLevelFilter,
+          child: Container(
             padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01),
             child: Row(
               children: [
@@ -556,7 +671,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(4.0),
                       ),
-                      contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                      contentPadding:
+                          EdgeInsets.symmetric(vertical: 8, horizontal: 10),
                     ),
                     onChanged: (value) {
                       _debouncedFilter();
@@ -573,7 +689,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(4.0),
                       ),
-                      contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                      contentPadding:
+                          EdgeInsets.symmetric(vertical: 8, horizontal: 10),
                     ),
                     onChanged: (value) {
                       _debouncedFilter();
@@ -588,6 +705,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
               ],
             ),
           ),
+        ),
       ],
     );
   }
@@ -635,7 +753,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
                               selectedNotesText,
                               style: TextStyle(
                                 fontSize: screenWidth * 0.03,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                               ),
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
@@ -653,8 +773,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
             ),
           ),
         ),
-        if (_showNotesFilter)
-          Container(
+        _buildFilterExpansion(
+          visible: _showNotesFilter,
+          child: Container(
             padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01),
             child: Row(
               children: [
@@ -667,7 +788,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(4.0),
                       ),
-                      contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                      contentPadding:
+                          EdgeInsets.symmetric(vertical: 8, horizontal: 10),
                     ),
                     onChanged: (value) {
                       _debouncedFilter();
@@ -684,7 +806,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(4.0),
                       ),
-                      contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                      contentPadding:
+                          EdgeInsets.symmetric(vertical: 8, horizontal: 10),
                     ),
                     onChanged: (value) {
                       _debouncedFilter();
@@ -699,6 +822,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
               ],
             ),
           ),
+        ),
       ],
     );
   }
@@ -746,7 +870,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
                               selectedBpmText,
                               style: TextStyle(
                                 fontSize: screenWidth * 0.03,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                               ),
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
@@ -764,8 +890,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
             ),
           ),
         ),
-        if (_showBpmFilter)
-          Container(
+        _buildFilterExpansion(
+          visible: _showBpmFilter,
+          child: Container(
             padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01),
             child: Row(
               children: [
@@ -778,7 +905,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(4.0),
                       ),
-                      contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                      contentPadding:
+                          EdgeInsets.symmetric(vertical: 8, horizontal: 10),
                     ),
                     onChanged: (value) {
                       _debouncedFilter();
@@ -795,7 +923,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(4.0),
                       ),
-                      contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                      contentPadding:
+                          EdgeInsets.symmetric(vertical: 8, horizontal: 10),
                     ),
                     onChanged: (value) {
                       _debouncedFilter();
@@ -810,6 +939,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
               ],
             ),
           ),
+        ),
       ],
     );
   }
@@ -853,7 +983,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
                               selectedVersionsText,
                               style: TextStyle(
                                 fontSize: screenWidth * 0.03,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                               ),
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
@@ -871,8 +1003,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
             ),
           ),
         ),
-        if (_showVersionFilter)
-          Container(
+        _buildFilterExpansion(
+          visible: _showVersionFilter,
+          child: Container(
             padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01),
             child: Wrap(
               spacing: screenWidth * 0.02,
@@ -899,6 +1032,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
               }).toList(),
             ),
           ),
+        ),
       ],
     );
   }
@@ -941,7 +1075,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
                               selectedGenresText,
                               style: TextStyle(
                                 fontSize: screenWidth * 0.03,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                               ),
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
@@ -959,8 +1095,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
             ),
           ),
         ),
-        if (_showGenreFilter)
-          Container(
+        _buildFilterExpansion(
+          visible: _showGenreFilter,
+          child: Container(
             padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01),
             child: Wrap(
               spacing: screenWidth * 0.02,
@@ -987,6 +1124,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
               }).toList(),
             ),
           ),
+        ),
       ],
     );
   }
@@ -1031,7 +1169,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
                               selectedTagsText,
                               style: TextStyle(
                                 fontSize: screenWidth * 0.03,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                               ),
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
@@ -1049,8 +1189,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
             ),
           ),
         ),
-        if (_showTagFilter)
-          Container(
+        _buildFilterExpansion(
+          visible: _showTagFilter,
+          child: Container(
             padding: EdgeInsets.symmetric(vertical: screenHeight * 0.01),
             child: _isLoadingTags
                 ? Center(
@@ -1069,7 +1210,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
                             '暂无标签数据',
                             style: TextStyle(
                               fontSize: screenWidth * 0.03,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                           ),
                         ),
@@ -1093,7 +1236,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
                               // 分组标题
                               Padding(
                                 padding: EdgeInsets.only(
-                                  top: groupIndex == 0 ? 0 : screenHeight * 0.005,
+                                  top: groupIndex == 0
+                                      ? 0
+                                      : screenHeight * 0.005,
                                   bottom: screenHeight * 0.008,
                                 ),
                                 child: Text(
@@ -1101,7 +1246,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                   style: TextStyle(
                                     fontSize: screenWidth * 0.032,
                                     fontWeight: FontWeight.bold,
-                                    color: Theme.of(context).colorScheme.onSurface,
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -1110,11 +1256,13 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                 spacing: screenWidth * 0.02,
                                 runSpacing: screenHeight * 0.008,
                                 children: tagsInGroup.map((tagId) {
-                                  String tagName = _tagIdToNameMap[tagId] ?? '未知标签';
+                                  String tagName =
+                                      _tagIdToNameMap[tagId] ?? '未知标签';
                                   return FilterChip(
                                     label: Text(
                                       tagName,
-                                      style: TextStyle(fontSize: screenWidth * 0.028),
+                                      style: TextStyle(
+                                          fontSize: screenWidth * 0.028),
                                     ),
                                     selected: _selectedTagIds.contains(tagId),
                                     onSelected: (selected) {
@@ -1136,6 +1284,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                         },
                       ),
           ),
+        ),
       ],
     );
   }
@@ -1243,11 +1392,14 @@ class _SongSearchPageState extends State<SongSearchPage> {
                     const SizedBox(width: 4),
                     GestureDetector(
                       onTap: onClear,
-                      child: Icon(Icons.close, size: screenWidth * 0.04,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      child: Icon(Icons.close,
+                          size: screenWidth * 0.04,
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                   ],
-                  Icon(Icons.chevron_right, size: screenWidth * 0.04,
+                  Icon(Icons.chevron_right,
+                      size: screenWidth * 0.04,
                       color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ],
               ),
@@ -1279,7 +1431,9 @@ class _SongSearchPageState extends State<SongSearchPage> {
             final query = filterQuery.toLowerCase();
             final filtered = query.isEmpty
                 ? fullList
-                : fullList.where((e) => e.toLowerCase().contains(query)).toList();
+                : fullList
+                    .where((e) => e.toLowerCase().contains(query))
+                    .toList();
 
             return AlertDialog(
               title: Text(title),
@@ -1298,7 +1452,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                              vertical: 10, horizontal: 12),
                         ),
                         onChanged: (v) => setDialogState(() => filterQuery = v),
                       ),
@@ -1321,13 +1476,16 @@ class _SongSearchPageState extends State<SongSearchPage> {
                                 title: Text(item,
                                     style: TextStyle(
                                       color: isSelected
-                                          ? AppColors.linkBlue(Theme.of(context).brightness)
+                                          ? AppColors.linkBlue(
+                                              Theme.of(context).brightness)
                                           : null,
-                                      fontWeight: isSelected ? FontWeight.bold : null,
+                                      fontWeight:
+                                          isSelected ? FontWeight.bold : null,
                                     )),
                                 trailing: isSelected
                                     ? Icon(Icons.check,
-                                        color: AppColors.linkBlue(Theme.of(context).brightness))
+                                        color: AppColors.linkBlue(
+                                            Theme.of(context).brightness))
                                     : null,
                                 onTap: () {
                                   onSelected(item);
@@ -1371,411 +1529,488 @@ class _SongSearchPageState extends State<SongSearchPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
 
-    final Color cardBgColor = Theme.of(context).colorScheme.surface.withOpacity(0.9);
-    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
-    final double borderRadiusSmall = 8.0;
-    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '歌曲搜索',
       resizeToAvoidBottomInset: false,
-      body: GestureDetector(
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
+      ),
+      child: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusScope.of(context).unfocus(),
-        child: Stack(
-          children: [
-            CommonWidgetUtil.buildCommonBgWidget(),
-            CommonWidgetUtil.buildCommonChiffonBgWidget(context),
+        child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        // 根据设备尺寸计算字体大小
+                        double screenWidth = MediaQuery.of(context).size.width;
+                        double screenHeight =
+                            MediaQuery.of(context).size.height;
 
-          Column(
-            children: [
-              // 标题栏统一走公共组件
-              const PageTopBar(title: '歌曲搜索'),
+                        // 基础字体大小
+                        double baseFontSize = screenWidth * 0.04;
+                        double smallFontSize = screenWidth * 0.035;
+                        double tinyFontSize = screenWidth * 0.03;
 
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: cardBgColor,
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
-                  ),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      // 根据设备尺寸计算字体大小
-                      double screenWidth = MediaQuery.of(context).size.width;
-                      double screenHeight = MediaQuery.of(context).size.height;
+                        // 边距
+                        double padding = screenWidth * 0.04;
 
-                      // 基础字体大小
-                      double baseFontSize = screenWidth * 0.04;
-                      double smallFontSize = screenWidth * 0.035;
-                      double tinyFontSize = screenWidth * 0.03;
-
-                      // 边距
-                      double padding = screenWidth * 0.04;
-
-                      return Column(
-                        children: [
-                          // 搜索输入框
-                          Padding(
-                            padding: EdgeInsets.all(padding),
-                            child: TextField(
-                              controller: _searchController,
-                              onChanged: (value) {
-                                // 防抖搜索
-                                _debouncedSearch(value);
-                              },
-                              decoration: InputDecoration(
-                                hintText: _searchByTitleOnly
-                                    ? '只按歌名搜索'
-                                    : '歌名/BPM/谱师/曲师/别名/歌曲ID/...',
-                                hintStyle: TextStyle(fontSize: smallFontSize),
-                                prefixIcon: const Icon(Icons.search),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8.0),
-                                ),
-                              ),
-                              style: TextStyle(fontSize: baseFontSize),
-                            ),
-                          ),
-
-                          // 只搜索歌名开关
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: padding),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.text_fields,
-                                  size: smallFontSize + 2,
-                                  color: _searchByTitleOnly
-                                      ? AppColors.linkBlue(brightness)
-                                      : Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
-                                SizedBox(width: 4),
-                                Text(
-                                  '只搜索歌名',
-                                  style: TextStyle(
-                                    fontSize: smallFontSize,
-                                    color: _searchByTitleOnly
-                                        ? AppColors.linkBlue(brightness)
-                                        : Theme.of(context).colorScheme.onSurfaceVariant,
-                                    fontWeight: _searchByTitleOnly
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
+                        return Column(
+                          children: [
+                            // 搜索输入框
+                            Padding(
+                              padding: EdgeInsets.all(padding),
+                              child: TextField(
+                                controller: _searchController,
+                                textInputAction: TextInputAction.search,
+                                onSubmitted: _submitSearch,
+                                onChanged: (value) {
+                                  // 防抖搜索
+                                  _debouncedSearch(value);
+                                },
+                                decoration: InputDecoration(
+                                  hintText: _searchByTitleOnly
+                                      ? '只按歌名搜索'
+                                      : '歌名/BPM/谱师/曲师/别名/歌曲ID/...',
+                                  hintStyle: TextStyle(fontSize: smallFontSize),
+                                  prefixIcon: const Icon(Icons.search),
+                                  suffixIcon: _searchHistory.isEmpty ? null : IconButton(
+                                    tooltip: '搜索历史',
+                                    icon: const Icon(Icons.history),
+                                    onPressed: () => setState(() {
+                                      _showSearchHistory = !_showSearchHistory;
+                                    }),
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8.0),
                                   ),
                                 ),
-                                Spacer(),
-                                Switch(
-                                  value: _searchByTitleOnly,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _searchByTitleOnly = value;
-                                    });
-                                    // 防抖触发一次搜索，立即响应
-                                    _debouncedSearch(_searchController.text);
-                                  },
-                                ),
-                              ],
+                                style: TextStyle(fontSize: baseFontSize),
+                              ),
                             ),
-                          ),
-                          SizedBox(height: screenHeight * 0.005),
 
-                          // 筛选条件、条目总数和搜索结果一起滚动
-                          Expanded(
-                            child: SingleChildScrollView(
-                              padding: EdgeInsets.only(left: padding, right: padding, bottom: padding),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                            // 只搜索歌名开关
+                            Padding(
+                              padding:
+                                  EdgeInsets.symmetric(horizontal: padding),
+                              child: Row(
                                 children: [
-                                  // 筛选按钮区域
-                                  if (_showAllFilters)
-                                    Column(
-                                      children: [
-                                        // 定数筛选
-                                        _buildLevelFilter(screenWidth, screenHeight),
-                                        SizedBox(height: screenHeight * 0.01),
+                                  Icon(
+                                    Icons.text_fields,
+                                    size: smallFontSize + 2,
+                                    color: _searchByTitleOnly
+                                        ? AppColors.linkBlue(brightness)
+                                        : Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    '只搜索歌名',
+                                    style: TextStyle(
+                                      fontSize: smallFontSize,
+                                      color: _searchByTitleOnly
+                                          ? AppColors.linkBlue(brightness)
+                                          : Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                      fontWeight: _searchByTitleOnly
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                  Spacer(),
+                                  Switch(
+                                    value: _searchByTitleOnly,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _searchByTitleOnly = value;
+                                      });
+                                      // 防抖触发一次搜索，立即响应
+                                      _debouncedSearch(_searchController.text);
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(height: screenHeight * 0.005),
 
-                                        // 物量筛选
-                                        _buildNotesFilter(screenWidth, screenHeight),
-                                        SizedBox(height: screenHeight * 0.01),
-
-                                        // BPM 筛选
-                                        _buildBpmFilter(screenWidth, screenHeight),
-                                        SizedBox(height: screenHeight * 0.01),
-
-                                        // 版本筛选
-                                        _buildVersionFilter(screenWidth, screenHeight),
-                                        SizedBox(height: screenHeight * 0.01),
-
-                                        // 流派筛选
-                                    _buildGenreFilter(screenWidth, screenHeight),
-                                    SizedBox(height: screenHeight * 0.01),
-
-                                    // 谱师筛选
-                                    _buildCharterFilter(screenWidth, screenHeight),
-                                    SizedBox(height: screenHeight * 0.01),
-
-                                    // 曲师筛选
-                                    _buildArtistFilter(screenWidth, screenHeight),
-                                    SizedBox(height: screenHeight * 0.01),
-
-                                    // 标签筛选
-                                    _buildTagFilter(screenWidth, screenHeight),
-                                    SizedBox(height: screenHeight * 0.01),
-                                  ],
-                                ),
-
-                              // 搜索结果数量显示
-                              if ((_searchController.text.isNotEmpty ||
-                                      _selectedVersions.isNotEmpty ||
-                                      _selectedGenres.isNotEmpty ||
-                                      _selectedTagIds.isNotEmpty ||
-                                      _selectedCharter != null ||
-                                      _selectedArtist != null ||
-                                      _minLevelController.text.isNotEmpty ||
-                                      _maxLevelController.text.isNotEmpty ||
-                                      _minNotesController.text.isNotEmpty ||
-                                      _maxNotesController.text.isNotEmpty ||
-                                      _minBpmController.text.isNotEmpty ||
-                                      _maxBpmController.text.isNotEmpty) &&
-                                  !_isSearching &&
-                                  _errorMessage == null)
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                            // 筛选条件、条目总数和搜索结果一起滚动
+                            Expanded(
+                              child: SingleChildScrollView(
+                                padding: EdgeInsets.only(
+                                    left: padding,
+                                    right: padding,
+                                    bottom: padding),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
                                   children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            '找到 $_totalItems 首乐曲，每页 15 首',
-                                            style: TextStyle(
-                                              fontSize: smallFontSize,
-                                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
+                                    if (_searchHistory.isNotEmpty &&
+                                        (_searchController.text.trim().isEmpty || _showSearchHistory))
+                                      _buildSearchHistory(),
+                                    // 筛选按钮区域
+                                    AnimatedCrossFade(
+                                      duration:
+                                          const Duration(milliseconds: 260),
+                                      sizeCurve: Curves.easeInOutCubic,
+                                      alignment: Alignment.topCenter,
+                                      firstChild: Column(
+                                        children: [
+                                          // 定数筛选
+                                          _buildLevelFilter(
+                                              screenWidth, screenHeight),
+                                          SizedBox(height: screenHeight * 0.01),
+
+                                          // 物量筛选
+                                          _buildNotesFilter(
+                                              screenWidth, screenHeight),
+                                          SizedBox(height: screenHeight * 0.01),
+
+                                          // BPM 筛选
+                                          _buildBpmFilter(
+                                              screenWidth, screenHeight),
+                                          SizedBox(height: screenHeight * 0.01),
+
+                                          // 版本筛选
+                                          _buildVersionFilter(
+                                              screenWidth, screenHeight),
+                                          SizedBox(height: screenHeight * 0.01),
+
+                                          // 流派筛选
+                                          _buildGenreFilter(
+                                              screenWidth, screenHeight),
+                                          SizedBox(height: screenHeight * 0.01),
+
+                                          // 谱师筛选
+                                          _buildCharterFilter(
+                                              screenWidth, screenHeight),
+                                          SizedBox(height: screenHeight * 0.01),
+
+                                          // 曲师筛选
+                                          _buildArtistFilter(
+                                              screenWidth, screenHeight),
+                                          SizedBox(height: screenHeight * 0.01),
+
+                                          // 标签筛选
+                                          _buildTagFilter(
+                                              screenWidth, screenHeight),
+                                          SizedBox(height: screenHeight * 0.01),
+                                        ],
+                                      ),
+                                      secondChild: const SizedBox(
+                                          width: double.infinity),
+                                      crossFadeState: _showAllFilters
+                                          ? CrossFadeState.showFirst
+                                          : CrossFadeState.showSecond,
+                                    ),
+
+                                    // 搜索结果数量显示
+                                    if ((_searchController.text.isNotEmpty ||
+                                            _selectedVersions.isNotEmpty ||
+                                            _selectedGenres.isNotEmpty ||
+                                            _selectedTagIds.isNotEmpty ||
+                                            _selectedCharter != null ||
+                                            _selectedArtist != null ||
+                                            _minLevelController
+                                                .text.isNotEmpty ||
+                                            _maxLevelController
+                                                .text.isNotEmpty ||
+                                            _minNotesController
+                                                .text.isNotEmpty ||
+                                            _maxNotesController
+                                                .text.isNotEmpty ||
+                                            _minBpmController.text.isNotEmpty ||
+                                            _maxBpmController
+                                                .text.isNotEmpty) &&
+                                        !_isSearching &&
+                                        _errorMessage == null)
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  '找到 $_totalItems 首乐曲，每页 15 首',
+                                                  style: TextStyle(
+                                                    fontSize: smallFontSize,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              SizedBox(
+                                                  width: screenWidth * 0.02),
+                                              ElevatedButton(
+                                                onPressed: () {
+                                                  setState(() {
+                                                    _searchController.clear();
+                                                    _minLevelController.clear();
+                                                    _maxLevelController.clear();
+                                                    _minNotesController.clear();
+                                                    _maxNotesController.clear();
+                                                    _minBpmController.clear();
+                                                    _maxBpmController.clear();
+                                                    _selectedVersions.clear();
+                                                    _selectedGenres.clear();
+                                                    _selectedTagIds.clear();
+                                                    _selectedCharter = null;
+                                                    _selectedArtist = null;
+                                                    _showAllFilters = true;
+                                                    _performSearch('');
+                                                  });
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            4),
+                                                  ),
+                                                  padding: EdgeInsets.symmetric(
+                                                    horizontal:
+                                                        screenWidth * 0.02,
+                                                    vertical:
+                                                        screenHeight * 0.005,
+                                                  ),
+                                                  minimumSize: Size(
+                                                      screenWidth * 0.15, 30),
+                                                  backgroundColor:
+                                                      AppColors.errorRed(
+                                                          brightness),
+                                                  foregroundColor: Colors.white,
+                                                ),
+                                                child: Text(
+                                                  '重置',
+                                                  style: TextStyle(
+                                                      fontSize: tinyFontSize),
+                                                ),
+                                              ),
+                                              SizedBox(
+                                                  width: screenWidth * 0.01),
+                                              ElevatedButton(
+                                                onPressed: () {
+                                                  setState(() {
+                                                    _showAllFilters =
+                                                        !_showAllFilters;
+                                                  });
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            4),
+                                                  ),
+                                                  padding: EdgeInsets.symmetric(
+                                                    horizontal:
+                                                        screenWidth * 0.02,
+                                                    vertical:
+                                                        screenHeight * 0.005,
+                                                  ),
+                                                  minimumSize: Size(
+                                                      screenWidth * 0.15, 30),
+                                                  backgroundColor:
+                                                      AppColors.linkBlue(
+                                                          brightness),
+                                                  foregroundColor: Colors.white,
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      _showAllFilters
+                                                          ? Icons.expand_less
+                                                          : Icons.expand_more,
+                                                      size: 16,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      _showAllFilters
+                                                          ? '收起筛选'
+                                                          : '展开筛选',
+                                                      style: TextStyle(
+                                                        fontSize: tinyFontSize,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+
+                                    SizedBox(height: screenHeight * 0.01),
+                                    // 加载状态
+                                    if (_isSearching)
+                                      Center(
+                                        child: Padding(
+                                          padding: EdgeInsets.all(
+                                              screenHeight * 0.1),
+                                          child: Column(
+                                            children: [
+                                              CircularProgressIndicator(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurface,
+                                              ),
+                                              SizedBox(
+                                                  height: screenHeight * 0.02),
+                                              Text(
+                                                '正在搜索...',
+                                                style: TextStyle(
+                                                    fontSize: baseFontSize,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurfaceVariant),
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                        SizedBox(width: screenWidth * 0.02),
-                                        ElevatedButton(
-                                          onPressed: () {
-                                            setState(() {
-                                              _searchController.clear();
-                                              _minLevelController.clear();
-                                              _maxLevelController.clear();
-                                              _minNotesController.clear();
-                                              _maxNotesController.clear();
-                                              _minBpmController.clear();
-                                              _maxBpmController.clear();
-                                              _selectedVersions.clear();
-                                              _selectedGenres.clear();
-                                              _selectedTagIds.clear();
-                                              _selectedCharter = null;
-                                              _selectedArtist = null;
-                                              _showAllFilters = true;
-                                              _performSearch('');
-                                            });
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: screenWidth * 0.02,
-                                              vertical: screenHeight * 0.005,
-                                            ),
-                                            minimumSize: Size(screenWidth * 0.15, 30),
-                                            backgroundColor: AppColors.errorRed(brightness),
-                                            foregroundColor: Colors.white,
-                                          ),
-                                          child: Text(
-                                            '重置',
-                                            style: TextStyle(fontSize: tinyFontSize),
-                                          ),
-                                        ),
-                                        SizedBox(width: screenWidth * 0.01),
-                                        ElevatedButton(
-                                          onPressed: () {
-                                            setState(() {
-                                              _showAllFilters = !_showAllFilters;
-                                            });
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: screenWidth * 0.02,
-                                              vertical: screenHeight * 0.005,
-                                            ),
-                                            minimumSize: Size(screenWidth * 0.15, 30),
-                                            backgroundColor: AppColors.linkBlue(brightness),
-                                            foregroundColor: Colors.white,
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
+                                      )
+                                    // 错误状态
+                                    else if (_errorMessage != null)
+                                      Center(
+                                        child: Padding(
+                                          padding: EdgeInsets.all(
+                                              screenHeight * 0.1),
+                                          child: Column(
                                             children: [
                                               Icon(
-                                                _showAllFilters ? Icons.expand_less : Icons.expand_more,
-                                                size: 16,
+                                                Icons.error_outline,
+                                                color: AppColors.errorRed(
+                                                    brightness),
+                                                size: screenWidth * 0.12,
                                               ),
-                                              const SizedBox(width: 4),
+                                              SizedBox(
+                                                  height: screenHeight * 0.02),
                                               Text(
-                                                _showAllFilters ? '收起筛选' : '展开筛选',
+                                                _errorMessage!,
+                                                textAlign: TextAlign.center,
                                                 style: TextStyle(
-                                                  fontSize: tinyFontSize,
+                                                  color: AppColors.errorRed(
+                                                      brightness),
+                                                  fontSize: baseFontSize,
                                                 ),
                                               ),
                                             ],
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              
-                              SizedBox(height: screenHeight * 0.01),
-                              // 加载状态
-                              if (_isSearching)
-                                Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.all(screenHeight * 0.1),
-                                    child: Column(
-                                      children: [
-                                        CircularProgressIndicator(
-                                          color: Theme.of(context).colorScheme.onSurface,
-                                        ),
-                                        SizedBox(height: screenHeight * 0.02),
-                                        Text(
-                                          '正在搜索...',
-                                          style: TextStyle(fontSize: baseFontSize, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                              // 错误状态
-                              else if (_errorMessage != null)
-                                Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.all(screenHeight * 0.1),
-                                    child: Column(
-                                      children: [
-                                        Icon(
-                                          Icons.error_outline,
-                                          color: AppColors.errorRed(brightness),
-                                          size: screenWidth * 0.12,
-                                        ),
-                                        SizedBox(height: screenHeight * 0.02),
-                                        Text(
-                                          _errorMessage!,
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: AppColors.errorRed(brightness),
-                                            fontSize: baseFontSize,
+                                      )
+                                    else if (_allSearchResults.isEmpty &&
+                                        _searchController.text.isNotEmpty)
+                                      Center(
+                                        child: Padding(
+                                          padding: EdgeInsets.all(
+                                              screenHeight * 0.1),
+                                          child: Text(
+                                            '未找到匹配的歌曲',
+                                            style: TextStyle(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                              fontSize: baseFontSize,
+                                            ),
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                              else if (_allSearchResults.isEmpty &&
-                                  _searchController.text.isNotEmpty)
-                                Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.all(screenHeight * 0.1),
-                                    child: Text(
-                                      '未找到匹配的歌曲',
-                                      style: TextStyle(
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                        fontSize: baseFontSize,
+                                      )
+                                    // 展示搜索结果
+                                    else if (_currentPageResults.isNotEmpty)
+                                      Column(
+                                        children: [
+                                          // 搜索结果列表
+                                          ..._currentPageResults
+                                              .map((song) =>
+                                                  _buildSongItem(song))
+                                              .toList(),
+                                        ],
+                                      )
+                                    // 初始状态
+                                    else
+                                      Center(
+                                        child: Padding(
+                                          padding: EdgeInsets.all(
+                                              screenHeight * 0.1),
+                                          child: Text(
+                                            '请输入搜索关键词',
+                                            style: TextStyle(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                              fontSize: baseFontSize,
+                                            ),
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                )
-                              // 展示搜索结果
-                              else if (_currentPageResults.isNotEmpty)
-                                Column(
-                                  children: [
-                                    // 搜索结果列表
-                                    ..._currentPageResults
-                                        .map((song) => _buildSongItem(song))
-                                        .toList(),
                                   ],
-                                )
-                              // 初始状态
-                              else
-                                Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.all(screenHeight * 0.1),
-                                    child: Text(
-                                      '请输入搜索关键词',
-                                      style: TextStyle(
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                        fontSize: baseFontSize,
-                                      ),
+                                ),
+                              ),
+                            ),
+
+                            // 分页控件
+                            if (_totalPages > 1)
+                              Container(
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                    top: BorderSide(
+                                      color: Theme.of(context).colorScheme.outlineVariant,
                                     ),
                                   ),
                                 ),
-                            ],
-                          ),
-                        ),
-                      ),
+                                // 底部安全区由 BackgroundPageScaffold 的 contentPadding 提供，
+                                // 分页控件贴近安全区，避免视觉上被抬得过高。
+                                margin: EdgeInsets.fromLTRB(
+                                  padding,
+                                  padding,
+                                  padding,
+                                  0,
+                                ),
+                                padding: EdgeInsets.symmetric(
+                                  vertical: screenHeight * 0.008,
+                                  horizontal: screenWidth * 0.05,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    // 上一页按钮
+                                    IconButton(
+                                      onPressed: _currentPage > 1
+                                          ? () => _goToPage(_currentPage - 1)
+                                          : null,
+                                      icon: const Icon(Icons.chevron_left),
+                                    ),
 
-                      // 分页控件
-                      if (_totalPages > 1)
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(8.0),
-                            boxShadow: [AppColors.defaultShadow(brightness)],
-                          ),
-                          margin: EdgeInsets.all(padding),
-                          padding: EdgeInsets.symmetric(
-                            vertical: screenHeight * 0.008,
-                            horizontal: screenWidth * 0.05,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              // 上一页按钮
-                              IconButton(
-                                onPressed: _currentPage > 1
-                                    ? () => _goToPage(_currentPage - 1)
-                                    : null,
-                                icon: const Icon(Icons.chevron_left),
-                              ),
+                                    // 页码显示
+                                    Text(
+                                      '$_currentPage / $_totalPages',
+                                      style: TextStyle(
+                                        fontSize: smallFontSize,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                                    ),
 
-                              // 页码显示
-                              Text(
-                                '$_currentPage / $_totalPages',
-                                style: TextStyle(
-                                  fontSize: smallFontSize,
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    // 下一页按钮
+                                    IconButton(
+                                      onPressed: _currentPage < _totalPages
+                                          ? () => _goToPage(_currentPage + 1)
+                                          : null,
+                                      icon: const Icon(Icons.chevron_right),
+                                    ),
+                                  ],
                                 ),
                               ),
-
-                              // 下一页按钮
-                              IconButton(
-                                onPressed: _currentPage < _totalPages
-                                    ? () => _goToPage(_currentPage + 1)
-                                    : null,
-                                icon: const Icon(Icons.chevron_right),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
+                          ],
+                        );
+          },
+        ),
       ),
-        ],
-      ),
-    ),
     );
   }
 
@@ -1785,7 +2020,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
 
     // 生成匹配信息
     List<Map<String, String>> matchInfo = _getMatchInfo(song);
-    
+
     // 获取标签信息
     List<String> tagInfoList = _getTagInfoForSong(song);
 
@@ -1802,7 +2037,10 @@ class _SongSearchPageState extends State<SongSearchPage> {
         margin: const EdgeInsets.only(bottom: 6),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          border: Border.all(color: brightness == Brightness.dark ? Colors.grey.shade700 : Colors.grey.shade200),
+          border: Border.all(
+              color: brightness == Brightness.dark
+                  ? Colors.grey.shade700
+                  : Colors.grey.shade200),
           borderRadius: BorderRadius.circular(8),
           color: Theme.of(context).colorScheme.surface,
         ),
@@ -1812,8 +2050,13 @@ class _SongSearchPageState extends State<SongSearchPage> {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade100,
-                border: Border.all(color: brightness == Brightness.dark ? Colors.grey.shade700 : Colors.grey.shade200),
+                color: brightness == Brightness.dark
+                    ? Colors.grey.shade800
+                    : Colors.grey.shade100,
+                border: Border.all(
+                    color: brightness == Brightness.dark
+                        ? Colors.grey.shade700
+                        : Colors.grey.shade200),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: CoverUtil.buildCoverWidget(song.id, 80),
@@ -1823,7 +2066,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
               //   errorBuilder: (context, error, stackTrace) {
               //     // 生成网络曲绘URL
               //     String coverId = song.id.toString();
-                  
+
               //     // 对于6位数的曲绘，只需要去除第一位
               //     if (coverId.length == 6) {
               //       // 去掉第一位
@@ -1833,7 +2076,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
               //       coverId = '1' + '0' * (4 - coverId.length) + coverId;
               //     }
               //     String networkCoverUrl = 'https://www.diving-fish.com/covers/$coverId.png';
-                  
+
               //     return Image.network(
               //       networkCoverUrl,
               //       fit: BoxFit.cover,
@@ -1890,11 +2133,17 @@ class _SongSearchPageState extends State<SongSearchPage> {
                   Row(
                     children: [
                       Text(
-                        song.id.toString().length == 6 ? 'UTAGE' : (song.type == 'SD' ? 'ST' : 'DX'),
+                        song.id.toString().length == 6
+                            ? 'UTAGE'
+                            : (song.type == 'SD' ? 'ST' : 'DX'),
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: song.id.toString().length == 6 ? const Color(0xFFFF6B8B) : (song.type == 'SD' ? AppColors.linkBlue(brightness) : AppColors.warningOrange(brightness)),
+                          color: song.id.toString().length == 6
+                              ? const Color(0xFFFF6B8B)
+                              : (song.type == 'SD'
+                                  ? AppColors.linkBlue(brightness)
+                                  : AppColors.warningOrange(brightness)),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -1904,7 +2153,8 @@ class _SongSearchPageState extends State<SongSearchPage> {
                           '${StringUtil.formatVersionWithFlag(song.basicInfo.from, song.isExtra)} | ${song.basicInfo.genre}',
                           style: TextStyle(
                             fontSize: 14,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1932,7 +2182,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
                               ))
                           .toList(),
                     ),
-                  
+
                   if (tagInfoList.isNotEmpty)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1961,26 +2211,26 @@ class _SongSearchPageState extends State<SongSearchPage> {
   // 获取歌曲的标签信息（显示每个难度与用户所选标签的交集）
   List<String> _getTagInfoForSong(dynamic song) {
     List<String> tagInfoList = [];
-    
+
     // 如果没有缓存的标签实体，返回空
     if (_cachedTagsEntity == null) {
       return tagInfoList;
     }
-    
+
     // 如果没有选择任何标签，返回空
     if (_selectedTagIds.isEmpty) {
       return tagInfoList;
     }
-    
+
     // 构建所选标签的集合
     Set<int> selectedTagSet = Set.from(_selectedTagIds);
-    
+
     // 获取标签名称映射
     Map<int, String> tagIdToNameMap = {};
     for (var tag in _cachedTagsEntity!.tags) {
       tagIdToNameMap[tag.id] = tag.localizedName.zhHans;
     }
-    
+
     // 获取歌曲信息
     final String songTitle = song.basicInfo.title;
     String sheetType;
@@ -1991,11 +2241,11 @@ class _SongSearchPageState extends State<SongSearchPage> {
     } else {
       sheetType = 'std';
     }
-    
+
     // 遍历所有难度，获取与所选标签的交集
     for (int i = 0; i < song.level.length; i++) {
       String sheetDifficulty = _getDifficultyByIndex(i);
-      
+
       // 查找当前谱面的标签
       final List<TagSongItem> tagSongs = _cachedTagsEntity!.tagSongs
           .where((tagSong) =>
@@ -2003,7 +2253,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
               tagSong.sheetType == sheetType &&
               tagSong.sheetDifficulty == sheetDifficulty)
           .toList();
-      
+
       if (tagSongs.isNotEmpty) {
         // 获取该难度下与所选标签的交集
         List<String> tagNames = [];
@@ -2015,7 +2265,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
             }
           }
         }
-        
+
         // 如果有交集，显示该难度的标签信息
         if (tagNames.isNotEmpty) {
           String difficultyName = _getDifficultyDisplayName(i);
@@ -2023,10 +2273,10 @@ class _SongSearchPageState extends State<SongSearchPage> {
         }
       }
     }
-    
+
     return tagInfoList;
   }
-  
+
   // 获取难度显示名称
   String _getDifficultyDisplayName(int index) {
     switch (index) {
@@ -2044,7 +2294,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
         return 'Unknown';
     }
   }
-  
+
   // 获取匹配信息
   List<Map<String, String>> _getMatchInfo(dynamic song) {
     List<Map<String, String>> matchInfos = [];
@@ -2111,8 +2361,7 @@ class _SongSearchPageState extends State<SongSearchPage> {
     }
 
     // 曲师筛选：列出歌曲命中的曲师
-    if (_selectedArtist != null &&
-        song.basicInfo.artist == _selectedArtist) {
+    if (_selectedArtist != null && song.basicInfo.artist == _selectedArtist) {
       matchInfos.add({'type': '曲师', 'value': song.basicInfo.artist});
     }
 
@@ -2147,8 +2396,11 @@ class _SongSearchPageState extends State<SongSearchPage> {
     }
     // 检查版本匹配
     if (song.basicInfo.from.toLowerCase().contains(query)) {
-      matchInfos
-          .add({'type': '版本', 'value': StringUtil.formatVersionWithFlag(song.basicInfo.from, song.isExtra)});
+      matchInfos.add({
+        'type': '版本',
+        'value':
+            StringUtil.formatVersionWithFlag(song.basicInfo.from, song.isExtra)
+      });
     }
     // 检查别名匹配
     final aliases = SongAliasManager.instance.aliases[song.title] ?? [];

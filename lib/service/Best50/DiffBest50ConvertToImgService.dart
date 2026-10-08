@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'ThunderBest50Export.dart';
 import 'package:my_first_flutter_app/utils/ExportUserInfoWidget.dart';
 import 'dart:io';
 import 'dart:typed_data';
@@ -22,7 +23,7 @@ class DiffBest50ConvertToImg {
   static GlobalKey _globalKey = GlobalKey();
 
   // 导出为图片的方法
-  static Future<File?> convertToImage(BuildContext context, Map<String, dynamic>? diffBest50Data, List<Map<String, dynamic>> diffSongs, List<dynamic>? maimaiMusicData, {int currentMode = 0, int? jpegQuality}) async {
+  static Future<File?> convertToImage(BuildContext context, Map<String, dynamic>? diffBest50Data, List<Map<String, dynamic>> diffSongs, List<dynamic>? maimaiMusicData, {int currentMode = 0, int? jpegQuality, bool thunderMode = false, bool thunderVertical = true}) async {
     OverlayEntry? overlayEntry;
     try {
       debugPrint('=== STARTING DIFF IMAGE CONVERSION ===');
@@ -40,8 +41,11 @@ class DiffBest50ConvertToImg {
       // 创建一个Widget，用于生成图片
       Widget imageWidget = RepaintBoundary(
         key: globalKey,
-        child: await _buildExportImageWidget(context, diffBest50Data, diffSongs, maimaiMusicData, currentMode: currentMode),
+        child: await _buildExportImageWidget(context, diffBest50Data, diffSongs, maimaiMusicData, currentMode: currentMode, thunderMode: thunderMode, thunderVertical: thunderVertical),
       );
+      final exportWidth = thunderMode
+          ? ThunderBest50Export.widthFor(diffSongs.length, thunderVertical)
+          : 1700.0;
 
       // 创建一个屏幕外的OverlayEntry，避免影响主UI
       // 使用Positioned将Widget定位到屏幕外，确保它被渲染但不可见
@@ -49,7 +53,7 @@ class DiffBest50ConvertToImg {
         builder: (context) => Positioned(
           left: -9999, // 移到屏幕外
           top: -9999,
-          width: 1700, // 与 Best50ConvertToImgService 对齐：姓名框 1150 + gap 16 + metaRow 494 + 20*2 padding = 1700
+          width: exportWidth,
           child: Material(
             type: MaterialType.transparency,
             child: imageWidget,
@@ -230,7 +234,7 @@ class DiffBest50ConvertToImg {
   }
 
   // 构建用于导出的Widget
-  static Future<Widget> _buildExportImageWidget(BuildContext context, Map<String, dynamic>? diffBest50Data, List<Map<String, dynamic>> diffSongs, List<dynamic>? maimaiMusicData, {int currentMode = 0}) async {
+  static Future<Widget> _buildExportImageWidget(BuildContext context, Map<String, dynamic>? diffBest50Data, List<Map<String, dynamic>> diffSongs, List<dynamic>? maimaiMusicData, {int currentMode = 0, bool thunderMode = false, bool thunderVertical = true}) async {
     // 计算各项指标
     int diffRatingSum = diffBest50Data?['diffRatingSum'] ?? 0;
     int best50Diff = diffBest50Data?['best50Diff'] ?? 0;
@@ -254,8 +258,20 @@ class DiffBest50ConvertToImg {
         ? scoreRateSum / diffSongs.length 
         : 0.0;
 
+    if (thunderMode) {
+      final maxIdLength = diffSongs.any((song) => '${song['song_id']}'.length == 6) ? 6 : 5;
+      return ThunderBest50Export.build(
+        title: '拟合 Best50',
+        vertical: thunderVertical,
+        count: diffSongs.length,
+        statistics: '拟合 Rating $diffRatingSum\n平均 Rating ${diffRatingAverage.toStringAsFixed(1)}\n'
+            '平均达成率 ${diffBest50AchievementAverage.toStringAsFixed(4)}%\n'
+            '平均 DX 分达成率 ${(diffBest50ScoreRateAverage * 100).toStringAsFixed(2)}%',
+        cardBuilder: (index) => _buildDataGameCard(context, diffSongs[index], maimaiMusicData, maxIdLength),
+      );
+    }
     // 创建一个容器，设置固定宽度以确保布局一致
-    double containerWidth = 1700; // 与 Best50ConvertToImgService 对齐：宽度 1700 容纳姓名框 + metaRow 横排布局
+    double containerWidth = thunderMode && !thunderVertical ? 17000 : 1700;
 
     return Container(
       width: containerWidth,
@@ -301,7 +317,7 @@ class DiffBest50ConvertToImg {
                 SizedBox(height: 16.0),
 
                 // 基于拟合难度的Best50 卡片网格 (5列)
-                _buildDataCardGrid(context, diffSongs, 1.85, 5, maimaiMusicData),
+                _buildDataCardGrid(context, diffSongs, thunderMode ? 1.25 : 1.85, thunderMode ? (thunderVertical ? 1 : 50) : 5, maimaiMusicData),
                 SizedBox(height: 20.0),
               ],
             ),
@@ -625,7 +641,7 @@ class DiffBest50ConvertToImg {
       }
     }
     return Container(
-      width: 1700,
+      width: crossAxisCount == 50 ? 17000 : 1700,
       child: GridView.builder(
         shrinkWrap: true,
         physics: NeverScrollableScrollPhysics(),

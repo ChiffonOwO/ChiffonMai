@@ -1,10 +1,11 @@
+import '../../widgets/AnimatedChoiceBar.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../constant/CacheKeyConstant.dart';
 import '../../service/RankingList/FittedRatingRankingListService.dart';
-import '../../utils/AppDesignTokens.dart';
 import '../../utils/AppTheme.dart';
 import '../../widgets/PageTopBar.dart';
+import '../../widgets/ThemeAwareBackground.dart';
 import '../../widgets/CommunityAvatar.dart';
 import '../../utils/CurrentDataSourceNotifier.dart';
 import '../../utils/RankingRowExtent.dart';
@@ -12,14 +13,17 @@ import '../../utils/RankingRowExtent.dart';
 class FittedRatingRankingListPage extends StatefulWidget {
   final FittedMode initialMode;
 
-  const FittedRatingRankingListPage({super.key, this.initialMode = FittedMode.a});
+  const FittedRatingRankingListPage(
+      {super.key, this.initialMode = FittedMode.a});
 
   @override
   State<FittedRatingRankingListPage> createState() =>
       _FittedRatingRankingListPageState();
 }
 
-class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPage> {
+class _FittedRatingRankingListPageState
+    extends State<FittedRatingRankingListPage> {
+  int _requestGeneration = 0;
   // 排行榜（按当前指标排序后取前100）
   List<FittedRankItem> _rankList = [];
   bool _isLoading = true;
@@ -87,6 +91,7 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
       _isButtonDisabled = true;
     });
     Future.delayed(const Duration(seconds: 1), () {
+      if (!mounted) return;
       setState(() {
         _isButtonDisabled = false;
       });
@@ -126,6 +131,9 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
   }
 
   Future<void> _loadRankings({bool refresh = false}) async {
+    if (!mounted) return;
+    final generation = ++_requestGeneration;
+    final mode = _currentMode;
     setState(() {
       _isLoading = true;
       _errorMessage = '';
@@ -133,11 +141,11 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
 
     try {
       final items = await FittedRatingRankingListService.getRankings(
-        mode: _currentMode,
+        mode: mode,
         refresh: refresh,
       );
 
-      if (!mounted) return;
+      if (!mounted || generation != _requestGeneration) return;
       final ranked =
           FittedRatingRankingListService.calculateRankedPositions(items);
       final top = ranked.take(100).toList();
@@ -151,24 +159,24 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
           }
         }
         userItem ??= await FittedRatingRankingListService.getCurrentUserRank(
-          mode: _currentMode,
+          mode: mode,
           userId: _currentUserId!,
         );
       }
 
-      if (!mounted) return;
+      if (!mounted || generation != _requestGeneration) return;
       setState(() {
         _rankList = top;
         _currentUserRankItem = userItem;
       });
     } catch (e) {
-      if (mounted) {
+      if (mounted && generation == _requestGeneration) {
         setState(() {
           _errorMessage = '加载失败: $e';
         });
       }
     } finally {
-      if (mounted) {
+      if (mounted && generation == _requestGeneration) {
         setState(() {
           _isLoading = false;
         });
@@ -237,7 +245,8 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
     }
   }
 
-  Widget _buildValueCell(FittedRankItem item, {required Brightness brightness}) {
+  Widget _buildValueCell(FittedRankItem item,
+      {required Brightness brightness}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -273,7 +282,8 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.tableBorder(brightness))),
+        border: Border(
+            bottom: BorderSide(color: AppColors.tableBorder(brightness))),
         color: isCurrentUser
             ? AppColors.linkBlue(brightness).withValues(alpha: 0.08)
             : null,
@@ -283,13 +293,16 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
           // 排名
           SizedBox(
             width: 40,
-            child: Center(child: _buildRankBadge(item.rank, brightness: brightness)),
+            child: Center(
+                child: _buildRankBadge(item.rank, brightness: brightness)),
           ),
 
           Expanded(
             child: CommunityPlayerIdentity(
               avatarId: item.avatarId,
               dataSource: item.dataSource,
+              // 开发者白名单按 `<source>:<id>` 整串匹配，见 DataSourceTag
+              playerId: item.playerId,
               name: item.playerName.isEmpty ? '未知玩家' : item.playerName,
               // 头像高度对齐「玩家名 + 数据源标签」两行文字的总高
               avatarMatchesTextHeight: true,
@@ -338,7 +351,8 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.auto_graph, size: 64, color: AppColors.greyHint(brightness)),
+          Icon(Icons.auto_graph,
+              size: 64, color: AppColors.greyHint(brightness)),
           const SizedBox(height: 16),
           Text(
             _errorMessage.isNotEmpty ? _errorMessage : '暂无排行数据',
@@ -353,86 +367,29 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
     );
   }
 
-  Widget _buildModeSwitcher() {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(AppDesignTokens.radiusLarge),
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        child: Row(
-          children: FittedMode.values.map((m) {
-            final selected = m == _currentMode;
-            return Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3),
-                child: GestureDetector(
-                  onTap: () => _onModeChanged(m),
-                  child: AnimatedContainer(
-                    duration: AppDesignTokens.fastMotion,
-                    curve: Curves.easeOut,
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? scheme.primaryContainer
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: selected
-                          ? [
-                              BoxShadow(
-                                color: scheme.primary.withValues(alpha: 0.22),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '模式${m.label}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            letterSpacing: 0.2,
-                            fontWeight:
-                                selected ? FontWeight.w700 : FontWeight.w500,
-                            color: selected
-                                ? scheme.onPrimaryContainer
-                                : scheme.onSurfaceVariant,
-                          ),
-                        ),
-                        if (selected) ...[
-                          const SizedBox(width: 6),
-                          Icon(
-                            Icons.check_circle_rounded,
-                            size: 16,
-                            color: scheme.onPrimaryContainer,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
+  Widget _buildModeSwitcher() => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+        child: AnimatedChoiceBar<FittedMode>(
+            values: FittedMode.values,
+            value: _currentMode,
+            label: (mode) => '模式${mode.label}',
+            onChanged: _onModeChanged),
+      );
 
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     return Scaffold(
-      backgroundColor: AppColors.cardBackground(brightness),
-      body: Column(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        fit: StackFit.expand,
         children: [
+          Positioned.fill(
+            child: ColoredBox(color: Theme.of(context).colorScheme.surface),
+          ),
+          const ThemeAwareBackground(),
+          Column(
+            children: [
           // 顶部栏统一走公共组件（标题 = 思源黑体 20 / bold / primary / 居中）。
           // 以前是 `Scaffold.appBar: AppBar` + 裸 `Text`，标题会被 AppBar
           // 重新套上的 DefaultTextStyle 顶成系统 Roboto。
@@ -442,10 +399,12 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
               IconButton(
                 icon: _isLoading
                     ? CircularProgressIndicator(
-                        color: AppColors.primaryText(brightness), strokeWidth: 2)
+                        color: AppColors.primaryText(brightness),
+                        strokeWidth: 2)
                     : Icon(Icons.refresh,
                         color: AppColors.primaryText(brightness)),
-                onPressed: (_isLoading || _isButtonDisabled) ? null : _onRefresh,
+                onPressed:
+                    (_isLoading || _isButtonDisabled) ? null : _onRefresh,
                 tooltip: '刷新',
               ),
               if (_currentUserRankItem != null)
@@ -462,7 +421,8 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: AppColors.warningOrange(brightness).withValues(alpha: 0.08),
+              color:
+                  AppColors.warningOrange(brightness).withValues(alpha: 0.08),
               border: Border(
                   bottom: BorderSide(
                       color: AppColors.warningOrange(brightness)
@@ -562,6 +522,7 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
                     child: CommunityPlayerIdentity(
                       avatarId: _currentUserRankItem!.avatarId,
                       dataSource: _currentUserRankItem!.dataSource,
+                      playerId: _currentUserRankItem!.playerId,
                       name: _currentUserRankItem!.playerName.isEmpty
                           ? '未知玩家'
                           : _currentUserRankItem!.playerName,
@@ -584,6 +545,8 @@ class _FittedRatingRankingListPageState extends State<FittedRatingRankingListPag
                 ],
               ),
             ),
+            ],
+          ),
         ],
       ),
     );

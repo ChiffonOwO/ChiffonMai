@@ -5,7 +5,6 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import '../../service/Best50/DiffBest50Service.dart';
@@ -17,7 +16,7 @@ import '../../utils/AppTheme.dart';
 import '../../widgets/B50GameCardWidget.dart';
 import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
-import '../../widgets/PageTopBar.dart';
+import '../../widgets/BackgroundPageScaffold.dart';
 
 class DiffBest50Page extends StatefulWidget {
   const DiffBest50Page({super.key});
@@ -133,47 +132,28 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
     cardPadding = screenWidth * 0.02;
     fontSizeBase = screenWidth * 0.035;
 
-    final double borderRadiusSmall = 8.0;
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '拟合Best50查询',
+      actions: [
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            foregroundColor: Theme.of(context).colorScheme.onSurface,
+            minimumSize: const Size(90, 32),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8.0),
+            ),
+          ),
+          onPressed: _toggleMode,
+          child: Text('模式${['A', 'B', 'C'][_currentMode]}'),
+        ),
+      ],
       resizeToAvoidBottomInset: false,
-      body: Stack(
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
+      ),
+      child: Stack(
         children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏（始终显示）
-              PageTopBar(
-                title: '拟合Best50查询',
-                actions: [
-                // 模式切换按钮（始终显示）
-                ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                foregroundColor: Theme.of(context).colorScheme.onSurface,
-                minimumSize: Size(100 * 0.9, 36 * 0.9),
-                shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8.0),
-                ),
-                ),
-                onPressed: _toggleMode,
-                child: Text(
-                '模式${['A', 'B', 'C'][_currentMode]}',
-                style: TextStyle(fontSize: 12),
-                ),
-                ),
-                ],
-              ),
-
-              // 内容区域
-              Expanded(
-                child: Stack(
-                  children: [
                     // 加载中状态（覆盖层）
                     if (_isLoading)
                       Container(
@@ -198,19 +178,14 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
 
                     // 内容
                     if (!_isLoading)
-                      _buildContent(brightness, borderRadiusSmall),
-                  ],
-                ),
-              ),
+                      _buildContent(brightness),
             ],
           ),
-        ],
-      ),
     );
   }
 
   // 构建内容区域
-  Widget _buildContent(Brightness brightness, double borderRadiusSmall) {
+  Widget _buildContent(Brightness brightness) {
     // 如果没有数据，显示空状态
     if (_diffBest50Data == null || _diffSongs.isEmpty) {
       return Center(
@@ -244,18 +219,15 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
       );
     }
 
-    // 主内容区域
-    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
-    return Container(
-      margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(borderRadiusSmall),
-        boxShadow: [AppColors.defaultShadow(brightness)],
+    // 主内容直接布局在背景上，局部歌曲卡片负责建立阅读层次。
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        MediaQuery.of(context).size.width * 0.03,
+        MediaQuery.of(context).size.width * 0.03,
+        MediaQuery.of(context).size.width * 0.03,
+        MediaQuery.paddingOf(context).bottom + 20,
       ),
-      child: SingleChildScrollView(
-        padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.03),
-        child: Column(
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // 评分区域
@@ -291,7 +263,6 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
               ],
             ),
           ],
-        ),
       ),
     );
   }
@@ -884,6 +855,8 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
       final quality = await ExportQualitySelector.show(
         context,
         estimatedPngSize: ImageEncodeUtil.estimatePngSize(songCount: 50),
+        exportingLabel: '拟合 Best50',
+        enableThunderMode: true,
       );
       if (quality == null) return;
 
@@ -911,6 +884,8 @@ class _DiffBest50PageState extends State<DiffBest50Page> {
         _maimaiMusicData,
         currentMode: _currentMode,
         jpegQuality: quality.jpegQuality,
+        thunderMode: quality.thunderMode,
+        thunderVertical: quality.thunderVertical,
       );
 
       // 关闭加载指示器

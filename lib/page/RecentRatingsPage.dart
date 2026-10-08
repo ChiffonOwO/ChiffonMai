@@ -5,12 +5,10 @@ import '../entity/DivingFish/Song.dart';
 import '../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../page/SongInfoPage.dart';
 import '../utils/AppTheme.dart';
-import '../utils/AppConstants.dart';
-import '../utils/CommonWidgetUtil.dart';
 import '../utils/CoverUtil.dart';
 import '../utils/CurrentDataSourceNotifier.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
-import '../widgets/PageTopBar.dart';
+import '../widgets/BackgroundPageScaffold.dart';
 
 /// 评分记录数据模型
 class RatingRecordItem {
@@ -385,52 +383,26 @@ class _RecentRatingsPageState extends State<RecentRatingsPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     final Color textPrimaryColor = Theme.of(context).colorScheme.onSurface;
-    final Color cardBgColor = Theme.of(context).colorScheme.surface.withValues(alpha: 0.9);
-    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '最近评分',
+      actions: [
+        IconButton(
+          icon: Icon(Icons.refresh, color: textPrimaryColor),
+          onPressed: _isLoading ? null : _refresh,
+        ),
+      ],
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          Column(
-            children: [
-              PageTopBar(
-                title: '最近评分',
-                actions: [
-  IconButton(
-                        icon: Icon(Icons.refresh, color: textPrimaryColor),
-                        onPressed: _isLoading ? null : _refresh,
-                      ),
-],
-              ),
-
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: cardBgColor,
-                    borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-                    boxShadow: [defaultShadow],
-                  ),
-                  child: _isLoading
-                      ? _buildLoading(brightness)
-                      : _errorMessage != null
-                          ? _buildError(brightness)
-                          : _ratings.isEmpty
-                              ? _buildEmpty(brightness)
-                              : _buildRatingList(brightness, screenWidth),
-                ),
-              ),
-            ],
-          ),
-        ],
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
       ),
+      child: _isLoading
+          ? _buildLoading(brightness)
+          : _errorMessage != null
+              ? _buildError(brightness)
+              : _ratings.isEmpty
+                  ? _buildEmpty(brightness)
+                  : _buildRatingList(brightness, screenWidth),
     );
   }
 

@@ -1,10 +1,11 @@
+import 'AnimatedChoiceBar.dart';
 import 'package:flutter/material.dart';
 
 import '../service/SyncStatsService.dart';
 
 /// 同步统计的展示组件。
 ///
-/// 显示位置（线路1 AWMC / 线路2 Score Hub 都有）：
+/// 显示位置（线路1 AWMC / 线路2 maimai Score Hub 都有）：
 ///   * 「系统 → 同步成绩到水鱼 / 落雪」每个 tile 的线路切换器下面一行小字：
 ///     `近 100 次 · 平均 12.3s · 成功率 96%`，点它打开详情；
 ///   * 「同步成绩到 AWMC NET」对话框里同样一行（二维码直传，没有线路切换器）；
@@ -48,16 +49,55 @@ class SyncStatsView {
         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
         child: Row(
           children: [
-            Icon(Icons.insights_outlined, size: 14, color: scheme.onSurfaceVariant),
+            Icon(Icons.insights_outlined,
+                size: 14, color: scheme.onSurfaceVariant),
             const SizedBox(width: 6),
             Expanded(
-              child: Text(
-                text,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                softWrap: false,
-                style: TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant),
-              ),
+              child: FadeContent(
+                  child: !loading && stats != null && stats.hasData
+                      ? TweenAnimationBuilder<double>(
+                          key: const ValueKey('sync-stats-values'),
+                          tween: Tween<double>(end: stats.count.toDouble()),
+                          duration: MediaQuery.disableAnimationsOf(context)
+                              ? Duration.zero
+                              : const Duration(milliseconds: 450),
+                          curve: Curves.easeOutCubic,
+                          builder: (_, count, __) =>
+                              TweenAnimationBuilder<double>(
+                            tween: Tween<double>(end: stats.avgMs),
+                            duration: MediaQuery.disableAnimationsOf(context)
+                                ? Duration.zero
+                                : const Duration(milliseconds: 450),
+                            curve: Curves.easeOutCubic,
+                            builder: (_, avgMs, __) =>
+                                TweenAnimationBuilder<double>(
+                              tween:
+                                  Tween<double>(end: stats.successRate * 100),
+                              duration: MediaQuery.disableAnimationsOf(context)
+                                  ? Duration.zero
+                                  : const Duration(milliseconds: 450),
+                              curve: Curves.easeOutCubic,
+                              builder: (_, rate, __) => Text(
+                                '近100次 / ${count.round()}样本 / 平均${SyncStats.formatDuration(avgMs.round())} / 成功${rate.round()}%',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                softWrap: false,
+                                style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: scheme.onSurfaceVariant),
+                              ),
+                            ),
+                          ),
+                        )
+                      : Text(
+                          text,
+                          key: ValueKey(text),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: false,
+                          style: TextStyle(
+                              fontSize: 11.5, color: scheme.onSurfaceVariant),
+                        )),
             ),
             Icon(Icons.chevron_right, size: 14, color: scheme.onSurfaceVariant),
           ],
@@ -87,8 +127,8 @@ class SyncStatsView {
                 Text(
                   '记录最近 ${SyncStatsService.windowSize} 次同步的耗时与成败'
                   '（所有使用者共享，仅含耗时/成败，不含二维码与账号信息）。',
-                  style: TextStyle(
-                      fontSize: 12, color: scheme.onSurfaceVariant),
+                  style:
+                      TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 12),
                 // 按 SyncLine 分组、组内平台取自 allSlots 而不是叉乘：

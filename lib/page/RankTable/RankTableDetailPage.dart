@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/service/RankTable/RankTableService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
@@ -7,7 +6,9 @@ import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
-import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/BackgroundPageScaffold.dart';
+import '../../service/RankTable/RankCompletionStore.dart';
+import '../../widgets/RankCompletionButton.dart';
 
 class RankDetailPage extends StatefulWidget {
   final String rankName;
@@ -21,7 +22,7 @@ class RankDetailPage extends StatefulWidget {
 class _RankDetailPageState extends State<RankDetailPage> {
   final UserPlayDataManager _userPlayDataManager = UserPlayDataManager();
   final MaimaiMusicDataManager _musicDataManager = MaimaiMusicDataManager();
-  
+
   Map<String, dynamic>? _userPlayData;
   List<Song>? _songs;
   bool _isLoading = true;
@@ -29,7 +30,6 @@ class _RankDetailPageState extends State<RankDetailPage> {
   late double _paddingXS;
   late double _paddingS;
   late double _paddingM;
-  late double _paddingL;
   late double _borderRadiusSmall;
   late double _textSizeXS;
   late double _textSizeS;
@@ -40,6 +40,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
   @override
   void initState() {
     super.initState();
+    RankCompletionStore.instance.load();
     _loadData();
   }
 
@@ -51,7 +52,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
     try {
       final playData = await _userPlayDataManager.getCachedUserPlayData();
       final songs = await _musicDataManager.getCachedSongs();
-      
+
       setState(() {
         _userPlayData = playData;
         _songs = songs;
@@ -67,7 +68,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
 
   String _getAchievement(String songId, int difficulty) {
     if (_userPlayData == null) return '';
-    
+
     final records = _userPlayData!['records'] as List?;
     if (records == null) return '';
 
@@ -75,13 +76,13 @@ class _RankDetailPageState extends State<RankDetailPage> {
       if (record is Map<String, dynamic>) {
         final recordSongId = record['song_id']?.toString();
         final recordDifficulty = record['level_index'] as int?;
-        
+
         if (recordSongId == songId && recordDifficulty == difficulty) {
           return record['achievements']?.toString() ?? '';
         }
       }
     }
-    
+
     return '';
   }
 
@@ -92,35 +93,37 @@ class _RankDetailPageState extends State<RankDetailPage> {
     return (value * 10000).round();
   }
 
-  int _calcMinDamage(Song song, int levelIndex, String achievement, RankData rankData) {
+  int _calcMinDamage(
+      Song song, int levelIndex, String achievement, RankData rankData) {
     if (achievement.isEmpty) return 0;
     if (levelIndex < 0 || levelIndex >= song.charts.length) return 0;
-    
+
     final chart = song.charts[levelIndex];
     final notes = chart.notes;
     if (notes.isEmpty) return 0;
-    
+
     // notes数组: DX=[tap, hold, slide, touch, break], SD=[tap, hold, slide, break]
     final tap = notes[0];
     final hold = notes.length >= 2 ? notes[1] : 0;
     final slide = notes.length >= 3 ? notes[2] : 0;
     final touch = notes.length >= 5 ? notes[3] : 0;
-    final breakNote = notes.length >= 5 ? notes[4] : (notes.length >= 4 ? notes[3] : 0);
-    
+    final breakNote =
+        notes.length >= 5 ? notes[4] : (notes.length >= 4 ? notes[3] : 0);
+
     final totalBase = tap + touch + 2 * hold + 3 * slide + 5 * breakNote;
     if (totalBase == 0) return 0;
-    
+
     final base = 100000.0 / totalBase;
     final achievementInt = _parseAchievementToInt(achievement);
     if (achievementInt <= 0) return 0;
-    
+
     final minus = 1010000 - achievementInt;
     final amount = minus / base;
-    
+
     final greats = (amount / 2).floor();
     final goods = (amount / 5).floor();
     final misses = (amount / 10).floor();
-    
+
     final damages = <int>[];
     if (rankData.greatDamage != 0) {
       damages.add(rankData.greatDamage * greats);
@@ -131,7 +134,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
     if (rankData.missDamage != 0) {
       damages.add(rankData.missDamage * misses);
     }
-    
+
     if (damages.isEmpty) return 0;
     damages.sort();
     return damages.first;
@@ -142,31 +145,33 @@ class _RankDetailPageState extends State<RankDetailPage> {
     double totalAchievement = 0;
     int remainingHp = rankData.initialHp;
     bool isDead = false;
-    
+
     for (int i = 0; i < 4; i++) {
       final songId = rankData.songIds[i];
       final levelIndex = rankData.levelIndexes[i];
       final achievement = _getAchievement(songId, levelIndex);
       final achievementValue = double.tryParse(achievement) ?? 0.0;
       totalAchievement += achievementValue;
-      
+
       if (!isDead && achievement.isNotEmpty) {
         final song = _getSongById(songId);
         if (song != null) {
-          final damage = _calcMinDamage(song, levelIndex, achievement, rankData);
+          final damage =
+              _calcMinDamage(song, levelIndex, achievement, rankData);
           remainingHp -= damage;
           if (remainingHp <= 0) {
             remainingHp = 0;
             isDead = true;
           } else if (i < 3) {
             // 前3首通关后回复（不超过初始血量上限）
-            remainingHp = (remainingHp + rankData.healAmount).clamp(0, rankData.initialHp);
+            remainingHp = (remainingHp + rankData.healAmount)
+                .clamp(0, rankData.initialHp);
           }
           // 最后一首（i==3）不回复，直接以扣血后的血量作为最终结果
         }
       }
     }
-    
+
     return {
       'totalAchievement': totalAchievement,
       'remainingHp': remainingHp,
@@ -185,13 +190,11 @@ class _RankDetailPageState extends State<RankDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
     _scaleFactor = screenWidth / 375.0;
     _paddingXS = 4.0 * _scaleFactor;
     _paddingS = 4.0 * _scaleFactor;
     _paddingM = 12.0 * _scaleFactor;
-    _paddingL = 10.0 * _scaleFactor;
     _borderRadiusSmall = 8.0 * _scaleFactor;
     _textSizeXS = 9.0 * _scaleFactor;
     _textSizeS = 11.0 * _scaleFactor;
@@ -199,43 +202,32 @@ class _RankDetailPageState extends State<RankDetailPage> {
     _textSizeL = 14.0 * _scaleFactor;
 
     final rankData = RankListService().getRankData(widget.rankName);
-    final isNormalRank = ['初段', '二段', '三段', '四段', '五段', '六段', '七段', '八段', '九段', '十段'].contains(widget.rankName);
-    final textPrimaryColor = Theme.of(context).colorScheme.onSurface;
-    final cardBgColor = Theme.of(context).colorScheme.surface;
-    final cardShadow = AppColors.defaultShadow(brightness);
+    final isNormalRank = [
+      '初段',
+      '二段',
+      '三段',
+      '四段',
+      '五段',
+      '六段',
+      '七段',
+      '八段',
+      '九段',
+      '十段'
+    ].contains(widget.rankName);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          
-          Column(
-            children: [
-              // 标题栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
-              // 与 Best50 页、其余 50 多个页面同款。
-              PageTopBar(title: widget.rankName),
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL),
-                  decoration: BoxDecoration(
-                    color: cardBgColor,
-                    borderRadius: BorderRadius.circular(_borderRadiusSmall),
-                    boxShadow: [cardShadow],
-                  ),
-                  child: _isLoading 
-                    ? Center(child: CircularProgressIndicator())
-                    : SingleChildScrollView(
-                        padding: EdgeInsets.all(_paddingM),
-                        child: rankData != null ? _buildContent(rankData, isNormalRank) : _buildEmptyContent(),
-                      ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+
+
+    return BackgroundPageScaffold(
+      title: widget.rankName,
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: _isLoading
+                      ? Center(child: CircularProgressIndicator())
+                      : SingleChildScrollView(
+                          padding: EdgeInsets.all(_paddingM),
+                          child: rankData != null
+                              ? _buildContent(rankData, isNormalRank)
+                              : _buildEmptyContent(),
+                        ),
     );
   }
 
@@ -259,24 +251,27 @@ class _RankDetailPageState extends State<RankDetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: _paddingM, vertical: _paddingS),
-          decoration: BoxDecoration(
-            color: isNormalRank ? AppColors.medalColor('bronze') : Colors.purple,
-            borderRadius: BorderRadius.circular(_borderRadiusSmall),
-          ),
-          child: Text(
-            rankData.name,
-            style: TextStyle(
-              fontSize: _textSizeL,
-              fontWeight: FontWeight.bold,
-              color: isNormalRank ? Colors.white : const Color(0xFFE6E6FA),
+        Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          Flexible(
+              child: Container(
+            padding: EdgeInsets.symmetric(
+                horizontal: _paddingM, vertical: _paddingS),
+            decoration: BoxDecoration(
+              color:
+                  isNormalRank ? AppColors.medalColor('bronze') : Colors.purple,
+              borderRadius: BorderRadius.circular(_borderRadiusSmall),
             ),
-          ),
-        ),
-        
+            child: Text(rankData.name,
+                style: TextStyle(
+                    fontSize: _textSizeL,
+                    fontWeight: FontWeight.bold,
+                    color:
+                        isNormalRank ? Colors.white : const Color(0xFFE6E6FA))),
+          )),
+          const SizedBox(width: 8),
+          RankCompletionButton(rank: widget.rankName),
+        ]),
         SizedBox(height: _paddingM),
-        
         Text(
           '段位曲目',
           style: TextStyle(
@@ -294,7 +289,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
             final song = _getSongById(songId);
             final hasAchievement = achievement.isNotEmpty;
             final achievementValue = double.tryParse(achievement) ?? 0.0;
-            
+
             return InkWell(
               onTap: () {
                 Navigator.push(
@@ -370,27 +365,38 @@ class _RankDetailPageState extends State<RankDetailPage> {
                           Row(
                             children: [
                               Container(
-                                padding: EdgeInsets.symmetric(horizontal: _paddingXS, vertical: 2),
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: _paddingXS, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: _getDifficultyBorderColor(levelIndex).withOpacity(0.2),
+                                  color: _getDifficultyBorderColor(levelIndex)
+                                      .withOpacity(0.2),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
                                   _getDifficultyName(levelIndex),
                                   style: TextStyle(
                                     fontSize: _textSizeXS,
-                                    color: _getDifficultyBorderColor(levelIndex),
+                                    color:
+                                        _getDifficultyBorderColor(levelIndex),
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ),
                               SizedBox(width: _paddingS),
                               Text(
-                                hasAchievement ? '达成率: ${achievementValue.toStringAsFixed(4)}%' : '未游玩',
+                                hasAchievement
+                                    ? '达成率: ${achievementValue.toStringAsFixed(4)}%'
+                                    : '未游玩',
                                 style: TextStyle(
                                   fontSize: _textSizeS,
-                                  color: hasAchievement && achievementValue >= 100 ? AppColors.successGreen(brightness) : subtitleColor,
-                                  fontWeight: hasAchievement && achievementValue >= 100 ? FontWeight.bold : FontWeight.normal,
+                                  color:
+                                      hasAchievement && achievementValue >= 100
+                                          ? AppColors.successGreen(brightness)
+                                          : subtitleColor,
+                                  fontWeight:
+                                      hasAchievement && achievementValue >= 100
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
                                 ),
                               ),
                             ],
@@ -399,13 +405,18 @@ class _RankDetailPageState extends State<RankDetailPage> {
                             SizedBox(height: 2),
                             Builder(
                               builder: (context) {
-                                final minDamage = _calcMinDamage(song, levelIndex, achievement, rankData);
+                                final minDamage = _calcMinDamage(
+                                    song, levelIndex, achievement, rankData);
                                 return Text(
                                   '预计最低扣血: $minDamage',
                                   style: TextStyle(
                                     fontSize: _textSizeS,
-                                    color: minDamage > 0 ? AppColors.errorRed(brightness) : AppColors.greyHint(brightness),
-                                    fontWeight: minDamage > 0 ? FontWeight.bold : FontWeight.normal,
+                                    color: minDamage > 0
+                                        ? AppColors.errorRed(brightness)
+                                        : AppColors.greyHint(brightness),
+                                    fontWeight: minDamage > 0
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
                                   ),
                                 );
                               },
@@ -420,24 +431,24 @@ class _RankDetailPageState extends State<RankDetailPage> {
             );
           }).toList(),
         ),
-        
         () {
           final result = _calcResult(rankData);
           final totalAchievement = result['totalAchievement'] as double;
           final remainingHp = result['remainingHp'] as int;
           final isDead = result['isDead'] as bool;
-          
+
           bool allHaveAchievement = true;
           for (int i = 0; i < 4; i++) {
-            final a = _getAchievement(rankData.songIds[i], rankData.levelIndexes[i]);
+            final a =
+                _getAchievement(rankData.songIds[i], rankData.levelIndexes[i]);
             if (a.isEmpty) {
               allHaveAchievement = false;
               break;
             }
           }
-          
+
           if (!allHaveAchievement) return SizedBox.shrink();
-          
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -477,7 +488,9 @@ class _RankDetailPageState extends State<RankDetailPage> {
                             style: TextStyle(
                               fontSize: _textSizeL,
                               fontWeight: FontWeight.bold,
-                              color: totalAchievement >= 400 ? AppColors.successGreen(brightness) : AppColors.errorRed(brightness),
+                              color: totalAchievement >= 400
+                                  ? AppColors.successGreen(brightness)
+                                  : AppColors.errorRed(brightness),
                             ),
                           ),
                         ),
@@ -488,7 +501,9 @@ class _RankDetailPageState extends State<RankDetailPage> {
                             style: TextStyle(
                               fontSize: _textSizeL,
                               fontWeight: FontWeight.bold,
-                              color: remainingHp > 0 ? AppColors.successGreen(brightness) : AppColors.errorRed(brightness),
+                              color: remainingHp > 0
+                                  ? AppColors.successGreen(brightness)
+                                  : AppColors.errorRed(brightness),
                             ),
                           ),
                         ),
@@ -499,7 +514,9 @@ class _RankDetailPageState extends State<RankDetailPage> {
                             style: TextStyle(
                               fontSize: _textSizeL,
                               fontWeight: FontWeight.bold,
-                              color: isDead ? AppColors.errorRed(brightness) : AppColors.successGreen(brightness),
+                              color: isDead
+                                  ? AppColors.errorRed(brightness)
+                                  : AppColors.successGreen(brightness),
                             ),
                           ),
                         ),
@@ -511,9 +528,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
             ],
           );
         }(),
-        
         SizedBox(height: _paddingM),
-        
         Text(
           '血量设置',
           style: TextStyle(
@@ -523,7 +538,6 @@ class _RankDetailPageState extends State<RankDetailPage> {
           ),
         ),
         SizedBox(height: _paddingXS),
-        
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
@@ -545,11 +559,16 @@ class _RankDetailPageState extends State<RankDetailPage> {
               SizedBox(height: _paddingXS),
               Row(
                 children: [
-                  _buildStatValueCell('${rankData.initialHp}', AppColors.successGreen(brightness)),
-                  _buildStatValueCell('-${rankData.greatDamage}', AppColors.warningOrange(brightness)),
-                  _buildStatValueCell('-${rankData.goodDamage}', AppColors.errorRed(brightness)),
-                  _buildStatValueCell('-${rankData.missDamage}', Colors.redAccent),
-                  _buildStatValueCell('+${rankData.healAmount}', Colors.lightGreen),
+                  _buildStatValueCell('${rankData.initialHp}',
+                      AppColors.successGreen(brightness)),
+                  _buildStatValueCell('-${rankData.greatDamage}',
+                      AppColors.warningOrange(brightness)),
+                  _buildStatValueCell('-${rankData.goodDamage}',
+                      AppColors.errorRed(brightness)),
+                  _buildStatValueCell(
+                      '-${rankData.missDamage}', Colors.redAccent),
+                  _buildStatValueCell(
+                      '+${rankData.healAmount}', Colors.lightGreen),
                 ],
               ),
             ],
@@ -564,7 +583,9 @@ class _RankDetailPageState extends State<RankDetailPage> {
       child: Text(
         label,
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: _textSizeM, color: Theme.of(context).colorScheme.onSurface),
+        style: TextStyle(
+            fontSize: _textSizeM,
+            color: Theme.of(context).colorScheme.onSurface),
       ),
     );
   }
@@ -598,12 +619,18 @@ class _RankDetailPageState extends State<RankDetailPage> {
 
   String _getDifficultyName(int levelIndex) {
     switch (levelIndex) {
-      case 0: return 'BASIC';
-      case 1: return 'ADVANCED';
-      case 2: return 'EXPERT';
-      case 3: return 'MASTER';
-      case 4: return 'Re:MASTER';
-      default: return 'UNKNOWN';
+      case 0:
+        return 'BASIC';
+      case 1:
+        return 'ADVANCED';
+      case 2:
+        return 'EXPERT';
+      case 3:
+        return 'MASTER';
+      case 4:
+        return 'Re:MASTER';
+      default:
+        return 'UNKNOWN';
     }
   }
 
@@ -614,7 +641,7 @@ class _RankDetailPageState extends State<RankDetailPage> {
   Widget _buildSongTypeTag(String? type) {
     String tagText = '';
     Color tagColor = Colors.grey;
-    
+
     if (type != null) {
       if (type.toLowerCase() == 'dx') {
         tagText = 'DX';
@@ -624,11 +651,11 @@ class _RankDetailPageState extends State<RankDetailPage> {
         tagColor = AppColors.linkBlue(Theme.of(context).brightness);
       }
     }
-    
+
     if (tagText.isEmpty) {
       return SizedBox.shrink();
     }
-    
+
     return Text(
       tagText,
       style: TextStyle(

@@ -2,18 +2,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../manager/DivingFishProbeManager.dart';
 import '../../utils/AppTheme.dart';
 import '../../constant/CacheKeyConstant.dart';
 import '../../constant/LoadingTipsConstant.dart';
 import '../../service/SyncStatsService.dart';
 import '../../utils/SyncRouteNotifier.dart';
+import '../../utils/SecureCredentialStore.dart';
+import '../../utils/ExternalLaunchUtil.dart';
 import '../../widgets/QrQuickFillButtons.dart';
+import '../../widgets/SmoothLinearProgressIndicator.dart';
 
 /// 同步成绩到落雪（对话框形式，与"同步成绩到水鱼"一致）
 ///
-/// 通过输入登入二维码（SGWCMAID 开头），使用 Maimai Score Hub 的
+/// 通过输入登入二维码（SGWCMAID 开头），使用 maimai Score Hub 的
 /// cabinet-score-jobs API 抓取成绩，然后导出到落雪（LXNS）平台。
 class UpdateLuoXueScorePage extends StatefulWidget {
   const UpdateLuoXueScorePage({super.key});
@@ -68,8 +70,8 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
   }
 
   Future<void> _checkLxnsToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final local = prefs.getString(CacheKeyConstant.probeLxnsImportToken);
+    final local =
+        await SecureCredentialStore.read(CacheKeyConstant.probeLxnsImportToken);
     if (mounted) {
       setState(() {
         _hasLxnsToken = local != null && local.isNotEmpty;
@@ -84,10 +86,10 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
       Fluttertoast.showToast(msg: '请输入落雪个人 API 密钥');
       return;
     }
-    // 先保存到本地缓存（无需 Hub 登录）
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(CacheKeyConstant.probeLxnsImportToken, token);
-    // 如果 Hub 已登录，同步绑定到 Hub
+    // 先保存到本地缓存（无需登录 maimai Score Hub）
+    await SecureCredentialStore.write(
+        CacheKeyConstant.probeLxnsImportToken, token);
+    // 如果 maimai Score Hub 已登录，同步绑定到 maimai Score Hub
     final ok = await DivingFishProbeManager().setLxnsImportToken(token);
     if (mounted) {
       setState(() {
@@ -119,9 +121,9 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
       }
       lxnsToken = inputToken;
     } else {
-      // 已保存过，从本地缓存加载（防止 Hub 侧未绑定）
-      final prefs = await SharedPreferences.getInstance();
-      lxnsToken = prefs.getString(CacheKeyConstant.probeLxnsImportToken);
+      // 已保存过，从本地缓存加载（防止 maimai Score Hub 侧未绑定）
+      lxnsToken = await SecureCredentialStore.read(
+          CacheKeyConstant.probeLxnsImportToken);
     }
 
     setState(() {
@@ -345,9 +347,8 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
                           onTap: () async {
                             final uri = Uri.parse(
                                 'https://maimai.lxns.net/user/profile?tab=thirdparty');
-                            if (await canLaunchUrl(uri)) {
-                              await launchUrl(uri,
-                                  mode: LaunchMode.externalApplication);
+                            if (await ExternalLaunchUtil.open(uri)) {
+                              return;
                             }
                           },
                           child: Text.rich(
@@ -526,10 +527,10 @@ class _UpdateLuoXueScorePageState extends State<UpdateLuoXueScorePage> {
                 if (!_isDone) ...[
                   const SizedBox(height: 10),
                   if (_progress != null)
-                    LinearProgressIndicator(
+                    SmoothLinearProgressIndicator(
                         value: _progress, color: AppColors.linkBlue(brightness))
                   else
-                    LinearProgressIndicator(
+                    SmoothLinearProgressIndicator(
                         color: AppColors.linkBlue(brightness)),
                   const SizedBox(height: 12),
                   Center(

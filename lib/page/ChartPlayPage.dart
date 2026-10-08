@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:media_scanner/media_scanner.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:simai_flutter/simai_flutter.dart';
 import 'package:my_first_flutter_app/service/ChartPlaySettingsStore.dart';
@@ -12,7 +11,6 @@ import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/PlayerThemeScope.dart';
 import 'package:my_first_flutter_app/utils/RefreshRateUtil.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
-import 'package:my_first_flutter_app/api/ApiUrls.dart';
 
 class ChartPlayPage extends StatefulWidget {
   final String maidataContent;
@@ -48,6 +46,10 @@ class _ChartPlayPageState extends State<ChartPlayPage>
   Key _playerKey = UniqueKey();
   String? _audioUrl;
   ImageProvider? _bgImageProvider;
+  bool _ignoreAudioLookupResult = false;
+  bool _isLeaving = false;
+  bool _hasLoggedPlayerBuild = false;
+  Timer? _loadingDiagnosticTimer;
 
   /// 设置落盘防抖：侧边栏每拖一下滑块都会 notifyListeners，
   /// 不防抖会写爆 SharedPreferences。
@@ -70,6 +72,16 @@ class _ChartPlayPageState extends State<ChartPlayPage>
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     // 提前把上次的侧边栏设置读进内存，等控制器建好就能直接套用
     ChartPlaySettingsStore().load();
+    // 短期心跳仅输出到调试日志：计时器也停住时，说明 Dart 主线程被阻塞，
+    // 并非单纯某个资源 Future 没有完成。最多记录 20 秒，不持续轮询。
+    final diagnosticWatch = Stopwatch()..start();
+    _loadingDiagnosticTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      debugPrint(
+        '[ChartPlay] heartbeat elapsed=${diagnosticWatch.elapsedMilliseconds}ms '
+        'controller=${_controller != null}',
+      );
+      if (timer.tick >= 4) timer.cancel();
+    });
     _loadChart();
   }
 
@@ -127,9 +139,18 @@ class _ChartPlayPageState extends State<ChartPlayPage>
     ChartPlaySettingsStore().saveFrom(_controller);
   }
 
+  /// 播放器仍在初始化时，重复点击左上角返回会让异步 GameWidget 与控制器
+  /// 同时销毁。只接受第一次返回请求，避免重复 pop 叠加资源销毁。
+  void _leavePlayerPage() {
+    if (_isLeaving || !mounted) return;
+    _isLeaving = true;
+    unawaited(Navigator.of(context).maybePop<void>());
+  }
+
   Future<void> _loadChart() async {
+    debugPrint('[ChartPlay] load-start songId=${widget.songId}');
     if (widget.maidataContent.isEmpty) {
-      debugPrint("Error: maidata content is empty");
+      debugPrint('[ChartPlay] load-abort: maidata content is empty');
       return;
     }
 
@@ -138,12 +159,33 @@ class _ChartPlayPageState extends State<ChartPlayPage>
     // 一旦 SharedPreferences 读得比建控制器慢，就会拿默认值建控制器，
     // 退出时再把默认值写回去——用户的设置就被默默清掉了。
     await ChartPlaySettingsStore().load();
+    if (!mounted || _isLeaving) return;
+    debugPrint('[ChartPlay] settings-ready');
 
-    // 加载音源URL
-    await _loadAudioUrl();
-    
+    // 音源是可选资源，不能让曲库接口或音源服务阻塞谱面播放器的创建。
+    // 猜歌页面本身就是无声渲染；播放页在音源不可用时也应先显示谱面。
+    _ignoreAudioLookupResult = false;
+    try {
+      await _loadAudioUrl().timeout(const Duration(seconds: 8));
+    } on TimeoutException {
+      debugPrint('加载音源地址超时，先以无声模式打开谱面');
+      _ignoreAudioLookupResult = true;
+      _audioUrl = null;
+    } catch (e) {
+      debugPrint('加载音源地址失败，先以无声模式打开谱面: $e');
+      _ignoreAudioLookupResult = true;
+      _audioUrl = null;
+    }
+
+    if (!mounted || _isLeaving) return;
+    debugPrint('[ChartPlay] audio-lookup-ready hasUrl=${_audioUrl != null}');
+
     // 加载曲绘
     await _loadBackgroundImage();
+    if (!mounted || _isLeaving) return;
+    debugPrint(
+      '[ChartPlay] background-ready hasProvider=${_bgImageProvider != null}',
+    );
 
     try {
       var simaiFile = SimaiFile(widget.maidataContent);
@@ -159,7 +201,8 @@ class _ChartPlayPageState extends State<ChartPlayPage>
           resolvedInote = widget.selectedInote;
           debugPrint("Found chart for selected inote_${widget.selectedInote}");
         } else {
-          debugPrint("No chart found for selected inote_${widget.selectedInote}");
+          debugPrint(
+              "No chart found for selected inote_${widget.selectedInote}");
         }
       } else {
         // 否则按优先级查找
@@ -187,11 +230,16 @@ class _ChartPlayPageState extends State<ChartPlayPage>
       }
 
       final chart = SimaiConvert.deserialize(chartText);
+      debugPrint(
+        '[ChartPlay] chart-parsed notes=${chart.noteCollections.length} '
+        'timings=${chart.timingChanges.length}',
+      );
 
       // 确定音频来源：本地文件直接使用，远程URL需下载到临时文件
       String? audioPath;
       if (_audioUrl != null) {
-        if (_audioUrl!.startsWith('http://') || _audioUrl!.startsWith('https://')) {
+        if (_audioUrl!.startsWith('http://') ||
+            _audioUrl!.startsWith('https://')) {
           audioPath = await _downloadAudioToTemp(_audioUrl!);
         } else {
           audioPath = _audioUrl;
@@ -201,13 +249,16 @@ class _ChartPlayPageState extends State<ChartPlayPage>
       final difficulty = _difficultyForInote(resolvedInote);
       final videoMetadata = _buildVideoMetadata(simaiFile, difficulty);
       final videoOutputPath = await _buildVideoOutputPath();
+      if (!mounted || _isLeaving) return;
 
+      late final SimaiPlayerController controller;
       setState(() {
         _chartOffset = offset;
         _controller?.removeListener(_scheduleSettingsSave);
         _controller?.dispose();
         _gameplayController?.dispose();
-        _controller = _createController(chart, audioPath);
+        controller = _createController(chart, audioPath);
+        _controller = controller;
         _gameplayController = SimaiGameplayController(
           chart: chart,
           audioFilePath: audioPath,
@@ -221,8 +272,13 @@ class _ChartPlayPageState extends State<ChartPlayPage>
         );
         _playerKey = UniqueKey();
       });
-    } catch (e) {
-      debugPrint("Error loading chart: $e");
+      debugPrint(
+        '[ChartPlay] controller-published audioPath=${audioPath != null} '
+        'background=${_bgImageProvider != null}',
+      );
+    } catch (e, stack) {
+      debugPrint('[ChartPlay] chart-load-error: $e\n$stack');
+      if (!mounted || _isLeaving) return;
       _loadFallbackChart();
     }
   }
@@ -268,27 +324,19 @@ class _ChartPlayPageState extends State<ChartPlayPage>
       '(${result.duration.inSeconds}s, $sizeMb MB) -> ${result.path}',
     );
     Fluttertoast.showToast(
-      msg: '视频已保存到相册：${result.width}×${result.height} · $sizeMb MB',
+      msg: '视频已生成，请在导出页点击“保存到相册”：'
+          '${result.width}×${result.height} · $sizeMb MB',
     );
-    // 视频已直接写入相册目录，通知系统刷新相册即可
-    if (Platform.isAndroid) {
-      MediaScanner.loadMedia(path: result.path);
-    }
   }
 
-  // 构建视频导出到系统相册的输出路径（参考图片导出到相册的路径构建方式）
+  // Android 11+ 的 Movies 是分区存储目录，第三方库直接在其中创建临时文件
+  // 会被系统拒绝（EPERM）。让 simai_flutter 使用应用临时目录，再通过它的
+  // “保存到相册”流程交给 MediaStore 写入公开媒体库。
   Future<String?> _buildVideoOutputPath() async {
     try {
-      Directory? directory;
-      if (Platform.isAndroid) {
-        const moviesPath = '/storage/emulated/0/Movies';
-        directory = Directory(moviesPath);
-        if (!directory.existsSync()) {
-          directory.createSync(recursive: true);
-        }
-      } else {
-        directory = await getApplicationDocumentsDirectory();
-      }
+      if (Platform.isAndroid) return null;
+
+      final directory = await getApplicationDocumentsDirectory();
       final safeTitle = widget.songTitle.replaceAll(
         RegExp(r'[\\/:*?"<>|]'),
         '_',
@@ -331,6 +379,7 @@ class _ChartPlayPageState extends State<ChartPlayPage>
       );
 
       if (luoXueSongId != null) {
+        if (_ignoreAudioLookupResult) return;
         _audioUrl = 'https://assets2.lxns.net/maimai/music/$luoXueSongId.mp3';
         debugPrint("Loaded audio URL: $_audioUrl");
         return;
@@ -340,11 +389,11 @@ class _ChartPlayPageState extends State<ChartPlayPage>
       debugPrint("Error loading audio URL from luoXue: $e");
     }
 
-    // 第二站（兜底）：wmc.pub —— luoXue 没命中就直接按 songId 拼 track.mp3。
-    // 不在这里落盘不缓存：单曲一次性下载、播完即丢，进程级生命周期就够。
-    // 也不加进系统中心「maidata 管理」（用户明确说了音源兜底不用管）。
-    _audioUrl = ApiUrls.wmcAudioUrl(widget.songId);
-    debugPrint("Fallback audio URL (wmc.pub): $_audioUrl");
+    // 找不到可用音源时保持无声播放，不能把一个未经验证的兜底地址交给
+    // SimaiPlayerPage；某些错误响应会让播放器一直停留在初始化遮罩。
+    if (!_ignoreAudioLookupResult) {
+      debugPrint("No audio found for song: ${widget.songTitle}");
+    }
   }
 
   Future<void> _loadBackgroundImage() async {
@@ -357,7 +406,8 @@ class _ChartPlayPageState extends State<ChartPlayPage>
 
     try {
       _bgImageProvider = await CoverUtil.resolveCoverProvider(widget.songId);
-      debugPrint("Resolved background image provider for song ${widget.songId}");
+      debugPrint(
+          "Resolved background image provider for song ${widget.songId}");
     } catch (e) {
       debugPrint("Error loading background image: $e");
       _bgImageProvider = null;
@@ -366,9 +416,22 @@ class _ChartPlayPageState extends State<ChartPlayPage>
 
   Future<String?> _downloadAudioToTemp(String url) async {
     try {
-      final response = await ApiClient.get(Uri.parse(url));
+      final response = await ApiClient.get(Uri.parse(url)).timeout(
+        const Duration(seconds: 12),
+      );
       if (response.statusCode != 200) {
         debugPrint("Failed to download audio: ${response.statusCode}");
+        return null;
+      }
+      final contentType = response.headers['content-type']?.toLowerCase();
+      if (contentType != null &&
+          (contentType.contains('text/html') ||
+              contentType.contains('application/json'))) {
+        debugPrint('音源响应不是音频文件: $contentType');
+        return null;
+      }
+      if (response.bodyBytes.length < 1024) {
+        debugPrint('音源文件过小，跳过加载: ${response.bodyBytes.length} bytes');
         return null;
       }
       final dir = await getTemporaryDirectory();
@@ -383,6 +446,7 @@ class _ChartPlayPageState extends State<ChartPlayPage>
   }
 
   Future<void> _loadFallbackChart() async {
+    if (!mounted || _isLeaving) return;
     const sampleChart = """
 &inote_1=(140){4}
 1,2,3,4,5,6,7,8,
@@ -402,19 +466,23 @@ E
       // 确定音频来源
       String? audioPath;
       if (_audioUrl != null) {
-        if (_audioUrl!.startsWith('http://') || _audioUrl!.startsWith('https://')) {
+        if (_audioUrl!.startsWith('http://') ||
+            _audioUrl!.startsWith('https://')) {
           audioPath = await _downloadAudioToTemp(_audioUrl!);
         } else {
           audioPath = _audioUrl;
         }
       }
 
+      late final SimaiPlayerController controller;
+      if (!mounted || _isLeaving) return;
       setState(() {
         _chartOffset = 0.0;
         _controller?.removeListener(_scheduleSettingsSave);
         _controller?.dispose();
         _gameplayController?.dispose();
-        _controller = _createController(chart, audioPath);
+        controller = _createController(chart, audioPath);
+        _controller = controller;
         _gameplayController = SimaiGameplayController(
           chart: chart,
           audioFilePath: audioPath,
@@ -425,11 +493,15 @@ E
         _videoMetadata = null;
         _playerKey = UniqueKey();
       });
+      debugPrint('[ChartPlay] fallback-controller-published');
     }
   }
 
   @override
   void dispose() {
+    _isLeaving = true;
+    _loadingDiagnosticTimer?.cancel();
+    debugPrint('[ChartPlay] dispose');
     WidgetsBinding.instance.removeObserver(this);
     // 离开播放页恢复 App 原本的主题
     PlayerThemeScope.forceDarkTheme.value = false;
@@ -456,6 +528,10 @@ E
 
   @override
   Widget build(BuildContext context) {
+    if (_controller != null && !_hasLoggedPlayerBuild) {
+      _hasLoggedPlayerBuild = true;
+      debugPrint('[ChartPlay] SimaiPlayerPage-build');
+    }
     return Scaffold(
       backgroundColor: Colors.black,
       body: _controller == null
@@ -467,6 +543,7 @@ E
               videoExportMetadata: _videoMetadata,
               videoExportOptions: _videoExportOptions,
               onVideoExported: _onVideoExported,
+              onBack: _leavePlayerPage,
               disposeController: false,
             ),
     );

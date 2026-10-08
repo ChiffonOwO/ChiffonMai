@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio_background/just_audio_background.dart';
@@ -13,20 +14,36 @@ import 'package:my_first_flutter_app/utils/ExportSettings.dart';
 import 'package:my_first_flutter_app/utils/FavoriteFeaturesNotifier.dart';
 import 'package:my_first_flutter_app/utils/FavoriteImportFlow.dart';
 import 'package:my_first_flutter_app/utils/LoginStateNotifier.dart';
+import 'package:my_first_flutter_app/utils/SecureCredentialStore.dart';
 import 'package:my_first_flutter_app/utils/PlayerThemeScope.dart';
 import 'package:my_first_flutter_app/utils/ThemeManager.dart';
 import 'package:my_first_flutter_app/utils/UpdateNotifier.dart';
 import 'package:my_first_flutter_app/utils/UserProfileNotifier.dart';
 import 'package:my_first_flutter_app/service/ConnectivityService.dart';
 import 'package:my_first_flutter_app/widgets/PortablePlayerBadge.dart';
+import 'package:my_first_flutter_app/utils/NavigationPreferences.dart';
 import 'service/AccountSwitchService.dart';
+import 'service/LogExportService.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await AccountSwitchService.ensureMigrated();
-  await _initBackgroundAudio();
+  LogExportService.instance.install();
   GoogleFonts.config.allowRuntimeFetching = true;
   runApp(MyApp());
+  // 凭据迁移和媒体会话属于后台准备工作，不能挡住首页首帧和点击事件。
+  // 尤其是 debug 模式下网络字体/插件初始化较慢，启动阶段等待它们会让
+  // 用户连续点击到尚未挂载完成的路由，表现为卡顿甚至闪退。
+  unawaited(_initStartupServices());
+}
+
+Future<void> _initStartupServices() async {
+  try {
+    await SecureCredentialStore.migrateLegacy();
+    await AccountSwitchService.ensureMigrated();
+    await _initBackgroundAudio();
+  } catch (e) {
+    debugPrint('[Startup] 后台初始化失败（不影响首页交互）: $e');
+  }
 }
 
 /// 初始化随身听的后台播放（通知栏 / 锁屏 / 耳机按键控制）。
@@ -90,6 +107,7 @@ class _MyAppState extends State<MyApp> {
     UserProfileNotifier.load();
     // 导出相关偏好（收藏夹自定义后缀）
     ExportSettings.load();
+    NavigationPreferences.instance.load();
     _initFileOpenHandling();
     _checkUpdateForBadge();
   }
@@ -214,11 +232,24 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     if (!_themeLoaded) {
-      return MaterialApp(
+      // 偏好读取前跟随系统；读取后在背景预加载期间立即切换到用户主题。
+      return ListenableBuilder(
+        listenable: Listenable.merge([
+          ThemeManager().notifier,
+          ThemeManager().pureBlackNotifier,
+          ThemeManager().seedColorNotifier,
+        ]),
+        builder: (context, _) => MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme(),
-        darkTheme: AppTheme.darkTheme(),
+        theme: AppTheme.lightTheme(seedColor: ThemeManager().seedColor),
+        darkTheme: ThemeManager().pureBlackEnabled
+            ? AppTheme.pureBlackTheme(seedColor: ThemeManager().seedColor)
+            : AppTheme.darkTheme(seedColor: ThemeManager().seedColor),
+        themeMode: ThemeManager().isLoaded
+            ? ThemeManager().themeMode
+            : ThemeMode.system,
         home: const SplashPage(),
+        ),
       );
     }
 
@@ -228,6 +259,7 @@ class _MyAppState extends State<MyApp> {
         ThemeManager().pureBlackNotifier,
         ThemeManager().seedColorNotifier,
         ThemeManager().customBackgroundPathNotifier,
+        NavigationPreferences.instance,
       ]),
       builder: (context, _) {
         final themeMode = ThemeManager().themeMode;
@@ -254,6 +286,12 @@ class _MyAppState extends State<MyApp> {
               theme: forceDark ? darkThemeData : lightThemeData,
               darkTheme: darkThemeData,
               themeMode: forceDark ? ThemeMode.dark : themeMode,
+              localizationsDelegates: const [
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
               // 强制深色时立即切换，避免主题渐变在播放器页面上再闪一下
               themeAnimationDuration:
                   forceDark ? Duration.zero : kThemeAnimationDuration,
@@ -261,9 +299,7 @@ class _MyAppState extends State<MyApp> {
                 return MediaQuery(
                   data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
                   child: DefaultTextStyle(
-                    style: _fontsLoaded
-                        ? AppTheme.font()
-                        : const TextStyle(),
+                    style: _fontsLoaded ? AppTheme.font() : const TextStyle(),
                     // 随身听悬浮球挂在**这里**（MaterialApp.builder），而不是
                     // AppShell 的 body 里 —— 这是关键：
                     //   MaterialApp.builder 包住的是 Navigator，所以悬浮球在**所有

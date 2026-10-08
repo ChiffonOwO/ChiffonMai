@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constant/CacheKeyConstant.dart';
+import 'SecureCredentialStore.dart';
 
 /// 水鱼账号登录态：跨页面共享的实时状态。
 ///
@@ -13,7 +14,9 @@ class LoginStateNotifier {
   /// 从 SharedPreferences 加载登录状态（应用启动时调用一次）。
   static Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    final jwt = prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '';
+    final jwt = await SecureCredentialStore.read(
+            CacheKeyConstant.probeDivingFishToken) ??
+        '';
     _publish(jwt.isNotEmpty);
   }
 

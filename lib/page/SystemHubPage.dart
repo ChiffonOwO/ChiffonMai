@@ -1,10 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'HubComponents.dart';
 import 'SettingsPage.dart';
 import 'DataBackupPage.dart';
@@ -15,8 +13,10 @@ import 'AboutAppPage.dart';
 import 'Awmc/AwmcConsolePage.dart';
 import 'SupportDeveloperPage.dart';
 import 'FriendLinksPage.dart';
+import 'LoadingTipsPage.dart';
 import '../manager/LZYCheckUpdateManager.dart';
 import '../manager/MaidataManager.dart';
+import '../manager/DivingFishProbeManager.dart';
 import '../manager/DivingFish/ProberException.dart';
 import '../manager/LuoXue/CollectionsManager.dart';
 import '../entity/LuoXue/Collection.dart';
@@ -28,9 +28,10 @@ import '../utils/UpdateNotifier.dart';
 import '../widgets/SyncRouteFooter.dart';
 import '../widgets/SyncStatsFooter.dart';
 import '../widgets/SyncFlowMixin.dart';
-import '../widgets/SyncScoreDialogs.dart'
-    show SyncScoreDialogs, SyncCallbacks;
+import '../widgets/SyncScoreDialogs.dart' show SyncScoreDialogs, SyncCallbacks;
 import '../widgets/CollectionPickerSheet.dart';
+import '../service/LogExportService.dart';
+import '../widgets/LxnsAssetImage.dart';
 import '../widgets/RefreshDataDialog.dart'
     show
         showRefreshDataDialog,
@@ -38,7 +39,9 @@ import '../widgets/RefreshDataDialog.dart'
         refreshBest50DataWithProgress,
         executeAdvancedRefreshData,
         launchUrlFallback;
-import '../widgets/AdvancedRefreshDataDialog.dart' show showAdvancedRefreshDataDialog;
+import '../widgets/AdvancedRefreshDataDialog.dart'
+    show showAdvancedRefreshDataDialog;
+import '../widgets/MaimaiHubLoginDialog.dart' show showMaimaiHubLoginDialog;
 import '../constant/CacheKeyConstant.dart';
 import '../constant/AppLinks.dart';
 import '../utils/FavoriteFeaturesNotifier.dart';
@@ -46,7 +49,9 @@ import '../utils/FeatureFlags.dart';
 import '../utils/LoginStateNotifier.dart';
 import '../utils/UserProfileNotifier.dart';
 import '../utils/AppTheme.dart';
+import '../utils/ExternalLaunchUtil.dart';
 import '../service/CommunityAvatarStore.dart';
+import '../widgets/ErrorMessageDialog.dart';
 
 class SystemHubPage extends StatefulWidget {
   final VoidCallback onAccountManageTap;
@@ -71,10 +76,10 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
   // 首页「收藏的功能」区里的同名入口读的是同一份状态，两边永远不会显示不一致。
   // 线路落盘仍走 SyncRouteStore（同一套 prefs 键）。
 
-  // ===== 登出水鱼二次确认 + 进度 =====
-  bool _logoutConfirming = false;
+  // ===== 登出水鱼确认 + 进度 =====
   bool _loggingOut = false;
   String _logoutText = '';
+  bool _maimaiHubLoggedIn = false;
 
   // ===== 头像 / 姓名框（用于 Best50 图片导出） =====
   int _selectedAvatarId = 1;
@@ -85,8 +90,10 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
   // ===== 长任务的进行状态（显示在对应按钮上，替代原来的进度对话框） =====
   bool _refreshing = false;
   String _refreshText = '';
+  double _refreshProgress = 0;
   bool _refreshingAdvanced = false;
   String _refreshAdvancedText = '';
+  double _refreshAdvancedProgress = 0;
   bool _refreshingMaidata = false;
   int _maidataProgressCompleted = 0;
   int _maidataProgressTotal = 0;
@@ -108,15 +115,22 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
     // 监听共享状态：首页登出水鱼账号 / 同步成功后此处也会自动刷新昵称 / QQ
     UserProfileNotifier.instance.addListener(_onUserProfileChanged);
     _onUserProfileChanged();
+    _selectedAvatarId = CommunityAvatarStore.instance.value.avatarId;
     CommunityAvatarStore.instance.addListener(_onAvatarChanged);
     LoginStateNotifier.instance.addListener(_onAvatarLoginChanged);
     unawaited(CommunityAvatarStore.instance.activate());
     _fetchAvatarIcons();
     _loadCachedPlateId();
     _fetchAvatarPlates();
+    unawaited(_refreshMaimaiHubLoginState());
     // 线路 + 统计（与首页收藏区共享同一份状态；重复调用幂等）
     SyncRouteNotifier.instance.addListener(_onSyncRouteChanged);
     SyncRouteNotifier.instance.ensureLoaded();
+  }
+
+  Future<void> _refreshMaimaiHubLoginState() async {
+    final token = await DivingFishProbeManager().ensureAuthToken();
+    if (mounted) setState(() => _maimaiHubLoggedIn = token != null);
   }
 
   void _onSyncRouteChanged() {
@@ -155,7 +169,10 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
   // ===== 头像 / 姓名框读写 =====
 
   void _onAvatarChanged() {
-    if (mounted) setState(() => _selectedAvatarId = CommunityAvatarStore.instance.value.avatarId);
+    if (mounted) {
+      setState(() =>
+          _selectedAvatarId = CommunityAvatarStore.instance.value.avatarId);
+    }
   }
 
   void _onAvatarLoginChanged() {
@@ -266,6 +283,29 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
       Navigator.push(context, MaterialPageRoute(builder: (_) => page))
           .then((_) => _loadProfile());
 
+  Future<void> _exportLogs() async {
+    try {
+      final file = await LogExportService.instance
+          .export();
+      if (!mounted) return;
+      await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+                title: const Text('日志已导出'),
+                content: SelectableText(file.path),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('知道了'))
+                ],
+              ));
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('导出日志失败：$e')));
+    }
+  }
+
   /// 打开外链；**打不开就把内容复制到剪贴板并提示**（不会静默失败）。
   ///
   /// [copyText] 默认复制 [url]。加群链接那种「复制链接没用」的情况要显式换成群号；
@@ -279,8 +319,7 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
   }) async {
     final uri = Uri.parse(url);
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (await ExternalLaunchUtil.open(uri)) {
         return;
       }
     } catch (e) {
@@ -305,20 +344,24 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
     setState(() {
       _refreshing = true;
       _refreshText = '正在刷新数据...';
+      _refreshProgress = 0;
     });
     try {
       await executeRefreshData(request, onProgress: (p, t) {
         if (!mounted) return;
-        setState(() => _refreshText = '$t $p%');
+        setState(() {
+          _refreshText = '$t $p%';
+          _refreshProgress = p / 100;
+        });
       });
       if (!mounted) return;
       Fluttertoast.showToast(msg: '数据刷新成功!');
     } on ProberException catch (e) {
       // 未授权 → 直接拉起授权页；其余按统一文案提示。
       // 与首页刷新入口共用 presentRefreshError，避免两边行为不一致。
-      if (mounted) await presentRefreshError(e, qq: request.qq.trim());
+      if (mounted) await presentRefreshError(context, e, qq: request.qq.trim());
     } catch (e) {
-      if (mounted) await presentRefreshError(e, qq: request.qq.trim());
+      if (mounted) await presentRefreshError(context, e, qq: request.qq.trim());
     } finally {
       if (mounted) {
         setState(() {
@@ -339,13 +382,17 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
     setState(() {
       _refreshingAdvanced = true;
       _refreshAdvancedText = '正在刷新数据...';
+      _refreshAdvancedProgress = 0;
     });
     try {
       await executeAdvancedRefreshData(
         request,
         onProgress: (p, t) {
           if (!mounted) return;
-          setState(() => _refreshAdvancedText = '$t $p%');
+          setState(() {
+            _refreshAdvancedText = '$t $p%';
+            _refreshAdvancedProgress = p / 100;
+          });
         },
       );
       if (!mounted) return;
@@ -353,9 +400,9 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
     } on ProberException catch (e) {
       // 未授权 → 直接拉起授权页；其余按统一文案提示。
       // 与首页刷新入口共用 presentRefreshError，避免两边行为不一致。
-      if (mounted) await presentRefreshError(e, qq: request.qq.trim());
+      if (mounted) await presentRefreshError(context, e, qq: request.qq.trim());
     } catch (e) {
-      if (mounted) await presentRefreshError(e, qq: request.qq.trim());
+      if (mounted) await presentRefreshError(context, e, qq: request.qq.trim());
     } finally {
       if (mounted) {
         setState(() {
@@ -463,9 +510,8 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
             _maidataProgressCompleted = current;
             _maidataProgressTotal = total;
             // 总数未定时（各流派文件夹列表还没回齐）只报已发现数量。
-            _maidataProgressText = total > 0
-                ? '$current / $total'
-                : '已发现 $current 首，正在统计总量...';
+            _maidataProgressText =
+                total > 0 ? '$current / $total' : '已发现 $current 首，正在统计总量...';
           });
         },
       );
@@ -474,7 +520,7 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
     } catch (e) {
       debugPrint('刷新 maidata 失败：$e');
       if (!mounted) return;
-      Fluttertoast.showToast(msg: '刷新失败：$e');
+      await showErrorMessageDialog(context, message: '刷新失败：$e');
     } finally {
       if (mounted) {
         setState(() {
@@ -541,8 +587,8 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
     required bool participateRankings,
     required bool showNickname,
   }) async {
-    await refreshBest50DataWithProgress(qq,
-        (p, text) => onProgress(0.70 + p / 100 * 0.30, text),
+    await refreshBest50DataWithProgress(
+        qq, (p, text) => onProgress(0.70 + p / 100 * 0.30, text),
         participateRankings: participateRankings, showNickname: showNickname);
     await _loadProfile();
   }
@@ -557,25 +603,42 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
     SyncScoreDialogs.showDivingFishLoginDialog(context, syncCallbacks);
   }
 
-  /// 登出水鱼账号：第一次点击进入「再次确认」态，第二次点击才真正执行；
-  /// 清除水鱼账号相关的所有成绩 / 缓存（保留歌曲 / 收藏品等静态数据），
-  /// 并通知共享 LoginStateNotifier 让监听者（"登录水鱼"按钮等）即时刷新。
-  /// 进度显示在按钮上，不再弹模态对话框。
+  Future<void> _loginMaimaiHub() async {
+    if (anyBusy) return;
+    final loggedIn = await showMaimaiHubLoginDialog(context);
+    if (!mounted) return;
+    if (loggedIn) {
+      setState(() => _maimaiHubLoggedIn = true);
+      Fluttertoast.showToast(msg: 'maimai Score Hub 登录状态已保存，现在可以使用 OCR 了');
+    }
+  }
+
+  Future<bool> _confirmLogout() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('确认登出水鱼账号'),
+        content: const Text('登出后将清除缓存的登录信息和 ImportToken，确定要登出吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('登出'),
+          ),
+        ],
+      ),
+    );
+    return result == true;
+  }
+
+  /// 登出水鱼账号：先弹出确认对话框，再清除账号相关缓存。
   Future<void> _logoutDivingFish() async {
     if (_loggingOut) return;
-    if (!_logoutConfirming) {
-      // 第一次点击：进入二次确认态；5 秒内未再点自动复位
-      setState(() => _logoutConfirming = true);
-      Future.delayed(const Duration(seconds: 5), () {
-        if (mounted && _logoutConfirming && !_loggingOut) {
-          setState(() => _logoutConfirming = false);
-        }
-      });
-      return;
-    }
-    // 第二次点击：执行实际登出
+    if (!await _confirmLogout() || !mounted) return;
     setState(() {
-      _logoutConfirming = false;
       _loggingOut = true;
       _logoutText = '正在登出水鱼账号...';
     });
@@ -586,7 +649,9 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
       Fluttertoast.showToast(msg: '已登出水鱼账号');
     } catch (e) {
       debugPrint('登出水鱼账号失败：$e');
-      if (mounted) Fluttertoast.showToast(msg: '登出水鱼账号失败：$e');
+      if (mounted) {
+        await showErrorMessageDialog(context, message: '登出水鱼账号失败：$e');
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -615,27 +680,38 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
               selectedAvatarId: _selectedAvatarId,
               nickname: _userNickname,
               avatarStatus: CommunityAvatarStore.instance.value.message,
-              avatarStatusLevel:
-                  CommunityAvatarStore.instance.value.level,
+              avatarStatusLevel: CommunityAvatarStore.instance.value.level,
               onRetryAvatar: CommunityAvatarStore.instance.value.pending
-                  ? () => unawaited(CommunityAvatarStore.instance.retry()) : null,
+                  ? () => unawaited(CommunityAvatarStore.instance.retry())
+                  : null,
               onPickTap: _showCollectionPicker,
             ),
             children: [
               HubSection(
                 title: '数据与账号',
                 icon: Icons.sync_rounded,
-                subtitle: '登录水鱼 · 同步账号 · 数据备份 · 刷新缓存',
+                subtitle: 'maimai Score Hub 登录 · 登录水鱼 · 同步账号 · 数据备份 · 刷新缓存',
                 // 10 个入口里「AWMC 网关」默认隐藏（FeatureFlags.awmcGateway）
-                badgeCount: 9 + (FeatureFlags.awmcGateway ? 1 : 0),
+                badgeCount: 11 + (FeatureFlags.awmcGateway ? 1 : 0),
                 children: [
                   HubActionTile(
+                    title: '登录 maimai Score Hub',
+                    titleFontSize: 13,
+                    subtitle: _maimaiHubLoggedIn
+                        ? '已登录，可直接使用 OCR；点击可重新登录'
+                        : '仅登录，不同步成绩；用于 OCR 与 maimai Score Hub 功能',
+                    icon: _maimaiHubLoggedIn
+                        ? Icons.verified_user_outlined
+                        : Icons.login_rounded,
+                    isFavorited: _isFavorited('登录 maimai Score Hub'),
+                    onToggleFavorite: () =>
+                        _toggleFavorite('登录 maimai Score Hub'),
+                    onTap: _loginMaimaiHub,
+                    disabled: anyBusy,
+                  ),
+                  HubActionTile(
                     title: loggedIn ? '登出水鱼账号' : '登录水鱼',
-                    subtitle: _logoutConfirming
-                        ? '再次点击以确认登出'
-                        : (loggedIn
-                            ? '清除水鱼登录状态'
-                            : '获取 ImportToken 以使用同步功能'),
+                    subtitle: loggedIn ? '清除水鱼登录状态' : '获取 ImportToken 以使用同步功能',
                     icon: loggedIn ? Icons.logout_rounded : Icons.login_rounded,
                     isFavorited: _isFavorited(loggedIn ? '登出水鱼账号' : '登录水鱼'),
                     onToggleFavorite: () =>
@@ -643,7 +719,7 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
                     onTap: loggedIn ? _logoutDivingFish : _loginDivingFish,
                     loading: _loggingOut,
                     loadingText: _logoutText,
-                    awaitingConfirm: _logoutConfirming,
+                    disabled: anySyncBusy,
                   ),
                   HubActionTile(
                     title: '同步成绩到水鱼',
@@ -654,6 +730,9 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
                     onTap: syncToDivingFishByCurrentRoute,
                     loading: syncingDivingFish,
                     loadingText: syncText,
+                    showProgress: true,
+                    progressValue: divingFishProgress,
+                    disabled: syncingLuoXue || syncingAwmcNet || syncingMulti,
                     // 线路切换 + 统计：与首页「收藏的功能」区共用同一份状态
                     footer: SyncRouteFooter(
                       platform: SyncPlatform.divingFish,
@@ -669,6 +748,10 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
                     onTap: syncToLuoXueByCurrentRoute,
                     loading: syncingLuoXue,
                     loadingText: luoXueText,
+                    showProgress: true,
+                    progressValue: luoXueProgress,
+                    disabled:
+                        syncingDivingFish || syncingAwmcNet || syncingMulti,
                     footer: SyncRouteFooter(
                       platform: SyncPlatform.luoXue,
                       enabled: !anyBusy,
@@ -687,12 +770,30 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
                     onTap: syncToAwmcNetWithButton,
                     loading: syncingAwmcNet,
                     loadingText: awmcNetText,
+                    showProgress: true,
+                    progressValue: awmcNetProgress,
+                    disabled:
+                        syncingDivingFish || syncingLuoXue || syncingMulti,
                     // 统计行上提一点贴紧按钮：tile 底部本来就空着约 23px，
                     // 一行小字挂在那里会显得离按钮太远（见 SyncStatsFooter.footerLift）
                     footerLift: SyncStatsFooter.footerLift,
                     footer: const SyncStatsFooter(
                       slot: (SyncLine.direct, SyncPlatform.awmc),
                     ),
+                  ),
+                  HubActionTile(
+                    title: '同步成绩到多端',
+                    subtitle: '一份成绩同步到多个查分器',
+                    icon: Icons.devices_other_outlined,
+                    isFavorited: _isFavorited('同步成绩到多端'),
+                    onToggleFavorite: () => _toggleFavorite('同步成绩到多端'),
+                    onTap: syncToMultiplePlatforms,
+                    loading: syncingMulti,
+                    loadingText: multiSyncText,
+                    showProgress: true,
+                    progressValue: multiSyncProgress,
+                    disabled:
+                        syncingDivingFish || syncingLuoXue || syncingAwmcNet,
                   ),
                   HubActionTile(
                     title: '账号管理',
@@ -719,7 +820,9 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
                     onTap: _refreshData,
                     loading: _refreshing,
                     loadingText: _refreshText,
-                    disabled: _refreshingAdvanced,
+                    showProgress: true,
+                    progressValue: _refreshProgress,
+                    disabled: _refreshingAdvanced || anySyncBusy,
                   ),
                   HubActionTile(
                     title: '刷新数据（高级）',
@@ -730,7 +833,9 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
                     onTap: _advancedRefreshData,
                     loading: _refreshingAdvanced,
                     loadingText: _refreshAdvancedText,
-                    disabled: _refreshing,
+                    showProgress: true,
+                    progressValue: _refreshAdvancedProgress,
+                    disabled: _refreshing || anySyncBusy,
                   ),
                   HubActionTile(
                     title: 'maidata 管理',
@@ -747,9 +852,10 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
                         _refreshingMaidata && _maidataProgressTotal > 0
                             ? _maidataProgressCompleted
                             : null,
-                    progressTotal: _refreshingMaidata && _maidataProgressTotal > 0
-                        ? _maidataProgressTotal
-                        : null,
+                    progressTotal:
+                        _refreshingMaidata && _maidataProgressTotal > 0
+                            ? _maidataProgressTotal
+                            : null,
                     disabled: anyBusy && !_refreshingMaidata,
                   ),
                   // 「AWMC 网关」入口：默认隐藏（FeatureFlags.awmcGateway），
@@ -770,15 +876,31 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
                 title: '应用',
                 icon: Icons.tune_rounded,
                 subtitle: '主题 · 检查更新 · 服务器 · 社区',
-                badgeCount: 5,
+                badgeCount: 6,
                 children: [
                   HubActionTile(
-                    title: '主题与背景',
-                    subtitle: '调整主题色、模式和背景图',
+                    title: '主题与交互偏好',
+                    subtitle: '调整主题色、模式、背景图和交互偏好',
                     icon: Icons.palette_outlined,
-                    isFavorited: _isFavorited('主题与背景'),
-                    onToggleFavorite: () => _toggleFavorite('主题与背景'),
+                    isFavorited: _isFavorited('主题与交互偏好'),
+                    onToggleFavorite: () => _toggleFavorite('主题与交互偏好'),
                     onTap: () => _open(context, const SettingsPage()),
+                  ),
+                  HubActionTile(
+                    title: '加载语录管理',
+                    subtitle: '选择加载时展示的语录',
+                    icon: Icons.format_quote,
+                    isFavorited: _isFavorited('加载语录管理'),
+                    onToggleFavorite: () => _toggleFavorite('加载语录管理'),
+                    onTap: () => _open(context, const LoadingTipsPage()),
+                  ),
+                  HubActionTile(
+                    title: '打印日志',
+                    subtitle: '导出最近运行日志，方便排查问题',
+                    icon: Icons.receipt_long_outlined,
+                    isFavorited: _isFavorited('打印日志'),
+                    onToggleFavorite: () => _toggleFavorite('打印日志'),
+                    onTap: _exportLogs,
                   ),
                   // 「检查更新」在检测到新版本时会变成「发现新版本」+
                   // 绿色圆环箭头（见 UpdateAvailableIcon）。
@@ -904,8 +1026,8 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
                     icon: Icons.poll_outlined,
                     isFavorited: _isFavorited('问卷调查'),
                     onToggleFavorite: () => _toggleFavorite('问卷调查'),
-                    onTap: () => _launchExternal(
-                        context, AppLinks.surveyUrl, '问卷链接'),
+                    onTap: () =>
+                        _launchExternal(context, AppLinks.surveyUrl, '问卷链接'),
                   ),
                 ],
               ),
@@ -978,13 +1100,12 @@ class _MeProfileBanner extends StatelessWidget {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: CachedNetworkImage(
-                      imageUrl:
-                          'https://assets2.lxns.net/maimai/icon/$selectedAvatarId.png',
+                    child: LxnsAssetImage(
+                      url: lxnsIconUrl(selectedAvatarId),
                       width: 72,
                       height: 72,
                       fit: BoxFit.cover,
-                      placeholder: (_, __) => Container(
+                      placeholder: Container(
                         width: 72,
                         height: 72,
                         color: scheme.primaryContainer,
@@ -994,7 +1115,7 @@ class _MeProfileBanner extends StatelessWidget {
                           size: 36,
                         ),
                       ),
-                      errorWidget: (_, __, ___) => Container(
+                      errorWidget: Container(
                         width: 72,
                         height: 72,
                         color: scheme.primaryContainer,
@@ -1054,13 +1175,13 @@ class _MeProfileBanner extends StatelessWidget {
                     GestureDetector(
                       onTap: onRetryAvatar,
                       child: Text(avatarStatus,
-                        style: TextStyle(
-                            color: statusColor,
-                            fontSize: 11,
-                            fontWeight: avatarStatusLevel ==
-                                    AvatarSyncLevel.synced
-                                ? FontWeight.w600
-                                : FontWeight.normal)),
+                          style: TextStyle(
+                              color: statusColor,
+                              fontSize: 11,
+                              fontWeight:
+                                  avatarStatusLevel == AvatarSyncLevel.synced
+                                      ? FontWeight.w600
+                                      : FontWeight.normal)),
                     ),
                     Text(
                       '可按需在下方获取/同步成绩数据',

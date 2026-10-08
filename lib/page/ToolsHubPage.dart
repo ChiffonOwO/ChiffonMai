@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'HubComponents.dart';
 import '../service/CoverRecognitionService.dart';
 import '../utils/FavoriteFeaturesNotifier.dart';
+import '../utils/ExternalLaunchUtil.dart';
 import 'DailyRecommendPage.dart';
 import 'RandomChartPage.dart';
 import 'RecommendByTagsPage.dart';
@@ -23,6 +23,8 @@ import 'GlobalArcadeMapPage.dart';
 import 'KaleidXScope/KaleidXScopeSelectPage.dart';
 import 'PersonalizedChartPlayConfigure.dart';
 import 'Portable/PortablePlayerPage.dart';
+import 'NextPlayQueuePage.dart';
+import 'AttendanceWheelPage.dart';
 
 class ToolsHubPage extends StatefulWidget {
   const ToolsHubPage({super.key});
@@ -117,8 +119,8 @@ class _ToolsHubPageState extends State<ToolsHubPage> {
       BuildContext context, String url, String fallbackHint) async {
     final uri = Uri.parse(url);
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (await ExternalLaunchUtil.open(uri)) {
+        return;
       } else if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('无法打开链接：$fallbackHint')),
@@ -146,7 +148,7 @@ class _ToolsHubPageState extends State<ToolsHubPage> {
             title: '选曲推荐',
             icon: Icons.explore_outlined,
             subtitle: '每日 · 随机 · 标签 · Rating · 定数',
-            badgeCount: 5,
+            badgeCount: 6,
             children: [
               HubActionTile(
                 title: '每日推荐',
@@ -158,11 +160,19 @@ class _ToolsHubPageState extends State<ToolsHubPage> {
               ),
               HubActionTile(
                 title: '随机乐曲',
-                subtitle: '随机抽取 1-4 首歌曲',
+                subtitle: '自定义数量随机抽取歌曲',
                 icon: Icons.shuffle_rounded,
                 isFavorited: _isFavorited('随机乐曲'),
                 onToggleFavorite: () => _toggleFavorite('随机乐曲'),
                 onTap: () => _open(context, const RandomChartPage()),
+              ),
+              HubActionTile(
+                title: '出勤转盘',
+                subtitle: '等分转盘决定本次出勤选项',
+                icon: Icons.casino_outlined,
+                isFavorited: _isFavorited('出勤转盘'),
+                onToggleFavorite: () => _toggleFavorite('出勤转盘'),
+                onTap: () => _open(context, const AttendanceWheelPage()),
               ),
               HubActionTile(
                 title: '基于标签推荐',
@@ -255,13 +265,10 @@ class _ToolsHubPageState extends State<ToolsHubPage> {
                 onToggleFavorite: () => _toggleFavorite('曲绘识别'),
                 onTap: _openCoverRecognition,
                 loading: _coverIndexBuilding,
-                loadingText:
-                    _coverIndexBuilding ? '正在构建曲绘索引…' : null,
-                progressCurrent: _coverIndexBuilding
-                    ? _coverProgressCurrent
-                    : null,
-                progressTotal:
-                    _coverIndexBuilding ? _coverProgressTotal : null,
+                loadingText: _coverIndexBuilding ? '正在构建曲绘索引…' : null,
+                progressCurrent:
+                    _coverIndexBuilding ? _coverProgressCurrent : null,
+                progressTotal: _coverIndexBuilding ? _coverProgressTotal : null,
               ),
               HubActionTile(
                 title: '结算画面识别',
@@ -294,7 +301,7 @@ class _ToolsHubPageState extends State<ToolsHubPage> {
             title: '玩法与社区',
             icon: Icons.public_outlined,
             subtitle: '随身听 · 自定义谱面 · KALEIDXSCOPE · 好友 · 地图',
-            badgeCount: 6,
+            badgeCount: 7,
             children: [
               HubActionTile(
                 title: '随身听',
@@ -305,12 +312,21 @@ class _ToolsHubPageState extends State<ToolsHubPage> {
                 onTap: () => _openPortablePlayer(context),
               ),
               HubActionTile(
+                title: '下次想玩',
+                subtitle: '排好下次去机台想玩的歌曲',
+                icon: Icons.queue_music,
+                isFavorited: _isFavorited('下次想玩'),
+                onToggleFavorite: () => _toggleFavorite('下次想玩'),
+                onTap: () => _open(context, const NextPlayQueuePage()),
+              ),
+              HubActionTile(
                 title: '自定义谱面播放',
                 subtitle: '播放本地自定义谱面',
                 icon: Icons.play_circle_outline_rounded,
                 isFavorited: _isFavorited('自定义谱面播放'),
                 onToggleFavorite: () => _toggleFavorite('自定义谱面播放'),
-                onTap: () => _open(context, const PersonalizedChartPlayConfigure()),
+                onTap: () =>
+                    _open(context, const PersonalizedChartPlayConfigure()),
               ),
               HubActionTile(
                 title: 'KALEIDXSCOPE',

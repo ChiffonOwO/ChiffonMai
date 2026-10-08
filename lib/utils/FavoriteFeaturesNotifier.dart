@@ -39,12 +39,14 @@ class FavoriteFeaturesNotifier {
     // 「maidata 管理」原名「刷新 maidata」。迁移键写没空格的，跟新键一致，
     // 这样旧用户原来收藏的星标会自动落到新标题上。
     '刷新 maidata': 'maidata管理',
+    '主题与背景': '主题与交互偏好',
   };
 
   /// 从 SharedPreferences 加载收藏列表（应用启动时调用一次）。
   static Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getStringList(CacheKeyConstant.favoriteFeatures) ?? <String>[];
+    final raw =
+        prefs.getStringList(CacheKeyConstant.favoriteFeatures) ?? <String>[];
     final titles = raw.toSet();
 
     final migrated = <String>{};

@@ -1,9 +1,10 @@
+import 'AnimatedChoiceBar.dart';
 import 'package:flutter/material.dart';
 
 import '../service/SyncRouteStore.dart';
 
-/// 「同步成绩」的线路切换器：**线路1 AWMC 网关**（机台二维码 + `gw_` 令牌直连
-/// api.wmc.pub）/ **线路2 maimai Score Hub**（原有 scorehub 探针流程，走 maimai.bakapiano.com）。
+/// 「同步成绩」的线路切换器：**线路1 AWMC 网关**（机台二维码 + 用户平台凭据，
+/// 开发者令牌由服务端代理注入）/ **线路2 maimai Score Hub**（原有流程，走 maimai.bakapiano.com）。
 ///
 /// 贴在对应的 HubActionTile 下方（`HubActionTile.footer`）：
 /// 它自己是一行独立控件，点它**不会**触发 tile 的 onTap（不会误开始同步），
@@ -38,34 +39,35 @@ class SyncRouteSwitcher extends StatelessWidget {
           style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
         ),
         const SizedBox(width: 8),
-        SegmentedButton<int>(
-          showSelectedIcon: false,
-          style: SegmentedButton.styleFrom(
-            visualDensity: VisualDensity.compact,
-            textStyle: const TextStyle(fontSize: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          // 顺序：AWMC（线路1）在前，maimai Score Hub（线路2）在后。
-          // value 不变 — 老 prefs 里存的 0/1 含义不变，只是显示位置换了。
-          segments: const [
-            ButtonSegment<int>(value: SyncRouteStore.routeAwmc, label: Text('线路1')),
-            ButtonSegment<int>(value: SyncRouteStore.routeScoreHub, label: Text('线路2')),
-          ],
-          selected: {value},
-          onSelectionChanged:
-              enabled ? (selection) => onChanged(selection.first) : null,
-        ),
+        SizedBox(
+            width: 112,
+            child: AnimatedChoiceBar<int>(
+              compact: true,
+              values: const [
+                SyncRouteStore.routeAwmc,
+                SyncRouteStore.routeScoreHub
+              ],
+              value: value,
+              label: (route) =>
+                  route == SyncRouteStore.routeAwmc ? '线路1' : '线路2',
+              onChanged: enabled ? onChanged : null,
+            )),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(
-            SyncRouteStore.routeName(value),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: scheme.primary,
+          child: Transform.translate(
+            offset: const Offset(-6, 0),
+            child: FadeContent(
+              child: Text(
+                SyncRouteStore.routeName(value),
+                key: ValueKey(value),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: scheme.primary,
+                ),
+              ),
             ),
           ),
         ),

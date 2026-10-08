@@ -8,6 +8,7 @@ import '../api/ApiUrls.dart';
 import '../service/AWMC/AwmcPlayCountStore.dart';
 import '../constant/CacheKeyConstant.dart';
 import '../utils/CurrentDataSourceNotifier.dart';
+import '../utils/SecureCredentialStore.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
 // =============================================================================
@@ -15,10 +16,24 @@ import 'package:my_first_flutter_app/utils/ApiClient.dart';
 // =============================================================================
 
 /// 设为 false 可关闭所有 Probe 调试日志
-const bool _kDebugProbe = true;
+const bool _kDebugProbe =
+    bool.fromEnvironment('PROBE_LOG', defaultValue: false);
 void _log(String msg) {
-  if (_kDebugProbe) debugPrint('[Probe] $msg');
+  if (_kDebugProbe) debugPrint('[Probe] ${_redactLog(msg)}');
 }
+
+String _redactLog(String value) => value
+    .replaceAll(
+        RegExp(r'(authorization\s*:\s*bearer\s+)[^\s,}]+',
+            caseSensitive: false),
+        r'\1***')
+    .replaceAll(
+        RegExp(
+            r'(jwt_token|access_token|refresh_token|client_secret|import_token|x-prober-key)[=:" ]+[^,;\s}]+',
+            caseSensitive: false),
+        r'\1=***')
+    .replaceAll(RegExp(r'(qrCode|qrcode)["\s:=]+[^,}]+', caseSensitive: false),
+        r'\1=***');
 
 // =============================================================================
 // 状态 & 结果模型
@@ -168,19 +183,20 @@ class DivingFishProbeManager {
   /// 清除缓存的认证信息
   Future<void> clearAuth() async {
     _log('clearAuth — 清除 token + friendCode');
+    await SecureCredentialStore.delete(CacheKeyConstant.probeAuthToken);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(CacheKeyConstant.probeAuthToken);
     await prefs.remove(CacheKeyConstant.probeFriendCode);
     _authToken = null;
     _friendCode = null;
   }
 
-  /// 确保 _authToken 可用：优先用内存中的，其次从 SharedPreferences 缓存恢复
+  /// 确保 _authToken 可用：优先用内存中的，其次从系统安全存储恢复。
   Future<bool> _ensureAuthToken() async {
     if (_authToken != null) return true;
 
     final prefs = await SharedPreferences.getInstance();
-    final cached = prefs.getString(CacheKeyConstant.probeAuthToken);
+    final cached =
+        await SecureCredentialStore.read(CacheKeyConstant.probeAuthToken);
     if (cached != null && cached.isNotEmpty) {
       _authToken = cached;
       _friendCode = prefs.getString(CacheKeyConstant.probeFriendCode);
@@ -192,7 +208,7 @@ class DivingFishProbeManager {
     return false;
   }
 
-  /// 取当前可用的 MaimaiHub 用户 token；未登录时返回 null。
+  /// 取当前可用的 maimai Score Hub 用户 token；未登录时返回 null。
   ///
   /// 供同样要走 `/me/*` 的功能复用（例如结算画面识别），
   /// 避免各处重复实现「内存优先、其次读本地缓存」的恢复逻辑。
@@ -253,19 +269,19 @@ class DivingFishProbeManager {
         _log('✗ Step 1 失败: loginData 为 null');
         return SyncResult.failure('二维码无效或已过期，请重新扫描');
       }
-      _log('  loginData 完整响应: $loginData');
+      _log('  loginData 已返回（响应正文已隐藏）');
 
       _authToken = loginData['token'] as String?;
       _friendCode = (loginData['user'] as Map<String, dynamic>?)
           ?.tryGet<String>('friendCode');
 
-      _log(
-          '  解析 token: ${_authToken != null ? "${_authToken!.substring(0, _authToken!.length > 15 ? 15 : _authToken!.length)}..." : "null"}');
+      _log('  解析 token: ${_authToken != null ? "已取得" : "null"}');
       _log('  解析 friendCode: $_friendCode');
 
       if (_authToken == null || _friendCode == null) {
         _log('✗ Step 1 失败: token 或 friendCode 为 null');
-        return SyncResult.failure('Hub 响应异常——缺少 token 或 friendCode，请稍后重试');
+        return SyncResult.failure(
+            'maimai Score Hub 响应异常——缺少 token 或 friendCode，请稍后重试');
       }
 
       _log('✓ 认证成功，friendCode=$_friendCode');
@@ -313,7 +329,7 @@ class DivingFishProbeManager {
         final friendJobId = friendResult['jobId'] as String?;
         _log('  好友请求 jobId: $friendJobId');
         if (friendJobId == null) {
-          return SyncResult.failure('Hub 未返回好友请求任务 ID');
+          return SyncResult.failure('maimai Score Hub 未返回好友请求任务 ID');
         }
 
         // Step 2b: 等待好友关系建立
@@ -371,7 +387,7 @@ class DivingFishProbeManager {
 
       if (jobId == null) {
         _log('✗ Step 2 失败: jobId 为 null');
-        return SyncResult.failure('Hub 未返回任务 ID');
+        return SyncResult.failure('maimai Score Hub 未返回任务 ID');
       }
 
       _log('✓ 任务创建成功，jobId=$jobId');
@@ -492,7 +508,7 @@ class DivingFishProbeManager {
       // ===== Step 4: 导出到水鱼 ──
       _log('── Step 4: 导出到水鱼 ──');
 
-      // 尝试将本地缓存的水鱼 importToken 绑定到 Hub
+      // 尝试将本地缓存的水鱼 importToken 绑定到 maimai Score Hub
       _log('  尝试绑定本地缓存的水鱼 importToken...');
       final bindResult = await _bindCachedImportTokenToHub();
       _log('  绑定结果: $bindResult');
@@ -579,7 +595,7 @@ class DivingFishProbeManager {
 
   /// 通过舞萌|中二 登入二维码（SGWCMAID 开头）一键同步成绩到水鱼
   ///
-  /// 使用 Maimai Score Hub 的 cabinet-score-jobs API，
+  /// 使用 maimai Score Hub 的 cabinet-score-jobs API，
   /// 无需 Bot 好友关系即可直接从公众号抓取成绩。
   ///
   /// [qrCode] 舞萌|中二公众号生成的登入二维码字符串（以 SGWCMAID 开头）
@@ -607,13 +623,12 @@ class DivingFishProbeManager {
     // **尽力而为、绝不 await**：没令牌/超时/报错都忽略，下面的原有同步流程照走。
     // 次数算在**水鱼**名下（这条链路同步的目标就是水鱼），别落到别的账号上。
     // 详见 AwmcPlayCountStore.refreshQuietly。
-    AwmcPlayCountStore.refreshQuietly(qrCode,
-        source: RefreshDataSource.shuiyu);
+    AwmcPlayCountStore.refreshQuietly(qrCode, source: RefreshDataSource.shuiyu);
 
-    // 恢复或检查认证 token；若无则直接用 QR 码登录 Hub
+    // 恢复或检查认证 token；若无则直接用 QR 码登录 maimai Score Hub
     final hasToken = await _ensureAuthToken();
     if (!hasToken) {
-      _log('── Step 0: Hub 认证 ──');
+      _log('── Step 0: maimai Score Hub 认证 ──');
       _emit(
           onProgress,
           const SyncProgress(
@@ -623,7 +638,7 @@ class DivingFishProbeManager {
 
       final loginData = await _loginByQr(qrCode);
       if (loginData == null) {
-        _log('✗ Hub 登录失败: loginData 为 null');
+        _log('✗ maimai Score Hub 登录失败: loginData 为 null');
         return SyncResult.failure('二维码无效或已过期，请重新扫描');
       }
 
@@ -632,11 +647,11 @@ class DivingFishProbeManager {
           ?.tryGet<String>('friendCode');
 
       if (_authToken == null) {
-        _log('✗ Hub 登录失败: token 为 null');
-        return SyncResult.failure('Hub 认证失败，请稍后重试');
+        _log('✗ maimai Score Hub 登录失败: token 为 null');
+        return SyncResult.failure('maimai Score Hub 认证失败，请稍后重试');
       }
 
-      _log('✓ Hub 认证成功，friendCode=$_friendCode');
+      _log('✓ maimai Score Hub 认证成功，friendCode=$_friendCode');
     }
 
     _isSyncing = true;
@@ -662,7 +677,7 @@ class DivingFishProbeManager {
       final jobId = createResult['jobId'] as String?;
       if (jobId == null) {
         _log('✗ 创建响应缺少 jobId');
-        return SyncResult.failure('Hub 未返回任务 ID');
+        return SyncResult.failure('maimai Score Hub 未返回任务 ID');
       }
       _log('✓ Cabinet Job 创建成功，jobId=$jobId');
 
@@ -859,11 +874,27 @@ class DivingFishProbeManager {
   // 分步 API（适合需要手动控制流程的场景）
   // ===========================================================================
 
-  /// 仅做 QR 码认证，获取 token 和 friendCode
-  /// 返回 `{ token, user: { id, friendCode } }`
-  Future<Map<String, dynamic>?> loginByQr(String qrCode) {
+  /// 仅做 QR 码认证，获取并缓存 maimai Score Hub token，不创建抓取任务。
+  /// 返回 `{ token, user: { id, friendCode } }`。
+  ///
+  /// 这个入口给 OCR 等只需要 maimai Score Hub 登录态的功能使用；
+  /// 它不会更新「上次同步时间」，也不会触发任何成绩同步。
+  Future<Map<String, dynamic>?> loginByQr(String qrCode) async {
     _log('loginByQr 被调用 (QR长度: ${qrCode.length})');
-    return _loginByQr(qrCode);
+    final data = await _loginByQr(qrCode);
+    if (data == null) return null;
+
+    final token = data['token'];
+    if (token is! String || token.isEmpty) {
+      _log('loginByQr: maimai Score Hub 响应缺少 token');
+      return null;
+    }
+    _authToken = token;
+    final user = data['user'];
+    _friendCode =
+        user is Map<String, dynamic> ? user.tryGet<String>('friendCode') : null;
+    await _cacheAuthState();
+    return data;
   }
 
   /// 创建抓取任务（POST /me/dxnet-jobs）
@@ -948,7 +979,7 @@ class DivingFishProbeManager {
           '  ← HTTP ${loginResponse.statusCode} (${loginResponse.body.length} 字节)');
 
       if (loginResponse.statusCode != 200) {
-        _log('  ✗ 登录失败: ${loginResponse.statusCode} ${loginResponse.body}');
+        _log('  ✗ 登录失败: HTTP ${loginResponse.statusCode}');
         return null;
       }
 
@@ -962,8 +993,7 @@ class DivingFishProbeManager {
 
       // 从 Set-Cookie 提取 jwt_token
       final setCookie = loginResponse.headers['set-cookie'] ?? '';
-      _log(
-          '  Set-Cookie: ${setCookie.length > 200 ? '${setCookie.substring(0, 200)}...' : setCookie}');
+      _log('  Set-Cookie 已收到（${setCookie.length} 字节，正文已隐藏）');
       jwtToken = _extractJwtFromCookie(setCookie);
 
       if (jwtToken == null) {
@@ -1014,8 +1044,9 @@ class DivingFishProbeManager {
 
         // 缓存到本地
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(CacheKeyConstant.probeDivingFishToken, jwtToken);
-        await prefs.setString(
+        await SecureCredentialStore.write(
+            CacheKeyConstant.probeDivingFishToken, jwtToken);
+        await SecureCredentialStore.write(
             CacheKeyConstant.probeDivingFishImportToken, importToken);
         final bindQQ = profile.tryGet<String>('bind_qq') ?? '';
         if (bindQQ.isNotEmpty) {
@@ -1046,7 +1077,8 @@ class DivingFishProbeManager {
   /// 获取本地缓存的水鱼 importToken（如果有）
   Future<String?> getCachedDivingFishImportToken() async {
     final prefs = await SharedPreferences.getInstance();
-    final t = prefs.getString(CacheKeyConstant.probeDivingFishImportToken);
+    final t = await SecureCredentialStore.read(
+        CacheKeyConstant.probeDivingFishImportToken);
     _log('getCachedDivingFishImportToken → ${t != null ? "***" : "null"}');
     return t;
   }
@@ -1066,7 +1098,8 @@ class DivingFishProbeManager {
     }
 
     // 回退：用 JWT 调 API
-    final jwtToken = prefs.getString(CacheKeyConstant.probeDivingFishToken);
+    final jwtToken =
+        await SecureCredentialStore.read(CacheKeyConstant.probeDivingFishToken);
     if (jwtToken == null || jwtToken.isEmpty) {
       _log('  ✗ 无缓存 JWT，无法获取 bind_qq');
       return null;
@@ -1101,7 +1134,7 @@ class DivingFishProbeManager {
     }
   }
 
-  /// 将本地缓存的水鱼 importToken 绑定到 Hub（需已通过 QR 认证）
+  /// 将本地缓存的水鱼 importToken 绑定到 maimai Score Hub（需已通过 QR 认证）
   ///
   /// 调用时机：QR 认证成功后、同步导出前
   Future<bool> _bindCachedImportTokenToHub() async {
@@ -1112,7 +1145,8 @@ class DivingFishProbeManager {
       return false;
     }
 
-    _log('_bindCachedImportTokenToHub: 将缓存 importToken 同步到 Hub...');
+    _log(
+        '_bindCachedImportTokenToHub: 将缓存 importToken 同步到 maimai Score Hub...');
     try {
       final response = await _patchFollowRedirects(
         Uri.parse(ApiUrls.MaimaiHubProfileUrl),
@@ -1128,7 +1162,7 @@ class DivingFishProbeManager {
 
       _log('  ← HTTP ${response.statusCode}');
       if (response.statusCode == 200) {
-        _log('  ✓ importToken 已同步到 Hub');
+        _log('  ✓ importToken 已同步到 maimai Score Hub');
         return true;
       }
       _log('  ✗ 同步失败: ${response.body}');
@@ -1140,7 +1174,7 @@ class DivingFishProbeManager {
     }
   }
 
-  /// 检查当前 Hub 用户是否已绑定水鱼 importToken
+  /// 检查当前 maimai Score Hub 用户是否已绑定水鱼 importToken
   ///
   /// 需先调用 [loginByQr] 拿到 token，否则返回 null
   Future<bool?> hasDivingFishImportToken() async {
@@ -1175,7 +1209,7 @@ class DivingFishProbeManager {
     }
   }
 
-  /// 检查当前 Hub 用户是否已绑定落雪 importToken
+  /// 检查当前 maimai Score Hub 用户是否已绑定落雪 importToken
   ///
   /// 需先调用 [loginByQr] 拿到 token（或从缓存恢复），否则返回 null
   Future<bool?> hasLxnsImportToken() async {
@@ -1244,7 +1278,7 @@ class DivingFishProbeManager {
     }
   }
 
-  /// 用水鱼账号密码换取 importToken 并绑定到当前 Hub 用户
+  /// 用水鱼账号密码换取 importToken 并绑定到当前 maimai Score Hub 用户
   ///
   /// [username] 水鱼用户名
   /// [password] 水鱼密码
@@ -1883,18 +1917,17 @@ class DivingFishProbeManager {
     // **尽力而为、绝不 await**：没令牌/超时/报错都忽略，下面的原有同步流程照走。
     // 次数算在**落雪**名下（这条链路同步的目标就是落雪），别落到别的账号上。
     // 详见 AwmcPlayCountStore.refreshQuietly。
-    AwmcPlayCountStore.refreshQuietly(qrCode,
-        source: RefreshDataSource.luoxue);
+    AwmcPlayCountStore.refreshQuietly(qrCode, source: RefreshDataSource.luoxue);
 
     _isSyncing = true;
     _cancelled = false;
     _pollCount = 0;
 
     try {
-      // ===== Step 0: Hub 认证（用 QR 码直接登录 Hub，无需经过水鱼）=====
+      // ===== Step 0: maimai Score Hub 认证（用 QR 码直接登录 maimai Score Hub，无需经过水鱼）=====
       final hasToken = await _ensureAuthToken();
       if (!hasToken) {
-        _log('── Step 0: Hub 认证 ──');
+        _log('── Step 0: maimai Score Hub 认证 ──');
         _emit(
             onProgress,
             const SyncProgress(
@@ -1904,7 +1937,7 @@ class DivingFishProbeManager {
 
         final loginData = await _loginByQr(qrCode);
         if (loginData == null) {
-          _log('✗ Hub 登录失败: loginData 为 null');
+          _log('✗ maimai Score Hub 登录失败: loginData 为 null');
           return SyncResult.failure('二维码无效或已过期，请重新扫描');
         }
 
@@ -1913,11 +1946,11 @@ class DivingFishProbeManager {
             ?.tryGet<String>('friendCode');
 
         if (_authToken == null) {
-          _log('✗ Hub 登录失败: token 为 null');
-          return SyncResult.failure('Hub 认证失败，请稍后重试');
+          _log('✗ maimai Score Hub 登录失败: token 为 null');
+          return SyncResult.failure('maimai Score Hub 认证失败，请稍后重试');
         }
 
-        _log('✓ Hub 认证成功');
+        _log('✓ maimai Score Hub 认证成功');
       }
 
       // ===== Step 0.5: 设置落雪 importToken（如果有新传入的）=====
@@ -1946,7 +1979,7 @@ class DivingFishProbeManager {
 
       final jobId = createResult['jobId'] as String?;
       if (jobId == null) {
-        return SyncResult.failure('Hub 未返回任务 ID');
+        return SyncResult.failure('maimai Score Hub 未返回任务 ID');
       }
       _log('✓ Cabinet Job 创建成功，jobId=$jobId');
 
@@ -2021,7 +2054,7 @@ class DivingFishProbeManager {
       // ===== Step 3: 导出到落雪 =====
       _log('── 检查落雪 token ──');
       // 若本次同步刚通过 setLxnsImportToken 设置成功，则无需再联网校验一次；
-      // 仅当本次没有传入 token 时才回退到查询 Hub 是否已绑定。
+      // 仅当本次没有传入 token 时才回退到查询 maimai Score Hub 是否已绑定。
       final bool? hasLxns;
       if (lxnsImportToken != null && lxnsImportToken.isNotEmpty) {
         hasLxns = true;
@@ -2185,7 +2218,7 @@ class DivingFishProbeManager {
   // 辅助方法
   // ===========================================================================
 
-  /// 将 Hub 返回的 stage 映射为同步进度
+  /// 将 maimai Score Hub 返回的 stage 映射为同步进度
   ///
   /// [status] 可以是 DXNet job 或 Cabinet job 的返回体；
   /// 优先读取 [scoreProgress]（DXNet），其次读取 [progress]（Cabinet）。
@@ -2306,7 +2339,8 @@ class DivingFishProbeManager {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (_authToken != null) {
-        await prefs.setString(CacheKeyConstant.probeAuthToken, _authToken!);
+        await SecureCredentialStore.write(
+            CacheKeyConstant.probeAuthToken, _authToken!);
       }
       if (_friendCode != null) {
         await prefs.setString(CacheKeyConstant.probeFriendCode, _friendCode!);
@@ -2317,6 +2351,18 @@ class DivingFishProbeManager {
     } catch (e, stack) {
       _log('  ✗ 缓存同步状态失败: $e');
       _log('  Stack: $stack');
+    }
+  }
+
+  /// 只缓存 maimai Score Hub 登录态，不改变同步时间。
+  Future<void> _cacheAuthState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await SecureCredentialStore.write(
+        CacheKeyConstant.probeAuthToken, _authToken!);
+    if (_friendCode != null && _friendCode!.isNotEmpty) {
+      await prefs.setString(CacheKeyConstant.probeFriendCode, _friendCode!);
+    } else {
+      await prefs.remove(CacheKeyConstant.probeFriendCode);
     }
   }
 
@@ -2336,7 +2382,8 @@ class DivingFishProbeManager {
       _log('  _extractJwtFromCookie: 找到 token');
       return match2.group(1);
     }
-    _log('  _extractJwtFromCookie: 未找到 jwt_token，完整 Set-Cookie: $setCookie');
+    _log(
+        '  _extractJwtFromCookie: 未找到 jwt_token（Set-Cookie ${setCookie.length} 字节）');
     return null;
   }
 

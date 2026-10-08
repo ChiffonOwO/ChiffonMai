@@ -4,10 +4,9 @@ import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/service/DsRangeRecommendService.dart';
 import 'package:my_first_flutter_app/service/RatingRecommendService.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
-import '../widgets/PageTopBar.dart';
+import '../widgets/BackgroundPageScaffold.dart';
 
 class DsRangeRecommendPage extends StatefulWidget {
   const DsRangeRecommendPage({super.key});
@@ -168,7 +167,6 @@ class _DsRangeRecommendPageState extends State<DsRangeRecommendPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
 
     final totalPages = (_results.length / _pageSize).ceil();
@@ -176,51 +174,27 @@ class _DsRangeRecommendPageState extends State<DsRangeRecommendPage> {
     final endIndex = (startIndex + _pageSize).clamp(0, _results.length);
     final paginatedResults = _results.sublist(startIndex, endIndex);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '基于定数区间推荐',
       resizeToAvoidBottomInset: false,
-      body: Stack(
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
+      ),
+      child: Column(
         children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          Column(
-            children: [
-              PageTopBar(
-                title: '基于定数区间推荐',
-              ),
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surface
-                        .withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [AppColors.defaultShadow(brightness)],
-                  ),
-                  child: Column(
-                    children: [
-                      _buildControlPanel(brightness, screenWidth),
-                      Expanded(
-                        child: _isLoading || _isLoadingRating
-                            ? _buildLoadingState(screenHeight)
-                            : _results.isEmpty
-                                ? _buildEmptyState(brightness, screenHeight)
-                                : _buildResultsList(
-                                    brightness, paginatedResults, screenWidth),
-                      ),
-                      if (!_isLoading &&
-                          !_isLoadingRating &&
-                          _results.isNotEmpty &&
-                          totalPages > 1)
-                        _buildPagination(brightness, totalPages, screenWidth),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+          _buildControlPanel(brightness, screenWidth),
+          Expanded(
+            child: _isLoading || _isLoadingRating
+                ? _buildLoadingState(screenHeight)
+                : _results.isEmpty
+                ? _buildEmptyState(brightness, screenHeight)
+                : _buildResultsList(brightness, paginatedResults, screenWidth),
           ),
+          if (!_isLoading &&
+              !_isLoadingRating &&
+              _results.isNotEmpty &&
+              totalPages > 1)
+            _buildPagination(brightness, totalPages, screenWidth),
         ],
       ),
     );
@@ -370,12 +344,10 @@ class _DsRangeRecommendPageState extends State<DsRangeRecommendPage> {
       },
       style: ElevatedButton.styleFrom(
         backgroundColor: isSelected
-            ? Theme.of(context).colorScheme.onSurface
+            ? Theme.of(context).colorScheme.primary
             : Theme.of(context).colorScheme.surface,
         foregroundColor: isSelected
-            ? (brightness == Brightness.dark
-                ? const Color(0xFF1E1E2E)
-                : Colors.white)
+            ? Theme.of(context).colorScheme.onPrimary
             : Theme.of(context).colorScheme.onSurface,
         padding: const EdgeInsets.symmetric(vertical: 10),
         shape: RoundedRectangleBorder(

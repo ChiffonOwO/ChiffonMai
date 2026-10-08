@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constant/CacheKeyConstant.dart';
+import 'SecureCredentialStore.dart';
 import 'CurrentDataSourceNotifier.dart';
 import '../service/AccountSwitchService.dart';
 
@@ -138,9 +139,11 @@ class UserProfileNotifier {
       AccountSwitchService.onAccountLoggedOut(RefreshDataSource.shuiyu,
           clearCredentials: () async {
         final prefs = await SharedPreferences.getInstance();
+        await SecureCredentialStore.delete(
+            CacheKeyConstant.probeDivingFishToken);
+        await SecureCredentialStore.delete(
+            CacheKeyConstant.probeDivingFishImportToken);
         for (final key in [
-          CacheKeyConstant.probeDivingFishToken,
-          CacheKeyConstant.probeDivingFishImportToken,
           CacheKeyConstant.probeDivingFishBindQQ,
           CacheKeyConstant.shuiyuRankingsCache,
           CacheKeyConstant.shuiyuRankingsCacheTimestamp,

@@ -10,13 +10,12 @@ import '../../service/Best50/Best50ConvertToImgService.dart';
 import '../../service/Best50/IdealBest50Service.dart';
 import '../../utils/AppTheme.dart';
 import '../../utils/ColorUtil.dart';
-import '../../utils/CommonWidgetUtil.dart';
 import '../../utils/ExportQualitySelector.dart';
 import '../../utils/ImageEncodeUtil.dart';
 import '../../utils/StringUtil.dart';
 import '../../widgets/B50GameCardWidget.dart';
 import '../SongInfoPage.dart';
-import '../../widgets/PageTopBar.dart';
+import '../../widgets/BackgroundPageScaffold.dart';
 
 /// 理想 Best50：把全部游玩记录里非 SSS+ 的成绩升一档（100.4 → 100.5），
 /// 重算 RA 后重新取 B35 + B15，并列出相对原榜的新进榜歌曲。
@@ -144,6 +143,8 @@ class _IdealBest50PageState extends State<IdealBest50Page> {
       estimatedPngSize: ImageEncodeUtil.estimatePngSize(
         songCount: _sdSongs.length + _dxSongs.length,
       ),
+      exportingLabel: '拟合 Best50',
+      enableThunderMode: true,
     );
     if (!mounted || quality == null) return;
 
@@ -175,6 +176,8 @@ class _IdealBest50PageState extends State<IdealBest50Page> {
         _dxSongs,
         _maimaiMusicData,
         jpegQuality: quality.jpegQuality,
+        thunderMode: quality.thunderMode,
+        thunderVertical: quality.thunderVertical,
       );
 
       if (!mounted) return;
@@ -221,46 +224,18 @@ class _IdealBest50PageState extends State<IdealBest50Page> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Center(child: CircularProgressIndicator()),
+      return const BackgroundPageScaffold(
+        title: '理想 Best50',
+        resizeToAvoidBottomInset: false,
+        child: Center(child: CircularProgressIndicator()),
       );
     }
 
-    final brightness = Theme.of(context).brightness;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
-    const borderRadiusSmall = 8.0;
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '理想 Best50',
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          Column(
-            children: [
-              PageTopBar(
-                title: '理想 Best50',
-              ),
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surface
-                        .withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [AppColors.defaultShadow(brightness)],
-                  ),
-                  child: _data == null ? _buildEmptyState() : _buildContent(),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: _data == null ? _buildEmptyState() : _buildContent(),
     );
   }
 

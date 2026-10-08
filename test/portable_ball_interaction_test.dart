@@ -1,4 +1,4 @@
-﻿/*
+/*
  * 随身听悬浮球的交互回归测试。
  *
  * 这里复刻 `main.dart` 里球的挂法（`MaterialApp.builder` → Stack → 球），
@@ -113,9 +113,8 @@ void main() {
   /// 光 `await` 不会让 just_audio / cache manager 的真实异步跑完（会直接卡死）。
   Future<void> startPlayback(WidgetTester tester) async {
     await tester.runAsync(() async {
-      await PortablePlayerController()
-          .playQueue(const <PortableSong>[_song], 0)
-          .timeout(const Duration(seconds: 20));
+      await PortablePlayerController().playQueue(
+          const <PortableSong>[_song], 0).timeout(const Duration(seconds: 20));
     });
   }
 
@@ -189,8 +188,7 @@ void main() {
     final moved = ballCenter(tester);
     expect(moved.dx, lessThan(start.dx));
     expect(moved.dy, lessThan(start.dy));
-    expect(find.byType(PortableMiniCard), findsNothing,
-        reason: '拖动不该顺手弹出卡片');
+    expect(find.byType(PortableMiniCard), findsNothing, reason: '拖动不该顺手弹出卡片');
 
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString(CacheKeyConstant.portableBallOffset);
@@ -240,7 +238,8 @@ class _FakeJustAudio extends JustAudioPlatform {
       _FakeAudioPlayer(request.id);
 
   @override
-  Future<DisposePlayerResponse> disposePlayer(DisposePlayerRequest request) async =>
+  Future<DisposePlayerResponse> disposePlayer(
+          DisposePlayerRequest request) async =>
       DisposePlayerResponse();
 
   @override
@@ -323,7 +322,8 @@ class _FakeAudioPlayer extends AudioPlayerPlatform {
       updateTime: DateTime.now(),
       updatePosition: position,
       bufferedPosition: _duration,
-      duration: processingState == ProcessingStateMessage.idle ? null : _duration,
+      duration:
+          processingState == ProcessingStateMessage.idle ? null : _duration,
       icyMetadata: null,
       currentIndex: currentIndex,
       androidAudioSessionId: null,

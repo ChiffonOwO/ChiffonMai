@@ -45,6 +45,9 @@ class PortablePlayerEvent {
 /// （那会打出一千个 404，还会把 UI 卡死）。
 const int kPortableMaxConsecutiveSkips = 5;
 
+/// 随身听播放模式。
+enum PortablePlaybackMode { sequential, shuffle, single }
+
 /// 与 `MainActivity.kt` 的 `PORTABLE_NOTIFICATION_CHANNEL` 对应。
 ///
 /// 自定义通知栏那条路：audio_service 的通知布局由系统 `MediaStyle` 定死，
@@ -97,6 +100,44 @@ class PortablePlayerController extends ChangeNotifier {
   }
 
   bool get isPlaying => _player.playing;
+
+  PortablePlaybackMode _playbackMode = PortablePlaybackMode.sequential;
+
+  /// 单曲循环的次数；`null` 表示「不设置次数」，即一直循环当前曲目。
+  ///
+  /// ⚠️ 它记录的是**用户的设置**，不跟当前模式绑定：切到顺序/随机播放再切回
+  /// 单曲循环时要沿用上次的设置，否则用户刚设好的「3 次」会被静默清成无限。
+  int? _singleLoopCount;
+
+  /// 单曲循环时，**当前这一首已经完整播完的遍数**（只服务「指定次数」）。
+  ///
+  /// ⚠️ 别用 `ProcessingState.completed` 数：队列里还有下一首时，本曲播完平台是
+  /// **自动接下一首**，根本不会进 completed 状态 —— 次数就永远轮不到自己头上，
+  /// 表现就是「指定次数的单曲循环没生效」。真正的计数点见
+  /// [_onPositionDiscontinuity]。
+  int _singlePlaysDone = 0;
+
+  bool _handlingCompleted = false;
+
+  PortablePlaybackMode get playbackMode => _playbackMode;
+
+  /// 单曲循环的次数；`null` 表示不设置次数（一直循环）。
+  int? get singleLoopCount => _singleLoopCount;
+
+  /// 仅供测试：当前这一首已经完整播完的遍数。
+  @visibleForTesting
+  int get singlePlaysDone => _singlePlaysDone;
+
+  String get playbackModeLabel {
+    switch (_playbackMode) {
+      case PortablePlaybackMode.sequential:
+        return '顺序播放';
+      case PortablePlaybackMode.shuffle:
+        return '随机播放';
+      case PortablePlaybackMode.single:
+        return _singleLoopCount == null ? '单曲循环' : '单曲循环 $_singleLoopCount 次';
+    }
+  }
 
   /// 是否已经有可显示的当前曲（悬浮球据此决定显不显示）。
   bool get hasSong => currentSong != null;
@@ -164,6 +205,7 @@ class PortablePlayerController extends ChangeNotifier {
     _initialized = true;
 
     _player.currentIndexStream.listen((_) {
+      _onCurrentIndexChanged();
       notifyListeners();
       unawaited(_pushNotification());
     });
@@ -173,14 +215,15 @@ class PortablePlayerController extends ChangeNotifier {
       notifyListeners();
       unawaited(_pushNotification());
     });
-    // 播放到队尾自然结束：just_audio 会自动停下（没有开 loop），
-    // 这里只需把状态推给 UI，让悬浮球/播放页显示成「暂停」而不是卡在播放中。
     _player.processingStateStream.listen((state) {
       if (state == ProcessingState.completed) {
+        unawaited(_handleCompleted());
         notifyListeners();
         unawaited(_pushNotification());
       }
     });
+    // 「指定次数的单曲循环」全靠这条流数遍数，见 [_onPositionDiscontinuity]。
+    _player.positionDiscontinuityStream.listen(_onPositionDiscontinuity);
     _player.durationStream.listen((_) => notifyListeners());
     // just_audio 的加载/解码错误会以 stream error 的形式冒到 playbackEventStream
     // （`play()` 也会同时抛异常，两条路都要接住，否则会变成未捕获异常刷日志）。
@@ -206,6 +249,156 @@ class PortablePlayerController extends ChangeNotifier {
       }
       return null;
     });
+  }
+
+  /// 切换播放模式。
+  ///
+  /// **先通知 UI，再去落地平台侧**：`setLoopMode` / `setShuffleModeEnabled` 是平台
+  /// 调用，慢的时候要等好几帧才回来。等它们回来才 notify 的话，用户点下去图标
+  /// 不动、选择框里的勾选也不动，看着就像「点了没反应」。
+  ///
+  /// **不改动**已配置的单曲循环次数（那份设置由 [setSingleLoopCount] 管）：
+  /// 切走再切回来要沿用上次的「N 次」，不能悄悄退回无限循环。
+  Future<void> setPlaybackMode(PortablePlaybackMode mode) async {
+    _playbackMode = mode;
+    // 换到单曲循环：这一首从头数遍数
+    if (mode == PortablePlaybackMode.single) _singlePlaysDone = 0;
+    notifyListeners();
+    await _applyPlaybackMode(reshuffle: mode == PortablePlaybackMode.shuffle);
+  }
+
+  /// 设置单曲循环的次数（`null` = 不设置次数，即一直循环）。
+  ///
+  /// 「循环次数」本身就是单曲循环的子设置，所以在别的模式下设置它也会切到
+  /// 单曲循环 —— 否则用户设完 3 次却还停在顺序播放，界面上看不出任何变化。
+  Future<void> setSingleLoopCount(int? count) async {
+    _singleLoopCount = count;
+    _singlePlaysDone = 0;
+    if (_playbackMode != PortablePlaybackMode.single) {
+      await setPlaybackMode(PortablePlaybackMode.single);
+      return;
+    }
+    notifyListeners();
+    await _applyPlaybackMode();
+  }
+
+  /// 换曲（含平台自动接下一首）时调用。
+  ///
+  /// 「这一首播了几遍」的清零**不在这里**做：兜底把曲目拽回来时也会换 index，
+  /// 那一下不该把计数清零（见 [_onPositionDiscontinuity]）。
+  void _onCurrentIndexChanged() {
+    if (_playbackMode != PortablePlaybackMode.single) return;
+    unawaited(_player.setLoopMode(LoopMode.one));
+  }
+
+  /// 单曲循环「指定次数」的**计数点**。
+  ///
+  /// just_audio 把两种「位置不连续」都归到 `autoAdvance`：
+  ///   1. 同一首绕回开头 —— 平台的 `LoopMode.one` 无缝循环生效了，这一遍播完了；
+  ///   2. 落到下一首 —— 本曲播完了但循环没生效（少见），或者次数已经用完该走了。
+  /// 拖进度条走的是 `seek`，这里不看，所以不会把用户拖动算成一轮。
+  ///
+  /// 为什么不能靠 `ProcessingState.completed` 数：队列里还有下一首时它永远不来
+  /// （见 [_singlePlaysDone] 的注释）。
+  void _onPositionDiscontinuity(PositionDiscontinuity discontinuity) {
+    if (discontinuity.reason != PositionDiscontinuityReason.autoAdvance) return;
+    if (_playbackMode != PortablePlaybackMode.single) return;
+
+    final previousIndex = discontinuity.previousEvent.currentIndex;
+    final index = discontinuity.event.currentIndex;
+    final limit = _singleLoopCount;
+
+    if (previousIndex == index) {
+      // 同一首绕回开头：这一遍已经完整播完，新的这一遍正在放
+      _onSinglePlayCompleted();
+      return;
+    }
+
+    // 播着播着到下一首了
+    if (previousIndex == null ||
+        previousIndex < 0 ||
+        previousIndex >= _queue.length) {
+      return;
+    }
+    _singlePlaysDone++;
+    if (limit != null && _singlePlaysDone >= limit) {
+      // 次数用完了：这一首到此为止，接下来这一首重新开始数
+      //（单曲循环的次数是**按每首算的**），顺便把循环重新打开。
+      _singlePlaysDone = 0;
+      unawaited(_player.setLoopMode(LoopMode.one));
+      return;
+    }
+    // 次数还没用完却往下走了：说明本曲的循环没生效，把它拽回来接着放
+    unawaited(_player.seek(Duration.zero, index: previousIndex));
+  }
+
+  /// 本曲**完整播完了一遍**，并且平台已经从头接着放下一遍时调用。
+  ///
+  /// 数够「循环次数」就把平台的循环关掉，让这一遍放完自然往下走。
+  void _onSinglePlayCompleted() {
+    _singlePlaysDone++;
+    final limit = _singleLoopCount;
+    if (limit != null && _singlePlaysDone + 1 >= limit) {
+      // 正在放的这一遍就是最后一遍
+      unawaited(_player.setLoopMode(LoopMode.off));
+    }
+  }
+
+  /// 仅供测试：喂一次「本曲播完一遍」。
+  ///
+  /// 真机上这个信号来自 [`_onPositionDiscontinuity`] —— just_audio 自己会把
+  /// 「同一首绕开头」识别成 `autoAdvance`（见 `just_audio.dart` 里
+  /// `playbackEventStream.pairwise()` 那段），widget 测试里没法真跑出来
+  /// （平台激活在假时钟下走不完），所以这里留一个直通口子。
+  @visibleForTesting
+  void debugNotifySinglePlayCompleted() {
+    if (_playbackMode != PortablePlaybackMode.single) return;
+    _onSinglePlayCompleted();
+  }
+
+  /// 仅供测试：just_audio 的 Dart 侧当前循环模式。
+  ///
+  /// 读它而不是读 fake 平台收到的调用：平台调用在假时钟下不一定回得来，
+  /// 但 `setLoopMode` 会**同步**更新这个值，真机上再由此推给平台。
+  @visibleForTesting
+  LoopMode get debugLoopMode => _player.loopMode;
+
+  Future<void> _applyPlaybackMode({bool reshuffle = false}) async {
+    // 单曲循环统一交给平台的 `LoopMode.one`（无缝循环）；
+    // 「指定次数」由 [_onPositionDiscontinuity] 数遍数，数够了再把循环关掉。
+    await _player.setLoopMode(_playbackMode == PortablePlaybackMode.single
+        ? LoopMode.one
+        : LoopMode.off);
+    await _player
+        .setShuffleModeEnabled(_playbackMode == PortablePlaybackMode.shuffle);
+    if (reshuffle && _player.audioSource != null) {
+      await _player.shuffle();
+    }
+  }
+
+  /// 整条队列播完（`completed`）时的兜底。
+  ///
+  /// 单曲循环正常走的是平台的 `LoopMode.one`，不会进这里；能走到这儿说明平台
+  /// 没帮我们绕回去（无限循环的兜底），或者「次数」已经用完该停下来了。
+  Future<void> _handleCompleted() async {
+    if (_handlingCompleted) return;
+    _handlingCompleted = true;
+    try {
+      if (_playbackMode != PortablePlaybackMode.single) return;
+      _singlePlaysDone++;
+      final limit = _singleLoopCount;
+      if (limit != null && _singlePlaysDone >= limit) {
+        // 次数用完了：停在结尾（顺手 pause 一下，免得 UI 一直挂在「正在播放」）
+        await _player.pause();
+        return;
+      }
+      await _player.seek(Duration.zero);
+      unawaited(
+          _player.play().catchError((Object e) => _handleSourceFailure(e)));
+      notifyListeners();
+    } finally {
+      _handlingCompleted = false;
+    }
   }
 
   /// 把当前状态推给 Kotlin 的自定义通知栏。
@@ -311,7 +504,8 @@ class PortablePlayerController extends ChangeNotifier {
         initialIndex: 0,
         initialPosition: Duration.zero,
       );
-      unawaited(_player.play().catchError((Object e) => _handleSourceFailure(e)));
+      unawaited(
+          _player.play().catchError((Object e) => _handleSourceFailure(e)));
     } catch (e) {
       debugPrint('[Portable] wmc 兜底也失败: $e');
       _handleSourceFailure(e);
@@ -371,6 +565,11 @@ class PortablePlayerController extends ChangeNotifier {
     if (index < 0 || index >= _queue.length) return;
     final song = _queue[index];
 
+    if (_playbackMode == PortablePlaybackMode.single) {
+      // 换了一首：单曲循环的次数按每首算，重新开始数
+      _singlePlaysDone = 0;
+    }
+
     _setLoading(true);
     // 切到新歌 → 清掉「本首已试 wmc」标记，下次失败又可以试一次
     _triedWmcFallback = false;
@@ -380,9 +579,14 @@ class PortablePlayerController extends ChangeNotifier {
       // 但必须先于通知栏出现才有意义。
       await preloadNotificationArt(song);
 
-      if (_sourceRevision == _queueRevision && _player.audioSource != null) {
+      final queueChanged =
+          _sourceRevision != _queueRevision || _player.audioSource == null;
+      if (!queueChanged) {
         // 队列没变，直接跳（just_audio 按需加载这一首）
         await _player.seek(Duration.zero, index: index);
+        // 顺手把循环/随机再推一次：上一首「次数用完」时可能把单曲循环关掉了
+        // （见 [_onPositionDiscontinuity]），切到新的一首要重新打开。
+        await _applyPlaybackMode();
       } else {
         // 队列变了：重建源列表。
         //
@@ -411,6 +615,8 @@ class PortablePlayerController extends ChangeNotifier {
           initialPosition: Duration.zero,
         );
         _sourceRevision = _queueRevision;
+        await _applyPlaybackMode(
+            reshuffle: _playbackMode == PortablePlaybackMode.shuffle);
       }
       // ⚠️ 这里**不要** `await _player.play()`。
       //
@@ -421,7 +627,8 @@ class PortablePlayerController extends ChangeNotifier {
       // `_setLoading(false)` 要等整首歌才执行 → 列表行、全屏页的「加载中」
       // 一路转到底。只发起、不等完成；失败照旧汇到 [playbackEventStream]
       // 的 onError（`_handleSourceFailure`）。
-      unawaited(_player.play().catchError((Object e) => _handleSourceFailure(e)));
+      unawaited(
+          _player.play().catchError((Object e) => _handleSourceFailure(e)));
       _emit(PortablePlayerEvent('正在播放：${song.title}'));
     } catch (e) {
       // 只有「建源/发起播放」这一段的同步失败会走到这里（比如 URL 非法）。
@@ -442,7 +649,9 @@ class PortablePlayerController extends ChangeNotifier {
       if (_player.processingState == ProcessingState.completed) {
         await _player.seek(Duration.zero);
       }
-      await _player.play();
+      unawaited(_player
+          .play()
+          .catchError((Object error) => _handleSourceFailure(error)));
     }
     notifyListeners();
   }
@@ -450,13 +659,20 @@ class PortablePlayerController extends ChangeNotifier {
   Future<void> next() async {
     if (!_player.hasNext) return;
     await _player.seekToNext();
-    if (!_player.playing) await _player.play();
+    // play 的 Future 会等待到暂停/结束，不能让切歌按钮一直处于忙碌状态。
+    if (!_player.playing)
+      unawaited(_player
+          .play()
+          .catchError((Object error) => _handleSourceFailure(error)));
   }
 
   Future<void> previous() async {
     if (!_player.hasPrevious) return;
     await _player.seekToPrevious();
-    if (!_player.playing) await _player.play();
+    if (!_player.playing)
+      unawaited(_player
+          .play()
+          .catchError((Object error) => _handleSourceFailure(error)));
   }
 
   Future<void> seek(Duration position) => _player.seek(position);

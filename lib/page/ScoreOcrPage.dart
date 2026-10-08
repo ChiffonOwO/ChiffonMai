@@ -6,7 +6,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,11 +27,12 @@ import '../service/MaimaiHubOcrService.dart';
 import '../utils/ApiClient.dart';
 import '../utils/AppConstants.dart';
 import '../utils/AppTheme.dart';
-import '../utils/CommonWidgetUtil.dart';
 import '../utils/CoverUtil.dart';
+import '../utils/OcrImageCropUtil.dart';
 import '../utils/SongFilterUtil.dart';
 import '../utils/StringUtil.dart';
-import '../widgets/PageTopBar.dart';
+import '../utils/SecureCredentialStore.dart';
+import '../widgets/BackgroundPageScaffold.dart';
 import '../widgets/RefreshDataDialog.dart' show launchUrlFallback;
 
 /// 结算画面识别页（拍摄机台结算画面 → 裁剪 → 识别 → 显示结构化成绩）
@@ -43,10 +43,10 @@ import '../widgets/RefreshDataDialog.dart' show launchUrlFallback;
 /// 流程：
 ///   1. 拍照 / 从相册选图
 ///   2. 手动框选裁剪
-///   3. 调 MaimaiHub `POST /api/v1/me/ocr/recognize`（**需先登录 MaimaiHub**）
+///   3. 调 maimai Score Hub `POST /api/v1/me/ocr/recognize`（**需先登录 maimai Score Hub**）
 ///   4. 渲染识别出的曲名候选 / 达成率 / DX分 / 难度 / FC / FS
 ///
-/// 识别由 MaimaiHub 的专用模型完成（曲绘 ArcFace + 标题分类双路匹配），
+/// 识别由 maimai Score Hub 的专用模型完成（曲绘 ArcFace + 标题分类双路匹配），
 /// 直接产出结构化成绩，不需要再自己解析文本。
 ///
 /// 注：自家后端 `/api/ocr/score`（百度/腾讯通用 OCR）**已废弃**，本页不再走那条路。
@@ -189,7 +189,7 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
   MaimaiHubOcrBatch? _result;
   String? _error;
 
-  /// MaimaiHub 登录态；null 表示还没查完
+  /// maimai Score Hub 登录态；null 表示还没查完
   bool? _loggedIn;
 
   /// 水鱼 OAuth 授权状态（读取成绩需要授权本应用）。
@@ -200,14 +200,14 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
   /// 落雪个人 API 密钥是否**存在本机**。
   ///
   /// 这就是「本页的同步按钮能不能真的传上去」的唯一前提：直传落雪要的是
-  /// 密钥本体（`X-User-Token`），而 Hub 只肯返回一个布尔值、不肯把密钥还回来
+  /// 密钥本体（`X-User-Token`），而 maimai Score Hub 只肯返回一个布尔值、不肯把密钥还回来
   /// （见 [DivingFishProbeManager.setLxnsImportToken] 与后端 `PATCH /me`）。
-  /// 所以密钥只在 Hub 上有 = 本机传不了。
+  /// 所以密钥只在 maimai Score Hub 上有 = 本机传不了。
   bool _lxnsKeyLocal = false;
 
-  /// Hub 是否已绑定落雪密钥。**只能拿来提示，不能当成可同步的条件。**
+  /// maimai Score Hub 是否已绑定落雪密钥。**只能拿来提示，不能当成可同步的条件。**
   ///
-  /// 之前这里是个三态 `_lxnsHasToken`，本地没有就问 Hub，Hub 说 true 就显示
+  /// 之前这里是个三态 `_lxnsHasToken`，本地没有就问 maimai Score Hub，服务端说 true 就显示
   /// 「已设置密钥」—— 于是出现了「界面写着已设置、点同步却说没设置」：
   /// 密钥在云端，本机读不到。现在把这两个事实分开记。
   bool _lxnsKeyOnHub = false;
@@ -340,7 +340,7 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
 
   /// 同步标记统一转成**水鱼的值域**（fs / fsp / fsd / fsdp / sync）。
   ///
-  /// OCR 走的是 MaimaiHub，它的 `fs` 取值是 fdx / fdxp；水鱼的更新接口
+  /// OCR 走的是 maimai Score Hub，它的 `fs` 取值是 fdx / fdxp；水鱼的更新接口
   /// 只认 fsd / fsdp（见 prober 源码 `std_fs`，它内部也做了 fdx→fsd 的映射）。
   /// 这里统一成水鱼的写法，显示交给 [StringUtil.formatFS]（fsd→FDX、fsdp→FDX+）。
   String? _fsOf(MaimaiHubOcrItem item) {
@@ -588,10 +588,10 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
   //   水鱼 → `DivingFishOAuthManager.checkAuthorization(qq)`
   //          检查的是「本应用有没有被授权读取该 QQ 的成绩」，不是「有没有 token」。
   //          没有 OAuth 授权时，写入同样会被服务端拒绝。
-  //   落雪 → 本机密钥 (`probeLxnsImportToken`) 优先；其次问 Hub
+  //   落雪 → 本机密钥 (`probeLxnsImportToken`) 优先；其次问 maimai Score Hub
   //          （`DivingFishProbeManager.hasLxnsImportToken()`，只返布尔）。
   //          状态条上看到的「已设置密钥」= 本机有，跟上传能用的条件一致；
-  //          「云端已绑定·本机缺密钥」= Hub 有但本机没有，**不能直接同步**。
+  //          「云端已绑定·本机缺密钥」= maimai Score Hub 有但本机没有，**不能直接同步**。
   //          两条路（OAuth / X-User-Token）真要发起同步时由 service 自己决定。
 
   /// 读取两个上传目标的账号状态。
@@ -611,7 +611,9 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
       final prefs = await SharedPreferences.getInstance();
       qq = prefs.getString(CacheKeyConstant.probeDivingFishBindQQ) ?? '';
 
-      final jwt = prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '';
+      final jwt = await SecureCredentialStore.read(
+              CacheKeyConstant.probeDivingFishToken) ??
+          '';
       if (jwt.isNotEmpty) {
         // 与账号管理一致：优先用 profile 里的 bind_qq
         try {
@@ -642,14 +644,14 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
 
     // ── 落雪：分两个事实查，别混成一个 ──
     //
-    // 「本机有密钥」= 本页可以直传；「Hub 有密钥」= 只有 Hub 能代传，
-    // 本页的同步按钮用不上它。账号管理对话框也是先查本地再问 Hub，
+    // 「本机有密钥」= 本页可以直传；「maimai Score Hub 有密钥」= 只有服务端能代传，
+    // 本页的同步按钮用不上它。账号管理对话框也是先查本地再问 maimai Score Hub，
     // 但它那边两个来源都算「已设置」；在本页那样会撒谎。
     bool keyLocal = false;
     bool keyOnHub = false;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final local = prefs.getString(CacheKeyConstant.probeLxnsImportToken);
+      final local = await SecureCredentialStore.read(
+          CacheKeyConstant.probeLxnsImportToken);
       keyLocal = local != null && local.isNotEmpty;
       if (!keyLocal) {
         keyOnHub = await DivingFishProbeManager().hasLxnsImportToken() == true;
@@ -698,7 +700,8 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
 
   /// 打开落雪的第三方绑定页（个人 API 密钥就在那个页面生成）
   Future<void> _openLxnsProfilePage() async {
-    final uri = Uri.parse('https://maimai.lxns.net/user/profile?tab=thirdparty');
+    final uri =
+        Uri.parse('https://maimai.lxns.net/user/profile?tab=thirdparty');
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -714,13 +717,13 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
 
   /// 在本页直接粘贴落雪个人 API 密钥。
   ///
-  /// 为什么要有这个框：直传落雪要的是密钥本体，而 Hub 只返回
+  /// 为什么要有这个框：直传落雪要的是密钥本体，而 maimai Score Hub 只返回
   /// `hasLxnsImportToken` 这个布尔值（后端 `PATCH /me` 是只写不读），
   /// 所以「密钥只在云端」这种状态下本机无论如何都传不了，必须让用户
   /// 在本机存一份。之前唯一的入口在首页「账号管理」里，太绕。
   ///
-  /// 保存后照账号管理的做法顺手同步给 Hub；那一步是**尽力而为**，
-  /// 失败也不提示、不拦流程 —— 本地直传根本不依赖 Hub。
+  /// 保存后照账号管理的做法顺手同步给 maimai Score Hub；那一步是**尽力而为**，
+  /// 失败也不提示、不拦流程 —— 本地直传根本不依赖 maimai Score Hub。
   Future<void> _promptForLxnsKey() async {
     final text = await showDialog<String>(
       context: context,
@@ -740,9 +743,9 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
       return;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(CacheKeyConstant.probeLxnsImportToken, text);
-    // 顺手同步给 Hub。失败也不影响本机直传，所以不 await、不报错。
+    await SecureCredentialStore.write(
+        CacheKeyConstant.probeLxnsImportToken, text);
+    // 顺手同步给 maimai Score Hub。失败也不影响本机直传，所以不 await、不报错。
     unawaited(DivingFishProbeManager().setLxnsImportToken(text));
 
     if (!mounted) return;
@@ -814,7 +817,12 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
       }
     }
     try {
-      final photo = await _picker.pickImage(source: source, imageQuality: 95);
+      final photo = await _picker.pickImage(
+        source: source,
+        imageQuality: 95,
+        maxWidth: 2560,
+        maxHeight: 2560,
+      );
       if (photo != null && mounted) {
         final cropped = await Navigator.push<String>(
           context,
@@ -1087,9 +1095,8 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
                                         ? null
                                         : '定数 ${_dsAtIndex(song, i)!.toStringAsFixed(1)}',
                                   ].whereType<String>().join(' · '),
-                                  onSelected: (_) => apply((e) =>
-                                      e.difficulty =
-                                          _difficultyNameOf(i).toLowerCase()),
+                                  onSelected: (_) => apply((e) => e.difficulty =
+                                      _difficultyNameOf(i).toLowerCase()),
                                 ),
                             ],
                           ),
@@ -1188,7 +1195,8 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
                     options: _fsOptions,
                     current: _fsOf(item),
                     // 仅此处把 sync 显示成 SYNC（formatFS 的通用显示仍是 SC）
-                    labelOf: (v) => v == 'sync' ? 'SYNC' : StringUtil.formatFS(v),
+                    labelOf: (v) =>
+                        v == 'sync' ? 'SYNC' : StringUtil.formatFS(v),
                     onPick: (v) => apply((e) => e.fs = v),
                     onClear: edit?.fs != null
                         ? () => apply((e) => e.fs = null)
@@ -1293,8 +1301,8 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
             ),
             if (onClear != null)
               IconButton(
-                icon: Icon(Icons.close,
-                    size: 16, color: scheme.onSurfaceVariant),
+                icon:
+                    Icon(Icons.close, size: 16, color: scheme.onSurfaceVariant),
                 tooltip: '恢复为识别结果',
                 onPressed: onClear,
                 visualDensity: VisualDensity.compact,
@@ -1459,7 +1467,8 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
                               padding: const EdgeInsets.only(right: 8),
                               child: ActionChip(
                                 label: Text(t),
-                                avatar: const Icon(Icons.auto_awesome, size: 16),
+                                avatar:
+                                    const Icon(Icons.auto_awesome, size: 16),
                                 onPressed: () {
                                   final m = _findSong(songs, t, item.isDx);
                                   Navigator.pop(
@@ -1490,8 +1499,8 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
                               )
                             : ListView.builder(
                                 itemCount: filtered.length,
-                                itemBuilder: (_, i) =>
-                                    _buildPickerRow(ctx, filtered[i], brightness),
+                                itemBuilder: (_, i) => _buildPickerRow(
+                                    ctx, filtered[i], brightness),
                               ),
                   ),
                 ],
@@ -1550,7 +1559,8 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      onTap: () => Navigator.pop(ctx, _SongChoice(song: song, manualTitle: null)),
+      onTap: () =>
+          Navigator.pop(ctx, _SongChoice(song: song, manualTitle: null)),
     );
   }
 
@@ -1558,57 +1568,17 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    final sw = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
+    final sw = MediaQuery.sizeOf(context).width;
     final c = Theme.of(context).colorScheme.onSurface;
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '结算画面识别',
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          // crossAxisAlignment 必须显式写 stretch。
-          //
-          // 默认值 center 下，Expanded 只撑满主轴（竖直），横轴仍是松约束——
-          // 里面那张内容卡片会**按内容宽度收缩**：识别成功后因为结果卡片有
-          // width: double.infinity 而撑满，空状态/识别中则会缩到引导文字的宽度，
-          // 看起来就是「卡片忽宽忽窄」。加了 stretch 后卡片恒等于屏幕宽度。
-          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            _buildTitleBar(sw, c),
-            Expanded(
-              child: Container(
-                // 左右不留边、贴满屏幕宽度。
-                //
-                // 全 App 有 41 个页面用的是 `fromLTRB(4, 0, 4, 10 + safeBottom)`，
-                // 本页**有意偏离**那个标准：结算画面以横向信息为主（曲名、达成率、
-                // 六项成绩字段），卡片越宽越好读。这是本页唯一的例外，改回去只需
-                // 把下面的 0 换回 4。
-                margin: EdgeInsets.fromLTRB(0, 0, 0, 10 + safeBottom),
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surface
-                      .withValues(alpha: 0.9),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [AppConstants.defaultShadow(brightness)],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: _buildContent(sw, c),
-                ),
-              ),
-            ),
-          ]),
-        ],
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
       ),
+      child: SizedBox.expand(child: _buildContent(sw, c)),
     );
   }
-
-  // 顶部栏统一走公共组件（标题样式对齐 Rating 排行榜页的 AppBar）
-  Widget _buildTitleBar(double sw, Color c) =>
-      const PageTopBar(title: '结算画面识别');
 
   Widget _buildContent(double sw, Color c) {
     return SingleChildScrollView(
@@ -1698,7 +1668,11 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: Image.file(File(_photoPath!), fit: BoxFit.contain),
+              child: Image.file(
+                File(_photoPath!),
+                fit: BoxFit.contain,
+                cacheWidth: 1080,
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -1734,7 +1708,7 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
         ),
       );
 
-  /// 未登录 MaimaiHub 时的提示横幅。
+  /// 未登录 maimai Score Hub 时的提示横幅。
   ///
   /// 识别接口必须带用户 token，未登录必然 401，所以提前说清楚，
   /// 免得用户截好图才在最后一步失败。
@@ -1754,8 +1728,8 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '未登录 MaimaiHub，无法识别。'
-              '请先到「首页 → 同步成绩」完成 MaimaiHub 登录后回来重试。',
+              '未登录 maimai Score Hub，无法识别。'
+              '请先到「系统 → 登录 maimai Score Hub」完成认证；登录后可直接识别，无需实际同步成绩。',
               style: TextStyle(
                   color: c.withValues(alpha: 0.85), fontSize: sw * 0.032),
             ),
@@ -1806,6 +1780,7 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
     required String readyText,
     required String notReadyText,
     String? unknownText,
+
     /// `ready == false` 但仍有一种「半可用」的独立状态时用（落雪的
     /// 「云端已绑定、本机没有」）。给文案就会显示成橙色警告态。
     String? warnText,
@@ -2509,7 +2484,7 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
 
 /// 「粘贴落雪密钥」对话框。
 class _LxnsKeyPromptDialog extends StatefulWidget {
-  /// Hub 已绑定但本机没有密钥时为 true，对话框里额外给一行橙色说明
+  /// maimai Score Hub 已绑定但本机没有密钥时为 true，对话框里额外给一行橙色说明
   /// 「本机读不到密钥，同步仍不可用」。
   final bool cloudOnlyHint;
   const _LxnsKeyPromptDialog({required this.cloudOnlyHint});
@@ -2528,7 +2503,8 @@ class _LxnsKeyPromptDialogState extends State<_LxnsKeyPromptDialog> {
   }
 
   Future<void> _openLxnsProfilePage() async {
-    final uri = Uri.parse('https://maimai.lxns.net/user/profile?tab=thirdparty');
+    final uri =
+        Uri.parse('https://maimai.lxns.net/user/profile?tab=thirdparty');
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -2640,6 +2616,7 @@ class _OcrImageCropPage extends StatefulWidget {
 class _OcrImageCropPageState extends State<_OcrImageCropPage> {
   ui.Image? _image;
   bool _loading = true;
+  bool _cropping = false;
   Rect _imageRect = Rect.zero;
   Rect _cropRect = Rect.zero;
   _OcrCropHandle _activeHandle = _OcrCropHandle.none;
@@ -2652,19 +2629,50 @@ class _OcrImageCropPageState extends State<_OcrImageCropPage> {
   @override
   void initState() {
     super.initState();
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     _loadImage();
   }
 
   Future<void> _loadImage() async {
-    final bytes = await File(widget.imagePath).readAsBytes();
-    final codec = await ui.instantiateImageCodec(bytes);
-    final frame = await codec.getNextFrame();
-    if (mounted) {
+    try {
+      // 裁剪使用已经限制到 2048px 的预览图，避免再次把相机原图全尺寸解码。
+      final data = await _image!.toByteData(format: ui.ImageByteFormat.png);
+      if (data == null) {
+        Fluttertoast.showToast(msg: '裁剪失败，将使用原图继续');
+        return;
+      }
+      final bytes = data.buffer.asUint8List();
+      final codec = await ui.instantiateImageCodec(bytes, targetWidth: 2048);
+      final frame = await codec.getNextFrame();
+      codec.dispose();
+      if (!mounted) {
+        frame.image.dispose();
+        return;
+      }
       setState(() {
+        _image?.dispose();
         _image = frame.image;
         _loading = false;
       });
+    } catch (e) {
+      debugPrint('OCR 裁剪页加载图片失败: $e');
+      if (!mounted) return;
+      setState(() => _loading = false);
+      Fluttertoast.showToast(msg: '图片无法读取，请换一张图片重试');
+      Navigator.of(context).pop();
     }
+  }
+
+  @override
+  void dispose() {
+    _image?.dispose();
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    super.dispose();
   }
 
   Rect _calcImageRect(Size container) {
@@ -2691,6 +2699,18 @@ class _OcrImageCropPageState extends State<_OcrImageCropPage> {
         size,
       );
     });
+  }
+
+  Rect _clampCropRect(Rect rect, Rect imageRect) {
+    final maxSize = math.min(imageRect.width, imageRect.height);
+    if (maxSize <= 0) return Rect.zero;
+    final minSize = math.min(_minCropSize, maxSize);
+    final size = rect.width.clamp(minSize, maxSize).toDouble();
+    final maxLeft = math.max(imageRect.left, imageRect.right - size);
+    final maxTop = math.max(imageRect.top, imageRect.bottom - size);
+    final left = rect.left.clamp(imageRect.left, maxLeft).toDouble();
+    final top = rect.top.clamp(imageRect.top, maxTop).toDouble();
+    return Rect.fromLTWH(left, top, size, size);
   }
 
   MouseCursor _cursorForHandle(_OcrCropHandle h) => switch (h) {
@@ -2732,6 +2752,11 @@ class _OcrImageCropPageState extends State<_OcrImageCropPage> {
     }
     final delta = d.localPosition - _dragStart!;
     final r = _cropRectStart!;
+    final minSize = math.min(
+      _minCropSize,
+      math.min(_imageRect.width, _imageRect.height),
+    );
+    if (minSize <= 0) return;
     Rect newRect;
     switch (_activeHandle) {
       case _OcrCropHandle.body:
@@ -2747,60 +2772,64 @@ class _OcrImageCropPageState extends State<_OcrImageCropPage> {
       case _OcrCropHandle.topLeft:
         final maxDelta =
             math.max(r.width - delta.dx, r.height - delta.dy).toDouble();
-        final size = maxDelta.clamp(
-            _minCropSize,
-            math
-                .min(r.right - _imageRect.left, r.bottom - _imageRect.top)
-                .toDouble());
+        final maxSize = math.max(
+            minSize,
+            math.min(
+              r.right - _imageRect.left,
+              r.bottom - _imageRect.top,
+            ));
+        final size = maxDelta.clamp(minSize, maxSize).toDouble();
         newRect = Rect.fromLTWH(
-          (r.right - size)
-              .clamp(_imageRect.left, _imageRect.right - _minCropSize),
-          (r.bottom - size)
-              .clamp(_imageRect.top, _imageRect.bottom - _minCropSize),
+          (r.right - size).clamp(_imageRect.left, _imageRect.right - minSize),
+          (r.bottom - size).clamp(_imageRect.top, _imageRect.bottom - minSize),
           size,
           size,
         );
       case _OcrCropHandle.topRight:
         final maxDelta =
             math.max(r.width + delta.dx, r.height - delta.dy).toDouble();
-        final size = maxDelta.clamp(
-            _minCropSize,
-            math
-                .min(_imageRect.right - r.left, r.bottom - _imageRect.top)
-                .toDouble());
+        final maxSize = math.max(
+            minSize,
+            math.min(
+              _imageRect.right - r.left,
+              r.bottom - _imageRect.top,
+            ));
+        final size = maxDelta.clamp(minSize, maxSize).toDouble();
         newRect = Rect.fromLTWH(
-          r.left.clamp(_imageRect.left, _imageRect.right - _minCropSize),
-          (r.bottom - size)
-              .clamp(_imageRect.top, _imageRect.bottom - _minCropSize),
+          r.left.clamp(_imageRect.left, _imageRect.right - minSize),
+          (r.bottom - size).clamp(_imageRect.top, _imageRect.bottom - minSize),
           size,
           size,
         );
       case _OcrCropHandle.bottomLeft:
         final maxDelta =
             math.max(r.width - delta.dx, r.height + delta.dy).toDouble();
-        final size = maxDelta.clamp(
-            _minCropSize,
-            math
-                .min(r.right - _imageRect.left, _imageRect.bottom - r.top)
-                .toDouble());
+        final maxSize = math.max(
+            minSize,
+            math.min(
+              r.right - _imageRect.left,
+              _imageRect.bottom - r.top,
+            ));
+        final size = maxDelta.clamp(minSize, maxSize).toDouble();
         newRect = Rect.fromLTWH(
-          (r.right - size)
-              .clamp(_imageRect.left, _imageRect.right - _minCropSize),
-          r.top.clamp(_imageRect.top, _imageRect.bottom - _minCropSize),
+          (r.right - size).clamp(_imageRect.left, _imageRect.right - minSize),
+          r.top.clamp(_imageRect.top, _imageRect.bottom - minSize),
           size,
           size,
         );
       case _OcrCropHandle.bottomRight:
         final maxDelta =
             math.max(r.width + delta.dx, r.height + delta.dy).toDouble();
-        final size = maxDelta.clamp(
-            _minCropSize,
-            math
-                .min(_imageRect.right - r.left, _imageRect.bottom - r.top)
-                .toDouble());
+        final maxSize = math.max(
+            minSize,
+            math.min(
+              _imageRect.right - r.left,
+              _imageRect.bottom - r.top,
+            ));
+        final size = maxDelta.clamp(minSize, maxSize).toDouble();
         newRect = Rect.fromLTWH(
-          r.left.clamp(_imageRect.left, _imageRect.right - _minCropSize),
-          r.top.clamp(_imageRect.top, _imageRect.bottom - _minCropSize),
+          r.left.clamp(_imageRect.left, _imageRect.right - minSize),
+          r.top.clamp(_imageRect.top, _imageRect.bottom - minSize),
           size,
           size,
         );
@@ -2817,28 +2846,33 @@ class _OcrImageCropPageState extends State<_OcrImageCropPage> {
   }
 
   Future<String?> _doCrop() async {
-    if (_image == null) return widget.imagePath;
-    final scaleX = _image!.width / _imageRect.width;
-    final scaleY = _image!.height / _imageRect.height;
-    final x = ((_cropRect.left - _imageRect.left) * scaleX)
-        .round()
-        .clamp(0, _image!.width);
-    final y = ((_cropRect.top - _imageRect.top) * scaleY)
-        .round()
-        .clamp(0, _image!.height);
-    final w = (_cropRect.width * scaleX).round().clamp(1, _image!.width - x);
-    final h = (_cropRect.height * scaleY).round().clamp(1, _image!.height - y);
+    if (_image == null || _imageRect.isEmpty || _cropRect.isEmpty) {
+      return widget.imagePath;
+    }
     try {
+      final crop = _cropRect.intersect(_imageRect);
+      if (crop.isEmpty || crop.width <= 0 || crop.height <= 0) {
+        return widget.imagePath;
+      }
       final bytes = await File(widget.imagePath).readAsBytes();
-      final decoded = img.decodeImage(bytes);
-      if (decoded == null) return widget.imagePath;
-      final cropped = img.copyCrop(decoded, x: x, y: y, width: w, height: h);
+      final encoded = await OcrImageCropUtil.cropAndEncodeAsync(
+        bytes: bytes,
+        left: (crop.left - _imageRect.left) / _imageRect.width,
+        top: (crop.top - _imageRect.top) / _imageRect.height,
+        width: crop.width / _imageRect.width,
+        height: crop.height / _imageRect.height,
+      );
+      if (encoded == null) {
+        Fluttertoast.showToast(msg: '裁剪失败，将使用原图继续');
+        return widget.imagePath;
+      }
       final outPath =
           '${Directory.systemTemp.path}/ocr_crop_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      await File(outPath).writeAsBytes(img.encodeJpg(cropped, quality: 92));
+      await File(outPath).writeAsBytes(encoded, flush: true);
       return outPath;
     } catch (e) {
       debugPrint('OCR 裁剪出错: $e');
+      Fluttertoast.showToast(msg: '裁剪失败，将使用原图继续');
       return widget.imagePath;
     }
   }
@@ -2877,14 +2911,20 @@ class _OcrImageCropPageState extends State<_OcrImageCropPage> {
                   const Spacer(),
                   TextButton.icon(
                     onPressed: () async {
+                      if (_cropping) return;
+                      setState(() => _cropping = true);
                       final navigator = Navigator.of(context);
-                      final out = await _doCrop();
-                      if (mounted) navigator.pop(out);
+                      try {
+                        final out = await _doCrop();
+                        if (mounted) navigator.pop(out);
+                      } finally {
+                        if (mounted) setState(() => _cropping = false);
+                      }
                     },
                     icon:
                         const Icon(Icons.check, color: Colors.green, size: 20),
-                    label: const Text('确认',
-                        style: TextStyle(
+                    label: Text(_cropping ? '处理中...' : '确认',
+                        style: const TextStyle(
                             color: Colors.green, fontWeight: FontWeight.bold)),
                   ),
                 ],
@@ -2894,6 +2934,11 @@ class _OcrImageCropPageState extends State<_OcrImageCropPage> {
               child: LayoutBuilder(builder: (ctx, c) {
                 final actualSize = Size(c.maxWidth, c.maxHeight);
                 _imageRect = _calcImageRect(actualSize);
+                if (_imageRect.isEmpty) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  );
+                }
                 if (_cropRect.isEmpty || _cropRect == Rect.zero) {
                   WidgetsBinding.instance
                       .addPostFrameCallback((_) => _initCropRect());
@@ -2901,6 +2946,7 @@ class _OcrImageCropPageState extends State<_OcrImageCropPage> {
                     child: CircularProgressIndicator(color: Colors.white),
                   );
                 }
+                _cropRect = _clampCropRect(_cropRect, _imageRect);
                 return GestureDetector(
                   onPanStart: _onPanStart,
                   onPanUpdate: _onPanUpdate,

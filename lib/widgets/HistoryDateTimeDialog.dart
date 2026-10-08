@@ -58,6 +58,7 @@ class _HistoryDateTimeDialogState extends State<_HistoryDateTimeDialog> {
       initialDate: _selected,
       firstDate: DateTime(1970),
       lastDate: DateTime.now().add(const Duration(days: 3650)),
+      locale: const Locale('zh', 'CN'),
     );
     if (picked == null || !mounted) return;
     setState(() {
@@ -76,6 +77,7 @@ class _HistoryDateTimeDialogState extends State<_HistoryDateTimeDialog> {
     final picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(_selected),
+      helpText: '选择时间',
     );
     if (picked == null || !mounted) return;
     setState(() {
@@ -123,8 +125,7 @@ class _HistoryDateTimeDialogState extends State<_HistoryDateTimeDialog> {
   Widget build(BuildContext context) {
     final dateText = '${_selected.year}-${_two(_selected.month)}-'
         '${_two(_selected.day)}';
-    final timeText =
-        '${_two(_selected.hour)}:${_two(_selected.minute)}';
+    final timeText = '${_two(_selected.hour)}:${_two(_selected.minute)}';
     return AlertDialog(
       title: const Text('选择时间'),
       content: Column(
@@ -143,8 +144,8 @@ class _HistoryDateTimeDialogState extends State<_HistoryDateTimeDialog> {
             width: double.infinity,
             child: OutlinedButton.icon(
               icon: const Icon(Icons.schedule_outlined),
-              label: Text(
-                  '$timeText:${_secondsController.text.padLeft(2, '0')}'),
+              label:
+                  Text('$timeText:${_secondsController.text.padLeft(2, '0')}'),
               onPressed: _pickTime,
             ),
           ),

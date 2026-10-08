@@ -7,6 +7,9 @@ import 'CurrentDataSourceNotifier.dart';
 
 /// 导出图片共享个人信息组件
 class ExportUserInfoWidget {
+  /// 长图等专用导出布局可以复用账号数据，在截图前完成读取。
+  static Future<Map<String, dynamic>> loadUserInfo() => _loadUserInfo(DateTime.now());
+
   /// 构建个人信息区域 Widget（异步加载数据）
   ///
   /// [exportTime] 图片导出时间，不传则使用当前时间

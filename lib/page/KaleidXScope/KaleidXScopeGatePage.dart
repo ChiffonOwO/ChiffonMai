@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/KaleidDateUtil.dart';
 
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/entity/KaleidXScope/KaleidXScopeGate.dart';
@@ -6,10 +7,9 @@ import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.d
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/service/KaleidXScope/KaleidXScopeGateService.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
-import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/BackgroundPageScaffold.dart';
 import 'package:my_first_flutter_app/widgets/KaleidXScopeSourceNotice.dart';
 
 /// 新增门页。布局与青门至红门的攻略页保持一致，数据由门接口提供。
@@ -34,8 +34,7 @@ class _KaleidXScopeGatePageState extends State<KaleidXScopeGatePage> {
   String? _error;
 
   late double _borderRadiusSmall;
-  late double _defaultShadowBlurRadius;
-  late double _defaultShadowOffset;
+
   late double _paddingXS;
   late double _paddingS;
   late double _paddingM;
@@ -94,8 +93,7 @@ class _KaleidXScopeGatePageState extends State<KaleidXScopeGatePage> {
   void _initSizeParams(BuildContext context) {
     final scaleFactor = MediaQuery.of(context).size.width / 375.0;
     _borderRadiusSmall = 8.0 * scaleFactor;
-    _defaultShadowBlurRadius = 5.0 * scaleFactor;
-    _defaultShadowOffset = 2.0 * scaleFactor;
+
     _paddingXS = 4.0 * scaleFactor;
     _paddingS = 4.0 * scaleFactor;
     _paddingM = 12.0 * scaleFactor;
@@ -109,13 +107,6 @@ class _KaleidXScopeGatePageState extends State<KaleidXScopeGatePage> {
     _progressBarHeight = 24.0 * scaleFactor;
   }
 
-  BoxShadow _defaultShadow(Brightness brightness) => BoxShadow(
-        color: brightness == Brightness.dark
-            ? Colors.black.withValues(alpha: 0.3)
-            : Colors.black12,
-        blurRadius: _defaultShadowBlurRadius,
-        offset: Offset(_defaultShadowOffset, _defaultShadowOffset),
-      );
 
   @override
   void initState() {
@@ -265,58 +256,140 @@ class _KaleidXScopeGatePageState extends State<KaleidXScopeGatePage> {
     final challenges = _gateData!.challenges;
     if (challenges.isEmpty) return const SizedBox.shrink();
     return Column(
-      children: challenges.map((challenge) {
-        final fontSize = 10.0 * MediaQuery.of(context).size.width / 375.0;
-        return Padding(
-          padding: EdgeInsets.only(bottom: _paddingL),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(_borderRadiusSmall),
-              border: Border.all(
-                  color: Theme.of(context).colorScheme.outlineVariant),
-            ),
-            padding: EdgeInsets.all(_paddingM),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(challenge.name,
-                  style: TextStyle(
-                      fontSize: _textSizeL, fontWeight: FontWeight.bold)),
-              SizedBox(height: _paddingS),
-              _buildChallengeBar(challenge.phases, fontSize),
-              SizedBox(height: _paddingXS),
-              for (final phase in challenge.phases)
-                Padding(
-                  padding: EdgeInsets.symmetric(vertical: _paddingXS * .5),
-                  child: Row(children: [
-                    Text(
-                        '${phase.startDate}${phase.endDate != null ? ' - ${phase.endDate}' : ' - 后续'}:',
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        KaleidDateUtil.currentHeader(context, challenges),
+        ...challenges.map((challenge) {
+          final fontSize = 10.0 * MediaQuery.of(context).size.width / 375.0;
+          return Padding(
+            padding: EdgeInsets.only(bottom: _paddingL),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(_borderRadiusSmall),
+                border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant),
+              ),
+              padding: EdgeInsets.all(_paddingM),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(challenge.name,
                         style: TextStyle(
-                            fontSize: _textSizeS,
-                            color: AppColors.greyHint(brightness))),
-                    SizedBox(width: _paddingXS),
-                    Text(phase.difficulty,
-                        style: TextStyle(
-                            fontSize: _textSizeS,
-                            fontWeight: FontWeight.bold,
-                            color: _getDifficultyColor(phase.difficulty))),
-                    SizedBox(width: _paddingXS),
-                    Text('LIFE ${phase.lifeTarget}',
-                        style: TextStyle(
-                            fontSize: _textSizeS, fontWeight: FontWeight.bold)),
-                    if (phase.target != null) ...[
-                      SizedBox(width: _paddingXS),
-                      Text('目标 ${phase.target}',
-                          style: TextStyle(
-                              fontSize: _textSizeS,
-                              color: AppColors.greyHint(brightness))),
-                    ],
+                            fontSize: _textSizeL, fontWeight: FontWeight.bold)),
+                    SizedBox(height: _paddingS),
+                    _buildChallengeBar(challenge.phases, fontSize),
+                    SizedBox(height: _paddingXS),
+                    for (final phase in challenge.phases)
+                      _buildChallengePhase(
+                        phase,
+                        showFinalPhaseDetails: challenge.name == '里门',
+                        brightness: brightness,
+                      ),
                   ]),
-                ),
-            ]),
-          ),
-        );
-      }).toList(),
+            ),
+          );
+        }).toList(),
+      ],
+    );
+  }
+
+  Widget _buildChallengePhase(
+    ChallengePhase phase, {
+    required bool showFinalPhaseDetails,
+    required Brightness brightness,
+  }) {
+    final dateText = KaleidDateUtil.range(phase.startDate, phase.endDate);
+
+    if (!showFinalPhaseDetails) {
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: _paddingXS * .5),
+        child: Row(
+          children: [
+            Text('$dateText:',
+                style: TextStyle(
+                    fontSize: _textSizeS,
+                    color: AppColors.greyHint(brightness))),
+            SizedBox(width: _paddingXS),
+            Text(phase.difficulty,
+                style: TextStyle(
+                    fontSize: _textSizeS,
+                    fontWeight: FontWeight.bold,
+                    color: _getDifficultyColor(phase.difficulty))),
+            SizedBox(width: _paddingXS),
+            Text('LIFE ${phase.lifeTarget}',
+                style: TextStyle(
+                    fontSize: _textSizeS, fontWeight: FontWeight.bold)),
+            if (phase.target != null) ...[
+              SizedBox(width: _paddingXS),
+              Text('目标 ${phase.target}',
+                  style: TextStyle(
+                      fontSize: _textSizeS,
+                      color: AppColors.greyHint(brightness))),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: _paddingXS * .5),
+      child: Container(
+        width: double.infinity,
+        padding:
+            EdgeInsets.symmetric(horizontal: _paddingS, vertical: _paddingXS),
+        decoration: BoxDecoration(
+          color: Theme.of(context)
+              .colorScheme
+              .surfaceContainerHighest
+              .withValues(alpha: .45),
+          borderRadius: BorderRadius.circular(_borderRadiusSmall),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: _paddingS,
+              runSpacing: _paddingXS,
+              children: [
+                Text(dateText,
+                    style: TextStyle(
+                        fontSize: _textSizeS,
+                        color: AppColors.greyHint(brightness))),
+                Text(phase.difficulty,
+                    style: TextStyle(
+                        fontSize: _textSizeS,
+                        fontWeight: FontWeight.bold,
+                        color: _getDifficultyColor(phase.difficulty))),
+              ],
+            ),
+            SizedBox(height: _paddingXS),
+            Wrap(
+              spacing: _paddingS,
+              runSpacing: _paddingXS,
+              children: [
+                Text('一阶段 ${phase.lifeTarget}',
+                    style: TextStyle(
+                        fontSize: _textSizeS, fontWeight: FontWeight.bold)),
+                Text('二阶段 ${phase.target ?? '-'}',
+                    style: TextStyle(
+                        fontSize: _textSizeS, fontWeight: FontWeight.bold)),
+                if (phase.penalties != null &&
+                    phase.penalties!.trim().isNotEmpty)
+                  ...phase.penalties!
+                      .split('|')
+                      .where((item) => item.trim().isNotEmpty)
+                      .map((item) => Text(
+                            item.trim(),
+                            style: TextStyle(
+                                fontSize: _textSizeS,
+                                color: AppColors.greyHint(brightness)),
+                          )),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -370,17 +443,15 @@ class _KaleidXScopeGatePageState extends State<KaleidXScopeGatePage> {
       var current = <ChallengePhase>[];
       var currentWidth = 0.0;
       for (final phase in phases) {
-        final added = current.isEmpty
-            ? minCellWidth
-            : minCellWidth + separator;
+        final added = current.isEmpty ? minCellWidth : minCellWidth + separator;
         if (current.isNotEmpty &&
-            (current.length >= maxPerRow ||
-                currentWidth + added > available)) {
+            (current.length >= maxPerRow || currentWidth + added > available)) {
           rows.add(current);
           current = <ChallengePhase>[];
           currentWidth = 0;
         }
-        currentWidth += current.isEmpty ? minCellWidth : minCellWidth + separator;
+        currentWidth +=
+            current.isEmpty ? minCellWidth : minCellWidth + separator;
         current.add(phase);
       }
       if (current.isNotEmpty) rows.add(current);
@@ -398,11 +469,11 @@ class _KaleidXScopeGatePageState extends State<KaleidXScopeGatePage> {
                     if (i > 0) SizedBox(width: separator),
                     Expanded(
                       child: Container(
-                        color: _getDifficultyColor(
-                            rows[rowIndex][i].difficulty),
+                        color:
+                            _getDifficultyColor(rows[rowIndex][i].difficulty),
                         alignment: Alignment.center,
-                        padding: EdgeInsets.symmetric(
-                            horizontal: _paddingXS * .5),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: _paddingXS * .5),
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
@@ -639,26 +710,12 @@ class _KaleidXScopeGatePageState extends State<KaleidXScopeGatePage> {
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
     _initSizeParams(context);
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(children: [
-        CommonWidgetUtil.buildCommonBgWidget(),
-        CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-        Column(children: [
-          PageTopBar(
-            title: _getGateTitle(),
-            bottom: const KaleidXScopeSourceNotice(),
-          ),
-          Expanded(
-            child: Container(
-              margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL),
-              decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(_borderRadiusSmall),
-                  boxShadow: [_defaultShadow(brightness)]),
-              child: _isLoading
+    return BackgroundPageScaffold(
+      title: _getGateTitle(),
+      bottom: const KaleidXScopeSourceNotice(),
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
                       ? Center(
@@ -671,10 +728,6 @@ class _KaleidXScopeGatePageState extends State<KaleidXScopeGatePage> {
                           padding: EdgeInsets.symmetric(
                               horizontal: _paddingL, vertical: _paddingS),
                           child: _buildSongList()),
-            ),
-          ),
-        ]),
-      ]),
     );
   }
 }

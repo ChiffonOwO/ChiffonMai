@@ -35,6 +35,9 @@ class PortableSong {
   final String genre;
   final int bpm;
 
+  /// 水鱼提供的各难度定数，用于随身听的下次想玩添加对话框。
+  final List<double> difficultyConstants;
+
   /// 该曲在水鱼曲库里是否有 DX 谱面条目（只用于列表上的一个小标记）。
   final bool hasDx;
 
@@ -46,12 +49,12 @@ class PortableSong {
     required this.artist,
     required this.genre,
     required this.bpm,
+    this.difficultyConstants = const <double>[],
     this.hasDx = false,
   });
 
   /// 音源 URL（**点击歌曲行时才使用**，不要在列表渲染阶段请求它）。
-  String get audioUrl =>
-      'https://assets2.lxns.net/maimai/music/$audioId.mp3';
+  String get audioUrl => 'https://assets2.lxns.net/maimai/music/$audioId.mp3';
 
   /// wmc.pub 兜底 URL：落雪 (`assets2.lxns.net`) 拉 404 时尝试这一条。
   ///

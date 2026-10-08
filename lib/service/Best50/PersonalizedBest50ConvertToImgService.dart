@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'ThunderBest50Export.dart';
 import 'dart:io';
 import 'package:my_first_flutter_app/utils/ExportUserInfoWidget.dart';
 import 'dart:typed_data';
@@ -24,7 +25,7 @@ class PersonalizedB50ConvertToImg {
   // 导出为图片的方法
   // [warningText] 非空时在标题与统计区之间插入红色告警文案（自定义 Best50 非法数据提示）。
   // [sortLabel] 非空时在标题下方标注当前排序状态（自定义 Best50 一键排序）。
-  static Future<File?> convertToImage(BuildContext context, String title, List<Map<String, dynamic>> personalizedSongs, List<dynamic>? maimaiMusicData, {int? jpegQuality, String? warningText, String? sortLabel}) async {
+  static Future<File?> convertToImage(BuildContext context, String title, List<Map<String, dynamic>> personalizedSongs, List<dynamic>? maimaiMusicData, {int? jpegQuality, String? warningText, String? sortLabel, bool thunderMode = false, bool thunderVertical = true}) async {
     OverlayEntry? overlayEntry;
     try {
       debugPrint('=== STARTING PERSONALIZED B50 IMAGE CONVERSION ===');
@@ -42,16 +43,19 @@ class PersonalizedB50ConvertToImg {
       // 创建一个Widget，用于生成图片
       Widget imageWidget = RepaintBoundary(
         key: globalKey,
-        child: await _buildExportImageWidget(context, title, personalizedSongs, maimaiMusicData, warningText, sortLabel),
+        child: await _buildExportImageWidget(context, title, personalizedSongs, maimaiMusicData, warningText, sortLabel, thunderMode: thunderMode, thunderVertical: thunderVertical),
       );
 
+      final exportWidth = thunderMode
+          ? ThunderBest50Export.widthFor(personalizedSongs.length, thunderVertical)
+          : 1700.0;
       // 创建一个屏幕外的OverlayEntry，避免影响主UI
       // 使用Positioned将Widget定位到屏幕外，确保它被渲染但不可见
       overlayEntry = OverlayEntry(
         builder: (context) => Positioned(
           left: -9999, // 移到屏幕外
           top: -9999,
-          width: 1700, // 与 Best50ConvertToImgService 对齐：姓名框 1150 + gap 16 + metaRow 494 + 20*2 padding = 1700
+          width: exportWidth,
           child: Material(
             type: MaterialType.transparency,
             child: imageWidget,
@@ -226,8 +230,33 @@ class PersonalizedB50ConvertToImg {
   }
 
   // 构建用于导出的Widget
-  static Future<Widget> _buildExportImageWidget(BuildContext context, String title, List<Map<String, dynamic>> personalizedSongs, List<dynamic>? maimaiMusicData, String? warningText, String? sortLabel) async {
-    double containerWidth = 1700; // 与 Best50ConvertToImgService 对齐：容纳姓名框 + metaRow 横排布局
+  static Future<Widget> _buildExportImageWidget(BuildContext context, String title, List<Map<String, dynamic>> personalizedSongs, List<dynamic>? maimaiMusicData, String? warningText, String? sortLabel, {bool thunderMode = false, bool thunderVertical = true}) async {
+    if (thunderMode) {
+      final sum = personalizedSongs.fold<int>(0, (sum, song) => sum + ((song['ra'] as num?)?.toInt() ?? 0));
+      final scoreRateSum = personalizedSongs.fold<double>(0, (sum, song) {
+        return sum + _calculateScoreRate(
+          (song['song_id'] as num?)?.toInt() ?? 0,
+          (song['level_index'] as num?)?.toInt() ?? 0,
+          (song['dxScore'] as num?)?.toInt() ?? 0,
+          maimaiMusicData,
+        );
+      });
+      final averageScoreRate = personalizedSongs.isEmpty
+          ? 0.0
+          : scoreRateSum / personalizedSongs.length;
+      final maxIdLength = personalizedSongs.any((song) => '${song['song_id']}'.length == 6) ? 6 : 5;
+      return ThunderBest50Export.build(
+        title: title,
+        vertical: thunderVertical,
+        count: personalizedSongs.length,
+        statistics: '共 ${personalizedSongs.length} 张谱面\nRating 合计 $sum\n'
+            '平均 DX 分达成率 ${(averageScoreRate * 100).toStringAsFixed(2)}%',
+        warning: warningText,
+        sortLabel: sortLabel,
+        cardBuilder: (index) => _buildGameCard(context: context, songData: personalizedSongs[index], maimaiMusicData: maimaiMusicData, index: index, maxIdLength: maxIdLength),
+      );
+    }
+    double containerWidth = thunderMode && !thunderVertical ? 17000 : 1700;
 
     return Container(
       width: containerWidth,
@@ -312,7 +341,7 @@ class PersonalizedB50ConvertToImg {
                 SizedBox(height: 16.0),
 
                 // 歌曲卡片网格
-                _buildDataCardGrid(context, personalizedSongs, 1.85, 5, maimaiMusicData),
+                _buildDataCardGrid(context, personalizedSongs, thunderMode ? 1.25 : 1.85, thunderMode ? (thunderVertical ? 1 : 50) : 5, maimaiMusicData),
               ],
             ),
           ),
@@ -492,7 +521,7 @@ class PersonalizedB50ConvertToImg {
       }
     }
     return Container(
-      width: 1700,
+      width: crossAxisCount == 50 ? 17000 : 1700,
       child: GridView.builder(
         shrinkWrap: true,
         physics: NeverScrollableScrollPhysics(),

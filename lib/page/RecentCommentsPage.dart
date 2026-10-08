@@ -6,11 +6,9 @@ import '../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../page/SongInfoPage.dart';
 import '../service/SongInfoService.dart';
 import '../utils/AppTheme.dart';
-import '../utils/AppConstants.dart';
-import '../utils/CommonWidgetUtil.dart';
 import '../utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
-import '../widgets/PageTopBar.dart';
+import '../widgets/BackgroundPageScaffold.dart';
 import '../widgets/CommunityAvatar.dart';
 
 /// 最近评论页面：展示最近50条评论，每页10条，Redis+MySQL二级缓存
@@ -280,52 +278,26 @@ class _RecentCommentsPageState extends State<RecentCommentsPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     final Color textPrimaryColor = Theme.of(context).colorScheme.onSurface;
-    final Color cardBgColor = Theme.of(context).colorScheme.surface.withValues(alpha: 0.9);
-    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          Column(
-            children: [
-              PageTopBar(
-                title: '最近评论',
-                actions: [
+    return BackgroundPageScaffold(
+      title: '最近评论',
+      actions: [
   IconButton(
                         icon: Icon(Icons.refresh, color: textPrimaryColor),
                         onPressed: _isLoading ? null : _refresh,
                       ),
 ],
-              ),
-
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: cardBgColor,
-                    borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-                    boxShadow: [defaultShadow],
-                  ),
-                  child: _isLoading
-                      ? _buildLoading(brightness)
-                      : _errorMessage != null
-                          ? _buildError(brightness)
-                          : _comments.isEmpty
-                              ? _buildEmpty(brightness)
-                              : _buildCommentList(brightness, screenWidth),
-                ),
-              ),
-            ],
-          ),
-        ],
+      resizeToAvoidBottomInset: false,
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
       ),
+      child: _isLoading
+          ? _buildLoading(brightness)
+          : _errorMessage != null
+              ? _buildError(brightness)
+              : _comments.isEmpty
+                  ? _buildEmpty(brightness)
+                  : _buildCommentList(brightness, screenWidth),
     );
   }
 

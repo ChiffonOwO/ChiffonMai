@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
-import 'package:my_first_flutter_app/utils/AppConstants.dart';
-import '../widgets/PageTopBar.dart';
+import '../widgets/BackgroundPageScaffold.dart';
 
 class AchievementFullReverseCalculator extends StatefulWidget {
   const AchievementFullReverseCalculator({super.key});
@@ -141,10 +139,8 @@ class _AchievementFullReverseCalculatorState
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
     
     // 计算总计
@@ -154,37 +150,12 @@ class _AchievementFullReverseCalculatorState
     int totalGo = _tapGo + _holdGo + _slideGo + _touchGo + _breakGo;
     int totalM = _tapM + _holdM + _slideM + _touchM + _breakM;
 
-    // 自定义常量
-    final double borderRadiusSmall = 8.0;
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false, // 防止键盘弹出时挤压背景
-      body: Stack(
-        children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏
-              PageTopBar(
-                title: '达成率反推',
-              ),
-
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [AppConstants.defaultShadow(brightness)],
-                  ),
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.all(screenWidth * 0.04), // padding 为屏幕宽度的4%
+    return BackgroundPageScaffold(
+      title: '达成率反推',
+      resizeToAvoidBottomInset: false,
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.all(screenWidth * 0.04), // padding 为屏幕宽度的4%
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -244,12 +215,6 @@ class _AchievementFullReverseCalculatorState
                       ],
                     ),
                   ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 

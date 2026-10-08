@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import '../service/UserScoreSearchService.dart';
 import '../manager/DivingFish/MaimaiMusicDataManager.dart';
-import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'SongInfoPage.dart';
 import '../utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/widgets/B50GameCardWidget.dart';
 import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
-import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/BackgroundPageScaffold.dart';
 
 class UserScoreSearchPage extends StatefulWidget {
   const UserScoreSearchPage({Key? key}) : super(key: key);
@@ -928,7 +926,6 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     final brightness = Theme.of(context).brightness;
     // ignore: unused_local_variable
     final stats =  _calculateStats();
@@ -936,32 +933,13 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
     // 初始化按钮尺寸
     _initButtonSizes(screenWidth);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '成绩查询',
       resizeToAvoidBottomInset: false, // 防止键盘弹出时调整布局
-      body: Stack(
-        children: [
-
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-        
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
-              // 与 Best50 页、其余 50 多个页面同款。
-              PageTopBar(title: '成绩查询'),
-              
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom), // 进一步减小上边距，从4减小到0
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-                    boxShadow: [AppConstants.defaultShadow(brightness)],
-                  ),
-                  child: _isLoading
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
+      ),
+      child: _isLoading
                       ? Center(child: CircularProgressIndicator())
                       : _userPlayData == null
                           ? Center(child: Text('没有找到缓存数据', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)))
@@ -1460,12 +1438,6 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                 ),
                               ],
                             ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
   

@@ -406,6 +406,7 @@ class MainActivity : AudioServiceActivity() {
      * 多半是 content:// URI，必须先落盘成普通文件。
      */
     private fun copyToCache(uri: Uri): String? {
+        val maxImportBytes = 50L * 1024L * 1024L
         return try {
             val displayName = queryDisplayName(uri) ?: "import_${System.currentTimeMillis()}"
             val safeName = displayName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
@@ -419,7 +420,20 @@ class MainActivity : AudioServiceActivity() {
             // 前缀时间戳，避免同名文件互相覆盖
             val target = File(dir, "${System.currentTimeMillis()}_$safeName")
             contentResolver.openInputStream(uri)?.use { input ->
-                target.outputStream().use { output -> input.copyTo(output) }
+                target.outputStream().use { output ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    var total = 0L
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        if (total > maxImportBytes) {
+                            target.delete()
+                            return null
+                        }
+                        output.write(buffer, 0, count)
+                    }
+                }
             } ?: return null
 
             target.absolutePath

@@ -8,24 +8,26 @@ import '../entity/MaimaiHubOcrResult.dart';
 import '../manager/DivingFishProbeManager.dart';
 import '../utils/ApiClient.dart';
 
-/// MaimaiHub 结算画面识别（走 MaimaiHub backend 代理）
+/// maimai Score Hub 结算画面识别（走 maimai Score Hub backend 代理）
 ///
 /// 输入是**对着机台结算页面拍的照片**（不是手机截图），文案统一用「拍摄」。
 ///
 /// ## 为什么要绕 backend
-/// MaimaiHub 的 OCR 是仓库里的独立 FastAPI 服务 `ocr-api/`，只监听 `127.0.0.1:19100`，
+/// maimai Score Hub 的 OCR 是仓库里的独立 FastAPI 服务 `ocr-api/`，只监听 `127.0.0.1:19100`，
 /// 通过 autossh 隧道转发给 backend 容器（`host.docker.internal:19100`）。
 /// **App 直连不到它**，只能调 backend 的代理接口：
 ///
 /// ```text
-/// POST {MaimaiHubBaseUrl}/me/ocr/recognize
-/// Authorization: Bearer <MaimaiHub 用户 token>
+/// POST {maimai Score Hub API}/me/ocr/recognize
+/// Authorization: Bearer <maimai Score Hub 用户 token>
 /// Content-Type: multipart/form-data，字段名 images（可重复，1..20 张）
 /// ```
 ///
 /// ## 和自家后端 OCR 的区别
 /// 自家 `POST /api/ocr/score` 返回**原始文本块**（百度/腾讯通用 OCR），字段要自己解析；
 /// 这个是**面向舞萌成绩图的专用识别**，直接返回曲名候选/达成率/DX分/难度/FC/FS。
+/// 识别只需要有效的 maimai Score Hub 登录 token，不依赖用户先完成一次成绩同步；
+/// 识别结果是否再上传到水鱼或落雪由页面上的可选按钮单独决定。
 class MaimaiHubOcrService {
   MaimaiHubOcrService._();
   static final MaimaiHubOcrService instance = MaimaiHubOcrService._();
@@ -39,10 +41,10 @@ class MaimaiHubOcrService {
   /// 识别比较慢（真实模型跑 GPU），给足超时
   static const Duration _timeout = Duration(seconds: 90);
 
-  /// 当前是否有可用的 MaimaiHub 登录态。
+  /// 当前是否有可用的 maimai Score Hub 登录态。
   ///
   /// 该接口必须带用户 token，未登录时直接返回 false，调用方应引导去登录
-  /// （见首页/账号同步页的 MaimaiHub 扫码登录入口）。
+  /// （见系统页的 maimai Score Hub 扫码登录入口）。
   Future<bool> isAvailable() async =>
       await DivingFishProbeManager().ensureAuthToken() != null;
 
@@ -72,7 +74,7 @@ class MaimaiHubOcrService {
 
     final token = await DivingFishProbeManager().ensureAuthToken();
     if (token == null || token.isEmpty) {
-      throw MaimaiHubOcrException('未登录 MaimaiHub，无法使用该识别服务');
+      throw MaimaiHubOcrException('未登录 maimai Score Hub，无法使用该识别服务');
     }
 
     final uri = Uri.parse(ApiUrls.MaimaiHubOcrRecognizeUrl);
@@ -125,7 +127,7 @@ class MaimaiHubOcrService {
       case 400:
         return '图片为空或数量超限${detail.isEmpty ? '' : '：$detail'}';
       case 401:
-        return '登录状态已失效，请重新登录 MaimaiHub';
+        return '登录状态已失效，请重新登录 maimai Score Hub';
       case 413:
         return '有图片超过 8 MiB 上限';
       case 415:

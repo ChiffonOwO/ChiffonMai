@@ -9,7 +9,6 @@ import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartBySongExcerptService.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartCommonSettingsService.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:my_first_flutter_app/utils/LuoXueSongUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
@@ -18,9 +17,10 @@ import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/SongFilterUtil.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import '../../utils/ExternalLaunchUtil.dart';
 import '../../constant/LoadingTipsConstant.dart';
 import 'GuessChartLoadingView.dart';
-import '../../widgets/PageTopBar.dart';
+import '../../widgets/BackgroundPageScaffold.dart';
 
 class GuessChartBySongExcerptPage extends StatefulWidget {
   const GuessChartBySongExcerptPage({super.key});
@@ -930,18 +930,19 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
                 GestureDetector(
                   onTap: () async {
                     final url = Uri.parse('https://maimai.yukineko2233.top/');
-                    // 1. 检查是否能打开该链接
-                    if (await canLaunchUrl(url)) {
-                      // 2. 指定跳转到外部浏览器（关键：mode 参数）
-                      await launchUrl(
-                        url,
-                        mode: LaunchMode.externalApplication, // 强制跳浏览器
+
+                    if (!await ExternalLaunchUtil.open(url) && context.mounted) {
+
+                      await ExternalLaunchUtil.copyFallback(
+
+                        context,
+
+                        url.toString(),
+
+                        message: '无法打开该链接，链接已复制到剪贴板',
+
                       );
-                    } else {
-                      // 提示用户无法打开
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('无法打开该链接')),
-                      );
+
                     }
                   },
                   child: Text(
@@ -1436,40 +1437,15 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
     final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
 
     // 自定义常量
-    final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false, // 防止键盘弹出时挤压背景
-      body: Stack(
-        children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏
-              PageTopBar(
-                title: '猜歌（音频片段）',
-              ),
-
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
-                  ),
-                  child: GestureDetector(
+    return BackgroundPageScaffold(
+      title: '猜歌（音频片段）',
+      resizeToAvoidBottomInset: false,
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: GestureDetector(
                     onTap: () {
                       setState(() {
                         _showSearchResults = false;
@@ -1896,12 +1872,6 @@ class _GuessChartBySongExcerptPageState extends State<GuessChartBySongExcerptPag
                       },
                     ),
                   ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

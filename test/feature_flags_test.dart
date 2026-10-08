@@ -13,11 +13,11 @@ import 'package:my_first_flutter_app/utils/FeatureRegistry.dart';
 /// 另外两处（`SystemHubPage` 的 tile、`HomePage` 的点击分支）属于 UI，
 /// 同样是 `if (FeatureFlags.awmcGateway)` 包起来的，改开关一起生效。
 void main() {
-  List<String> allTitles({required bool loggedIn}) => FeatureRegistry
-      .allCategories(loggedIn)
-      .expand((c) => c.items)
-      .map((i) => i.title)
-      .toList();
+  List<String> allTitles({required bool loggedIn}) =>
+      FeatureRegistry.allCategories(loggedIn)
+          .expand((c) => c.items)
+          .map((i) => i.title)
+          .toList();
 
   test('AWMC 网关入口是否出现，跟 FeatureFlags.awmcGateway 完全一致', () {
     for (final loggedIn in [true, false]) {
@@ -30,8 +30,8 @@ void main() {
   });
 
   test('系统分类的其它入口不受影响', () {
-    final system = FeatureRegistry.allCategories(true)
-        .firstWhere((c) => c.name == '系统');
+    final system =
+        FeatureRegistry.allCategories(true).firstWhere((c) => c.name == '系统');
     final titles = system.items.map((i) => i.title).toList();
 
     expect(titles, contains('同步成绩到水鱼'));
@@ -40,9 +40,9 @@ void main() {
     expect(titles, contains('访问官方网站'));
     expect(titles, contains('加入 QQ 群'));
     expect(titles, contains('数据备份'));
-    expect(titles, contains('主题与背景'));
-    // 18 个公开入口 + 开关打开时多一个「AWMC 网关」
-    expect(titles.length, FeatureFlags.awmcGateway ? 19 : 18,
+    expect(titles, contains('主题与交互偏好'));
+    // 19 个公开入口 + 开关打开时多一个「AWMC 网关」
+    expect(titles.length, FeatureFlags.awmcGateway ? 20 : 19,
         reason: '往「系统」分类加/删入口时，这里的数字要一起改');
   });
 }

@@ -4,6 +4,7 @@ import '../../service/RankingList/RatingRankListService.dart';
 import '../../utils/AppTheme.dart';
 import '../../utils/ColorUtil.dart';
 import '../../widgets/PageTopBar.dart';
+import '../../widgets/ThemeAwareBackground.dart';
 import '../../widgets/CommunityAvatar.dart';
 import '../../utils/CurrentDataSourceNotifier.dart';
 import '../../utils/RankingRowExtent.dart';
@@ -15,7 +16,10 @@ class RatingRankListPage extends StatefulWidget {
   State<RatingRankListPage> createState() => _RatingRankListPageState();
 }
 
-class _RatingRankListPageState extends State<RatingRankListPage> {
+class _RatingRankListPageState extends State<RatingRankListPage>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabs;
+  int _requestGeneration = 0;
   List<RankItem> _rankList = [];
   bool _isLoading = true;
   String _errorMessage = '';
@@ -59,6 +63,7 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
   @override
   void initState() {
     super.initState();
+    _tabs = TabController(length: _tabNames.length, vsync: this);
     _loadData();
   }
 
@@ -107,7 +112,8 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
     setState(() {
       _isButtonDisabled = true;
     });
-    Future.delayed(const Duration(seconds: 1), () {
+    Future.delayed(const Duration(milliseconds: 250), () {
+      if (!mounted) return;
       setState(() {
         _isButtonDisabled = false;
       });
@@ -139,6 +145,8 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
   }
 
   Future<void> _loadRankings() async {
+    if (!mounted) return;
+    final generation = ++_requestGeneration;
     setState(() {
       _isLoading = true;
       _errorMessage = '';
@@ -161,6 +169,7 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
             : <RankItem>[];
       }
 
+      if (!mounted || generation != _requestGeneration) return;
       // 计算并列排名
       items = RatingRankListService.calculateRankedPositions(items);
 
@@ -171,7 +180,8 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
 
         // 打印前10个排行榜项的用户ID
         for (int i = 0; i < items.length && i < 10; i++) {
-          print('[DEBUG] 排行榜项[$i]: userId=${items[i].userId}, nickname=${items[i].nickname}, totalRating=${items[i].totalRating}');
+          print(
+              '[DEBUG] 排行榜项[$i]: userId=${items[i].userId}, nickname=${items[i].nickname}, totalRating=${items[i].totalRating}');
         }
 
         // 查找当前用户
@@ -191,7 +201,8 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
 
         // 检查是否找到匹配的用户
         if (foundUser.totalRating > 0) {
-          print('[DEBUG] ✅ 找到当前用户: rank=${foundUser.rank}, nickname=${foundUser.nickname}, totalRating=${foundUser.totalRating}');
+          print(
+              '[DEBUG] ✅ 找到当前用户: rank=${foundUser.rank}, nickname=${foundUser.nickname}, totalRating=${foundUser.totalRating}');
         } else {
           print('[DEBUG] ❌ 未找到当前用户，使用默认值');
         }
@@ -201,22 +212,28 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
         _rankList = items;
       });
     } catch (e) {
+      if (!mounted || generation != _requestGeneration) return;
       setState(() {
         _errorMessage = '加载失败: $e';
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted && generation == _requestGeneration)
+        setState(() {
+          _isLoading = false;
+        });
     }
   }
 
-  Widget _buildRankItem(RankItem item, {bool isCurrentUser = false, required Brightness brightness}) {
+  Widget _buildRankItem(RankItem item,
+      {bool isCurrentUser = false, required Brightness brightness}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.tableBorder(brightness))),
-        color: isCurrentUser ? AppColors.linkBlue(brightness).withValues(alpha: 0.08) : null,
+        border: Border(
+            bottom: BorderSide(color: AppColors.tableBorder(brightness))),
+        color: isCurrentUser
+            ? AppColors.linkBlue(brightness).withValues(alpha: 0.08)
+            : null,
       ),
       child: Row(
         children: [
@@ -232,13 +249,17 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
             child: CommunityPlayerIdentity(
               avatarId: item.avatarId,
               dataSource: item.dataSource,
+              // 开发者白名单按 `<source>:<id>` 整串匹配，见 DataSourceTag
+              playerId: item.userId,
               name: item.nickname ?? '未知玩家',
               // 头像高度对齐「玩家名 + 数据源标签」两行文字的总高
               avatarMatchesTextHeight: true,
               nameStyle: TextStyle(
                 fontSize: 14,
                 fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.w500,
-                color: isCurrentUser ? AppColors.primaryText(brightness) : AppColors.secondaryText(brightness),
+                color: isCurrentUser
+                    ? AppColors.primaryText(brightness)
+                    : AppColors.secondaryText(brightness),
               ),
             ),
           ),
@@ -401,9 +422,16 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     return Scaffold(
-      backgroundColor: AppColors.cardBackground(brightness),
-      body: Column(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        fit: StackFit.expand,
         children: [
+          Positioned.fill(
+            child: ColoredBox(color: Theme.of(context).colorScheme.surface),
+          ),
+          const ThemeAwareBackground(),
+          Column(
+            children: [
           // 顶部栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
           // 与 Best50 页、其余 50 多个页面同款。
           //
@@ -417,10 +445,12 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
               IconButton(
                 icon: _isLoading
                     ? CircularProgressIndicator(
-                        color: AppColors.primaryText(brightness), strokeWidth: 2)
+                        color: AppColors.primaryText(brightness),
+                        strokeWidth: 2)
                     : Icon(Icons.refresh,
                         color: AppColors.primaryText(brightness)),
-                onPressed: (_isLoading || _isButtonDisabled) ? null : _onRefresh,
+                onPressed:
+                    (_isLoading || _isButtonDisabled) ? null : _onRefresh,
                 tooltip: '刷新',
               ),
               // 快速定位到当前用户的按钮
@@ -438,8 +468,12 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: AppColors.warningOrange(brightness).withValues(alpha: 0.08),
-              border: Border(bottom: BorderSide(color: AppColors.warningOrange(brightness).withValues(alpha: 0.3))),
+              color:
+                  AppColors.warningOrange(brightness).withValues(alpha: 0.08),
+              border: Border(
+                  bottom: BorderSide(
+                      color: AppColors.warningOrange(brightness)
+                          .withValues(alpha: 0.3))),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -464,65 +498,30 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
             ),
           ),
 
-          // Tab 切换
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.tableBorder(brightness))),
-            ),
-            child: Row(
-              children: List.generate(_tabNames.length, (index) {
-                return Expanded(
-                  child: InkWell(
-                    onTap: (_isLoading || _isButtonDisabled) ? null : () {
-                      setState(() {
-                        _selectedTab = index;
-                      });
-                      _onRefresh();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(
-                            color: _selectedTab == index
-                                ? AppColors.primaryText(brightness)
-                                : Colors.transparent,
-                            width: 3,
-                          ),
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          _tabNames[index],
-                          // 4 个 Tab 平分一行，每格只有 ~80dp：宁可省略号，
-                          // 也不要让它折成两行把 Tab 栏撑高
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: _selectedTab == index
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                            color: (_isLoading || _isButtonDisabled) && _selectedTab != index
-                                ? AppColors.secondaryText(brightness)
-                                : (_selectedTab == index
-                                    ? AppColors.primaryText(brightness)
-                                    : AppColors.secondaryText(brightness)),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ),
+          TabBar(
+            controller: _tabs,
+            labelColor: Theme.of(context).colorScheme.primary,
+            unselectedLabelColor:
+                Theme.of(context).colorScheme.onSurfaceVariant,
+            tabs: [for (final name in _tabNames) Tab(text: name)],
+            onTap: (index) {
+              if (_isButtonDisabled) {
+                _tabs.animateTo(_selectedTab);
+                return;
+              }
+              if (index == _selectedTab) return;
+              setState(() => _selectedTab = index);
+              _disableButtons();
+              _loadRankings();
+            },
           ),
 
           // 排行榜列表
           Expanded(
             child: _isLoading
-                ? Center(child: CircularProgressIndicator(color: AppColors.primaryText(brightness)))
+                ? Center(
+                    child: CircularProgressIndicator(
+                        color: AppColors.primaryText(brightness)))
                 : _rankList.isEmpty
                     ? _buildEmptyState(brightness)
                     : ListView.builder(
@@ -540,7 +539,9 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
                           final item = _rankList[index];
                           final isCurrentUser = _currentUserId != null &&
                               item.userId == _currentUserId;
-                          return _buildRankItem(item, isCurrentUser: isCurrentUser, brightness: brightness);
+                          return _buildRankItem(item,
+                              isCurrentUser: isCurrentUser,
+                              brightness: brightness);
                         },
                       ),
           ),
@@ -550,7 +551,8 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: AppColors.primaryText(brightness))),
+                border: Border(
+                    top: BorderSide(color: AppColors.primaryText(brightness))),
                 color: AppColors.linkBlue(brightness).withValues(alpha: 0.08),
               ),
               child: Row(
@@ -559,7 +561,8 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
                   SizedBox(
                     width: 40,
                     child: Center(
-                      child: _buildRankBadge(_currentUserRankItem!.rank, brightness: brightness),
+                      child: _buildRankBadge(_currentUserRankItem!.rank,
+                          brightness: brightness),
                     ),
                   ),
 
@@ -567,6 +570,7 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
                     child: CommunityPlayerIdentity(
                       avatarId: _currentUserRankItem!.avatarId,
                       dataSource: _currentUserRankItem!.dataSource,
+                      playerId: _currentUserRankItem!.userId,
                       name: _currentUserRankItem!.nickname ?? '未知玩家',
                       avatarMatchesTextHeight: true,
                       nameStyle: TextStyle(
@@ -618,6 +622,8 @@ class _RatingRankListPageState extends State<RatingRankListPage> {
                 ],
               ),
             ),
+            ],
+          ),
         ],
       ),
     );

@@ -9,14 +9,20 @@ import '../manager/DivingFishProbeManager.dart';
 import '../service/SyncStatsService.dart';
 import '../utils/AppTheme.dart';
 import '../utils/SyncRouteNotifier.dart';
+import '../utils/SecureCredentialStore.dart';
 import 'QrQuickFillButtons.dart';
+import 'PostSyncRefreshOptions.dart';
+import 'SmoothLinearProgressIndicator.dart';
+import 'RefreshDataDialog.dart'
+    show RefreshDataRequest, RefreshDataSource, executeAdvancedRefreshData;
+
+export 'MultiScoreSyncDialog.dart'
+    show MultiScoreSyncInput, showMultiScoreSyncInputDialog;
 
 /// 同步成绩相关的回调上下文：用于让同步对话框在父页面（首页 / 我的）之间复用。
 class SyncCallbacks {
-
   /// 同步成功后保存新 QQ
   final Future<void> Function(String qq) onSaveQQ;
-
 
   /// 同步完成后自动刷新本地数据（用于继续展示进度）
   final Future<void> Function({
@@ -46,11 +52,13 @@ class DivingFishSyncInput {
   final String qrCode;
   final bool participateRankings;
   final bool showNickname;
+  final RefreshDataRequest? refreshRequest;
 
   const DivingFishSyncInput({
     required this.qrCode,
     required this.participateRankings,
     required this.showNickname,
+    this.refreshRequest,
   });
 }
 
@@ -110,6 +118,7 @@ Future<DivingFishSyncInput?> showDivingFishSyncInputDialog(
       prefs.getBool(CacheKeyConstant.participateRankings) ?? false;
   var showNickname = prefs.getBool(CacheKeyConstant.showNickname) ?? false;
   final qrController = TextEditingController();
+  final refreshKey = GlobalKey<PostSyncRefreshOptionsState>();
   ModalRoute<DivingFishSyncInput>? dialogRoute;
 
   if (!context.mounted) return null;
@@ -154,27 +163,10 @@ Future<DivingFishSyncInput?> showDivingFishSyncInputDialog(
                     contentPadding: const EdgeInsets.all(12),
                   ),
                 ),
-                const SizedBox(height: 8),
-                CheckboxListTile(
-                  title:
-                      const Text('参与排行榜', style: TextStyle(fontSize: 14)),
-                  value: participateRankings,
-                  onChanged: (value) {
-                    setState(() {
-                      participateRankings = value ?? false;
-                      if (!participateRankings) showNickname = false;
-                    });
-                  },
+                PostSyncRefreshOptions(
+                  key: refreshKey,
+                  source: RefreshDataSource.shuiyu,
                 ),
-                if (participateRankings)
-                  CheckboxListTile(
-                    title: const Text('在排行榜中显示昵称',
-                        style: TextStyle(fontSize: 14)),
-                    value: showNickname,
-                    onChanged: (value) {
-                      setState(() => showNickname = value ?? false);
-                    },
-                  ),
                 const SizedBox(height: 12),
                 ElevatedButton.icon(
                   icon: const Icon(Icons.send, size: 18),
@@ -187,26 +179,28 @@ Future<DivingFishSyncInput?> showDivingFishSyncInputDialog(
                   onPressed: () async {
                     final qrCode = qrController.text.trim();
                     if (qrCode.isEmpty) {
-                      Fluttertoast.showToast(
-                          msg: '请先粘贴舞萌|中二登入二维码字符串');
+                      Fluttertoast.showToast(msg: '请先粘贴舞萌|中二登入二维码字符串');
                       return;
                     }
                     if (!qrCode.startsWith('SGWCMAID')) {
-                      Fluttertoast.showToast(
-                          msg: '无效的二维码，请使用舞萌|中二公众号生成的登入二维码');
+                      Fluttertoast.showToast(msg: '无效的二维码，请使用舞萌|中二公众号生成的登入二维码');
                       return;
                     }
                     final prefs2 = await SharedPreferences.getInstance();
-                    await prefs2.setBool(
-                        CacheKeyConstant.participateRankings,
+                    await prefs2.setBool(CacheKeyConstant.participateRankings,
                         participateRankings);
                     await prefs2.setBool(
                         CacheKeyConstant.showNickname, showNickname);
+                    final refreshRequest =
+                        await refreshKey.currentState?.collectRequest();
+                    if (refreshKey.currentState?.enabled == true &&
+                        refreshRequest == null) return;
                     if (!dialogContext.mounted) return;
                     Navigator.of(dialogContext).pop(DivingFishSyncInput(
                       qrCode: qrCode,
                       participateRankings: participateRankings,
                       showNickname: showNickname,
+                      refreshRequest: refreshRequest,
                     ));
                   },
                 ),
@@ -229,7 +223,8 @@ Future<DivingFishSyncInput?> showDivingFishSyncInputDialog(
 }
 
 /// 把 [SyncProgress] 的阶段映射为 0-1 的进度值。
-double divingFishStageProgress(SyncProgress p) => SyncScoreDialogs._stageProgress(p);
+double divingFishStageProgress(SyncProgress p) =>
+    SyncScoreDialogs._stageProgress(p);
 
 // ============================================================
 // 「同步成绩到落雪」的输入 / 执行分离版本
@@ -242,10 +237,12 @@ class LuoXueSyncInput {
 
   /// 落雪个人 API 密钥；已在本地保存过时为 null（执行时从缓存读取）
   final String? lxnsImportToken;
+  final RefreshDataRequest? refreshRequest;
 
   const LuoXueSyncInput({
     required this.qrCode,
     required this.lxnsImportToken,
+    this.refreshRequest,
   });
 }
 
@@ -254,11 +251,12 @@ class LuoXueSyncInput {
 /// 返回 null 表示用户取消。已在本地保存过落雪 API 密钥时不再要求重新填写。
 Future<LuoXueSyncInput?> showLuoXueSyncInputDialog(BuildContext context) async {
   final brightness = Theme.of(context).brightness;
-  final prefs = await SharedPreferences.getInstance();
-  final savedToken = prefs.getString(CacheKeyConstant.probeLxnsImportToken);
+  final savedToken =
+      await SecureCredentialStore.read(CacheKeyConstant.probeLxnsImportToken);
   final hasSavedToken = savedToken != null && savedToken.isNotEmpty;
   final qrController = TextEditingController();
   final tokenController = TextEditingController();
+  final refreshKey = GlobalKey<PostSyncRefreshOptionsState>();
   String? error;
   ModalRoute<LuoXueSyncInput>? dialogRoute;
 
@@ -270,133 +268,140 @@ Future<LuoXueSyncInput?> showLuoXueSyncInputDialog(BuildContext context) async {
     builder: (dialogContext) {
       dialogRoute ??= ModalRoute.of(dialogContext);
       return StatefulBuilder(
-      builder: (context, setState) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.cloud_sync_outlined, size: 22),
-            SizedBox(width: 8),
-            Text('同步成绩到落雪'),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+        builder: (context, setState) => AlertDialog(
+          title: const Row(
             children: [
-              Text(
-                '在舞萌|中二公众号请求并打开二维码，扫描后将字符串粘贴到下方：',
-                style: TextStyle(
-                    fontSize: 13, color: AppColors.greyHint(brightness)),
-              ),
-              const SizedBox(height: 12),
-              // 与水鱼同步对话框保持一致：剪贴板 / 相册 / 扫码三件套
-              QrQuickFillButtons(
-                controller: qrController,
-                onFilled: () => setState(() => error = null),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: qrController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: '舞萌DX | 中二节奏 登入二维码(SGWCMAID...)',
-                  hintStyle: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.greyHint(brightness, shade: 400)),
-                  border:
-                      OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.all(12),
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (hasSavedToken)
-                Row(
-                  children: [
-                    Icon(Icons.check_circle,
-                        size: 16, color: AppColors.successGreen(brightness)),
-                    const SizedBox(width: 6),
-                    Text('已保存落雪 API 密钥',
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: AppColors.successGreen(brightness))),
-                  ],
-                )
-              else ...[
+              Icon(Icons.cloud_sync_outlined, size: 22),
+              SizedBox(width: 8),
+              Text('同步成绩到落雪'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
                 Text(
-                  '需要落雪个人 API 密钥（落雪咖啡屋 → 设置 → 个人 API 密钥）：',
+                  '在舞萌|中二公众号请求并打开二维码，扫描后将字符串粘贴到下方：',
                   style: TextStyle(
                       fontSize: 13, color: AppColors.greyHint(brightness)),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
+                // 与水鱼同步对话框保持一致：剪贴板 / 相册 / 扫码三件套
+                QrQuickFillButtons(
+                  controller: qrController,
+                  onFilled: () => setState(() => error = null),
+                ),
+                const SizedBox(height: 12),
                 TextField(
-                  controller: tokenController,
+                  controller: qrController,
+                  maxLines: 3,
                   decoration: InputDecoration(
-                    labelText: '落雪个人 API 密钥',
+                    hintText: '舞萌DX | 中二节奏 登入二维码(SGWCMAID...)',
+                    hintStyle: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.greyHint(brightness, shade: 400)),
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.all(12),
                   ),
                 ),
-              ],
-              if (error != null) ...[
-                const SizedBox(height: 10),
-                Text(error!,
+                const SizedBox(height: 16),
+                if (hasSavedToken)
+                  Row(
+                    children: [
+                      Icon(Icons.check_circle,
+                          size: 16, color: AppColors.successGreen(brightness)),
+                      const SizedBox(width: 6),
+                      Text('已保存落雪 API 密钥',
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.successGreen(brightness))),
+                    ],
+                  )
+                else ...[
+                  Text(
+                    '需要落雪个人 API 密钥（落雪咖啡屋 → 设置 → 个人 API 密钥）：',
                     style: TextStyle(
-                        fontSize: 12, color: AppColors.errorRed(brightness))),
-              ],
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.send, size: 18),
-                label: const Text('开始同步'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                  minimumSize: const Size.fromHeight(44),
+                        fontSize: 13, color: AppColors.greyHint(brightness)),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: tokenController,
+                    decoration: InputDecoration(
+                      labelText: '落雪个人 API 密钥',
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ],
+                if (error != null) ...[
+                  const SizedBox(height: 10),
+                  Text(error!,
+                      style: TextStyle(
+                          fontSize: 12, color: AppColors.errorRed(brightness))),
+                ],
+                PostSyncRefreshOptions(
+                  key: refreshKey,
+                  source: RefreshDataSource.luoxue,
                 ),
-                onPressed: () async {
-                  final qrCode = qrController.text.trim();
-                  if (qrCode.isEmpty) {
-                    setState(() => error = '请先粘贴舞萌|中二登入二维码字符串');
-                    return;
-                  }
-                  if (!qrCode.startsWith('SGWCMAID')) {
-                    setState(() => error = '无效的二维码，请使用舞萌|中二公众号生成的登入二维码');
-                    return;
-                  }
-                  String? token;
-                  if (!hasSavedToken) {
-                    token = tokenController.text.trim();
-                    if (token.isEmpty) {
-                      setState(() => error = '请先填写落雪个人 API 密钥');
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.send, size: 18),
+                  label: const Text('开始同步'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    minimumSize: const Size.fromHeight(44),
+                  ),
+                  onPressed: () async {
+                    final qrCode = qrController.text.trim();
+                    if (qrCode.isEmpty) {
+                      setState(() => error = '请先粘贴舞萌|中二登入二维码字符串');
                       return;
                     }
-                    // 先落盘，执行阶段就不用再传了
-                    final prefs2 = await SharedPreferences.getInstance();
-                    await prefs2.setString(
-                        CacheKeyConstant.probeLxnsImportToken, token);
-                  }
-                  if (!dialogContext.mounted) return;
-                  Navigator.of(dialogContext).pop(LuoXueSyncInput(
-                    qrCode: qrCode,
-                    lxnsImportToken: token,
-                  ));
-                },
-              ),
-            ],
+                    if (!qrCode.startsWith('SGWCMAID')) {
+                      setState(() => error = '无效的二维码，请使用舞萌|中二公众号生成的登入二维码');
+                      return;
+                    }
+                    String? token;
+                    if (!hasSavedToken) {
+                      token = tokenController.text.trim();
+                      if (token.isEmpty) {
+                        setState(() => error = '请先填写落雪个人 API 密钥');
+                        return;
+                      }
+                      // 先落盘，执行阶段就不用再传了
+                      await SecureCredentialStore.write(
+                          CacheKeyConstant.probeLxnsImportToken, token);
+                    }
+                    final refreshRequest =
+                        await refreshKey.currentState?.collectRequest();
+                    if (refreshKey.currentState?.enabled == true &&
+                        refreshRequest == null) return;
+                    if (!dialogContext.mounted) return;
+                    Navigator.of(dialogContext).pop(LuoXueSyncInput(
+                      qrCode: qrCode,
+                      lxnsImportToken: token,
+                      refreshRequest: refreshRequest,
+                    ));
+                  },
+                ),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('取消'),
-          ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('取消'),
+            ),
+          ],
         ),
       );
     },
   );
 
-  await _disposeAfterDialogCloses(
-      dialogRoute, [qrController, tokenController]);
+  await _disposeAfterDialogCloses(dialogRoute, [qrController, tokenController]);
   return result;
 }
 
@@ -413,6 +418,17 @@ Future<int> executeLuoXueSync(
   );
   if (!result.isSuccess) {
     throw SyncFlowException(result.errorMessage ?? '同步失败');
+  }
+  if (input.refreshRequest != null) {
+    onProgress(0.72, '同步完成，正在刷新本地数据...');
+    try {
+      await executeAdvancedRefreshData(
+        input.refreshRequest!,
+        onProgress: (p, text) => onProgress(0.72 + p / 1000, text),
+      );
+    } catch (e) {
+      throw SyncFlowException('同步已完成，但刷新数据失败：$e');
+    }
   }
   onProgress(1.0, '同步完成！共 ${result.exportedCount} 条成绩已导出到落雪');
   return result.exportedCount;
@@ -450,7 +466,10 @@ Future<DivingFishSyncOutcome> executeDivingFishSync(
     throw SyncFlowException(msg);
   }
 
-  onProgress(0.70, '同步成功！正在刷新本地数据...');
+  onProgress(
+    0.70,
+    input.refreshRequest == null ? '同步成功，正在收尾...' : '同步成功！正在刷新本地数据...',
+  );
 
   String? qq = await DivingFishProbeManager().fetchBindQQ();
   qq ??= await DivingFishProbeManager().fetchBindQQ();
@@ -459,16 +478,21 @@ Future<DivingFishSyncOutcome> executeDivingFishSync(
   var refreshed = false;
   if (hasQQ) {
     await callbacks.onSaveQQ(qq);
-    await callbacks.onRefreshAfterSync(
-      qq: qq,
-      onProgress: (p, t) => onProgress(p, t),
-      participateRankings: input.participateRankings,
-      showNickname: input.showNickname,
-    );
-    refreshed = true;
+    if (input.refreshRequest != null) {
+      await executeAdvancedRefreshData(
+        input.refreshRequest!,
+        onProgress: (p, text) => onProgress(0.70 + p / 333, text),
+      );
+      refreshed = true;
+    }
   }
 
-  onProgress(1.0, refreshed ? '全部完成！本地数据已刷新' : '同步完成！（需先登录水鱼才能自动刷新本地数据）');
+  onProgress(
+    1.0,
+    input.refreshRequest != null
+        ? (refreshed ? '全部完成！本地数据已刷新' : '同步完成！')
+        : '同步完成！',
+  );
   return DivingFishSyncOutcome(
     exportedCount: result.exportedCount,
     localDataRefreshed: refreshed,
@@ -710,7 +734,8 @@ class SyncScoreDialogs {
                                 progress = 0.70;
                               });
 
-                              String? qq = await DivingFishProbeManager().fetchBindQQ();
+                              String? qq =
+                                  await DivingFishProbeManager().fetchBindQQ();
                               if (qq == null) {
                                 qq = await DivingFishProbeManager()
                                     .fetchBindQQ();
@@ -833,11 +858,11 @@ class SyncScoreDialogs {
                             currentStage != SyncStage.cancelled) ...[
                           const SizedBox(height: 10),
                           if (progress != null)
-                            LinearProgressIndicator(
+                            SmoothLinearProgressIndicator(
                                 value: progress,
                                 color: Theme.of(context).colorScheme.primary)
                           else
-                            LinearProgressIndicator(
+                            SmoothLinearProgressIndicator(
                                 color: Theme.of(context).colorScheme.primary),
                           const SizedBox(height: 12),
                           Center(
@@ -970,7 +995,8 @@ class SyncScoreDialogs {
                                   statusText = '同步成功！正在刷新本地数据...';
                                   progress = 0.70;
                                 });
-                                String? qq = await DivingFishProbeManager().fetchBindQQ();
+                                String? qq = await DivingFishProbeManager()
+                                    .fetchBindQQ();
                                 if (qq == null) {
                                   qq = await DivingFishProbeManager()
                                       .fetchBindQQ();
@@ -1213,7 +1239,8 @@ class SyncScoreDialogs {
     );
 
     // 弹窗关闭后释放 controllers，避免泄漏（等退场动画结束再放，见助手注释）
-    await _disposeAfterDialogCloses(dialogRoute, [userController, passController]);
+    await _disposeAfterDialogCloses(
+        dialogRoute, [userController, passController]);
   }
 
   // ===== 内部辅助 =====
@@ -1236,5 +1263,4 @@ class SyncScoreDialogs {
         return 0.0;
     }
   }
-
 }

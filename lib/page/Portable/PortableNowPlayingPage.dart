@@ -10,13 +10,17 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../widgets/ExportSuccessDialog.dart';
 
 import '../../entity/Portable/PortableSong.dart';
 import '../../service/Portable/PortablePlayerController.dart';
+import '../../service/Portable/PortableSongDownloadService.dart';
 import '../../utils/AppDesignTokens.dart';
 import '../../utils/CommonWidgetUtil.dart';
 import '../../widgets/PageTopBar.dart';
 import '../../widgets/PortablePlayerBadge.dart';
+import '../../widgets/AnimatedChoiceBar.dart';
+import '../../widgets/PortablePlaybackModeButton.dart';
 
 class PortableNowPlayingPage extends StatefulWidget {
   const PortableNowPlayingPage({super.key});
@@ -27,13 +31,20 @@ class PortableNowPlayingPage extends StatefulWidget {
 
 class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
   final PortablePlayerController _player = PortablePlayerController();
-  final List<StreamSubscription<dynamic>> _subs = <StreamSubscription<dynamic>>[];
+  final List<StreamSubscription<dynamic>> _subs =
+      <StreamSubscription<dynamic>>[];
 
   double? _dragValue;
+  double _coverDrag = 0;
+  bool _switching = false;
+  double _slideDirection = 1;
+  bool _downloading = false;
+  double? _downloadProgress;
 
   @override
   void initState() {
     super.initState();
+    _player.addListener(_safeSetState);
     _subs.add(_player.currentIndexStream.listen((_) => _safeSetState()));
     _subs.add(_player.playingStream.listen((_) => _safeSetState()));
     _subs.add(_player.positionStream.listen((_) {
@@ -43,6 +54,7 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
 
   @override
   void dispose() {
+    _player.removeListener(_safeSetState);
     for (final sub in _subs) {
       sub.cancel();
     }
@@ -63,11 +75,32 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
+          Positioned.fill(child: ColoredBox(color: scheme.surface)),
           CommonWidgetUtil.buildCommonBgWidget(),
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
           Column(
             children: [
-              const PageTopBar(title: '正在播放'),
+              PageTopBar(
+                title: '正在播放',
+                actions: [
+                  if (song != null)
+                    IconButton(
+                      tooltip: '下载歌曲',
+                      icon: _downloading
+                          ? SizedBox(
+                              width: 21,
+                              height: 21,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                value: _downloadProgress,
+                              ),
+                            )
+                          : const Icon(Icons.download_outlined),
+                      onPressed: _downloading ? null : () => _downloadSong(song),
+                    ),
+                  const PortablePlaybackModeButton(),
+                ],
+              ),
               Expanded(
                 child: Center(
                   child: ConstrainedBox(
@@ -103,6 +136,50 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
     );
   }
 
+  Future<void> _downloadSong(PortableSong song) async {
+    setState(() {
+      _downloading = true;
+      _downloadProgress = null;
+    });
+    String? fallbackPath;
+    try {
+      final file = await PortableSongDownloadService.instance.download(
+        song,
+        onProgress: (progress) {
+          if (mounted) setState(() => _downloadProgress = progress);
+        },
+        onFallback: (path) => fallbackPath = path,
+      );
+      if (mounted) {
+        await showExportSuccessDialog(
+          context,
+          filePath: file.path,
+          fileName: song.title,
+          title: '下载成功',
+          successPrefix: '已下载',
+          fallbackPath: fallbackPath,
+        );
+      }
+    } on AudioDownloadSourceException catch (e) {
+      if (mounted) _showDownloadHint(e.message);
+    } catch (e) {
+      if (mounted) _showDownloadHint('下载失败：$e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _downloading = false;
+          _downloadProgress = null;
+        });
+      }
+    }
+  }
+
+  void _showDownloadHint(String message) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 4)),
+    );
+  }
+
   Widget _content(
     BuildContext context,
     ColorScheme scheme,
@@ -123,27 +200,7 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
       child: Column(
         children: [
           const SizedBox(height: 8),
-          // 曲绘
-          Container(
-            width: coverSize,
-            height: coverSize,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.28),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: PortableCover(
-              song: song,
-              size: coverSize,
-              radius: 18,
-            ),
-          ),
+          _coverCarousel(song, coverSize),
           const SizedBox(height: 26),
           Text(
             song.title,
@@ -174,9 +231,8 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
             ),
             child: Slider(
               value: value,
-              onChanged: totalMs <= 0
-                  ? null
-                  : (v) => setState(() => _dragValue = v),
+              onChanged:
+                  totalMs <= 0 ? null : (v) => setState(() => _dragValue = v),
               onChangeEnd: (v) async {
                 final target = Duration(milliseconds: (v * totalMs).round());
                 setState(() => _dragValue = null);
@@ -191,11 +247,13 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
               children: [
                 Text(
                   _fmt(Duration(milliseconds: (value * totalMs).round())),
-                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                  style:
+                      TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                 ),
                 Text(
                   _fmt(duration),
-                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                  style:
+                      TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -208,8 +266,10 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
               IconButton(
                 iconSize: 40,
                 tooltip: '上一首',
-                icon: Icon(Icons.skip_previous, color: theme.colorScheme.onSurface),
-                onPressed: _player.hasPrevious ? () => _player.previous() : null,
+                icon: Icon(Icons.skip_previous,
+                    color: theme.colorScheme.onSurface),
+                onPressed:
+                    _player.hasPrevious ? () => _changeSong(false) : null,
               ),
               const SizedBox(width: 18),
               _playButton(theme),
@@ -218,7 +278,7 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
                 iconSize: 40,
                 tooltip: '下一首',
                 icon: Icon(Icons.skip_next, color: theme.colorScheme.onSurface),
-                onPressed: _player.hasNext ? () => _player.next() : null,
+                onPressed: _player.hasNext ? () => _changeSong(true) : null,
               ),
             ],
           ),
@@ -227,36 +287,133 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
     );
   }
 
+  Future<void> _changeSong(bool next) async {
+    if (_switching ||
+        _player.isLoading ||
+        (next ? !_player.hasNext : !_player.hasPrevious)) return;
+    setState(() {
+      _switching = true;
+      _slideDirection = next ? 1 : -1;
+      _coverDrag = 0;
+    });
+    try {
+      await (next ? _player.next() : _player.previous());
+    } finally {
+      if (mounted) setState(() => _switching = false);
+    }
+  }
+
+  Widget _coverCarousel(PortableSong song, double size) {
+    final queue = _player.queue;
+    final index = queue.indexOf(song);
+    final previews = _player.playbackMode != PortablePlaybackMode.shuffle;
+    return LayoutBuilder(builder: (context, constraints) {
+      final mainSize = size.clamp(0.0, constraints.maxWidth * .76);
+      final neighborSize = mainSize * .64;
+      Widget neighbor(PortableSong neighbor, bool next) => GestureDetector(
+          onTap: () => _changeSong(next),
+          child: Opacity(
+              opacity: .5,
+              child: PortableCover(
+                  song: neighbor, size: neighborSize, radius: 16)));
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragUpdate: (details) {
+          if (!_switching)
+            setState(() => _coverDrag = (_coverDrag + details.delta.dx)
+                .clamp(-mainSize / 3, mainSize / 3));
+        },
+        onHorizontalDragCancel: () => setState(() => _coverDrag = 0),
+        onHorizontalDragEnd: (details) {
+          final velocity = details.primaryVelocity ?? 0;
+          if (_coverDrag.abs() > 40 || velocity.abs() > 300) {
+            final next = velocity.abs() > 300 ? velocity < 0 : _coverDrag < 0;
+            _changeSong(next);
+          }
+          setState(() => _coverDrag = 0);
+        },
+        child: SizedBox(
+            height: mainSize + 20,
+            child: ClipRect(
+                child: Stack(alignment: Alignment.center, children: [
+              if (previews && index > 0 && _player.hasPrevious)
+                Positioned(
+                    left: -neighborSize * .35,
+                    child: neighbor(queue[index - 1], false)),
+              if (previews &&
+                  index >= 0 &&
+                  index + 1 < queue.length &&
+                  _player.hasNext)
+                Positioned(
+                    right: -neighborSize * .35,
+                    child: neighbor(queue[index + 1], true)),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                transform: Matrix4.translationValues(_coverDrag, 0, 0),
+                child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    transitionBuilder: (child, animation) => FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                            position: Tween<Offset>(
+                                    begin: Offset(_slideDirection * .18, 0),
+                                    end: Offset.zero)
+                                .animate(CurvedAnimation(
+                                    parent: animation,
+                                    curve: Curves.easeOutCubic)),
+                            child: child)),
+                    child: Container(
+                        key: ValueKey(song.portableKey),
+                        width: mainSize,
+                        height: mainSize,
+                        decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .shadow
+                                      .withValues(alpha: .2),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 6))
+                            ]),
+                        child: PortableCover(
+                            song: song, size: mainSize, radius: 20))),
+              ),
+            ]))),
+      );
+    });
+  }
+
   Widget _playButton(ThemeData theme) {
     final scheme = theme.colorScheme;
-    final loading = _player.isLoading;
-    return SizedBox(
+    final radius = BorderRadius.circular(_player.isPlaying ? 12 : 34);
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeInOutCubic,
       width: 68,
       height: 68,
+      decoration: BoxDecoration(color: scheme.primary, borderRadius: radius),
       child: Material(
-        color: scheme.primary,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: loading ? null : () => _player.togglePlayPause(),
-          child: Center(
-            child: loading
-                ? SizedBox(
-                    width: 26,
-                    height: 26,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.6,
-                      valueColor: AlwaysStoppedAnimation<Color>(scheme.onPrimary),
-                    ),
-                  )
-                : Icon(
-                    _player.isPlaying ? Icons.pause : Icons.play_arrow,
-                    size: 36,
-                    color: scheme.onPrimary,
-                  ),
-          ),
-        ),
-      ),
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: radius,
+            onTap: _player.isLoading ? null : () => _player.togglePlayPause(),
+            child: Center(
+                child: FadeContent(
+                    child: _player.isLoading
+                        ? SizedBox(
+                            key: const ValueKey('loading'),
+                            width: 26,
+                            height: 26,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2.6, color: scheme.onPrimary))
+                        : Icon(
+                            _player.isPlaying ? Icons.pause : Icons.play_arrow,
+                            key: ValueKey(_player.isPlaying),
+                            size: 36,
+                            color: scheme.onPrimary))),
+          )),
     );
   }
 

@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../utils/AppDesignTokens.dart';
+import '../utils/NavigationPreferences.dart';
+import '../widgets/MainNavigationViewport.dart';
 import '../widgets/ThemeAwareBackground.dart';
 import 'HomePage.dart';
 import 'Best50HubPage.dart';
@@ -36,6 +40,11 @@ class _AppShellState extends State<AppShell> {
   late final List<Widget> _pages;
   final GlobalKey<HomePageState> _homePageKey = GlobalKey<HomePageState>();
   bool _firstFrameNotified = false;
+  double _horizontalDragDistance = 0;
+  Timer? _navSelectionDebounce;
+  int? _pendingIndex;
+
+  static const Duration _navDebounceDuration = Duration(milliseconds: 120);
 
   // ===== 6 个主分类标签（首页 + FeatureRegistry 的 5 大功能分类） =====
   static const List<_NavTab> _tabs = [
@@ -83,10 +92,12 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
+    NavigationPreferences.instance.addListener(_onNavigationPreferencesChanged);
+    unawaited(NavigationPreferences.instance.load());
     _pages = [
       HomePage(
         key: _homePageKey,
-        onEntertainmentTap: () => setState(() => _index = 3),
+        onEntertainmentTap: () => _selectIndex(3),
       ),
       const LibraryHubPage(),
       const Best50HubPage(),
@@ -106,18 +117,83 @@ class _AppShellState extends State<AppShell> {
   }
 
   @override
+  void dispose() {
+    _navSelectionDebounce?.cancel();
+    NavigationPreferences.instance
+        .removeListener(_onNavigationPreferencesChanged);
+    super.dispose();
+  }
+
+  void _onNavigationPreferencesChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _selectIndex(int index) {
+    final next = index.clamp(0, _tabs.length - 1);
+    if (next == _index && _pendingIndex == null) return;
+    if (next == _index) {
+      _pendingIndex = null;
+      _navSelectionDebounce?.cancel();
+      return;
+    }
+
+    _pendingIndex = next;
+    _navSelectionDebounce?.cancel();
+    _navSelectionDebounce = Timer(_navDebounceDuration, () {
+      if (!mounted || _pendingIndex == null) return;
+      final target = _pendingIndex!;
+      _pendingIndex = null;
+      if (target == _index) return;
+      setState(() => _index = target);
+    });
+  }
+
+  void _onHorizontalDragStart(DragStartDetails _) {
+    _horizontalDragDistance = 0;
+  }
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    _horizontalDragDistance += details.primaryDelta ?? details.delta.dx;
+  }
+
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    if (NavigationPreferences.instance.swipeEnabled &&
+        _horizontalDragDistance.abs() >= 48) {
+      _selectIndex(_index + (_horizontalDragDistance < 0 ? 1 : -1));
+    }
+    _horizontalDragDistance = 0;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       // 随身听悬浮球**不在这里** —— 它挂在 main.dart 的 MaterialApp.builder 上，
       // 这样才盖得住 push 出来的各个功能页（详见那边的注释）。
-      body: ThemeAwareBackground(
-        showDecorativeImage: _index == 0,
-        child: Center(
-          child: ConstrainedBox(
-            constraints:
-                const BoxConstraints(maxWidth: AppDesignTokens.maxContentWidth),
-            child: IndexedStack(index: _index, children: _pages),
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragStart: NavigationPreferences.instance.swipeEnabled
+            ? _onHorizontalDragStart
+            : null,
+        onHorizontalDragUpdate: NavigationPreferences.instance.swipeEnabled
+            ? _onHorizontalDragUpdate
+            : null,
+        onHorizontalDragEnd: NavigationPreferences.instance.swipeEnabled
+            ? _onHorizontalDragEnd
+            : null,
+        child: ThemeAwareBackground(
+          showDecorativeImage: _index == 0,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                  maxWidth: AppDesignTokens.maxContentWidth),
+              child: MainNavigationViewport(
+                pages: _pages,
+                index: _index,
+                transitionEnabled:
+                    NavigationPreferences.instance.transitionEnabled,
+              ),
+            ),
           ),
         ),
       ),
@@ -133,49 +209,61 @@ class _AppShellState extends State<AppShell> {
         ),
         child: SafeArea(
           top: false,
-            child: SizedBox(
-              height: barH,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final double tabW = constraints.maxWidth / _tabs.length;
-                  return Stack(
-                    children: [
-                      // 滑动的药丸 indicator（核心改动：AnimatedPositioned）
-                      AnimatedPositioned(
-                        duration: const Duration(milliseconds: 360),
-                        curve: Curves.easeOutCubic,
-                        left: _index * tabW + (tabW - pillW) / 2,
-                        top: iconTop,
-                        width: pillW,
-                        height: pillH,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: scheme.primary.withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(pillH / 2),
-                          ),
+          child: SizedBox(
+            height: barH,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final double tabW = constraints.maxWidth / _tabs.length;
+                return Stack(
+                  children: [
+                    // 滑动的药丸 indicator（核心改动：AnimatedPositioned）
+                    AnimatedPositioned(
+                      duration: const Duration(milliseconds: 360),
+                      curve: Curves.easeOutCubic,
+                      left: _index * tabW + (tabW - pillW) / 2,
+                      top: iconTop,
+                      width: pillW,
+                      height: pillH,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: scheme.primary.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(pillH / 2),
                         ),
                       ),
-                      // Tab row：icon + label，点击切换 _index
-                      Row(
-                        children: [
-                          for (int i = 0; i < _tabs.length; i++)
-                            Expanded(
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: () => setState(() => _index = i),
-                                child: Padding(
-                                  // 图标槽与药丸同高同顶，保证图标在药丸内垂直居中
-                                  padding: const EdgeInsets.only(top: iconTop),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      SizedBox(
-                                        height: pillH,
-                                        child: Center(
+                    ),
+                    // Tab row：icon + label，点击切换 _index
+                    Row(
+                      children: [
+                        for (int i = 0; i < _tabs.length; i++)
+                          Expanded(
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => _selectIndex(i),
+                              child: Padding(
+                                // 图标槽与药丸同高同顶，保证图标在药丸内垂直居中
+                                padding: const EdgeInsets.only(top: iconTop),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      height: pillH,
+                                      child: Center(
+                                        child: AnimatedSwitcher(
+                                          duration:
+                                              const Duration(milliseconds: 180),
+                                          switchInCurve: Curves.easeOut,
+                                          switchOutCurve: Curves.easeIn,
+                                          transitionBuilder:
+                                              (child, animation) =>
+                                                  FadeTransition(
+                                            opacity: animation,
+                                            child: child,
+                                          ),
                                           child: Icon(
                                             i == _index
                                                 ? _tabs[i].activeIcon
                                                 : _tabs[i].icon,
+                                            key: ValueKey(i == _index),
                                             size: 24,
                                             color: i == _index
                                                 ? scheme.primary
@@ -183,32 +271,33 @@ class _AppShellState extends State<AppShell> {
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(height: labelGap),
-                                      Text(
-                                        _tabs[i].label,
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          fontWeight: i == _index
-                                              ? FontWeight.w700
-                                              : FontWeight.w500,
-                                          letterSpacing: 0.4,
-                                          color: i == _index
-                                              ? scheme.primary
-                                              : scheme.onSurfaceVariant,
-                                        ),
+                                    ),
+                                    const SizedBox(height: labelGap),
+                                    Text(
+                                      _tabs[i].label,
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: i == _index
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                        letterSpacing: 0.4,
+                                        color: i == _index
+                                            ? scheme.primary
+                                            : scheme.onSurfaceVariant,
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                        ],
-                      ),
-                    ],
-                  );
-                },
-              ),
+                          ),
+                      ],
+                    ),
+                  ],
+                );
+              },
             ),
+          ),
         ),
       ),
     );

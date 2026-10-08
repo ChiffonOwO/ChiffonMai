@@ -82,6 +82,7 @@ class ExportPathUtil {
   static Future<Directory> resolveExportDir({
     String? subDir,
     void Function(String fallbackPath)? onFallback,
+    bool allowPrivateFallback = true,
   }) async {
     Directory build(Directory root) {
       final parts = <String>[
@@ -106,6 +107,9 @@ class ExportPathUtil {
       _cachedRoot = null;
     }
 
+    if (!allowPrivateFallback) {
+      throw StateError('公开导出目录不可写，已拒绝写入应用私有目录');
+    }
     final docs = await getApplicationDocumentsDirectory();
     final fallback = build(docs);
     if (!await fallback.exists()) await fallback.create(recursive: true);
@@ -133,13 +137,53 @@ class ExportPathUtil {
   }
 
   /// 同 [writeExportFile]，但写入文本。
+  /// 按流导出大文件，失败时删除临时文件，完整写入后才发布最终文件。
+  static Future<File> writeExportStream({
+    required String fileName,
+    required Stream<List<int>> stream,
+    String? subDir,
+    void Function(String fallbackPath)? onFallback,
+    bool allowPrivateFallback = true,
+  }) async {
+    final dir = await resolveExportDir(
+      subDir: subDir,
+      onFallback: onFallback,
+      allowPrivateFallback: allowPrivateFallback,
+    );
+    final target = File('${dir.path}${Platform.pathSeparator}$fileName');
+    final temporary = File('${target.path}.${DateTime.now().microsecondsSinceEpoch}.part');
+    final sink = temporary.openWrite();
+    // 立即监听文件系统错误，防止流尚在下载时出现未处理的异步异常。
+    final sinkDone = sink.done.then<Object?>((_) => null,
+        onError: (Object error, StackTrace _) => error);
+    try {
+      await sink.addStream(stream);
+      await sink.flush();
+      await sink.close();
+      final writeError = await sinkDone;
+      if (writeError != null) throw writeError;
+      final file = await temporary.rename(target.path);
+      await notifyMediaScanner(file);
+      return file;
+    } catch (_) {
+      try { await sink.close(); } catch (_) {}
+      if (await temporary.exists()) await temporary.delete();
+      rethrow;
+    }
+  }
+
+  /// 同 [writeExportFile]，但写入文本。
   static Future<File> writeExportTextFile({
     required String fileName,
     required String content,
     String? subDir,
     void Function(String fallbackPath)? onFallback,
+    bool allowPrivateFallback = true,
   }) async {
-    final dir = await resolveExportDir(subDir: subDir, onFallback: onFallback);
+    final dir = await resolveExportDir(
+        subDir: subDir,
+        onFallback: onFallback,
+        allowPrivateFallback: allowPrivateFallback);
     final file = File('${dir.path}${Platform.pathSeparator}$fileName');
     await file.writeAsString(content, flush: true);
     await notifyMediaScanner(file);

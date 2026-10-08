@@ -8,6 +8,8 @@ class ChallengePhase {
   final String difficulty;
   final int lifeTarget;
   final int? target;
+  /// P / Gr / Gd / M 的扣血说明，使用 `|` 分隔。
+  final String? penalties;
 
   ChallengePhase({
     required this.startDate,
@@ -15,6 +17,7 @@ class ChallengePhase {
     required this.difficulty,
     required this.lifeTarget,
     this.target,
+    this.penalties,
   });
 
   factory ChallengePhase.fromJson(Map<String, dynamic> json) {
@@ -24,6 +27,7 @@ class ChallengePhase {
       difficulty: (json['difficulty'] as String?) ?? '',
       lifeTarget: (json['lifeTarget'] as num?)?.toInt() ?? 1,
       target: (json['target'] as num?)?.toInt(),
+      penalties: json['penalties'] as String?,
     );
   }
 
@@ -33,6 +37,7 @@ class ChallengePhase {
         'difficulty': difficulty,
         'lifeTarget': lifeTarget,
         if (target != null) 'target': target,
+        if (penalties != null) 'penalties': penalties,
       };
 }
 

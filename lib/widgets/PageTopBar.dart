@@ -139,23 +139,27 @@ class PageTopBar extends StatelessWidget implements PreferredSizeWidget {
               : Builder(
                   builder: (context) => IconButton(
                     icon: const Icon(Icons.arrow_back),
-                    tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                    tooltip:
+                        MaterialLocalizations.of(context).backButtonTooltip,
                     onPressed: onBack,
                   ),
                 ),
-      title: Text(
-        title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        // 字体必须走 AppTheme.font：AppBar 会在标题外再套一层
-        // `DefaultTextStyle(style: appBarTheme.titleTextStyle)`，
-        // 不带族名的裸 TextStyle 会把全局网络字体顶掉（标题变 Roboto）。
-        style: AppTheme.font(
-          color: resolvedColor,
-          fontSize: resolvedFontSize,
-          fontWeight: resolvedWeight,
-        ),
-      ),
+      // 窄屏或动作按钮较多时仅按可用空间缩小，长标题仍完整显示。
+      title: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            // 字体必须走 AppTheme.font：AppBar 会在标题外再套一层
+            // `DefaultTextStyle(style: appBarTheme.titleTextStyle)`，
+            // 不带族名的裸 TextStyle 会把全局网络字体顶掉（标题变 Roboto）。
+            style: AppTheme.font(
+              color: resolvedColor,
+              fontSize: resolvedFontSize,
+              fontWeight: resolvedWeight,
+            ),
+          )),
       actions: actions.isEmpty ? null : actions,
       // 图标色与 appBarTheme.iconTheme 一致（primary）；页面传进来的 actions
       // 若自带 color 则以自带的为准
@@ -167,8 +171,7 @@ class PageTopBar extends StatelessWidget implements PreferredSizeWidget {
     // 需要**有界高度**才不会报 "non-zero flex but unbounded height" ——
     // 放在 Scaffold.appBar 时由 Scaffold 提供，放在 body 的 Column 里就得自己给。
     if (bottom == null) return appBar;
-    final statusBar =
-        primary ? MediaQuery.paddingOf(context).top : 0.0;
+    final statusBar = primary ? MediaQuery.paddingOf(context).top : 0.0;
     return SizedBox(
       height: preferredSize.height + statusBar,
       child: appBar,

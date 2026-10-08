@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:image/image.dart' as img;
@@ -9,6 +10,41 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../constant/CacheKeyConstant.dart';
 import '../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../utils/CoverUtil.dart';
+
+/// 在后台 isolate 中完成照片解码、裁方形、缩放和 pHash，避免相册大图阻塞 UI。
+Map<String, dynamic> _extractPhotoFeatures(Uint8List bytes) {
+  final decoded = img.decodeImage(bytes);
+  if (decoded == null) {
+    throw const FormatException('无法解码照片');
+  }
+
+  final w = decoded.width;
+  final h = decoded.height;
+  final square = w > h
+      ? img.copyCrop(decoded, x: (w - h) ~/ 2, y: 0, width: h, height: h)
+      : h > w
+          ? img.copyCrop(decoded, x: 0, y: (h - w) ~/ 2, width: w, height: w)
+          : decoded;
+  final resized = img.copyResize(square, width: 256, height: 256);
+
+  int sumR = 0, sumG = 0, sumB = 0;
+  const pixelCount = 256 * 256;
+  for (int y = 0; y < 256; y++) {
+    for (int x = 0; x < 256; x++) {
+      final p = resized.getPixel(x, y);
+      sumR += p.r.toInt();
+      sumG += p.g.toInt();
+      sumB += p.b.toInt();
+    }
+  }
+
+  return <String, dynamic>{
+    'hash': CoverRecognitionService._computePHashPure(resized),
+    'r': sumR ~/ pixelCount,
+    'g': sumG ~/ pixelCount,
+    'b': sumB ~/ pixelCount,
+  };
+}
 
 /// 曲绘识别服务（Tier 2 重构版）
 ///
@@ -60,8 +96,7 @@ class CoverRecognitionService {
       await file.writeAsString(payload);
       // 同步写一个时间戳，便于外部观测构建时间
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(
-          CacheKeyConstant.coverHashCacheTimestamp,
+      await prefs.setInt(CacheKeyConstant.coverHashCacheTimestamp,
           DateTime.now().millisecondsSinceEpoch);
     } catch (e) {
       debugPrint('保存曲绘特征缓存失败: $e');
@@ -98,8 +133,7 @@ class CoverRecognitionService {
     _featureCache = existing;
 
     // 3. 找出缺失的 songId（增量）
-    final missing =
-        songIds.where((sid) => !existing.containsKey(sid)).toList();
+    final missing = songIds.where((sid) => !existing.containsKey(sid)).toList();
     if (missing.isEmpty) {
       onProgress?.call(songIds.length, songIds.length);
       debugPrint('[CoverRecognition] 缓存已覆盖全部 ${songIds.length} 个 songId，跳过构建');
@@ -120,8 +154,7 @@ class CoverRecognitionService {
     final tasks = <({String coverId, Uint8List bytes})>[];
     for (final coverId in coverToSongIds.keys) {
       try {
-        final byteData =
-            await rootBundle.load('assets/cover/$coverId.webp');
+        final byteData = await rootBundle.load('assets/cover/$coverId.webp');
         tasks.add((coverId: coverId, bytes: byteData.buffer.asUint8List()));
       } catch (_) {
         // 本地无资源，跳过
@@ -168,8 +201,7 @@ class CoverRecognitionService {
         final image = img.decodeImage(task.bytes);
         if (image == null) continue;
         // 缩放至 256×256（DCT 输入）
-        final resized =
-            img.copyResize(image, width: 256, height: 256);
+        final resized = img.copyResize(image, width: 256, height: 256);
 
         // 平均颜色
         int sumR = 0, sumG = 0, sumB = 0;
@@ -302,29 +334,11 @@ class CoverRecognitionService {
         return null;
       }
       final bytes = await file.readAsBytes();
-      var photo = img.decodeImage(bytes);
-      if (photo == null) {
-        debugPrint('无法解码照片: $imagePath');
-        return null;
-      }
-      photo = _preprocessPhoto(photo);
-
-      // 计算照片的 pHash + 平均颜色
-      final resized = img.copyResize(photo, width: 256, height: 256);
-      int sumR = 0, sumG = 0, sumB = 0;
-      const pixelCount = 256 * 256;
-      for (int y = 0; y < 256; y++) {
-        for (int x = 0; x < 256; x++) {
-          final p = resized.getPixel(x, y);
-          sumR += p.r.toInt();
-          sumG += p.g.toInt();
-          sumB += p.b.toInt();
-        }
-      }
-      final photoHash = _computePHashPure(resized);
-      final photoR = sumR ~/ pixelCount;
-      final photoG = sumG ~/ pixelCount;
-      final photoB = sumB ~/ pixelCount;
+      final photoFeatures = await compute(_extractPhotoFeatures, bytes);
+      final photoHash = photoFeatures['hash'] as String;
+      final photoR = photoFeatures['r'] as int;
+      final photoG = photoFeatures['g'] as int;
+      final photoB = photoFeatures['b'] as int;
 
       // 读缓存
       final cachedFeatures = await getCachedFeatures();
@@ -360,10 +374,13 @@ class CoverRecognitionService {
         });
       }
 
-      allMatches.sort((a, b) =>
-          (b['combinedSimilarity'] as double)
-              .compareTo(a['combinedSimilarity'] as double));
+      allMatches.sort((a, b) => (b['combinedSimilarity'] as double)
+          .compareTo(a['combinedSimilarity'] as double));
       final topCandidates = allMatches.take(50).toList();
+      if (topCandidates.isEmpty) {
+        debugPrint('曲绘特征缓存没有可用条目');
+        return null;
+      }
 
       // 填充歌曲信息
       final musicManager = MaimaiMusicDataManager();
@@ -395,15 +412,17 @@ class CoverRecognitionService {
         return title.isNotEmpty && !title.startsWith('歌曲 #');
       }).toList();
 
-      final best =
-          validCandidates.isNotEmpty ? validCandidates.first : topCandidates.first;
+      final best = validCandidates.isNotEmpty
+          ? validCandidates.first
+          : topCandidates.first;
       final bestSim = best['similarity'] as double;
 
       const lowConfidenceThreshold = 50.0;
       final lowConfidence = bestSim < lowConfidenceThreshold;
 
       if (lowConfidence) {
-        debugPrint('最佳匹配综合相似度过低 ($bestSim% < $lowConfidenceThreshold%)，可能并非曲绘照片');
+        debugPrint(
+            '最佳匹配综合相似度过低 ($bestSim% < $lowConfidenceThreshold%)，可能并非曲绘照片');
       }
 
       return {
@@ -420,24 +439,6 @@ class CoverRecognitionService {
       debugPrint('曲绘识别失败: $e');
       return null;
     }
-  }
-
-  // ─── 图片预处理 ──────────────────────────────────────────────
-
-  img.Image _preprocessPhoto(img.Image image) {
-    final w = image.width;
-    final h = image.height;
-    img.Image square;
-    if (w > h) {
-      final offsetX = (w - h) ~/ 2;
-      square = img.copyCrop(image, x: offsetX, y: 0, width: h, height: h);
-    } else if (h > w) {
-      final offsetY = (h - w) ~/ 2;
-      square = img.copyCrop(image, x: 0, y: offsetY, width: w, height: w);
-    } else {
-      square = image;
-    }
-    return img.copyResize(square, width: 256, height: 256);
   }
 
   // ─── 距离计算 ────────────────────────────────────────────────

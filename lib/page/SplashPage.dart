@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// 应用启动加载页：纯白背景 + 应用图标 + 应用名称 + 加载动画。
+/// 应用启动加载页：主题底色 + 应用图标 + 应用名称 + 加载动画。
 /// 设计目标：克制、聚焦，把视觉权重留给 Logo。
 class SplashPage extends StatelessWidget {
   const SplashPage({super.key});
@@ -9,8 +10,15 @@ class SplashPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Scaffold(
-      backgroundColor: Colors.white,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: (isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
+          .copyWith(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: scheme.surface,
+      ),
+      child: Scaffold(
+      backgroundColor: scheme.surface,
       body: SafeArea(
         child: Center(
           child: Column(
@@ -24,6 +32,7 @@ class SplashPage extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

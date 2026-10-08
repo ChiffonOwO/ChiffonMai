@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
-import 'package:url_launcher/url_launcher.dart';
-
 import '../manager/DivingFish/DivingFishOAuthManager.dart';
 import '../manager/DivingFish/ProberException.dart';
+import 'ExternalUrlPolicy.dart';
+import 'ExternalLaunchUtil.dart';
+import '../widgets/ErrorMessageDialog.dart';
 
 /// 刷新水鱼成绩失败时，统一给用户的交代。
 ///
@@ -17,19 +17,24 @@ import '../manager/DivingFish/ProberException.dart';
 /// 这个函数就是那一步。
 ///
 /// [qq] 是本次要刷新的 QQ；为空时无法发起绑定，只给文案提示。
-Future<void> presentRefreshError(Object error, {String qq = ''}) async {
+Future<void> presentRefreshError(
+  BuildContext context,
+  Object error, {
+  String qq = '',
+}) async {
   if (error is ProberException && error.code == 'CONSENT_REQUIRED') {
     // 好友对比路径会带上现成的授权链接；没有就现发起一次设备码绑定。
     var url = error.bindingUrl ?? '';
     if (url.isEmpty && qq.isNotEmpty) {
       url = await DivingFishOAuthManager().startBinding(qq);
     }
+    if (!context.mounted) return;
 
     if (url.isEmpty) {
-      Fluttertoast.showToast(
-        msg: qq.isEmpty
-            ? error.message
-            : 'QQ $qq 尚未授权本应用，请稍后在「账号与同步」中完成授权',
+      await showErrorMessageDialog(
+        context,
+        title: '刷新数据失败',
+        message: qq.isEmpty ? error.message : 'QQ $qq 尚未授权本应用，请稍后在「账号与同步」中完成授权',
       );
       return;
     }
@@ -38,18 +43,23 @@ Future<void> presentRefreshError(Object error, {String qq = ''}) async {
     // 立刻回查必然仍是未授权（真正的重查入口在刷新对话框里）。
     var opened = false;
     try {
-      opened = await launchUrl(Uri.parse(url),
-          mode: LaunchMode.externalApplication);
+      final uri = Uri.tryParse(url);
+      if (uri != null && ExternalUrlPolicy.isAllowed(uri)) {
+        opened = await ExternalLaunchUtil.open(uri);
+      }
     } catch (e) {
       debugPrint('打开水鱼授权页失败: $e');
     }
-    Fluttertoast.showToast(
-      msg: opened
+    if (!context.mounted) return;
+    await showErrorMessageDialog(
+      context,
+      title: opened ? '需要完成授权' : '刷新数据失败',
+      message: opened
           ? '该 QQ 尚未授权本应用，已打开授权页；授权完成后请重新刷新'
           : '该 QQ 尚未授权本应用，请在浏览器中打开授权页完成绑定',
     );
     return;
   }
 
-  Fluttertoast.showToast(msg: '刷新数据失败：$error');
+  await showErrorMessageDialog(context, message: '刷新数据失败：$error');
 }

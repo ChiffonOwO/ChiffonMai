@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_first_flutter_app/constant/CacheKeyConstant.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/service/RankingList/SongRankingService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/service/SongInfoService.dart';
-import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/BackgroundPageScaffold.dart';
 import 'package:my_first_flutter_app/widgets/CommunityAvatar.dart';
 
 class SongRankingPage extends StatefulWidget {
@@ -576,6 +575,8 @@ class _SongRankingPageState extends State<SongRankingPage> {
             child: CommunityPlayerIdentity(
               avatarId: entry.avatarId,
               dataSource: entry.dataSource,
+              // 开发者白名单按 `<source>:<id>` 整串匹配，见 DataSourceTag
+              playerId: entry.playerId,
               name: entry.playerName,
               // 头像高度对齐「玩家名 + 数据源标签」两行文字的总高
               // （单曲排行榜 / DX 分数排行榜共用这一行）
@@ -790,37 +791,26 @@ class _SongRankingPageState extends State<SongRankingPage> {
         ? '达成率排行榜'
         : 'DX分数排行榜';
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          
-          Column(
-            children: [
-              // 顶部栏统一走公共组件（标题是变量）
-              PageTopBar(
-                title: title,
-                actions: [
+    return BackgroundPageScaffold(
+      title: title,
+      actions: [
                   // 免责声明按钮
                   IconButton(
                     icon: const Icon(Icons.info_outline),
                     onPressed: _showDisclaimer,
                   ),
                 ],
-              ),
-              
-              // 歌曲信息区域 - 固定宽高，左侧曲绘，右侧信息
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: Column(children: [// 歌曲信息区域 - 固定宽高，左侧曲绘，右侧信息
               Container(
                 margin: EdgeInsets.fromLTRB(4, 0, 4, 8),
                 height: 120,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    AppColors.defaultShadow(brightness),
-                  ],
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
                 ),
                 child: Row(
                     children: [
@@ -925,17 +915,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                     ],
                   ),
                 ),
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 8, 4, 16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      AppColors.defaultShadow(brightness),
-                    ],
-                  ),
-                  child: _isLoading 
+Expanded(child: _isLoading
                       ? Center(child: CircularProgressIndicator())
                       : _errorMessage != null
                           ? Center(child: Text(_errorMessage!))
@@ -996,6 +976,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                           child: CommunityPlayerIdentity(
                                             avatarId: _currentUserEntry!.avatarId,
                                             dataSource: _currentUserEntry!.dataSource,
+                                            playerId: _currentUserEntry!.playerId,
                                             name: _currentUserEntry!.playerName,
                                             avatarMatchesTextHeight: true,
                                             nameStyle: TextStyle(
@@ -1115,13 +1096,7 @@ class _SongRankingPageState extends State<SongRankingPage> {
                                     ),
                                   ),
                               ],
-                            ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+                            )),]),
     );
   }
 }

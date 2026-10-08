@@ -2,16 +2,16 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:redis/redis.dart';
 
-import '../api/DeveloperToken.dart';
+import '../api/ApiUrls.dart';
+import '../utils/ApiClient.dart';
 
 /// 同步成绩走的**通道**（前两个就是 `SyncRouteStore` 里可选的两条线路）。
 enum SyncLine {
-  /// 线路1：AWMC 网关（机台二维码 + `gw_` 令牌直连 api.wmc.pub）。
+  /// 线路1：AWMC 网关（机台二维码 + 用户平台凭据，开发者密钥由服务端代理注入）。
   awmc(key: 'awmc', label: 'AWMC 网关'),
 
-  /// 线路2：maimai Score Hub（scorehub 探针流程）。
+  /// 线路2：maimai Score Hub（原有流程）。
   scoreHub(key: 'scorehub', label: 'maimai Score Hub'),
 
   /// **不是线路**：机台二维码直传（目前只有 AWMC NET 用）。
@@ -98,13 +98,11 @@ class SyncStats {
 
   String get avgText => formatDuration(avgMs.round());
 
-  String get rangeText => count == 0
-      ? '—'
-      : '${formatDuration(minMs)} ~ ${formatDuration(maxMs)}';
+  String get rangeText =>
+      count == 0 ? '—' : '${formatDuration(minMs)} ~ ${formatDuration(maxMs)}';
 
-  String get lastText => count == 0
-      ? '—'
-      : '${formatDuration(lastMs)}${lastOk ? '' : '（失败）'}';
+  String get lastText =>
+      count == 0 ? '—' : '${formatDuration(lastMs)}${lastOk ? '' : '（失败）'}';
 
   /// 毫秒 → 便于阅读的文本。
   static String formatDuration(int ms) {
@@ -216,7 +214,7 @@ class SyncAttemptTracker {
   }
 }
 
-/// 同步成绩的耗时 / 成功率统计（Redis）。
+/// 同步成绩的耗时 / 成功率统计。
 ///
 /// 每个「线路 × 平台」槽位一条 Redis LIST（共 [allSlots] 个），只保留**最近 100 次**：
 ///
@@ -228,7 +226,7 @@ class SyncAttemptTracker {
 /// 刻意只存这三个字段：**不含二维码、令牌、QQ、账号 id** 等任何个人信息，
 /// 因此这些键可以安全地共享统计（看到的是所有用户的整体情况）。
 ///
-/// 所有操作都是「尽力而为」：Redis 连不上、超时、返回异常数据都不抛异常，
+/// 所有操作都是「尽力而为」：服务端不可用、超时、返回异常数据都不抛异常，
 /// 也**绝不影响同步本身**（统计失败最多是少一条样本）。
 class SyncStatsService {
   SyncStatsService._();
@@ -279,20 +277,25 @@ class SyncStatsService {
     required bool ok,
   }) async {
     if (debugDisableWrites) return;
-    final key = keyFor(line, platform);
-    final entry = json.encode({
-      't': DateTime.now().millisecondsSinceEpoch,
-      'd': durationMs < 0 ? 0 : durationMs,
-      'ok': ok ? 1 : 0,
-    });
-    await _withConnection((conn) async {
-      await conn.send_object(['LPUSH', key, entry]);
-      await conn.send_object(['LTRIM', key, 0, windowSize - 1]);
-      // 30 天没同步就让键自然过期，避免长期堆积
-      await conn.send_object(['EXPIRE', key, 30 * 24 * 3600]);
-      debugPrint('[SyncStats] 已记录 ${line.key}/${platform.key} '
-          '${durationMs}ms ok=$ok');
-    });
+    try {
+      final response = await ApiClient.post(
+        Uri.parse(ApiUrls.SyncStatsUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'line': line.key,
+          'platform': platform.key,
+          'durationMs': durationMs < 0 ? 0 : durationMs,
+          'ok': ok,
+        }),
+        timeout: timeout,
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        debugPrint('[SyncStats] 已记录 ${line.key}/${platform.key} '
+            '${durationMs}ms ok=$ok');
+      }
+    } catch (e) {
+      debugPrint('[SyncStats] 服务端记录失败（已忽略）: $e');
+    }
   }
 
   /// 读取某条线路 + 平台的统计；不可用（Redis 连不上 / 无数据）时返回 null。
@@ -311,62 +314,43 @@ class SyncStatsService {
     final result = <String, SyncStats?>{};
     if (queries.isEmpty) return result;
 
-    await _withConnection((conn) async {
-      for (final (line, platform) in queries) {
-        final id = '${line.key}:${platform.key}';
-        final raw = await conn
-            .send_object(['LRANGE', keyFor(line, platform), 0, windowSize - 1]);
-        final entries = <String>[];
-        if (raw is List) {
-          for (final item in raw) {
-            if (item is String) entries.add(item);
+    try {
+      final slots = queries.map((q) => slotOf(q.$1, q.$2)).join(',');
+      final response = await ApiClient.get(
+        Uri.parse(
+            '${ApiUrls.SyncStatsUrl}?slots=${Uri.encodeQueryComponent(slots)}'),
+        timeout: timeout,
+      );
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        final data = decoded is Map ? decoded['data'] : null;
+        if (data is Map) {
+          for (final (line, platform) in queries) {
+            final id = slotOf(line, platform);
+            final raw = data[id];
+            if (raw is List) {
+              result[id] = SyncStats.fromRawEntries(
+                raw.whereType<String>(),
+              );
+            }
           }
         }
-        result[id] = SyncStats.fromRawEntries(entries);
       }
-    });
+    } catch (e) {
+      debugPrint('[SyncStats] 服务端读取失败（已忽略）: $e');
+    }
 
     // 一个组合都没读到 = Redis 不可用：返回 null 让 UI 显示「统计不可用」，
     // 而不是冒充「暂无记录」（这两件事对用户的意义完全不同）。
-    if (result.isEmpty) {
-      for (final (line, platform) in queries) {
-        result['${line.key}:${platform.key}'] = null;
-      }
+    for (final (line, platform) in queries) {
+      result.putIfAbsent(slotOf(line, platform), () => null);
     }
     return result;
   }
 
   /// 清空统计（调试 / 排查用；正常流程不会调用）。
   static Future<void> clearAll() async {
-    await _withConnection((conn) async {
-      for (final (line, platform) in allSlots) {
-        await conn.send_object(['DEL', keyFor(line, platform)]);
-      }
-    });
-  }
-
-  /// 建连接 → AUTH →（必要时 SELECT）→ 执行 → 退出；任何异常都被吞掉。
-  static Future<void> _withConnection(
-    Future<void> Function(dynamic conn) body,
-  ) async {
-    try {
-      final conn =
-          await RedisConnection().connect(DeveloperToken.RedisHost, DeveloperToken.RedisPort)
-              .timeout(timeout);
-      try {
-        await conn.send_object(['AUTH', DeveloperToken.RedisPassword]).timeout(timeout);
-        if (DeveloperToken.RedisDatabase != 0) {
-          await conn.send_object(['SELECT', DeveloperToken.RedisDatabase])
-              .timeout(timeout);
-        }
-        await body(conn).timeout(timeout);
-      } finally {
-        try {
-          await conn.send_object(['QUIT']);
-        } catch (_) {}
-      }
-    } catch (e) {
-      debugPrint('[SyncStats] Redis 不可用，已忽略统计: $e');
-    }
+    // 生产环境不提供客户端清空统计入口，避免任何用户误删全局数据。
+    debugPrint('[SyncStats] clearAll 已禁用，请在服务端维护统计数据');
   }
 }

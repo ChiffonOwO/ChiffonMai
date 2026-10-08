@@ -40,6 +40,40 @@ class DataSourceStyle {
   }
 }
 
+/// 开发者的排行榜 playerId 白名单（`'<source>:<id>'` 口径）。
+///
+/// 名单里的人除了数据源标签（水鱼 / 落雪 / AWMC）之外，还会在**后面**多挂一个
+/// 「开发者喵」标签。加人只要往这里加一行，页面侧不用改任何逻辑。
+const Set<String> kDeveloperPlayerIds = {
+  'awmc:488581724',
+  'luoxue:946923365021984',
+  'shuiyu:488581724',
+};
+
+/// [playerId] 是不是开发者。
+///
+/// **精确匹配**整串 `'<source>:<id>'`，不做后缀匹配：否则 `awmc:488581724` 会把
+/// 别的源里恰好同号的玩家（例如落雪的 488581724）也一起标成开发者。
+bool isDeveloperPlayer(String? playerId) =>
+    playerId != null && kDeveloperPlayerIds.contains(playerId);
+
+/// 「开发者喵」标签的文字。
+const String developerTagLabel = '开发者喵';
+
+/// 「开发者喵」标签的配色。
+///
+/// 刻意不复用任何 [RefreshDataSource] 的配色：它标的是**身份**（开发组成员）而不是
+/// 数据源，跟在水鱼 / 落雪 / AWMC 后面一起出现时必须一眼能分开，所以单独用粉色。
+DataSourceStyle developerStyle(Brightness brightness) {
+  final isDark = brightness == Brightness.dark;
+  return DataSourceStyle(
+    label: developerTagLabel,
+    foreground: isDark ? Colors.pink[200]! : Colors.pink[700]!,
+    background:
+        isDark ? Colors.pink.withValues(alpha: 0.25) : Colors.pink[100]!,
+  );
+}
+
 /// 按数据源 key（`'shuiyu'` / `'luoxue'` / `'awmc'`）取标签样式。
 ///
 /// [key] 允许为 null / 空 / 未知，一律走灰色兜底，绝不默认成「水鱼」。
@@ -102,12 +136,19 @@ class DataSourceTag extends StatelessWidget {
   /// 数据源 key：`'shuiyu'` / `'luoxue'` / `'awmc'`。
   final String? dataSource;
 
+  /// 直接指定样式，覆盖 [dataSource] 推出的那份。
+  ///
+  /// 给「不是数据源、但用同一个胶囊外观」的标签用（目前就是 [developerStyle]
+  /// 的「开发者喵」），省得为了一颗胶囊再抄一遍 `Container + Text`。
+  final DataSourceStyle? styleOverride;
+
   /// 文字大小，默认 [defaultFontSize]（排行榜列表里的尺寸）。
   final double fontSize;
 
   const DataSourceTag({
     super.key,
     required this.dataSource,
+    this.styleOverride,
     this.fontSize = defaultFontSize,
   });
 
@@ -149,7 +190,8 @@ class DataSourceTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    final style = dataSourceStyleOf(dataSource, brightness);
+    final style =
+        styleOverride ?? dataSourceStyleOf(dataSource, brightness);
     return Container(
       padding:
           const EdgeInsets.symmetric(horizontal: 6, vertical: verticalPadding),

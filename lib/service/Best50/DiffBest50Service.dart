@@ -4,6 +4,7 @@ import '../../manager/DivingFish/UserPlayDataManager.dart';
 import '../../manager/DivingFish/DiffMusicDataManager.dart';
 import '../../manager/DivingFish/UserBest50Manager.dart';
 import '../../manager/DivingFish/MaimaiMusicDataManager.dart';
+import '../../utils/SongFilterUtil.dart';
 
 class DiffBest50Service {
   // 单例模式
@@ -50,9 +51,7 @@ class DiffBest50Service {
           diffSong.charts.forEach((songId, diffDataList) {
             List<Map<String, dynamic>> songCharts = [];
             for (var diffDataItem in diffDataList) {
-              songCharts.add({
-                'fit_diff': diffDataItem.fitDiff.toDouble()
-              });
+              songCharts.add({'fit_diff': diffDataItem.fitDiff.toDouble()});
             }
             diffData['charts'][songId] = songCharts;
           });
@@ -85,7 +84,7 @@ class DiffBest50Service {
 
     // 查找对应的评级和乘数
     Map<String, dynamic>? selectedRating;
-    
+
     // 遍历表格查找正确的区间
     for (var item in maimaiRatingMultiplier) {
       if (adjustedCompletion >= item['completion']) {
@@ -93,7 +92,7 @@ class DiffBest50Service {
         break;
       }
     }
-    
+
     // 如果没有找到（不应该发生），使用默认值
     selectedRating ??= {"rating": "D", "multiplier": 0.016};
 
@@ -133,6 +132,7 @@ class DiffBest50Service {
       // 遍历用户游玩记录
       for (var record in records) {
         int songId = record['song_id'];
+        if (SongFilterUtil.isUtageSong(songId.toString())) continue;
         int levelIndex = record['level_index'];
         double achievements = double.parse(record['achievements'].toString());
 
@@ -175,7 +175,8 @@ class DiffBest50Service {
       }
 
       // 计算DiffRating总和
-      int diffRatingSum = diffBest50.fold(0, (sum, item) => sum + (item['diffRating'] as int));
+      int diffRatingSum =
+          diffBest50.fold(0, (sum, item) => sum + (item['diffRating'] as int));
 
       // 计算真实的Best50 RA总和（从缓存或计算获取）
       int best50Sum = await _getBest50RatingSum(userData);
@@ -216,30 +217,49 @@ class DiffBest50Service {
       // 加载歌曲难度数据
       final songDiffData = await loadSongDiffData();
       if (songDiffData.isEmpty) {
-        return {'diffRatingSum': 0, 'diffBest50': [], 'diffSdSongs': [], 'diffDxSongs': [], 'best50Diff': 0};
+        return {
+          'diffRatingSum': 0,
+          'diffBest50': [],
+          'diffSdSongs': [],
+          'diffDxSongs': [],
+          'best50Diff': 0
+        };
       }
 
       // 获取用户游玩记录
       final userData = await getUserPlayData();
       if (userData == null || userData['records'] == null) {
-        return {'diffRatingSum': 0, 'diffBest50': [], 'diffSdSongs': [], 'diffDxSongs': [], 'best50Diff': 0};
+        return {
+          'diffRatingSum': 0,
+          'diffBest50': [],
+          'diffSdSongs': [],
+          'diffDxSongs': [],
+          'best50Diff': 0
+        };
       }
 
       // 获取用户Best50数据（已排序）
       final best50Manager = UserBest50Manager();
       var best50Data = await best50Manager.getCachedBest50Data();
-      
+
       // 如果没有缓存的Best50数据（落雪数据源场景），从游玩记录计算
       Map<String, dynamic>? calculatedBest50Data;
       if (best50Data == null) {
         calculatedBest50Data = await _calculateBest50FromPlayData(userData);
         if (calculatedBest50Data == null) {
-          return {'diffRatingSum': 0, 'diffBest50': [], 'diffSdSongs': [], 'diffDxSongs': [], 'best50Diff': 0};
+          return {
+            'diffRatingSum': 0,
+            'diffBest50': [],
+            'diffSdSongs': [],
+            'diffDxSongs': [],
+            'best50Diff': 0
+          };
         }
         best50Data = calculatedBest50Data;
       }
 
-      final chartsData = Map<String, dynamic>.from(songDiffData['charts'] as Map);
+      final chartsData =
+          Map<String, dynamic>.from(songDiffData['charts'] as Map);
       final records = userData['records'] as List;
 
       // 创建记录映射，便于查找
@@ -250,20 +270,22 @@ class DiffBest50Service {
       }
 
       // 存储计算结果（分离sd和dx）
-      List<Map<String, dynamic>> diffSdSongs = [];  // Best35 - 非当前版本
-      List<Map<String, dynamic>> diffDxSongs = [];  // Best15 - 当前版本
+      List<Map<String, dynamic>> diffSdSongs = []; // Best35 - 非当前版本
+      List<Map<String, dynamic>> diffDxSongs = []; // Best15 - 当前版本
 
       // 处理SD数据（Best35）
       if (best50Data['charts']?['sd'] is List) {
         for (var chart in (best50Data['charts']['sd'] as List)) {
-          await _processChart(Map<String, dynamic>.from(chart as Map), recordMap, chartsData, diffSdSongs);
+          await _processChart(Map<String, dynamic>.from(chart as Map),
+              recordMap, chartsData, diffSdSongs);
         }
       }
 
       // 处理DX数据（Best15）
       if (best50Data['charts']?['dx'] is List) {
         for (var chart in (best50Data['charts']['dx'] as List)) {
-          await _processChart(Map<String, dynamic>.from(chart as Map), recordMap, chartsData, diffDxSongs);
+          await _processChart(Map<String, dynamic>.from(chart as Map),
+              recordMap, chartsData, diffDxSongs);
         }
       }
 
@@ -275,7 +297,8 @@ class DiffBest50Service {
       List<Map<String, dynamic>> diffBest50 = [...diffSdSongs, ...diffDxSongs];
 
       // 计算DiffRating总和
-      int diffRatingSum = diffBest50.fold(0, (sum, item) => sum + (item['diffRating'] as int));
+      int diffRatingSum =
+          diffBest50.fold(0, (sum, item) => sum + (item['diffRating'] as int));
 
       // 计算与Best50的差值（使用正确的Rating总和）
       int best50Sum = best50Data['rating'] ?? 0;
@@ -290,12 +313,19 @@ class DiffBest50Service {
       };
     } catch (e) {
       debugPrint('计算DiffBest50数据失败: $e');
-      return {'diffRatingSum': 0, 'diffBest50': [], 'diffSdSongs': [], 'diffDxSongs': [], 'best50Diff': 0};
+      return {
+        'diffRatingSum': 0,
+        'diffBest50': [],
+        'diffSdSongs': [],
+        'diffDxSongs': [],
+        'best50Diff': 0
+      };
     }
   }
 
   // 从玩家游玩数据计算Best50（用于落雪数据源场景）
-  Future<Map<String, dynamic>?> _calculateBest50FromPlayData(Map<String, dynamic> userData) async {
+  Future<Map<String, dynamic>?> _calculateBest50FromPlayData(
+      Map<String, dynamic> userData) async {
     try {
       final records = userData['records'] as List;
       if (records.isEmpty) {
@@ -317,7 +347,7 @@ class DiffBest50Service {
 
       // 根据is_new分组
       List<Map<String, dynamic>> oldSongs = []; // is_new = false
-      List<Map<String, dynamic>> newSongs = [];  // is_new = true
+      List<Map<String, dynamic>> newSongs = []; // is_new = true
 
       for (var record in records) {
         int songId = record['song_id'];
@@ -338,8 +368,9 @@ class DiffBest50Service {
       List<Map<String, dynamic>> best15 = newSongs.take(15).toList();
 
       // 计算总Rating
-      int totalRating = best35.fold(0, (int sum, item) => sum + ((item['ra'] as int?) ?? 0)) + 
-                         best15.fold(0, (int sum, item) => sum + ((item['ra'] as int?) ?? 0));
+      int totalRating = best35.fold(
+              0, (int sum, item) => sum + ((item['ra'] as int?) ?? 0)) +
+          best15.fold(0, (int sum, item) => sum + ((item['ra'] as int?) ?? 0));
 
       return {
         'rating': totalRating,
@@ -360,20 +391,38 @@ class DiffBest50Service {
       // 加载歌曲难度数据
       final songDiffData = await loadSongDiffData();
       if (songDiffData.isEmpty) {
-        return {'diffRatingSum': 0, 'diffBest50': [], 'diffSdSongs': [], 'diffDxSongs': [], 'best50Diff': 0};
+        return {
+          'diffRatingSum': 0,
+          'diffBest50': [],
+          'diffSdSongs': [],
+          'diffDxSongs': [],
+          'best50Diff': 0
+        };
       }
 
       // 获取用户游玩记录
       final userData = await getUserPlayData();
       if (userData == null || userData['records'] == null) {
-        return {'diffRatingSum': 0, 'diffBest50': [], 'diffSdSongs': [], 'diffDxSongs': [], 'best50Diff': 0};
+        return {
+          'diffRatingSum': 0,
+          'diffBest50': [],
+          'diffSdSongs': [],
+          'diffDxSongs': [],
+          'best50Diff': 0
+        };
       }
 
       // 获取全量歌曲数据用于判断is_new
       final musicDataManager = MaimaiMusicDataManager();
       final songs = await musicDataManager.getCachedSongs();
       if (songs == null) {
-        return {'diffRatingSum': 0, 'diffBest50': [], 'diffSdSongs': [], 'diffDxSongs': [], 'best50Diff': 0};
+        return {
+          'diffRatingSum': 0,
+          'diffBest50': [],
+          'diffSdSongs': [],
+          'diffDxSongs': [],
+          'best50Diff': 0
+        };
       }
 
       // 构建歌曲ID到is_new的映射
@@ -386,8 +435,8 @@ class DiffBest50Service {
       final records = userData['records'] as List;
 
       // 存储计算结果（分离非当前版本和当前版本）
-      List<Map<String, dynamic>> diffSdSongs = [];  // 非当前版本（is_new=false）
-      List<Map<String, dynamic>> diffDxSongs = [];  // 当前版本（is_new=true）
+      List<Map<String, dynamic>> diffSdSongs = []; // 非当前版本（is_new=false）
+      List<Map<String, dynamic>> diffDxSongs = []; // 当前版本（is_new=true）
 
       // 用于计算真实的Best50 RA总和
       List<Map<String, dynamic>> oldSongsForBest50 = [];
@@ -462,17 +511,19 @@ class DiffBest50Service {
       List<Map<String, dynamic>> diffBest50 = [...diffSdSongs, ...diffDxSongs];
 
       // 计算DiffRating总和
-      int diffRatingSum = diffBest50.fold(0, (sum, item) => sum + (item['diffRating'] as int));
+      int diffRatingSum =
+          diffBest50.fold(0, (sum, item) => sum + (item['diffRating'] as int));
 
       // 计算真实的Best50 RA总和（按ra排序取前35/15）
       oldSongsForBest50.sort((a, b) => (b['ra'] ?? 0).compareTo(a['ra'] ?? 0));
       newSongsForBest50.sort((a, b) => (b['ra'] ?? 0).compareTo(a['ra'] ?? 0));
-      
+
       List<Map<String, dynamic>> best35 = oldSongsForBest50.take(35).toList();
       List<Map<String, dynamic>> best15 = newSongsForBest50.take(15).toList();
-      
-      int best50Sum = best35.fold(0, (int sum, item) => sum + ((item['ra'] as int?) ?? 0)) + 
-                      best15.fold(0, (int sum, item) => sum + ((item['ra'] as int?) ?? 0));
+
+      int best50Sum = best35.fold(
+              0, (int sum, item) => sum + ((item['ra'] as int?) ?? 0)) +
+          best15.fold(0, (int sum, item) => sum + ((item['ra'] as int?) ?? 0));
 
       // 计算与Best50的差值
       int best50Diff = diffRatingSum - best50Sum;
@@ -486,7 +537,13 @@ class DiffBest50Service {
       };
     } catch (e) {
       debugPrint('计算DiffBest50数据失败: $e');
-      return {'diffRatingSum': 0, 'diffBest50': [], 'diffSdSongs': [], 'diffDxSongs': [], 'best50Diff': 0};
+      return {
+        'diffRatingSum': 0,
+        'diffBest50': [],
+        'diffSdSongs': [],
+        'diffDxSongs': [],
+        'best50Diff': 0
+      };
     }
   }
 
@@ -513,7 +570,8 @@ class DiffBest50Service {
     double fitDiff = 0.0;
     bool useOfficialDiff = false;
     if (chartsData.containsKey(songId.toString())) {
-      final songCharts = List<Map<String, dynamic>>.from(chartsData[songId.toString()] as List);
+      final songCharts = List<Map<String, dynamic>>.from(
+          chartsData[songId.toString()] as List);
       if (levelIndex < songCharts.length) {
         fitDiff = songCharts[levelIndex]['fit_diff'] ?? 0.0;
       }
@@ -521,7 +579,9 @@ class DiffBest50Service {
 
     // 如果拟合定数不存在，使用官方定数
     if (fitDiff == 0.0) {
-      fitDiff = double.tryParse((record['ds'] ?? chart['ds'] ?? '0').toString()) ?? 0.0;
+      fitDiff =
+          double.tryParse((record['ds'] ?? chart['ds'] ?? '0').toString()) ??
+              0.0;
       useOfficialDiff = true;
     }
 

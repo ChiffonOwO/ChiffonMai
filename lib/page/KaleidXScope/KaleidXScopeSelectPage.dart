@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPageBLACK.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPageBLUE.dart';
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPageWHITE.dart';
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPagePURPLE.dart';
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPageYELLOW.dart';
 import 'package:my_first_flutter_app/page/KaleidXScope/KaleidXScopeInfoPageRED.dart';
-import 'package:my_first_flutter_app/utils/AppTheme.dart';
-import '../../widgets/PageTopBar.dart';
-import '../../widgets/KaleidXScopeSourceNotice.dart';
+import '../../widgets/BackgroundPageScaffold.dart';
 import '../../service/KaleidXScope/KaleidXScopeGateService.dart';
 import 'KaleidXScopeGatePage.dart';
 
@@ -92,7 +89,6 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
     // 获取设备尺寸
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
@@ -100,11 +96,8 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
     // 响应式尺寸计算（与黑门页面一致）
     final double scaleFactor = screenWidth / 375.0;
     final double _paddingS = 4.0 * scaleFactor;
-    final double _paddingL = 10.0 * scaleFactor;
-    final double borderRadiusSmall = 8.0 * scaleFactor;
 
     // 自定义常量
-    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
 
     // 计算图片宽度，留出边距
     final imageWidth = screenWidth - (_paddingS * 4); // 左右各2*_paddingS的边距
@@ -113,41 +106,16 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
     final availableHeight = screenHeight - 120; // 减去标题栏和底部边距
     final imageHeight = (availableHeight / 4) - 12; // 减去图片间隔
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(children: [
-            // 标题栏
-            PageTopBar(
-              title: 'KALEIDXSCOPE',
-              bottom: const KaleidXScopeSourceNotice(),
-              actions: [
+    return BackgroundPageScaffold(
+      title: 'KALEIDXSCOPE',
+      actions: [
                 IconButton(
                     onPressed: _loadGates,
                     icon: const Icon(Icons.refresh),
                     tooltip: '刷新门列表')
               ],
-            ),
-
-            // 主内容区域
-            Expanded(
-              child: Container(
-                margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL),
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surface
-                      .withValues(alpha: 0.9),
-                  borderRadius: BorderRadius.circular(borderRadiusSmall),
-                  boxShadow: [defaultShadow],
-                ),
-                child: SingleChildScrollView(
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: SingleChildScrollView(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Column(
@@ -251,7 +219,8 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
                                           child: Icon(
                                               item['type'] == 'error'
                                                   ? Icons.error_outline
-                                                  : Icons.door_back_door_outlined,
+                                                  : Icons
+                                                      .door_back_door_outlined,
                                               size: 64,
                                               color: Theme.of(context)
                                                   .colorScheme
@@ -281,11 +250,6 @@ class _KaleidXScopeSelectPageState extends State<KaleidXScopeSelectPage> {
                     ],
                   ),
                 ),
-              ),
-            ),
-          ]),
-        ],
-      ),
     );
   }
 }

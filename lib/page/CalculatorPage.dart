@@ -2011,10 +2011,8 @@ Widget _buildCard({
   return Container(
     width: double.infinity,
     decoration: BoxDecoration(
-      color: AppColors.cardBackgroundTranslucent(brightness),
       borderRadius: BorderRadius.circular(8),
       border: Border.all(color: AppColors.tableBorder(brightness), width: 2),
-      boxShadow: [AppColors.defaultShadow(brightness)],
     ),
     padding: const EdgeInsets.all(12),
     child: child,

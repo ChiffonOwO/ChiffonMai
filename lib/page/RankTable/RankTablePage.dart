@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/service/RankTable/RankTableService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/page/RankTable/RankTableDetailPage.dart';
-import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/BackgroundPageScaffold.dart';
+import '../../service/RankTable/RankCompletionStore.dart';
+import '../../widgets/RankCompletionButton.dart';
 
 class RankListPage extends StatefulWidget {
   const RankListPage({super.key});
@@ -15,12 +16,28 @@ class RankListPage extends StatefulWidget {
 
 class _RankListPageState extends State<RankListPage> {
   final RankListService _service = RankListService();
-  String? _selectedRank;
-  
+  final _completion = RankCompletionStore.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _completion.addListener(_changed);
+    _completion.load();
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _completion.removeListener(_changed);
+    super.dispose();
+  }
+
   late double _paddingXS;
   late double _paddingS;
   late double _paddingM;
-  late double _paddingL;
   late double _borderRadiusSmall;
   late double _textSizeM;
   late double _scaleFactor;
@@ -33,34 +50,13 @@ class _RankListPageState extends State<RankListPage> {
     _paddingXS = 4.0 * _scaleFactor;
     _paddingS = 4.0 * _scaleFactor;
     _paddingM = 12.0 * _scaleFactor;
-    _paddingL = 10.0 * _scaleFactor;
     _borderRadiusSmall = 8.0 * _scaleFactor;
     _textSizeM = 12.0 * _scaleFactor;
 
-    final cardBgColor = Theme.of(context).colorScheme.surface;
-    final cardShadow = AppColors.defaultShadow(brightness);
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          
-          Column(
-            children: [
-              // 标题栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
-              // 与 Best50 页、其余 50 多个页面同款。
-              PageTopBar(title: '段位表'),
-              
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL),
-                  decoration: BoxDecoration(
-                    color: cardBgColor,
-                    borderRadius: BorderRadius.circular(_borderRadiusSmall),
-                    boxShadow: [cardShadow],
-                  ),
-                  child: SingleChildScrollView(
+    return BackgroundPageScaffold(
+      title: '段位表',
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: SingleChildScrollView(
                     padding: EdgeInsets.all(_paddingM),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -70,30 +66,57 @@ class _RankListPageState extends State<RankListPage> {
                           style: TextStyle(
                             fontSize: _textSizeM,
                             fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                         ),
                         SizedBox(height: _paddingXS),
                         Column(
                           children: _service.getRankOptions().map((rank) {
                             final rankData = _service.getRankData(rank);
-                            final isNormalRank = ['初段', '二段', '三段', '四段', '五段', '六段', '七段', '八段', '九段', '十段'].contains(rank);
-                            
+                            final isNormalRank = [
+                              '初段',
+                              '二段',
+                              '三段',
+                              '四段',
+                              '五段',
+                              '六段',
+                              '七段',
+                              '八段',
+                              '九段',
+                              '十段'
+                            ].contains(rank);
+
                             return Container(
                               margin: EdgeInsets.only(bottom: _paddingXS),
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: _selectedRank == rank
-                                      ? AppColors.linkBlue(brightness)
-                                      : (brightness == Brightness.dark
-                                          ? const Color(0xFF2A2A3A)
-                                          : Colors.grey[100]!),
-                                  foregroundColor: Theme.of(context).colorScheme.onSurface,
-                                  minimumSize: Size(double.infinity, 56 * _scaleFactor),
+                                  backgroundColor: switch (
+                                      _completion.status(rank)) {
+                                    RankCompletion.passed =>
+                                      AppColors.successGreen(brightness)
+                                          .withValues(alpha: .25),
+                                    RankCompletion.failed =>
+                                      AppColors.errorRed(brightness)
+                                          .withValues(alpha: .25),
+                                    RankCompletion.redPassed =>
+                                      AppColors.warningOrange(brightness)
+                                          .withValues(alpha: .25),
+                                    RankCompletion.unplayed => Theme.of(context)
+                                        .colorScheme
+                                        .surfaceContainerLow,
+                                  },
+                                  foregroundColor:
+                                      Theme.of(context).colorScheme.onSurface,
+                                  minimumSize:
+                                      Size(double.infinity, 56 * _scaleFactor),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(_borderRadiusSmall),
+                                    borderRadius: BorderRadius.circular(
+                                        _borderRadiusSmall),
                                     side: BorderSide(
-                                      color: isNormalRank ? AppColors.medalColor('bronze') : Colors.purple,
+                                      color: isNormalRank
+                                          ? AppColors.medalColor('bronze')
+                                          : Colors.purple,
                                       width: 1,
                                     ),
                                   ),
@@ -102,7 +125,8 @@ class _RankListPageState extends State<RankListPage> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => RankDetailPage(rankName: rank),
+                                      builder: (context) =>
+                                          RankDetailPage(rankName: rank),
                                     ),
                                   );
                                 },
@@ -110,41 +134,58 @@ class _RankListPageState extends State<RankListPage> {
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     Container(
-                                      padding: EdgeInsets.symmetric(horizontal: _paddingM, vertical: _paddingXS),
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: _paddingM,
+                                          vertical: _paddingXS),
                                       decoration: BoxDecoration(
-                                        color: isNormalRank ? AppColors.medalColor('bronze') : Colors.purple,
-                                        borderRadius: BorderRadius.circular(_borderRadiusSmall),
+                                        color: isNormalRank
+                                            ? AppColors.medalColor('bronze')
+                                            : Colors.purple,
+                                        borderRadius: BorderRadius.circular(
+                                            _borderRadiusSmall),
                                       ),
                                       child: Text(
                                         rank,
                                         style: TextStyle(
                                           fontSize: _textSizeM,
                                           fontWeight: FontWeight.bold,
-                                          color: isNormalRank ? Colors.white : const Color(0xFFE6E6FA),
+                                          color: isNormalRank
+                                              ? Colors.white
+                                              : const Color(0xFFE6E6FA),
                                         ),
                                       ),
                                     ),
                                     SizedBox(width: _paddingS),
                                     if (rankData != null)
-                                      Row(
+                                      Flexible(
+                                          child: Row(
                                         children: List.generate(4, (index) {
-                                          final songId = rankData.songIds[index];
-                                          final levelIndex = rankData.levelIndexes[index];
+                                          final songId =
+                                              rankData.songIds[index];
+                                          final levelIndex =
+                                              rankData.levelIndexes[index];
                                           return Container(
-                                            margin: EdgeInsets.only(left: index > 0 ? _paddingXS : 0),
+                                            margin: EdgeInsets.only(
+                                                left:
+                                                    index > 0 ? _paddingXS : 0),
                                             width: 40 * _scaleFactor,
                                             height: 40 * _scaleFactor,
                                             child: Stack(
                                               children: [
-                                                CoverUtil.buildCoverWidgetWithContext(
+                                                CoverUtil
+                                                    .buildCoverWidgetWithContext(
                                                   context,
-                                                  songId.isNotEmpty ? songId : '0',
+                                                  songId.isNotEmpty
+                                                      ? songId
+                                                      : '0',
                                                   40 * _scaleFactor,
                                                 ),
                                                 Container(
                                                   decoration: BoxDecoration(
                                                     border: Border.all(
-                                                      color: _getDifficultyBorderColor(levelIndex),
+                                                      color:
+                                                          _getDifficultyBorderColor(
+                                                              levelIndex),
                                                       width: 2,
                                                     ),
                                                   ),
@@ -153,34 +194,37 @@ class _RankListPageState extends State<RankListPage> {
                                             ),
                                           );
                                         }).toList(),
-                                      ),
+                                      )),
+                                    RankCompletionButton(
+                                      rank: rank,
+                                      showAchievement: false,
+                                    ),
                                   ],
                                 ),
                               ),
                             );
                           }).toList(),
                         ),
-                        
                       ],
                     ),
                   ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
   Color _getDifficultyBorderColor(int levelIndex) {
     switch (levelIndex) {
-      case 0: return Colors.green;
-      case 1: return Color(0xFFFFCC00);
-      case 2: return Colors.pink;
-      case 3: return Colors.purple;
-      case 4: return Colors.purple.shade200;
-      default: return Colors.grey;
+      case 0:
+        return Colors.green;
+      case 1:
+        return Color(0xFFFFCC00);
+      case 2:
+        return Colors.pink;
+      case 3:
+        return Colors.purple;
+      case 4:
+        return Colors.purple.shade200;
+      default:
+        return Colors.grey;
     }
   }
 }

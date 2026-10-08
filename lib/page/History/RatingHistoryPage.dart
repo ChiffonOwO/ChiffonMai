@@ -332,7 +332,6 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground(brightness),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
@@ -450,8 +449,8 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground(brightness),
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
@@ -493,8 +492,8 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground(brightness),
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: HistoryLineChart(
         spots: spots,
@@ -533,8 +532,8 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground(brightness),
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -616,8 +615,8 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground(brightness),
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         children: [

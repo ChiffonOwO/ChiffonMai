@@ -128,6 +128,46 @@ void main() {
     });
   });
 
+  group('开发者喵标签（排行榜白名单）', () {
+    test('三个开发者 playerId 整串精确命中', () {
+      expect(isDeveloperPlayer('awmc:488581724'), isTrue);
+      expect(isDeveloperPlayer('luoxue:946923365021984'), isTrue);
+      expect(isDeveloperPlayer('shuiyu:488581724'), isTrue);
+    });
+
+    test('同号但不同源不算开发者（防止后缀匹配误伤）', () {
+      // 落雪的 488581724 与 shuiyu:488581724 号相同，但不是名单里的人
+      expect(isDeveloperPlayer('luoxue:488581724'), isFalse);
+      // 名单里是 shuiyu:488581724，awmc 的 946923365021984 同样不该命中
+      expect(isDeveloperPlayer('awmc:946923365021984'), isFalse);
+    });
+
+    test('空 / null / 普通玩家一律不是开发者', () {
+      expect(isDeveloperPlayer(null), isFalse);
+      expect(isDeveloperPlayer(''), isFalse);
+      expect(isDeveloperPlayer('shuiyu:1'), isFalse);
+      // 不带源前缀的历史 id 也不命中（白名单是 `<source>:<id>` 口径）
+      expect(isDeveloperPlayer('488581724'), isFalse);
+    });
+
+    test('标签文字是「开发者喵」，且配色与三个数据源都不同', () {
+      expect(developerTagLabel, '开发者喵');
+      expect(developerStyle(Brightness.light).label, '开发者喵');
+
+      final sourceColors = {
+        for (final key in ['shuiyu', 'luoxue', 'awmc'])
+          dataSourceStyleOf(key, Brightness.light).foreground.toARGB32(),
+      };
+      for (final brightness in [Brightness.light, Brightness.dark]) {
+        expect(
+            sourceColors.contains(
+                developerStyle(brightness).foreground.toARGB32()),
+            isFalse,
+            reason: '$brightness 下「开发者喵」的颜色不能和某个数据源撞色');
+      }
+    });
+  });
+
   group('水鱼账号三态（登录 / 没填 QQ / 正常）', () {
     test('没登录 → notLoggedIn（不管 QQ 有没有值）', () {
       expect(

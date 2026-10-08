@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../utils/ExternalLaunchUtil.dart';
 
 /// KALEIDXSCOPE 门页统一的数据来源说明。
 class KaleidXScopeSourceNotice extends StatelessWidget
@@ -13,12 +13,10 @@ class KaleidXScopeSourceNotice extends StatelessWidget
   Size get preferredSize => const Size.fromHeight(30);
 
   Future<void> _openSource(BuildContext context) async {
-    final opened =
-        await launchUrl(sourceUri, mode: LaunchMode.externalApplication);
+    final opened = await ExternalLaunchUtil.open(sourceUri);
     if (!opened && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('无法打开攻略来源')),
-      );
+      await ExternalLaunchUtil.copyFallback(context, sourceUri.toString(),
+          message: '无法打开攻略来源，链接已复制到剪贴板');
     }
   }
 

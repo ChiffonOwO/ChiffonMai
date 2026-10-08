@@ -140,6 +140,7 @@ class _Best50HubPageState extends State<Best50HubPage> {
                 title: '平均DX分数达成率排行榜',
                 subtitle: '按全量成绩的平均DX得分达成率排名',
                 icon: Icons.score_outlined,
+                titleFontSize: 13,
                 isFavorited: _isFavorited('平均DX分数达成率排行榜'),
                 onToggleFavorite: () => _toggleFavorite('平均DX分数达成率排行榜'),
                 onTap: () => _open(context,

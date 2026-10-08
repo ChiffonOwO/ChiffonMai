@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/ProberException.dart';
 import 'package:my_first_flutter_app/service/FriendCompareService.dart';
 import 'package:my_first_flutter_app/entity/FriendComparisonResult.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/ExternalUrlPolicy.dart';
+import 'package:my_first_flutter_app/utils/ExternalLaunchUtil.dart';
 import 'SongInfoPage.dart';
-import '../widgets/PageTopBar.dart';
+import '../widgets/BackgroundPageScaffold.dart';
 
 class FriendComparePage extends StatefulWidget {
   const FriendComparePage({super.key});
@@ -99,7 +100,16 @@ class _FriendComparePageState extends State<FriendComparePage> {
       if (e.code == 'CONSENT_REQUIRED' &&
           e.bindingUrl != null &&
           e.bindingUrl!.isNotEmpty) {
-        launchUrl(Uri.parse(e.bindingUrl!), mode: LaunchMode.externalApplication);
+        final uri = Uri.tryParse(e.bindingUrl!);
+        if (uri != null && ExternalUrlPolicy.isAllowed(uri)) {
+          final opened = await ExternalLaunchUtil.open(uri);
+          if (!opened && mounted) {
+            await Clipboard.setData(ClipboardData(text: uri.toString()));
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('无法打开授权页，链接已复制到剪贴板')),
+            );
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -115,34 +125,16 @@ class _FriendComparePageState extends State<FriendComparePage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final textPrimaryColor = Theme.of(context).colorScheme.onSurface;
-    final cardBgColor = Theme.of(context).colorScheme.surface;
-    final cardShadow = AppColors.defaultShadow(brightness);
+
     // ignore: unused_local_variable
-    final borderColor = AppColors.tableBorder(brightness);
-    final safeBottom = MediaQuery.of(context).padding.bottom;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+
+
+    return BackgroundPageScaffold(
+      title: '好友成绩对比',
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          Column(
-            children: [
-              PageTopBar(
-                title: '好友成绩对比',
-              ),
-
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: cardBgColor,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [cardShadow],
-                  ),
-                  child: SingleChildScrollView(
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: SingleChildScrollView(
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -176,14 +168,18 @@ class _FriendComparePageState extends State<FriendComparePage> {
                                       height: 16,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Theme.of(context).colorScheme.onPrimary,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onPrimary,
                                       ),
                                     )
                                   : Icon(Icons.compare_arrows),
                               label: Text('开始对比'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Theme.of(context).colorScheme.primary,
-                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                                backgroundColor:
+                                    Theme.of(context).colorScheme.primary,
+                                foregroundColor:
+                                    Theme.of(context).colorScheme.onPrimary,
                                 padding: EdgeInsets.symmetric(
                                   horizontal: 20,
                                   vertical: 14,
@@ -201,14 +197,18 @@ class _FriendComparePageState extends State<FriendComparePage> {
                           Container(
                             padding: EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: AppColors.errorRed(brightness).withValues(alpha: 0.08),
+                              color: AppColors.errorRed(brightness)
+                                  .withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.errorRed(brightness).withValues(alpha: 0.3)),
+                              border: Border.all(
+                                  color: AppColors.errorRed(brightness)
+                                      .withValues(alpha: 0.3)),
                             ),
                             child: Row(
                               children: [
                                 Icon(Icons.error_outline,
-                                    color: AppColors.errorRed(brightness), size: 20),
+                                    color: AppColors.errorRed(brightness),
+                                    size: 20),
                                 SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
@@ -244,7 +244,10 @@ class _FriendComparePageState extends State<FriendComparePage> {
                         // 对比结果
                         if (_result != null) ...[
                           SizedBox(height: 16),
-                          _buildSummaryCard(textPrimaryColor, Theme.of(context).colorScheme.primary, brightness),
+                          _buildSummaryCard(
+                              textPrimaryColor,
+                              Theme.of(context).colorScheme.primary,
+                              brightness),
                           SizedBox(height: 12),
                           // 难度筛选
                           _buildLevelFilter(brightness),
@@ -265,22 +268,40 @@ class _FriendComparePageState extends State<FriendComparePage> {
                                 children: [
                                   Row(
                                     children: [
-                                      Icon(Icons.history, size: 18, color: AppColors.greyHint(brightness)),
+                                      Icon(Icons.history,
+                                          size: 18,
+                                          color:
+                                              AppColors.greyHint(brightness)),
                                       SizedBox(width: 6),
                                       Text('历史对比记录',
-                                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600,
-                                          color: textPrimaryColor)),
+                                          style: TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w600,
+                                              color: textPrimaryColor)),
                                       Spacer(),
                                       GestureDetector(
                                         onTap: () async {
-                                          final confirm = await showDialog<bool>(
+                                          final confirm =
+                                              await showDialog<bool>(
                                             context: context,
                                             builder: (ctx) => AlertDialog(
                                               title: Text('清空历史'),
                                               content: Text('确定要清空全部历史记录吗？'),
                                               actions: [
-                                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('取消')),
-                                                TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('清空', style: TextStyle(color: AppColors.errorRed(brightness)))),
+                                                TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                            ctx, false),
+                                                    child: Text('取消')),
+                                                TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                            ctx, true),
+                                                    child: Text('清空',
+                                                        style: TextStyle(
+                                                            color: AppColors
+                                                                .errorRed(
+                                                                    brightness)))),
                                               ],
                                             ),
                                           );
@@ -289,7 +310,11 @@ class _FriendComparePageState extends State<FriendComparePage> {
                                             _loadHistory();
                                           }
                                         },
-                                        child: Text('清空', style: TextStyle(fontSize: 12, color: AppColors.errorRed(brightness))),
+                                        child: Text('清空',
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                color: AppColors.errorRed(
+                                                    brightness))),
                                       ),
                                     ],
                                   ),
@@ -304,11 +329,16 @@ class _FriendComparePageState extends State<FriendComparePage> {
                               child: Center(
                                 child: Column(
                                   children: [
-                                    Icon(Icons.people_outline, size: 80, color: AppColors.greyHint(brightness)),
+                                    Icon(Icons.people_outline,
+                                        size: 80,
+                                        color: AppColors.greyHint(brightness)),
                                     SizedBox(height: 16),
                                     Text('输入好友 QQ 号开始对比\n（好友需在水鱼查分器有数据）',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(color: AppColors.greyHint(brightness), fontSize: 15)),
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                            color:
+                                                AppColors.greyHint(brightness),
+                                            fontSize: 15)),
                                   ],
                                 ),
                               ),
@@ -317,17 +347,12 @@ class _FriendComparePageState extends State<FriendComparePage> {
                       ],
                     ),
                   ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
   /// 构建摘要卡片
-  Widget _buildSummaryCard(Color textColor, Color primaryColor, Brightness brightness) {
+  Widget _buildSummaryCard(
+      Color textColor, Color primaryColor, Brightness brightness) {
     final result = _result!;
     final theme = Theme.of(context);
     final containerColor = theme.colorScheme.primaryContainer;
@@ -360,9 +385,12 @@ class _FriendComparePageState extends State<FriendComparePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildStatBadge('我的谱面', '${result.myTotalCharts}', onContainerColor),
-              _buildStatBadge('好友谱面', '${result.friendTotalCharts}', onContainerColor),
-              _buildStatBadge('共同谱面', '${result.commonCount}', onContainerColor),
+              _buildStatBadge(
+                  '我的谱面', '${result.myTotalCharts}', onContainerColor),
+              _buildStatBadge(
+                  '好友谱面', '${result.friendTotalCharts}', onContainerColor),
+              _buildStatBadge(
+                  '共同谱面', '${result.commonCount}', onContainerColor),
             ],
           ),
           SizedBox(height: 12),
@@ -370,9 +398,12 @@ class _FriendComparePageState extends State<FriendComparePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildWinBadge('我赢', result.myWinCount, AppColors.successGreen(brightness)),
-              _buildWinBadge('平局', result.tieCount, AppColors.warningOrange(brightness)),
-              _buildWinBadge('好友赢', result.friendWinCount, AppColors.errorRed(brightness)),
+              _buildWinBadge(
+                  '我赢', result.myWinCount, AppColors.successGreen(brightness)),
+              _buildWinBadge(
+                  '平局', result.tieCount, AppColors.warningOrange(brightness)),
+              _buildWinBadge(
+                  '好友赢', result.friendWinCount, AppColors.errorRed(brightness)),
             ],
           ),
           SizedBox(height: 12),
@@ -486,11 +517,15 @@ class _FriendComparePageState extends State<FriendComparePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(nick, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface)),
+                  Text(nick,
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface)),
                   SizedBox(height: 2),
                   Text('$date  |  共同$common 首',
-                    style: TextStyle(fontSize: 12, color: AppColors.greyHint(brightness))),
+                      style: TextStyle(
+                          fontSize: 12, color: AppColors.greyHint(brightness))),
                 ],
               ),
             ),
@@ -507,7 +542,8 @@ class _FriendComparePageState extends State<FriendComparePage> {
                 await _service.deleteHistory(qq);
                 _loadHistory();
               },
-              child: Icon(Icons.close, size: 16, color: AppColors.greyHint(brightness)),
+              child: Icon(Icons.close,
+                  size: 16, color: AppColors.greyHint(brightness)),
             ),
           ],
         ),
@@ -522,7 +558,9 @@ class _FriendComparePageState extends State<FriendComparePage> {
         color: color.withAlpha(25),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(text, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
+      child: Text(text,
+          style: TextStyle(
+              fontSize: 11, fontWeight: FontWeight.bold, color: color)),
     );
   }
 
@@ -530,8 +568,11 @@ class _FriendComparePageState extends State<FriendComparePage> {
   Widget _buildLevelFilter(Brightness brightness) {
     const diffNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'Re:MASTER'];
     final diffColors = [
-      Colors.green, Color(0xFFFFCC00), Colors.red,
-      Colors.purple.shade400, Colors.purple.shade200,
+      Colors.green,
+      Color(0xFFFFCC00),
+      Colors.red,
+      Colors.purple.shade400,
+      Colors.purple.shade200,
     ];
 
     return Column(
@@ -541,8 +582,8 @@ class _FriendComparePageState extends State<FriendComparePage> {
         // 难度筛选
         Wrap(spacing: 6, runSpacing: 8, children: [
           _buildDiffChip('全部', null, AppColors.primaryText(brightness)),
-          ...List.generate(5, (i) =>
-              _buildDiffChip(diffNames[i], i, diffColors[i])),
+          ...List.generate(
+              5, (i) => _buildDiffChip(diffNames[i], i, diffColors[i])),
         ]),
         SizedBox(height: 8),
         // 胜负筛选
@@ -556,7 +597,8 @@ class _FriendComparePageState extends State<FriendComparePage> {
     );
   }
 
-  Widget _buildDiffChip(String label, int? levelIndex, Color color, {Color? selectedBg}) {
+  Widget _buildDiffChip(String label, int? levelIndex, Color color,
+      {Color? selectedBg}) {
     final isSelected = _filterLevelIndex == levelIndex;
     return GestureDetector(
       onTap: () => setState(() {
@@ -570,13 +612,17 @@ class _FriendComparePageState extends State<FriendComparePage> {
           border: Border.all(color: color, width: 1.5),
           borderRadius: BorderRadius.circular(14),
         ),
-        child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : color)),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? Colors.white : color)),
       ),
     );
   }
 
-  Widget _buildResultChip(String label, String? resultKey, Color color, {Color? selectedBg}) {
+  Widget _buildResultChip(String label, String? resultKey, Color color,
+      {Color? selectedBg}) {
     final isSelected = _filterResult == resultKey;
     return GestureDetector(
       onTap: () => setState(() {
@@ -590,8 +636,11 @@ class _FriendComparePageState extends State<FriendComparePage> {
           border: Border.all(color: color, width: 1.5),
           borderRadius: BorderRadius.circular(14),
         ),
-        child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : color)),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? Colors.white : color)),
       ),
     );
   }
@@ -604,21 +653,27 @@ class _FriendComparePageState extends State<FriendComparePage> {
 
     var filtered = result.commonCharts;
     if (_filterLevelIndex != null) {
-      filtered = filtered.where((c) => c.levelIndex == _filterLevelIndex).toList();
+      filtered =
+          filtered.where((c) => c.levelIndex == _filterLevelIndex).toList();
     }
     if (_filterResult != null) {
       filtered = filtered.where((c) {
         switch (_filterResult) {
-          case 'win': return c.isMyWin;
-          case 'tie': return c.isTie;
-          case 'lose': return c.isFriendWin;
-          default: return true;
+          case 'win':
+            return c.isMyWin;
+          case 'tie':
+            return c.isTie;
+          case 'lose':
+            return c.isFriendWin;
+          default:
+            return true;
         }
       }).toList();
     }
 
     final totalFiltered = filtered.length;
-    final maxDisplay = _displayCount > totalFiltered ? totalFiltered : _displayCount;
+    final maxDisplay =
+        _displayCount > totalFiltered ? totalFiltered : _displayCount;
     final hasMore = maxDisplay < totalFiltered;
 
     return Column(
@@ -660,7 +715,7 @@ class _FriendComparePageState extends State<FriendComparePage> {
                   onPressed: () => setState(() => _displayCount += _pageSize),
                   icon: Icon(Icons.expand_more, size: 18),
                   label: Text('加载更多 ($maxDisplay / $totalFiltered)',
-                    style: TextStyle(fontSize: 13)),
+                      style: TextStyle(fontSize: 13)),
                 ),
               ),
             ),
@@ -669,11 +724,14 @@ class _FriendComparePageState extends State<FriendComparePage> {
     );
   }
 
-  Widget _buildComparisonItem(ChartComparisonItem item, List<String> diffNames) {
+  Widget _buildComparisonItem(
+      ChartComparisonItem item, List<String> diffNames) {
     final brightness = Theme.of(context).brightness;
     final isUtage = item.songId.toString().length == 6;
     final diffName = isUtage ? 'UTAGE' : diffNames[item.levelIndex.clamp(0, 4)];
-    final accentColor = isUtage ? AppColors.utageAccent(brightness: brightness) : ColorUtil.getCardColor(item.levelIndex);
+    final accentColor = isUtage
+        ? AppColors.utageAccent(brightness: brightness)
+        : ColorUtil.getCardColor(item.levelIndex);
 
     Color myColor;
     Color friendColor;
@@ -714,7 +772,9 @@ class _FriendComparePageState extends State<FriendComparePage> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: CoverUtil.buildCoverWidgetWithContextRRect(
-                  context, item.songId.toString(), 44,
+                  context,
+                  item.songId.toString(),
+                  44,
                 ),
               ),
               SizedBox(width: 8),
@@ -725,13 +785,20 @@ class _FriendComparePageState extends State<FriendComparePage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(item.songTitle,
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onSurface),
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSurface),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                     SizedBox(height: 1),
                     Text('$diffName  ${item.ds.toStringAsFixed(1)}',
-                      style: TextStyle(fontSize: 10, color: accentColor, fontWeight: FontWeight.w600),
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: accentColor,
+                            fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
@@ -739,29 +806,51 @@ class _FriendComparePageState extends State<FriendComparePage> {
               SizedBox(
                 width: 72,
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  FittedBox(fit: BoxFit.scaleDown,
-                    child: Text('${item.myAchievements.toStringAsFixed(4)}%',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: myColor))),
+                  FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('${item.myAchievements.toStringAsFixed(4)}%',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: myColor))),
                   if (item.myRate.isNotEmpty)
-                    Text(StringUtil.formatRate(item.myRate), style: TextStyle(fontSize: 10,
-                      color: myColor.withAlpha(200), fontWeight: FontWeight.w600)),
+                    Text(StringUtil.formatRate(item.myRate),
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: myColor.withAlpha(200),
+                            fontWeight: FontWeight.w600)),
                 ]),
               ),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 2),
                 child: Icon(
-                  item.isTie ? Icons.drag_handle : item.isMyWin ? Icons.arrow_forward : Icons.arrow_back,
-                  size: 16, color: item.isTie ? AppColors.warningOrange(brightness) : AppColors.greyHint(brightness)),
+                    item.isTie
+                        ? Icons.drag_handle
+                        : item.isMyWin
+                            ? Icons.arrow_forward
+                            : Icons.arrow_back,
+                    size: 16,
+                    color: item.isTie
+                        ? AppColors.warningOrange(brightness)
+                        : AppColors.greyHint(brightness)),
               ),
               SizedBox(
                 width: 72,
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  FittedBox(fit: BoxFit.scaleDown,
-                    child: Text('${item.friendAchievements.toStringAsFixed(4)}%',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: friendColor))),
+                  FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                          '${item.friendAchievements.toStringAsFixed(4)}%',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: friendColor))),
                   if (item.friendRate.isNotEmpty)
-                    Text(StringUtil.formatRate(item.friendRate), style: TextStyle(fontSize: 10,
-                      color: friendColor.withAlpha(200), fontWeight: FontWeight.w600)),
+                    Text(StringUtil.formatRate(item.friendRate),
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: friendColor.withAlpha(200),
+                            fontWeight: FontWeight.w600)),
                 ]),
               ),
             ],

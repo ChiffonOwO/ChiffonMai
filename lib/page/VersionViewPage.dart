@@ -5,11 +5,9 @@ import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:media_scanner/media_scanner.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
-import 'package:my_first_flutter_app/utils/AppConstants.dart';
-import '../widgets/PageTopBar.dart';
+import '../widgets/BackgroundPageScaffold.dart';
 
 // 版本数据模型
 class VersionData {
@@ -267,7 +265,6 @@ class _VersionViewState extends State<VersionView> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     
     final tableHeaderFontSize = screenWidth * 0.035;
     final tableContentFontSize = screenWidth * 0.03;
@@ -275,22 +272,9 @@ class _VersionViewState extends State<VersionView> {
     final imageContainerSize = screenWidth * 0.15;
     final imageSize = screenWidth * 0.12;
     
-    final cardBgColor = Theme.of(context).colorScheme.surface.withOpacity(0.9);
-    final defaultShadow = AppConstants.defaultShadow(brightness);
-    final double borderRadiusSmall = 8.0;
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          Column(
-            children: [
-              PageTopBar(
-                title: 'maimai版本对照表',
-                actions: [
+    return BackgroundPageScaffold(
+      title: 'maimai版本对照表',
+      actions: [
   ElevatedButton(
                         onPressed: _toggleVersion,
                         style: ElevatedButton.styleFrom(
@@ -308,17 +292,11 @@ class _VersionViewState extends State<VersionView> {
                         ),
                       ),
 ],
-              ),
-
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: cardBgColor,
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
-                  ),
-                  child: LayoutBuilder(
+      resizeToAvoidBottomInset: false,
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
+      ),
+      child: LayoutBuilder(
                     builder: (context, constraints) {
                       final tableWidth = constraints.maxWidth;
                       final column1Width = tableWidth * 0.3;
@@ -456,12 +434,6 @@ class _VersionViewState extends State<VersionView> {
                   );
                 },
               ),
-                ),
-              )
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

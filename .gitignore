@@ -78,3 +78,38 @@ tool/backup/
 
 # golden 测试失败时的对比图（flutter test 自动生成，随手可清理）
 **/failures/
+
+# 本地分析与 AI 协作产物（不属于应用源码）
+/.analysis_extract/
+/.learnings/
+/.codex_tmp_home_restore/
+/analysis_current.txt
+/analyze_out.txt
+/dart_analyze_out.txt
+/tmp_ocr_report.txt
+/analyze.log
+/flutter_*.log
+
+# 本地开发工具、批量脚本与测试服务依赖
+/tool/
+/analyze_maidata.py
+/build_apk.ps1
+/server/node_modules/
+/server/scripts/
+/server/tests/special-rankings.test.js
+/server/tests/sync-stats.test.js
+
+# 本轮临时回归测试（保留在本机，不纳入发布提交）
+/test/hub_action_tile_progress_test.dart
+/test/loading_tips_store_test.dart
+/test/main_navigation_viewport_test.dart
+/test/multi_score_sync_runner_test.dart
+/test/portable_single_loop_test.dart
+/test/requested_ui_features_test.dart
+/test/smooth_linear_progress_indicator_test.dart
+/test/theme_preference_controls_test.dart
+
+# 审计/临时工作文档
+/docs/analysis-remediation-plan.md
+/docs/interaction-updates-2026-10-07.md
+/docs/account-state-audit.md

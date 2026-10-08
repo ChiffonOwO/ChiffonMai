@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import '../entity/FeatureModels.dart';
-import '../utils/CommonWidgetUtil.dart';
 import '../utils/AppTheme.dart';
 import '../utils/AppConstants.dart';
 import '../utils/FavoriteFeaturesNotifier.dart';
 import '../utils/UpdateNotifier.dart';
 import '../widgets/FeatureButton.dart';
-import '../widgets/PageTopBar.dart';
+import '../widgets/BackgroundPageScaffold.dart';
 import '../widgets/QuickSearchBar.dart';
 // UpdateAvailableIcon 是「发现新版本」的绿色圆环箭头，定义在 Hub 组件库里
 import 'HubComponents.dart' show UpdateAvailableIcon;
@@ -70,10 +69,6 @@ class _FeatureCategoryPageState extends State<FeatureCategoryPage> {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
-    final Color cardBgColor = Theme.of(context).colorScheme.surface.withValues(alpha: 0.9);
-    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
-
     // 构建按钮网格
     Widget buildGrid(List<ButtonItem> items) {
       if (items.isEmpty) {
@@ -132,30 +127,14 @@ class _FeatureCategoryPageState extends State<FeatureCategoryPage> {
       );
     }
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: widget.category.name,
       resizeToAvoidBottomInset: false,
-      body: Stack(
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
+      ),
+      child: Column(
         children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          Column(
-            children: [
-              // 顶部栏统一走公共组件（标题是变量，直接传进去即可）
-              PageTopBar(title: widget.category.name),
-
-              // 内容区
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: cardBgColor,
-                    borderRadius: BorderRadius.circular(AppConstants.borderRadiusSmall),
-                    boxShadow: [defaultShadow],
-                  ),
-                  child: Column(
-                    children: [
                       // 分类内搜索栏
                       Padding(
                         padding: EdgeInsets.fromLTRB(
@@ -186,12 +165,6 @@ class _FeatureCategoryPageState extends State<FeatureCategoryPage> {
                           },
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );

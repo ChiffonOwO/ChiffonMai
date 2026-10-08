@@ -36,7 +36,7 @@ class PortableSongLibrary {
   /// 否则老用户读到的是旧规则算出来的缓存（少歌 / 串歌）。
   /// v1: 初始版本（id / id+10000 + 曲名校验，音源取余）。
   /// v2: 排除宴会场曲目（`PortableLibraryResult.excludedUtageCount`）。
-  static const int cacheVersion = 2;
+  static const int cacheVersion = 3;
 
   static const String _prefsKey = 'portable_song_library_v$cacheVersion';
 
@@ -135,7 +135,8 @@ class PortableSongLibrary {
         .where((song) => matchesPortableSongQuery(
               song,
               normalized,
-              aliases: SongAliasManager.instance.aliases[song.title] ?? const [],
+              aliases:
+                  SongAliasManager.instance.aliases[song.title] ?? const [],
             ))
         .toList();
   }

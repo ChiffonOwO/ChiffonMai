@@ -13,7 +13,6 @@ import '../../service/Best50/PersonalizedBest50ConvertToImgService.dart';
 import '../../service/SongSearchService.dart';
 import '../../utils/AppTheme.dart';
 import '../../utils/ColorUtil.dart';
-import '../../utils/CommonWidgetUtil.dart';
 import '../../utils/CoverUtil.dart';
 import '../../utils/ExportQualitySelector.dart';
 import '../../utils/ImageEncodeUtil.dart';
@@ -21,7 +20,7 @@ import '../../utils/ScoreInputValidator.dart';
 import '../../utils/SongFilterUtil.dart';
 import '../../utils/StringUtil.dart';
 import '../../widgets/B50GameCardWidget.dart';
-import '../../widgets/PageTopBar.dart';
+import '../../widgets/BackgroundPageScaffold.dart';
 
 /// 自定义 Best50 的一键排序方式。
 enum _SortMode { raDesc, raAsc, dsDesc, dsAsc }
@@ -811,6 +810,8 @@ class _CustomBest50PageState extends State<CustomBest50Page> {
       estimatedPngSize: ImageEncodeUtil.estimatePngSize(
         songCount: _filledEntries.length,
       ),
+      exportingLabel: '自定义 Best50',
+      enableThunderMode: true,
     );
     if (!mounted || quality == null) return;
 
@@ -838,6 +839,8 @@ class _CustomBest50PageState extends State<CustomBest50Page> {
         jpegQuality: quality.jpegQuality,
         warningText: _warningText,
         sortLabel: _sortLabel,
+        thunderMode: quality.thunderMode,
+        thunderVertical: quality.thunderVertical,
       );
 
       if (!mounted) return;
@@ -929,40 +932,18 @@ class _CustomBest50PageState extends State<CustomBest50Page> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Center(child: CircularProgressIndicator()),
+      return const BackgroundPageScaffold(
+        title: '自定义 Best50',
+        resizeToAvoidBottomInset: false,
+        child: Center(child: CircularProgressIndicator()),
       );
     }
 
-    final brightness = Theme.of(context).brightness;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
-    const borderRadiusSmall = 8.0;
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '自定义 Best50',
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          Column(
-            children: [
-              PageTopBar(
-                title: '自定义 Best50',
-              ),
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surface
-                        .withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [AppColors.defaultShadow(brightness)],
-                  ),
-                  child: SingleChildScrollView(
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: SingleChildScrollView(
                     padding: EdgeInsets.all(
                         MediaQuery.of(context).size.width * 0.03),
                     child: Column(
@@ -976,12 +957,6 @@ class _CustomBest50PageState extends State<CustomBest50Page> {
                       ],
                     ),
                   ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 

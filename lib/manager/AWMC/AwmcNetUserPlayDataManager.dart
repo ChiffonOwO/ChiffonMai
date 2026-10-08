@@ -6,7 +6,6 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../api/ApiUrls.dart';
-import '../../api/DeveloperToken.dart';
 import '../../service/AccountSwitchService.dart';
 import '../../utils/ApiClient.dart';
 import '../../utils/CurrentDataSourceNotifier.dart';
@@ -17,8 +16,8 @@ import 'AwmcNetException.dart';
 /// ── 它和另外两个源的关系 ──
 ///   * **水鱼**：走后端 OAuth 代理，按绑定 QQ 读 `/player/records`；
 ///   * **落雪**：走 OAuth，读 `/api/v0/user/maimai/player/scores` 再转成 [RecordItem]；
-///   * **AWMC NET**：**直连**，用 `Developer-Token` 头 + `?qq=` 查
-///     `/dev/player/records`，返回的结构与水鱼 `/player/records` **逐字段一致**。
+///   * **AWMC NET**：通过本项目服务端代理查询，Developer-Token 只保存在服务端；
+///     客户端仅提交 `qq`，返回的结构与水鱼 `/player/records` **逐字段一致**。
 ///
 /// 正因为结构一致，AWMC NET 不需要像落雪那样单独写一套转换 + Best50 计算：
 /// 「归一化 → 写进 `user_play_data` 活动槽 → `UserBest50Manager` 算 Best50」
@@ -28,9 +27,8 @@ import 'AwmcNetException.dart';
 ///
 /// ── 认证 ──
 /// 不需要用户登录，也不需要 OAuth：只要有 QQ 号就能查（前提是该 QQ
-/// 已在 AWMC NET 绑定过并上传过成绩）。凭据是项目自带的开发者密钥，
-/// 与其他凭据一样放在 `lib/api/DeveloperToken.dart`（该文件已 gitignore，
-/// 模板见 `DeveloperTokenShow.dart`，CI 由 Secrets 生成）。
+/// 已在 AWMC NET 绑定过并上传过成绩）。开发者凭据由服务端环境注入，
+/// 不进入 APK。
 class AwmcNetUserPlayDataManager {
   AwmcNetUserPlayDataManager._internal();
 
@@ -84,25 +82,18 @@ class AwmcNetUserPlayDataManager {
       throw const AwmcNetException('QQ 号格式不对（应为 5–12 位数字）');
     }
 
-    final uri = Uri.parse(ApiUrls.AwmcNetRecordsApi)
+    final uri = Uri.parse(ApiUrls.AwmcNetRecordsProxyApi)
         .replace(queryParameters: {'qq': id});
 
-    // 出口固定校验：任何拼装错误都在这里拦下，杜绝把开发者密钥发到别的域名。
-    if (uri.host != Uri.parse(ApiUrls.AwmcNetBaseUrl).host) {
+    // 出口固定校验：任何拼装错误都在这里拦下。
+    if (uri.host != Uri.parse(ApiUrls.BackendBaseUrl).host) {
       throw AwmcNetException('拒绝请求非 AWMC NET 地址：${uri.host}');
     }
 
     final http.Response response;
     try {
-      final key = DeveloperToken.AwmcNetDeveloperKey;
       response = await ApiClient.get(
         uri,
-        headers: {
-          // 官方文档的头名（实测 /dev/player/records 认这个）
-          'Developer-Token': key,
-          // 同一个密钥用 Bearer 也通（实测 200），留个兜底
-          'Authorization': 'Bearer $key',
-        },
         timeout: timeout,
       );
     } on TimeoutException {

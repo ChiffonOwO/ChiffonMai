@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/ApiUrls.dart';
 import '../../constant/CacheKeyConstant.dart';
 import '../../service/SyncStatsService.dart';
 import '../../utils/AppTheme.dart';
+import '../../utils/SecureCredentialStore.dart';
+import '../../utils/ExternalLaunchUtil.dart';
 import '../../widgets/QrQuickFillButtons.dart';
 import '../../widgets/SyncStatsFooter.dart';
+import '../../widgets/PostSyncRefreshOptions.dart';
+import '../../widgets/RefreshDataDialog.dart'
+    show RefreshDataRequest, RefreshDataSource;
 
 /// 用户在「同步成绩到 AWMC NET」对话框里填的两样东西。
 class AwmcNetSyncInput {
@@ -17,8 +21,10 @@ class AwmcNetSyncInput {
 
   /// 用户在 net.wmc.pub 设置页生成的成绩导入 Token。
   final String importToken;
+  final RefreshDataRequest? refreshRequest;
 
-  const AwmcNetSyncInput({required this.qr, required this.importToken});
+  const AwmcNetSyncInput(
+      {required this.qr, required this.importToken, this.refreshRequest});
 }
 
 /// 打开「同步成绩到 AWMC NET」的**输入对话框**，返回用户填的内容（取消 = null）。
@@ -60,6 +66,7 @@ class _SyncToAwmcNetPageState extends State<SyncToAwmcNetPage> {
   /// 已保存的导入 Token（null = 还没设置）。
   String? _savedToken;
   bool _tokenChecked = false;
+  final _refreshKey = GlobalKey<PostSyncRefreshOptionsState>();
 
   @override
   void initState() {
@@ -76,7 +83,8 @@ class _SyncToAwmcNetPageState extends State<SyncToAwmcNetPage> {
 
   Future<void> _loadToken() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(CacheKeyConstant.awmcNetImportToken);
+    final token =
+        await SecureCredentialStore.read(CacheKeyConstant.awmcNetImportToken);
     if (!mounted) return;
     setState(() {
       _savedToken = (token != null && token.isNotEmpty) ? token : null;
@@ -91,7 +99,8 @@ class _SyncToAwmcNetPageState extends State<SyncToAwmcNetPage> {
       return;
     }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(CacheKeyConstant.awmcNetImportToken, token);
+    await SecureCredentialStore.write(
+        CacheKeyConstant.awmcNetImportToken, token);
     if (!mounted) return;
     setState(() {
       _savedToken = token;
@@ -102,7 +111,7 @@ class _SyncToAwmcNetPageState extends State<SyncToAwmcNetPage> {
 
   Future<void> _clearToken() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(CacheKeyConstant.awmcNetImportToken);
+    await SecureCredentialStore.delete(CacheKeyConstant.awmcNetImportToken);
     if (!mounted) return;
     setState(() => _savedToken = null);
   }
@@ -125,10 +134,18 @@ class _SyncToAwmcNetPageState extends State<SyncToAwmcNetPage> {
     // 用户是直接在输入框里填的（没点保存）：顺手存下来，下次不用再填
     if (_savedToken == null) {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(CacheKeyConstant.awmcNetImportToken, token);
+      await SecureCredentialStore.write(
+          CacheKeyConstant.awmcNetImportToken, token);
     }
+    final refreshRequest = await _refreshKey.currentState?.collectRequest();
+    if (_refreshKey.currentState?.enabled == true && refreshRequest == null)
+      return;
     if (!mounted) return;
-    Navigator.of(context).pop(AwmcNetSyncInput(qr: qr, importToken: token));
+    Navigator.of(context).pop(AwmcNetSyncInput(
+      qr: qr,
+      importToken: token,
+      refreshRequest: refreshRequest,
+    ));
   }
 
   // ---------------------------------------------------------------------------
@@ -162,7 +179,8 @@ class _SyncToAwmcNetPageState extends State<SyncToAwmcNetPage> {
             Text(
               '在「舞萌|中二」公众号请求登入二维码并打开，再粘贴到下方；'
               '也可直接用「扫描」或「从图片识别」。',
-              style: TextStyle(fontSize: 13, color: AppColors.greyHint(brightness)),
+              style: TextStyle(
+                  fontSize: 13, color: AppColors.greyHint(brightness)),
             ),
             const SizedBox(height: 12),
             QrQuickFillButtons(controller: _qrController),
@@ -173,8 +191,10 @@ class _SyncToAwmcNetPageState extends State<SyncToAwmcNetPage> {
               decoration: InputDecoration(
                 hintText: '舞萌DX | 中二节奏 登入二维码（SGWCMAID...）',
                 hintStyle: TextStyle(
-                    fontSize: 13, color: AppColors.greyHint(brightness, shade: 400)),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    fontSize: 13,
+                    color: AppColors.greyHint(brightness, shade: 400)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 contentPadding: const EdgeInsets.all(12),
               ),
             ),
@@ -186,6 +206,11 @@ class _SyncToAwmcNetPageState extends State<SyncToAwmcNetPage> {
             const SizedBox(height: 12),
             // 覆盖式写入这件事必须**在点开始之前**说：等导入完了再提醒就晚了
             _buildOverwriteWarning(brightness),
+
+            PostSyncRefreshOptions(
+              key: _refreshKey,
+              source: RefreshDataSource.awmc,
+            ),
 
             // ── 近 100 次统计（所有使用者共享；点开看详情）──
             // 二维码直传没有线路可选，所以这里只有统计、没有线路切换器。
@@ -291,7 +316,8 @@ class _SyncToAwmcNetPageState extends State<SyncToAwmcNetPage> {
   }
 
   Widget _howToGetToken(Brightness brightness) {
-    final hintStyle = TextStyle(fontSize: 12, color: AppColors.greyHint(brightness));
+    final hintStyle =
+        TextStyle(fontSize: 12, color: AppColors.greyHint(brightness));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -335,8 +361,7 @@ class _SyncToAwmcNetPageState extends State<SyncToAwmcNetPage> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '导入约需 30 秒，进度显示在按钮上；以机台为准，'
-              '会覆盖 AWMC NET 上已存在的对应成绩。',
+              '以机台为准，会覆盖 AWMC NET 上已存在的对应成绩。',
               style: TextStyle(fontSize: 12, color: warn),
             ),
           ),
@@ -352,8 +377,7 @@ class _SyncToAwmcNetPageState extends State<SyncToAwmcNetPage> {
   Future<void> _openSettingsPage() async {
     final uri = Uri.parse(ApiUrls.AwmcNetSettingsUrl);
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (await ExternalLaunchUtil.open(uri)) {
         return;
       }
     } catch (e) {

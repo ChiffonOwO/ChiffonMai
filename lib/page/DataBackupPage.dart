@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:my_first_flutter_app/service/DataBackupService.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
-import 'package:my_first_flutter_app/utils/AppConstants.dart';
-import '../widgets/PageTopBar.dart';
+import '../widgets/BackgroundPageScaffold.dart';
+import '../widgets/ExportSuccessDialog.dart';
 
 class DataBackupPage extends StatefulWidget {
   const DataBackupPage({super.key});
@@ -33,35 +32,14 @@ class _DataBackupPageState extends State<DataBackupPage> {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '数据备份',
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          Column(
-            children: [
-              // 标题栏
-              PageTopBar(
-                title: '数据备份',
-              ),
-
-              // 主内容
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      AppConstants.defaultShadow(brightness),
-                    ],
-                  ),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -158,12 +136,6 @@ class _DataBackupPageState extends State<DataBackupPage> {
                       ],
                     ),
                   ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -270,47 +242,13 @@ class _DataBackupPageState extends State<DataBackupPage> {
           _lastExportPath = path;
           _isExporting = false;
         });
-        // 显示成功对话框，包含文件路径和操作指引
-        final inDownload = path.contains('/Download');
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Row(
-              children: [
-                Icon(Icons.check_circle, color: AppColors.successGreen(Theme.of(context).brightness), size: 28),
-                SizedBox(width: 8),
-                Text('导出成功'),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('备份文件已保存' + (inDownload ? '到下载目录：' : '到：')),
-                SizedBox(height: 8),
-                Container(
-                  padding: EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Theme.of(ctx).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(path,
-                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                  ),
-                ),
-                SizedBox(height: 12),
-                if (inDownload)
-                  Text('可在文件管理器的「下载」文件夹中找到该文件。',
-                    style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text('确定'),
-              ),
-            ],
-          ),
+        await showExportSuccessDialog(
+          context,
+          filePath: path,
+          fileName: '备份文件',
+          warning: path.contains('/Download')
+              ? '可在文件管理器的「下载」文件夹中找到该文件。'
+              : null,
         );
       } else {
         if (mounted) {

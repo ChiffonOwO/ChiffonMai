@@ -28,8 +28,10 @@ class CacheKeyConstant {
   // 悬浮球位置（可拖动，记住用户摆的地方）
   static const String portableBallOffset = 'portable_ball_offset';
   // 是否已经申请过通知权限（首次进随身听页申请一次，不要每次进都弹）
-  static const String portableNotificationAsked =
-      'portable_notification_asked';
+  static const String portableNotificationAsked = 'portable_notification_asked';
+  // 离开随身听页面时是否重新显示悬浮球
+  static const String portableShowBallOnLibraryExit =
+      'portable_show_ball_on_library_exit';
 
   // 落雪OAuth相关
   static const String luoxueAccessToken = 'luoxue_access_token';
@@ -64,7 +66,8 @@ class CacheKeyConstant {
   // 账号元信息（昵称 / Rating / id / 是否有缓存），一个 JSON map
   static const String accountStore = 'account_store_v1';
   // 账号身份存档（昵称 / QQ / id / 评论身份 / 排行榜参与开关）：属于用户数据，进备份
-  static const String accountArchiveIdentityPrefix = 'account_archive_identity_';
+  static const String accountArchiveIdentityPrefix =
+      'account_archive_identity_';
   // 账号成绩存档（游玩数据 / Best50 / 推荐结果）：可重新拉取，不进备份
   static const String accountArchivePlayPrefix = 'account_archive_play_';
   // 活动槽事务恢复日志（JSON；兼容旧版仅保存目标源 key 的标记），不进备份
@@ -144,7 +147,8 @@ class CacheKeyConstant {
 
   // 平均值排行榜缓存相关（平均达成率 / 平均DX分数）
   static const String avgRankingsCache = 'avg_rankings_cache';
-  static const String avgRankingsCacheTimestamp = 'avg_rankings_cache_timestamp';
+  static const String avgRankingsCacheTimestamp =
+      'avg_rankings_cache_timestamp';
   static const String avgRankingsLastMetric = 'avg_rankings_last_metric';
 
   // 拟合总Rating排行榜缓存相关（按模式拼接 key）
@@ -198,7 +202,7 @@ class CacheKeyConstant {
   static const String profileCardStyle = 'profile_card_style';
 
   // ===== AWMC 网关（api.wmc.pub）相关 =====
-  // 用户本机保存的网关令牌（gw_...）；空表示未设置。
+  // 旧版网关令牌键，仅为升级兼容保留；当前开发者令牌只在服务端保存。
   // 注意：机台 qrcode **不落盘**，只在一次会话的内存里保存。
   static const String awmcToken = 'awmc_token';
   // AWMC 调用审计日志（JSON 数组，不含 qrcode / 令牌 / 请求体）
@@ -224,17 +228,19 @@ class CacheKeyConstant {
   /// AWMC NET 的成绩导入 Token（用户在 net.wmc.pub 官网「个人资料」里生成）。
   ///
   /// 它**等同该账号的上传权限**，所以：日志、错误文案、审计记录里都不要回显它。
-  /// 备份取舍上跟 `probeLxnsImportToken` 保持一致（不在 `_cacheExactKeys` 里，
-  /// 会随备份一起导出/还原）。
+  /// 不进入明文备份；实际值保存在系统安全存储中。
   static const String awmcNetImportToken = 'awmc_net_import_token';
 
+  /// 多端同步中补充的 AWMC NET QQ；只作同步设置，不切换当前成绩账号。
+  static const String awmcNetSyncQQ = 'awmc_net_sync_qq';
+
   // ===== 同步成绩的线路选择 =====
-  // 0 = 线路2 maimai Score Hub（原有 scorehub 流程），1 = 线路1 AWMC 网关
+  // 0 = 线路2 maimai Score Hub（原有流程），1 = 线路1 AWMC 网关
   // 整数值沿用历史命名不换（详见 SyncRouteStore 顶部注释）。
   static const String syncRouteDivingFish = 'sync_route_diving_fish';
   static const String syncRouteLuoXue = 'sync_route_luoxue';
 
-  // Maimai Score Hub 探针同步相关
+  // maimai Score Hub 探针同步相关
   static const String probeAuthToken = 'probe_auth_token';
   static const String probeFriendCode = 'probe_friend_code';
   static const String probeLastSyncTime = 'probe_last_sync_time';

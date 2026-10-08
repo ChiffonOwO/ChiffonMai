@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../entity/LuoXue/Collection.dart';
 import '../utils/AppTheme.dart';
+import 'LxnsAssetImage.dart';
 
 /// 收藏品选择器底部弹窗：在头像 / 姓名框两个 Tab 间切换并支持搜索。
 /// 从 HomePage 中提取出来，方便在「我的」等其他页面复用。
@@ -359,8 +359,8 @@ class _CollectionPickerSheetState extends State<CollectionPickerSheet> {
                       final item = filteredItems[index];
                       final isSelected = item.id == currentSelectedId;
                       final imageUrl = _activeTab == 0
-                          ? 'https://assets2.lxns.net/maimai/icon/${item.id}.png'
-                          : 'https://assets2.lxns.net/maimai/plate/${item.id}.png';
+                          ? lxnsIconUrl(item.id)
+                          : lxnsPlateUrl(item.id);
                       final scheme = Theme.of(context).colorScheme;
                       return GestureDetector(
                         onTap: () {
@@ -382,13 +382,16 @@ class _CollectionPickerSheetState extends State<CollectionPickerSheet> {
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(6),
-                            child: CachedNetworkImage(
-                              imageUrl: imageUrl,
-                              placeholder: (ctx, url) => const Center(
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2)),
-                              errorWidget: (ctx, url, err) =>
-                                  const Icon(Icons.error, size: 20),
+                            // 用 LxnsAssetImage 而不是裸 CachedNetworkImage：
+                            //   1. 磁盘缓存单开（2000 个名额），不再和排行榜头像 /
+                            //      曲绘挤 DefaultCacheManager 的 200 个名额；
+                            //   2. 零淡入 + 静态占位 —— 这个 sheet 每次拉起都重建
+                            //      Widget 树，磁盘读是异步的，用转圈占位会让
+                            //      「本地已命中」看起来像「正在联网」；
+                            //   3. 自动按格子宽度限制解码尺寸，姓名框（720×116）
+                            //      不再按原尺寸解码去挤 ImageCache。
+                            child: LxnsAssetImage(
+                              url: imageUrl,
                               fit: BoxFit.contain,
                             ),
                           ),

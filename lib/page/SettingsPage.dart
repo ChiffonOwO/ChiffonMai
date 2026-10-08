@@ -12,6 +12,7 @@ import '../utils/CommonWidgetUtil.dart';
 import '../utils/ExportSettings.dart';
 import '../utils/ThemeManager.dart';
 import '../widgets/PageTopBar.dart';
+import '../widgets/ThemePreferenceControls.dart';
 
 /// 设置页（独立页面，从首页主题弹窗"更多设置"进入）
 ///
@@ -68,6 +69,8 @@ class _SettingsPageState extends State<SettingsPage> {
       final photo = await _picker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 92,
+        maxWidth: 2560,
+        maxHeight: 2560,
       );
       if (photo == null) return;
 
@@ -85,9 +88,8 @@ class _SettingsPageState extends State<SettingsPage> {
       }
       await _clearOldBackgroundFiles(dir);
 
-      final ext = p.extension(photo.path).isNotEmpty
-          ? p.extension(photo.path)
-          : '.jpg';
+      final ext =
+          p.extension(photo.path).isNotEmpty ? p.extension(photo.path) : '.jpg';
       final destPath = p.join(dir.path, 'background$ext');
       final destFile = File(destPath);
 
@@ -217,6 +219,10 @@ class _SettingsPageState extends State<SettingsPage> {
                           ],
                         ),
                         const SizedBox(height: 24),
+                        _buildSectionTitle('外观与导航', c),
+                        const SizedBox(height: 8),
+                        const ThemePreferenceControls(),
+                        const SizedBox(height: 24),
                         _buildSectionTitle('背景图', c),
                         const SizedBox(height: 8),
                         _buildBackgroundSection(sw, c),
@@ -242,7 +248,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   // 顶部栏统一走公共组件（标题样式对齐 Rating 排行榜页的 AppBar）
   Widget _buildTitleBar(double sw, Color c) =>
-      const PageTopBar(title: '设置');
+      const PageTopBar(title: '主题与交互偏好');
 
   Widget _buildSectionTitle(String title, Color c) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -261,15 +267,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final bgPath = ThemeManager().customBackgroundPath;
     return Container(
       decoration: BoxDecoration(
-        color: scheme.surface.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
         children: [
@@ -284,7 +282,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 fit: StackFit.expand,
                 children: [
                   if (bgPath != null)
-                    Image.file(File(bgPath), fit: BoxFit.cover, gaplessPlayback: true)
+                    Image.file(File(bgPath),
+                        fit: BoxFit.cover, gaplessPlayback: true)
                   else
                     Image.asset('assets/background.png',
                         fit: BoxFit.cover, gaplessPlayback: true),
@@ -333,8 +332,8 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _previewSwatch(String label, Color color, double sw) {
-    final isLight = ThemeData.estimateBrightnessForColor(color) ==
-        Brightness.light;
+    final isLight =
+        ThemeData.estimateBrightnessForColor(color) == Brightness.light;
     final txtColor = isLight ? Colors.black87 : Colors.white;
     return Expanded(
       child: Container(
@@ -363,8 +362,8 @@ class _SettingsPageState extends State<SettingsPage> {
       spacing: 12,
       runSpacing: 12,
       children: _presetColors.map((color) {
-        final isSelected = current != null &&
-            current.toARGB32() == color.toARGB32();
+        final isSelected =
+            current != null && current.toARGB32() == color.toARGB32();
         return GestureDetector(
           onTap: () async {
             await ThemeManager().setSeedColor(color);
@@ -402,9 +401,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final brightness = Theme.of(context).brightness;
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: c.withValues(alpha: 0.15)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -445,7 +442,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 fit: StackFit.expand,
                 children: [
                   if (bgPath != null)
-                    Image.file(File(bgPath), fit: BoxFit.cover, gaplessPlayback: true)
+                    Image.file(File(bgPath),
+                        fit: BoxFit.cover, gaplessPlayback: true)
                   else
                     Image.asset('assets/background.png',
                         fit: BoxFit.cover, gaplessPlayback: true),
@@ -465,8 +463,8 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                       child: Text(
                         bgPath == null ? '当前：内置背景' : '当前：自定义图片',
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 12),
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 12),
                       ),
                     ),
                   ),
@@ -490,9 +488,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final opacity = ThemeManager().chiffonOpacity;
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: c.withValues(alpha: 0.15)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -595,9 +591,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final scheme = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: scheme.surface.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: c.withValues(alpha: 0.15)),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -613,8 +607,7 @@ class _SettingsPageState extends State<SettingsPage> {
               const Spacer(),
               // 固定值，只读展示（不让改，避免劫持常见后缀的打开方式）
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: scheme.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
@@ -772,8 +765,8 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
               ),
               const SizedBox(height: 12),
               Text('色相',
-                  style: TextStyle(
-                      fontSize: 12, color: scheme.onSurfaceVariant)),
+                  style:
+                      TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
               const SizedBox(height: 4),
               _HueSlider(
                 key: const ValueKey('color-hue-slider'),
@@ -856,9 +849,8 @@ class _ColorPickerArea extends StatelessWidget {
 
   void _handle(Offset local, Size size) {
     final s = size.width <= 0 ? 0.0 : (local.dx / size.width).clamp(0.0, 1.0);
-    final v = size.height <= 0
-        ? 0.0
-        : (1.0 - local.dy / size.height).clamp(0.0, 1.0);
+    final v =
+        size.height <= 0 ? 0.0 : (1.0 - local.dy / size.height).clamp(0.0, 1.0);
     onChanged(hsv.withSaturation(s).withValue(v));
   }
 
@@ -866,8 +858,7 @@ class _ColorPickerArea extends StatelessWidget {
   Widget build(BuildContext context) {
     final hueOnly = HSVColor.fromAHSV(1, hsv.hue, 1, 1).toColor();
     final thumbColor = hsv.toColor();
-    final thumbBrightness =
-        ThemeData.estimateBrightnessForColor(thumbColor);
+    final thumbBrightness = ThemeData.estimateBrightnessForColor(thumbColor);
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);

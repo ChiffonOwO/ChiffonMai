@@ -44,7 +44,7 @@ Song song(
 
 void main() {
   group('国服更新前沿', () {
-    test('取水鱼（非 extra、非宴会）里 id 最大的那首', () {
+    test('没有日期时按 id 回退取水鱼（非 extra、非宴会）里的最新曲', () {
       final result = UnionUpdateCompareService.compare([
         song('11900', title: '旧曲'),
         song('12000', title: '国服最新曲'),
@@ -56,6 +56,17 @@ void main() {
       expect(result.cnSongCount, 3);
       expect(result.upcoming, isEmpty);
       expect(result.skipped, isEmpty);
+    });
+
+    test('筛选后的国服常规曲按首发日期从新到旧取前沿', () {
+      final result = UnionUpdateCompareService.compare([
+        song('12000', title: 'id 较大但日期较早', releaseDate: '2025-01-01'),
+        song('11000', title: '日期最新', releaseDate: '2026-03-01'),
+        song('11500', title: '中间日期', releaseDate: '2025-06-01'),
+      ]);
+
+      expect(result.frontier?.id, '11000');
+      expect(result.cnSongs.map((s) => s.id), ['11000', '11500', '12000']);
     });
 
     test('宴会场（6 位 id）不参与前沿判定', () {

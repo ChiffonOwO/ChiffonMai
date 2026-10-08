@@ -1,10 +1,10 @@
+import '../widgets/AnimatedChoiceBar.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../api/ApiUrls.dart';
 import '../constant/CacheKeyConstant.dart';
@@ -23,11 +23,14 @@ import '../manager/DivingFish/UserBest50Manager.dart';
 import '../manager/DivingFish/UserPlayDataManager.dart';
 import '../manager/LuoXue/CollectionsManager.dart';
 import '../manager/LuoXue/LuoXueUserPlayDataManager.dart';
+import '../manager/LuoXue/LuoXueOAuthManager.dart';
+import '../manager/LuoXue/LuoXueOAuthManager.dart';
 import '../manager/MaiTagsManager.dart';
 import '../manager/SongAliasManager.dart';
 import '../service/History/ChartHistoryStore.dart';
 import '../service/AccountStore.dart';
 import '../service/AccountSwitchService.dart';
+import '../utils/SecureCredentialStore.dart';
 import '../service/CommunityNicknameSyncService.dart';
 import '../service/ConnectivityService.dart';
 import '../service/PaiziProgressService.dart';
@@ -40,6 +43,7 @@ import '../utils/CacheSourceRegistry.dart';
 import '../utils/CurrentDataSourceNotifier.dart';
 import '../utils/StringUtil.dart';
 import '../utils/UserProfileNotifier.dart';
+import '../utils/ExternalLaunchUtil.dart';
 import 'DivingFishAccountSection.dart';
 
 // 数据源枚举 / 当前数据源 Notifier 已抽到 utils，这里 re-export，
@@ -82,6 +86,9 @@ class RefreshDataRequest {
   /// 为 null 时回退到 [forceFullRefresh] 的"全部强制"语义。
   final Set<String>? forceSourceIds;
 
+  /// 落雪已在本机保存授权令牌时可以直接续期，无需再次输入授权码。
+  final bool useSavedAuthorization;
+
   const RefreshDataRequest({
     required this.dataSource,
     required this.qq,
@@ -90,6 +97,7 @@ class RefreshDataRequest {
     required this.showNickname,
     required this.forceFullRefresh,
     this.forceSourceIds,
+    this.useSavedAuthorization = false,
   });
 
   bool get isShuiyu => dataSource == RefreshDataSource.shuiyu;
@@ -104,7 +112,7 @@ class RefreshDataRequest {
       case RefreshDataSource.awmc:
         return qq.isNotEmpty;
       case RefreshDataSource.luoxue:
-        return authCode.isNotEmpty;
+        return authCode.isNotEmpty || useSavedAuthorization;
     }
   }
 }
@@ -121,7 +129,9 @@ Future<RefreshDataRequest?> showRefreshDataDialog(
 }) async {
   await CurrentDataSourceNotifier.load();
   final prefs = await SharedPreferences.getInstance();
-  final jwt = prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '';
+  final jwt =
+      await SecureCredentialStore.read(CacheKeyConstant.probeDivingFishToken) ??
+          '';
   final bindQQ = prefs.getString(CacheKeyConstant.probeDivingFishBindQQ) ?? '';
 
   // AWMC NET 的 QQ 必须取自**它自己的**账号存档，不能用共用的 cachedQQ：
@@ -161,7 +171,7 @@ Future<bool> executeRefreshData(
     // 最后仍然 onProgress(100, '数据刷新完成') 并 return true，调用方就弹
     // 「数据刷新成功!」——用户以为刷了，其实一条数据都没动。
     throw StateError(
-      source == RefreshDataSource.luoxue
+      source == RefreshDataSource.luoxue && !request.useSavedAuthorization
           ? '未填写落雪授权码'
           : '未拿到${source.displayName}的查询标识',
     );
@@ -233,7 +243,7 @@ Future<bool> executeAdvancedRefreshData(
   if (!willRefresh) {
     // 同 executeRefreshData：输入为空时不要假报成功
     throw StateError(
-      source == RefreshDataSource.luoxue
+      source == RefreshDataSource.luoxue && !request.useSavedAuthorization
           ? '未填写落雪授权码'
           : '未拿到${source.displayName}的查询标识',
     );
@@ -342,6 +352,7 @@ class _RefreshDataDialogState extends State<_RefreshDataDialog> {
   bool participateRankings = false;
   bool showNickname = false;
   bool forceFullRefresh = false;
+  bool _hasSavedLuoXueToken = false;
 
   @override
   void initState() {
@@ -354,6 +365,12 @@ class _RefreshDataDialogState extends State<_RefreshDataDialog> {
     if (_bindQQ.isNotEmpty) {
       _checkAuthorization();
     }
+    _loadLuoXueToken();
+  }
+
+  Future<void> _loadLuoXueToken() async {
+    final loggedIn = await LuoXueOAuthManager().isLoggedIn();
+    if (mounted) setState(() => _hasSavedLuoXueToken = loggedIn);
   }
 
   @override
@@ -480,36 +497,20 @@ class _RefreshDataDialogState extends State<_RefreshDataDialog> {
             // 所以标题单独一行，避免 RenderFlex overflow。
             const Text('当前数据源：'),
             const SizedBox(height: 6),
-            ToggleButtons(
-              constraints: const BoxConstraints(minHeight: 30, minWidth: 54),
-              isSelected: [
-                for (final source in RefreshDataSource.values)
-                  _currentDataSource == source,
-              ],
-              onPressed: (index) {
+            AnimatedChoiceBar<RefreshDataSource>(
+              values: RefreshDataSource.values,
+              value: _currentDataSource,
+              label: (source) => source.shortDisplayName,
+              onChanged: (source) {
                 // 这里只选「本次要刷新的数据源」，不直接切活动源：
                 // 真正的切换/换槽在 executeRefreshData 里由 runRefresh 完成，
                 // 否则活动槽与数据源会不一致。
                 setState(() {
-                  _currentDataSource = RefreshDataSource.values[index];
+                  _currentDataSource = source;
                   authCodeController.clear();
                 });
                 _loadRankingSettings();
               },
-              children: const [
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                  child: Text('水鱼'),
-                ),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                  child: Text('落雪'),
-                ),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                  child: Text('AWMC NET'),
-                ),
-              ],
             ),
             const SizedBox(height: 12),
             if (_currentDataSource == RefreshDataSource.shuiyu)
@@ -564,13 +565,18 @@ class _RefreshDataDialogState extends State<_RefreshDataDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_hasSavedLuoXueToken)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text('已保存落雪授权，将自动续期，无需再次输入授权码。',
+                style: TextStyle(color: AppColors.successGreen(brightness))),
+          ),
         ElevatedButton(
           onPressed: () async {
             final url = LuoXueUserPlayDataManager().getAuthorizationUrl();
             try {
-              if (await canLaunchUrl(Uri.parse(url))) {
-                await launchUrl(Uri.parse(url),
-                    mode: LaunchMode.externalApplication);
+              if (await ExternalLaunchUtil.openString(url)) {
+                return;
               } else {
                 if (!mounted) return;
                 launchUrlFallback(url, context);
@@ -648,7 +654,7 @@ class _RefreshDataDialogState extends State<_RefreshDataDialog> {
   /// AWMC NET.（net.wmc.pub）面板。
   ///
   /// 与水鱼 / 落雪最大的差别：**不需要任何登录或授权**，只填 QQ 号即可。
-  /// 凭据是项目自带的开发者密钥（见 `lib/api/DeveloperToken.dart`），用户侧无可配置项。
+  /// 凭据由服务端安全环境注入，用户侧无可配置项。
   Widget _buildAwmcPanel(Brightness brightness) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -706,9 +712,7 @@ class _RefreshDataDialogState extends State<_RefreshDataDialog> {
                 onPressed: () async {
                   const url = 'https://net.wmc.pub/';
                   try {
-                    if (await canLaunchUrl(Uri.parse(url))) {
-                      await launchUrl(Uri.parse(url),
-                          mode: LaunchMode.externalApplication);
+                    if (await ExternalLaunchUtil.openString(url)) {
                       return;
                     }
                   } catch (e) {
@@ -788,7 +792,8 @@ class _RefreshDataDialogState extends State<_RefreshDataDialog> {
     }
     // 落雪：没填授权码就点确认，原来会静默地「什么都不做但报成功」
     if (_currentDataSource == RefreshDataSource.luoxue &&
-        authCodeController.text.trim().isEmpty) {
+        authCodeController.text.trim().isEmpty &&
+        !_hasSavedLuoXueToken) {
       Fluttertoast.showToast(msg: '请先填写落雪授权码');
       return;
     }
@@ -827,6 +832,9 @@ class _RefreshDataDialogState extends State<_RefreshDataDialog> {
       participateRankings: participateRankings,
       showNickname: showNickname,
       forceFullRefresh: forceFullRefresh,
+      useSavedAuthorization: _currentDataSource == RefreshDataSource.luoxue &&
+          authCodeController.text.trim().isEmpty &&
+          _hasSavedLuoXueToken,
     );
     if (mounted) Navigator.of(context).pop(request);
   }
@@ -1399,11 +1407,18 @@ Future<void> _handleLuoXueAuthWithProgressImpl(
       debugPrint('清除推荐结果缓存失败: $e');
     }
 
-    onProgress(10, '正在换取访问令牌...');
-    final success =
-        await LuoXueUserPlayDataManager().exchangeCodeForToken(authCode);
-    if (!success) {
-      throw Exception('授权失败，请检查授权码是否正确');
+    onProgress(10, authCode.trim().isNotEmpty ? '正在换取访问令牌...' : '正在续期访问令牌...');
+    if (authCode.trim().isNotEmpty) {
+      final success = await LuoXueUserPlayDataManager()
+          .exchangeCodeForToken(authCode.trim());
+      if (!success) {
+        throw Exception('授权失败，请检查授权码是否正确');
+      }
+    } else {
+      final accessToken = await LuoXueOAuthManager().getAccessToken();
+      if (accessToken == null || accessToken.isEmpty) {
+        throw Exception('落雪授权已过期，请重新输入授权码');
+      }
     }
 
     onProgress(15, '授权成功，正在并行刷新数据...');
@@ -1792,4 +1807,3 @@ Future<({List<RecordItem>? best35, List<RecordItem>? best15})?>
     return null;
   }
 }
-

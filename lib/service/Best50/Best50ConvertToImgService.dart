@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'ThunderBest50Export.dart';
 import 'package:my_first_flutter_app/utils/ExportUserInfoWidget.dart';
 import 'package:my_first_flutter_app/widgets/B50GameCardWidget.dart';
 import 'dart:io';
@@ -25,7 +26,7 @@ class B50ConvertToImg {
   static GlobalKey _globalKey = GlobalKey();
 
   // 导出为图片的方法
-  static Future<File?> convertToImage(BuildContext context, Map<String, dynamic>? b50Data, List<Map<String, dynamic>> sdSongs, List<Map<String, dynamic>> dxSongs, List<dynamic>? maimaiMusicData, {bool isTheoreticalMode = false, int? jpegQuality, int? selectedPlateId}) async {
+  static Future<File?> convertToImage(BuildContext context, Map<String, dynamic>? b50Data, List<Map<String, dynamic>> sdSongs, List<Map<String, dynamic>> dxSongs, List<dynamic>? maimaiMusicData, {bool isTheoreticalMode = false, int? jpegQuality, int? selectedPlateId, bool thunderMode = false, bool thunderVertical = true}) async {
     OverlayEntry? overlayEntry;
     try {
       debugPrint('=== STARTING IMAGE CONVERSION ===');
@@ -43,8 +44,11 @@ class B50ConvertToImg {
       // 创建一个Widget，用于生成图片
       Widget imageWidget = RepaintBoundary(
         key: globalKey,
-        child: await _buildExportImageWidget(context, b50Data, sdSongs, dxSongs, maimaiMusicData, isTheoreticalMode: isTheoreticalMode, selectedPlateId: selectedPlateId),
+        child: await _buildExportImageWidget(context, b50Data, sdSongs, dxSongs, maimaiMusicData, isTheoreticalMode: isTheoreticalMode, selectedPlateId: selectedPlateId, thunderMode: thunderMode, thunderVertical: thunderVertical),
       );
+      final exportWidth = thunderMode
+          ? ThunderBest50Export.widthFor(sdSongs.length + dxSongs.length, thunderVertical)
+          : 1700.0;
 
       // 创建一个屏幕外的OverlayEntry，避免影响主UI
       // 使用Positioned将Widget定位到屏幕外，确保它被渲染但不可见
@@ -52,7 +56,7 @@ class B50ConvertToImg {
         builder: (context) => Positioned(
           left: -9999, // 移到屏幕外
           top: -9999,
-          width: 1700, // 2.5× 姓名框 1150 + 16 gap + metaRow 534 ≈ 1700
+          width: exportWidth,
           child: Material(
             type: MaterialType.transparency,
             child: imageWidget,
@@ -233,7 +237,7 @@ class B50ConvertToImg {
   }
 
   // 构建用于导出的Widget
-  static Future<Widget> _buildExportImageWidget(BuildContext context, Map<String, dynamic>? b50Data, List<Map<String, dynamic>> sdSongs, List<Map<String, dynamic>> dxSongs, List<dynamic>? maimaiMusicData, {bool isTheoreticalMode = false, int? selectedPlateId}) async {
+  static Future<Widget> _buildExportImageWidget(BuildContext context, Map<String, dynamic>? b50Data, List<Map<String, dynamic>> sdSongs, List<Map<String, dynamic>> dxSongs, List<dynamic>? maimaiMusicData, {bool isTheoreticalMode = false, int? selectedPlateId, bool thunderMode = false, bool thunderVertical = true}) async {
     // 计算各项指标
     // 计算Best35相关指标
     int best35Sum = sdSongs.fold(0, (sum, song) => sum + ((song['ra'] ?? 0) as int));
@@ -290,7 +294,7 @@ class B50ConvertToImg {
     double best15ScoreRateAverage = dxSongs.isNotEmpty ? dxScoreRateSum / dxSongs.length : 0.0;
 
     // 创建一个容器，设置固定宽度以确保布局一致
-    double containerWidth = 1700; // 适合5列布局的宽度
+    double containerWidth = thunderMode && !thunderVertical ? 17000 : 1700;
 
     // 计算谱面 ID 对齐宽度：若 50 首中存在 6 位 ID 则按 6 位对齐，否则按 5 位
     int maxIdLength = 5;
@@ -300,6 +304,20 @@ class B50ConvertToImg {
         maxIdLength = 6;
         break;
       }
+    }
+
+    if (thunderMode) {
+      final songs = [...sdSongs, ...dxSongs];
+      return ThunderBest50Export.build(
+        title: isTheoreticalMode ? '理论 Best50' : 'Best50',
+        vertical: thunderVertical,
+        count: songs.length,
+        showUserInfo: !isTheoreticalMode,
+        statistics: 'Rating $rating\nBest35 $best35Sum · Best15 $best15Sum\n'
+            '平均达成率 ${best50AchievementAverage.toStringAsFixed(4)}%\n'
+            '平均 DX 分达成率 ${(best50ScoreRateAverage * 100).toStringAsFixed(2)}%',
+        cardBuilder: (index) => _buildDataGameCard(context, songs[index], b50Data, maimaiMusicData, maxIdLength),
+      );
     }
 
     return Container(
@@ -330,20 +348,31 @@ class B50ConvertToImg {
                 // （Center 依赖 Row 高度，Row 高度依赖 Center 高度），导致 infinite height 异常。
                 // 改用 SizedBox(height: 230) + Align(center) 显式给 metaRow 固定 230 高度。
                 if (!isTheoreticalMode) ...[
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ExportUserInfoWidget.buildUserInfoSection(context, selectedPlateId: selectedPlateId),
-                      const SizedBox(width: 16),
-                      SizedBox(
-                        height: 230,
-                        child: Align(
-                          alignment: Alignment.center,
-                          child: _buildMetaRow(),
+                  thunderMode
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            ExportUserInfoWidget.buildUserInfoSection(
+                                context, selectedPlateId: selectedPlateId),
+                            const SizedBox(height: 12),
+                            _buildMetaRow(),
+                          ],
+                        )
+                      : Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ExportUserInfoWidget.buildUserInfoSection(
+                                context, selectedPlateId: selectedPlateId),
+                            const SizedBox(width: 16),
+                            SizedBox(
+                              height: 230,
+                              child: Align(
+                                alignment: Alignment.center,
+                                child: _buildMetaRow(),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
                   SizedBox(height: 16.0),
                 ],
 
@@ -356,7 +385,7 @@ class B50ConvertToImg {
                 SizedBox(height: 16.0),
 
                 // Best35 卡片网格 (5列)
-                _buildDataCardGrid(context, sdSongs, 1.85, 5, b50Data, maimaiMusicData, maxIdLength),
+                _buildDataCardGrid(context, sdSongs, thunderMode ? 1.25 : 1.85, thunderMode ? (thunderVertical ? 1 : 50) : 5, b50Data, maimaiMusicData, maxIdLength),
                 SizedBox(height: 24.0),
 
                 // Best15 标题区域
@@ -364,7 +393,7 @@ class B50ConvertToImg {
                 SizedBox(height: 16.0),
 
                 // Best15 卡片网格 (5列)
-                _buildDataCardGrid(context, dxSongs, 1.85, 5, b50Data, maimaiMusicData, maxIdLength),
+                _buildDataCardGrid(context, dxSongs, thunderMode ? 1.25 : 1.85, thunderMode ? (thunderVertical ? 1 : 50) : 5, b50Data, maimaiMusicData, maxIdLength),
                 SizedBox(height: 20.0),
               ],
             ),
@@ -1409,7 +1438,7 @@ class B50ConvertToImg {
   static Widget _buildDataCardGrid(
       BuildContext context, List<Map<String, dynamic>> songs, double childAspectRatio, int crossAxisCount, Map<String, dynamic>? b50Data, List<dynamic>? maimaiMusicData, int maxIdLength) {
     return Container(
-      width: 1700,
+      width: crossAxisCount == 50 ? 17000 : 1700,
       child: GridView.builder(
         shrinkWrap: true,
         physics: NeverScrollableScrollPhysics(),

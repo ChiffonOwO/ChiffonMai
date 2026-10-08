@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import '../widgets/SmoothLinearProgressIndicator.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
@@ -471,11 +472,12 @@ class PersonalizedScoreConvertToImg {
                             Expanded(
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(4.0),
-                                child: LinearProgressIndicator(
+                                child: SmoothLinearProgressIndicator(
                                   value: stat['rate'] as double,
                                   backgroundColor: Colors.grey[200],
                                   valueColor: AlwaysStoppedAnimation<Color>(barColor),
                                   minHeight: 14.0,
+                                  animate: false,
                                 ),
                               ),
                             ),

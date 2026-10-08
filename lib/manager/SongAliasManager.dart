@@ -87,7 +87,7 @@ class SongAliasManager {
 
       // 处理后两个API的数据，合并到已有数据中
       _mergeAliasSource(combinedAliases, futures[1], 'DXRatingSongAliasApi');
-      _mergeAliasSource(combinedAliases, futures[2], 'MaimaiHubMusicAliases');
+      _mergeAliasSource(combinedAliases, futures[2], 'maimai Score Hub 曲目别名');
 
       // 只有在成功获取到新数据时才更新缓存，否则保留原有数据
       if (combinedAliases.isNotEmpty) {
@@ -243,7 +243,7 @@ class SongAliasManager {
     return null;
   }
 
-  /// 从 MaimaiHub 的曲目别名接口获取别名数据
+  /// 从 maimai Score Hub 的曲目别名接口获取别名数据
   ///
   /// 该接口按 `musicId` 返回别名，而本管理器与所有调用方都按**歌曲名**索引
   /// （调用方一律写 `aliases[song.title]`），所以要先拉一次 `/catalog/music`
@@ -257,13 +257,13 @@ class SongAliasManager {
       final catalogResp =
           await ApiClient.get(Uri.parse(ApiUrls.MaimaiHubMusicCatalogUrl));
       if (catalogResp.statusCode != 200) {
-        debugPrint('MaimaiHub曲目表请求失败，状态码=${catalogResp.statusCode}');
+        debugPrint('maimai Score Hub 曲目表请求失败，状态码=${catalogResp.statusCode}');
         return null;
       }
       final dynamic catalogJson =
           jsonDecode(utf8.decode(catalogResp.bodyBytes));
       if (catalogJson is! List) {
-        debugPrint('MaimaiHub曲目表格式异常，类型: ${catalogJson.runtimeType}');
+        debugPrint('maimai Score Hub 曲目表格式异常，类型: ${catalogJson.runtimeType}');
         return null;
       }
 
@@ -277,7 +277,7 @@ class SongAliasManager {
         idToTitle[id.toString().trim()] = title.trim();
       }
       if (idToTitle.isEmpty) {
-        debugPrint('MaimaiHub曲目表为空，跳过该来源');
+        debugPrint('maimai Score Hub 曲目表为空，跳过该来源');
         return null;
       }
 
@@ -285,17 +285,17 @@ class SongAliasManager {
       final aliasResp =
           await ApiClient.get(Uri.parse(ApiUrls.MaimaiHubMusicAliasesUrl));
       if (aliasResp.statusCode != 200) {
-        debugPrint('MaimaiHub别名请求失败，状态码=${aliasResp.statusCode}');
+        debugPrint('maimai Score Hub 别名请求失败，状态码=${aliasResp.statusCode}');
         return null;
       }
       final dynamic aliasJson = jsonDecode(utf8.decode(aliasResp.bodyBytes));
       if (aliasJson is! Map<String, dynamic>) {
-        debugPrint('MaimaiHub别名格式异常，类型: ${aliasJson.runtimeType}');
+        debugPrint('maimai Score Hub 别名格式异常，类型: ${aliasJson.runtimeType}');
         return null;
       }
       final rawList = aliasJson['aliases'];
       if (rawList is! List) {
-        debugPrint('MaimaiHub别名缺少 aliases 字段');
+        debugPrint('maimai Score Hub 别名缺少 aliases 字段');
         return null;
       }
 
@@ -324,12 +324,12 @@ class SongAliasManager {
       // 丢掉只有空别名列表的条目，避免污染合并结果
       newAliases.removeWhere((_, v) => v.isEmpty);
 
-      debugPrint('成功从MaimaiHub别名接口加载${newAliases.length}首歌曲的别名'
+      debugPrint('成功从 maimai Score Hub 别名接口加载${newAliases.length}首歌曲的别名'
           '（revision=${aliasJson['revision']}，'
           '${skippedNoTitle}条 musicId 在曲目表里找不到标题）');
       return newAliases;
     } catch (e) {
-      debugPrint('获取MaimaiHub别名异常：$e');
+      debugPrint('获取 maimai Score Hub 别名异常：$e');
     }
     return null;
   }

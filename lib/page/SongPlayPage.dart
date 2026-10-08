@@ -114,6 +114,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
+          Positioned.fill(child: ColoredBox(color: scheme.surface)),
           CommonWidgetUtil.buildCommonBgWidget(),
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
           Column(

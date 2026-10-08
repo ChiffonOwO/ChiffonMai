@@ -118,7 +118,7 @@
 | 线路 | 走法 | 需要什么 |
 | :--- | :--- | :--- |
 | **线路1 AWMC 网关** | 机台二维码直连 `api.wmc.pub` | AWMC 令牌 + 本机已缓存的第三方凭据 |
-| **线路2 maimai Score Hub** | 原有 scorehub 探针流程（maimai.bakapiano.com → 水鱼 / 落雪） | 水鱼登录态 / 落雪 API Key |
+| **线路2 maimai Score Hub** | 原有流程（maimai.bakapiano.com → 水鱼 / 落雪） | 水鱼登录态 / 落雪 API Key |
 
 线路1 的流程（`AwmcSyncFlow`）：
 
@@ -130,7 +130,7 @@
 3. `POST /v1/user/music`（4 Token，顺便刷新「游玩次数」缓存）→
    `POST /v1/update-lx` 或 `/v1/update-fish`（5 Token），共 9 Token。
 
-> ⚠️ 对话框里的「参与排行榜 / 显示昵称」**只对线路2（Score Hub）生效**：
+> ⚠️ 对话框里的「参与排行榜 / 显示昵称」**只对线路2（maimai Score Hub）生效**：
 > 官方 `/api/docs` 明确 `/v1/update-fish` 与 `/v1/update-lx` 只接收
 > `qrcode` + `token`/`key`。由于界面与线路2 完全相同，这里不再单独加提示文案，
 > 差异记在本文档里。
@@ -181,7 +181,7 @@ chiffonmai:sync_stats:<line>:<platform>     # line: scorehub|awmc, platform: fis
 * 4 个组合的统计只拉一次（`ensureLoaded()` 幂等），谁先加载完另一边直接复用，
   不会两个页面各拉一遍；
 * 两个页面的点击都按**当前线路**分发（线路1 → `AwmcSyncFlow` /
-  线路2 → 原有 scorehub 流程），不存在「显示线路1 却走了线路2」的可能。
+  线路2 → 原有流程），不存在「显示线路1 却走了线路2」的可能。
 
 > 线路2 水鱼的样本在**对话框内部**上报（`SyncScoreDialogs.showDivingFishSyncDialog`）：
 > 只有它知道最终是 `completed` / `failed` / `cancelled`（调用方拿到的是好友码）。

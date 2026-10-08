@@ -3,12 +3,10 @@ import 'dart:async';
 import '../../service/Collection/CollectionSearchService.dart';
 import '../../entity/LuoXue/Collection.dart';
 import '../../manager/LuoXue/CollectionsManager.dart';
-import '../../utils/CommonWidgetUtil.dart';
 import '../../utils/CollectionsImageUtil.dart';
 import '../../utils/AppTheme.dart';
-import '../../utils/AppConstants.dart';
 import 'CollectionInfoPage.dart';
-import '../../widgets/PageTopBar.dart';
+import '../../widgets/BackgroundPageScaffold.dart';
 
 class CollectionSearchPage extends StatefulWidget {
   const CollectionSearchPage({Key? key}) : super(key: key);
@@ -34,7 +32,6 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
   
   // 自定义常量
   final Color themeColor = Colors.blue;
-  final double borderRadiusSmall = 8.0;
   // 收藏品类型选项
   final List<Map<String, String>> _typeOptions = [
     {'value': 'trophies', 'label': '称号'},
@@ -184,52 +181,30 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
-
     // 按钮相关配置
     final buttonHeight = 36.0; // 降低按钮高度
     final buttonBorderRadius = 8.0;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '收藏品搜索',
+      actions: [
+        IconButton(
+          icon: Icon(Icons.refresh,
+              color: Theme.of(context).colorScheme.onSurface),
+          onPressed: _clearCache,
+          tooltip: '清除缓存并重新加载',
+        ),
+      ],
       resizeToAvoidBottomInset: false, // 防止键盘弹出时调整布局
-      body: GestureDetector(
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
+      ),
+      child: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusScope.of(context).unfocus(),
-        child: Stack(
-        children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏
-              PageTopBar(
-                title: '收藏品搜索',
-                actions: [
-                // 清除缓存按钮
-                IconButton(
-                icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.onSurface),
-                onPressed: _clearCache,
-                tooltip: '清除缓存并重新加载',
-                ),
-                ],
-              ),
-
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [AppConstants.defaultShadow(brightness)],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
                       children: [
                         // 搜索输入框
                         TextField(
@@ -532,14 +507,8 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
                                       },
                                     ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
       ),
     );

@@ -110,7 +110,7 @@ class CacheSourceRegistry {
     CacheSourceInfo(
       id: 'alias_maimaihub',
       displayName: '别名数据源3',
-      description: 'MaimaiHub',
+      description: 'maimai Score Hub',
       apiUrl: ApiUrls.MaimaiHubMusicAliasesUrl,
       cacheKey: 'song_aliases',
       timestampKey: 'alias_last_update',

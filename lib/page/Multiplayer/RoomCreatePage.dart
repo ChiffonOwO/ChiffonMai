@@ -3,11 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/GameType.dart';
 import 'package:my_first_flutter_app/manager/MultiplayerManager.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
-import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/utils/SongFilterUtil.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartByInfoService.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartCommonSettingsService.dart';
-import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/BackgroundPageScaffold.dart';
 
 class RoomCreatePage extends StatefulWidget {
   const RoomCreatePage({super.key});
@@ -480,31 +479,11 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
     final paddingL = 16.0 * scaleFactor;
     final borderRadiusSmall = 8.0 * scaleFactor;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '创建房间',
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          Column(
-            children: [
-              // 标题栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
-              // 与 Best50 页、其余 50 多个页面同款。
-              PageTopBar(title: '创建房间'),
-
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin:
-                      EdgeInsets.fromLTRB(paddingS, 0, paddingS, paddingL),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [AppConstants.defaultShadow(brightness)],
-                  ),
-                  child: _isLoading
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: _isLoading
                       ? const Center(child: CircularProgressIndicator())
                       : SingleChildScrollView(
                           padding: EdgeInsets.all(paddingM),
@@ -701,12 +680,6 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                             ],
                           ),
                         ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

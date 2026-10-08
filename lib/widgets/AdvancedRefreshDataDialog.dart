@@ -1,18 +1,21 @@
+import '../widgets/AnimatedChoiceBar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../constant/CacheKeyConstant.dart';
 import '../manager/DivingFishProbeManager.dart';
 import '../manager/DivingFish/DivingFishOAuthManager.dart';
 import '../manager/LuoXue/LuoXueUserPlayDataManager.dart';
+import '../manager/LuoXue/LuoXueOAuthManager.dart';
 import '../service/ConnectivityService.dart';
 import '../service/AccountStore.dart';
 import '../utils/AppTheme.dart';
 import '../utils/ApiClient.dart';
 import '../utils/CacheSourceRegistry.dart';
+import '../utils/SecureCredentialStore.dart';
+import '../utils/ExternalLaunchUtil.dart';
 import 'RefreshDataDialog.dart'
     show CurrentDataSourceNotifier, RefreshDataRequest, RefreshDataSource;
 import 'DivingFishAccountSection.dart';
@@ -31,7 +34,9 @@ Future<RefreshDataRequest?> showAdvancedRefreshDataDialog(
 }) async {
   await CurrentDataSourceNotifier.load();
   final prefs = await SharedPreferences.getInstance();
-  final jwt = prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '';
+  final jwt =
+      await SecureCredentialStore.read(CacheKeyConstant.probeDivingFishToken) ??
+          '';
   final bindQQ = prefs.getString(CacheKeyConstant.probeDivingFishBindQQ) ?? '';
 
   // AWMC NET 的 QQ 取自它自己的账号存档，不用共用的 cachedQQ
@@ -43,7 +48,7 @@ Future<RefreshDataRequest?> showAdvancedRefreshDataDialog(
 
   return showDialog<RefreshDataRequest>(
     context: context,
-    builder: (_) => _AdvancedRefreshDataDialog(
+    builder: (_) => AdvancedRefreshDataPanel(
       // 只传「有没有登录」：登录了但没填 QQ 要单独提示，见 DivingFishQqState
       hasDivingFishLogin: jwt.isNotEmpty,
       bindQQ: bindQQ,
@@ -67,7 +72,7 @@ class _TestResult {
   });
 }
 
-class _AdvancedRefreshDataDialog extends StatefulWidget {
+class AdvancedRefreshDataPanel extends StatefulWidget {
   /// 只表示「有没有登录水鱼」（JWT 非空）；「登录了但没填 QQ」是另一档，见 [DivingFishQqState]。
   final bool hasDivingFishLogin;
 
@@ -79,21 +84,23 @@ class _AdvancedRefreshDataDialog extends StatefulWidget {
 
   /// 打开对话框时预选的数据源（账号切换面板「去刷新」时传入）。
   final RefreshDataSource? initialSource;
+  final bool embedded;
 
-  const _AdvancedRefreshDataDialog({
+  const AdvancedRefreshDataPanel({
+    super.key,
     required this.hasDivingFishLogin,
     required this.bindQQ,
     required this.awmcQQ,
     this.initialSource,
+    this.embedded = false,
   });
 
   @override
-  State<_AdvancedRefreshDataDialog> createState() =>
-      _AdvancedRefreshDataDialogState();
+  State<AdvancedRefreshDataPanel> createState() =>
+      AdvancedRefreshDataPanelState();
 }
 
-class _AdvancedRefreshDataDialogState
-    extends State<_AdvancedRefreshDataDialog> {
+class AdvancedRefreshDataPanelState extends State<AdvancedRefreshDataPanel> {
   late RefreshDataSource _currentDataSource;
   final TextEditingController _authCodeController = TextEditingController();
 
@@ -117,6 +124,7 @@ class _AdvancedRefreshDataDialogState
 
   bool _participateRankings = false;
   bool _showNickname = false;
+  bool _hasSavedLuoXueToken = false;
 
   /// 用户勾选要强制刷新的缓存源 ID 集合。默认空集（全不勾选）；在 initState
   /// 里异步加载上次保存的勾选，被持久化到 SharedPreferences（key 见
@@ -146,6 +154,12 @@ class _AdvancedRefreshDataDialogState
     if (_bindQQ.isNotEmpty) {
       _checkAuthorization();
     }
+    _loadLuoXueToken();
+  }
+
+  Future<void> _loadLuoXueToken() async {
+    final loggedIn = await LuoXueOAuthManager().isLoggedIn();
+    if (mounted) setState(() => _hasSavedLuoXueToken = loggedIn);
   }
 
   @override
@@ -311,7 +325,7 @@ class _AdvancedRefreshDataDialogState
     }
   }
 
-  Future<void> _onConfirm() async {
+  Future<RefreshDataRequest?> collectRequest() async {
     // 水鱼：三态分别给不同交代（同 RefreshDataDialog）
     if (_currentDataSource == RefreshDataSource.shuiyu) {
       switch (resolveDivingFishQqState(
@@ -320,30 +334,31 @@ class _AdvancedRefreshDataDialogState
       )) {
         case DivingFishQqState.notLoggedIn:
           Fluttertoast.showToast(msg: '请先在「系统 → 登录水鱼」登录水鱼账号');
-          return;
+          return null;
         case DivingFishQqState.noBindQq:
           Fluttertoast.showToast(msg: '你的水鱼账号还没绑定 QQ 号，请先到水鱼官网「编辑个人资料」里填上');
-          return;
+          return null;
         case DivingFishQqState.bound:
           break;
       }
     }
     // 落雪：没填授权码就点确认，原来会静默地「什么都不做但报成功」
     if (_currentDataSource == RefreshDataSource.luoxue &&
-        _authCodeController.text.trim().isEmpty) {
+        _authCodeController.text.trim().isEmpty &&
+        !_hasSavedLuoXueToken) {
       Fluttertoast.showToast(msg: '请先填写落雪授权码');
-      return;
+      return null;
     }
     // AWMC NET 无需登录，但必须有 QQ 号才查得到
     if (_currentDataSource == RefreshDataSource.awmc) {
       final qq = _awmcQqController.text.trim();
       if (qq.isEmpty) {
         Fluttertoast.showToast(msg: '请输入 AWMC NET 的 QQ 号');
-        return;
+        return null;
       }
       if (!RegExp(r'^\d{5,12}$').hasMatch(qq)) {
         Fluttertoast.showToast(msg: 'QQ 号格式不对（应为 5–12 位数字）');
-        return;
+        return null;
       }
     }
     // 离线检查
@@ -357,9 +372,9 @@ class _AdvancedRefreshDataDialogState
           ),
         );
       }
-      return;
+      return null;
     }
-    if (!mounted) return;
+    if (!mounted) return null;
 
     // 持久化本次勾选，下次打开对话框时自动恢复
     final prefs = await SharedPreferences.getInstance();
@@ -376,8 +391,16 @@ class _AdvancedRefreshDataDialogState
       showNickname: _showNickname,
       forceFullRefresh: false, // 高级模式不依赖此字段
       forceSourceIds: Set<String>.from(_checkedIds),
+      useSavedAuthorization: _currentDataSource == RefreshDataSource.luoxue &&
+          _authCodeController.text.trim().isEmpty &&
+          _hasSavedLuoXueToken,
     );
-    if (mounted) Navigator.of(context).pop(request);
+    return request;
+  }
+
+  Future<void> _onConfirm() async {
+    final request = await collectRequest();
+    if (request != null && mounted) Navigator.of(context).pop(request);
   }
 
   // ====================================================================
@@ -386,28 +409,15 @@ class _AdvancedRefreshDataDialogState
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
+    if (widget.embedded) {
+      return _buildPanelContent(context);
+    }
     return AlertDialog(
       title: const Text('刷新数据（高级）'),
       content: SizedBox(
         width: 520,
         child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildDataSourceRow(),
-              const SizedBox(height: 12),
-              if (_currentDataSource == RefreshDataSource.shuiyu)
-                _buildShuiyuPanel(brightness),
-              if (_currentDataSource == RefreshDataSource.luoxue)
-                _buildLuoXuePanel(brightness),
-              if (_currentDataSource == RefreshDataSource.awmc)
-                _buildAwmcPanel(brightness),
-              _buildRankingOptions(brightness),
-              const SizedBox(height: 16),
-              _buildCacheSourceSection(),
-            ],
-          ),
+          child: _buildPanelContent(context),
         ),
       ),
       actions: [
@@ -423,6 +433,26 @@ class _AdvancedRefreshDataDialogState
     );
   }
 
+  Widget _buildPanelContent(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!widget.embedded) _buildDataSourceRow(),
+        if (!widget.embedded) const SizedBox(height: 12),
+        if (_currentDataSource == RefreshDataSource.shuiyu)
+          _buildShuiyuPanel(brightness),
+        if (_currentDataSource == RefreshDataSource.luoxue)
+          _buildLuoXuePanel(brightness),
+        if (_currentDataSource == RefreshDataSource.awmc)
+          _buildAwmcPanel(brightness),
+        _buildRankingOptions(brightness),
+        const SizedBox(height: 16),
+        _buildCacheSourceSection(),
+      ],
+    );
+  }
+
   Widget _buildDataSourceRow() {
     // 三个选项在窄屏一行放不下（还有「当前数据源：」标题），
     // 所以标题单独一行，避免 RenderFlex overflow。
@@ -431,35 +461,19 @@ class _AdvancedRefreshDataDialogState
       children: [
         const Text('当前数据源：'),
         const SizedBox(height: 6),
-        ToggleButtons(
-          constraints: const BoxConstraints(minHeight: 30, minWidth: 54),
-          isSelected: [
-            for (final source in RefreshDataSource.values)
-              _currentDataSource == source,
-          ],
-          onPressed: (index) {
+        AnimatedChoiceBar<RefreshDataSource>(
+          values: RefreshDataSource.values,
+          value: _currentDataSource,
+          label: (source) => source.shortDisplayName,
+          onChanged: (source) {
             // 只选「本次要刷新的数据源」；真正的切换由 executeAdvancedRefreshData
             // 里的 prepareForRefresh 完成，避免活动槽与数据源不一致。
             setState(() {
-              _currentDataSource = RefreshDataSource.values[index];
+              _currentDataSource = source;
               _authCodeController.clear();
             });
             _loadRankingSettings();
           },
-          children: const [
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-              child: Text('水鱼'),
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-              child: Text('落雪'),
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-              child: Text('AWMC NET'),
-            ),
-          ],
         ),
       ],
     );
@@ -511,13 +525,18 @@ class _AdvancedRefreshDataDialogState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_hasSavedLuoXueToken)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text('已保存落雪授权，将自动续期，无需再次输入授权码。',
+                style: TextStyle(color: AppColors.successGreen(brightness))),
+          ),
         ElevatedButton(
           onPressed: () async {
             final url = LuoXueUserPlayDataManager().getAuthorizationUrl();
             try {
-              if (await canLaunchUrl(Uri.parse(url))) {
-                await launchUrl(Uri.parse(url),
-                    mode: LaunchMode.externalApplication);
+              if (await ExternalLaunchUtil.openString(url)) {
+                return;
               } else if (mounted) {
                 _launchUrlFallback(url);
               }

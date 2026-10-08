@@ -16,7 +16,7 @@ const dbConfig = {
   host: 'localhost',
   port: 3306,
   user: 'root',
-  password: process.env.DB_PASSWORD || 'Maozedong001',
+  password: process.env.DB_PASSWORD || '',
   database: 'user_maimai_rankings',
   waitForConnections: true,
   connectionLimit: 5,
@@ -114,8 +114,8 @@ async function main() {
   try {
     const redis = require('redis');
     const client = redis.createClient({
-      url: 'redis://localhost:6379',
-      password: process.env.REDIS_PASSWORD || 'Maozedong001',
+      url: process.env.REDIS_URL || 'redis://localhost:6379',
+      password: process.env.REDIS_PASSWORD || '',
     });
     client.on('error', () => {});
     await client.connect();

@@ -16,12 +16,12 @@ import 'package:my_first_flutter_app/utils/CommonCacheUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/SongFilterUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import '../../utils/ExternalLaunchUtil.dart';
 import 'package:my_first_flutter_app/utils/LuoXueSongUtil.dart';
 import 'package:my_first_flutter_app/utils/PlayerThemeScope.dart';
 import 'package:my_first_flutter_app/utils/RefreshRateUtil.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../../widgets/PageTopBar.dart';
+import '../../widgets/BackgroundPageScaffold.dart';
 
 /// 谱面片段猜歌（看谱猜歌）：从已缓存 maidata 的曲库中随机选一首，
 /// 随机截取一段 N 秒的谱面片段，**无声**播放谱面动画，凭「看谱」猜出歌名。
@@ -1310,15 +1310,19 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                 GestureDetector(
                   onTap: () async {
                     final url = Uri.parse('https://maimai.yukineko2233.top/');
-                    if (await canLaunchUrl(url)) {
-                      await launchUrl(
-                        url,
-                        mode: LaunchMode.externalApplication,
+
+                    if (!await ExternalLaunchUtil.open(url) && context.mounted) {
+
+                      await ExternalLaunchUtil.copyFallback(
+
+                        context,
+
+                        url.toString(),
+
+                        message: '无法打开该链接，链接已复制到剪贴板',
+
                       );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('无法打开该链接')),
-                      );
+
                     }
                   },
                   child: Text(
@@ -1684,37 +1688,13 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
 
-    final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '猜歌（谱面片段）',
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          Column(
-            children: [
-              // 标题栏
-              PageTopBar(
-                title: '猜歌（谱面片段）',
-              ),
-
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color:
-                        Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
-                  ),
-                  child: LayoutBuilder(
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: LayoutBuilder(
                     builder: (context, constraints) {
                       double padding = screenWidth * 0.04;
 
@@ -2342,12 +2322,6 @@ class _GuessChartByChartPeekPageState extends State<GuessChartByChartPeekPage> {
                       );
                     },
                   ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

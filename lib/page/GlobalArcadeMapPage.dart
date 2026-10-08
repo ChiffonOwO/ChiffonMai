@@ -8,13 +8,11 @@ import 'package:my_first_flutter_app/entity/nearcade/NearCadeShop.dart';
 import 'package:my_first_flutter_app/service/NearCadeService.dart';
 import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import '../widgets/PageTopBar.dart';
+import '../utils/ArcadeMarkerCluster.dart';
 
 // 缓存 Key
 const _cacheKey = 'nearcade_shops_cache';
 const _cacheTimeKey = 'nearcade_shops_cache_time';
-
-// 视口内最大标点数
-const _maxVisibleMarkers = 200;
 
 class GlobalArcadeMapPage extends StatefulWidget {
   const GlobalArcadeMapPage({super.key});
@@ -40,6 +38,9 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
   bool _showSearchResults = false;
 
   LatLngBounds? _visibleBounds;
+  double _zoom = _defaultZoom;
+  (int, String, String)? _clusterSignature;
+  List<ArcadeMarkerCluster<Shop>> _clusteredShops = [];
 
   static const _defaultCenter = LatLng(35.0, 115.0);
   static const _defaultZoom = 4.0;
@@ -77,7 +78,8 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
 
     if (cachedJson != null) {
       try {
-        final data = NearCadeShop.fromJson(jsonDecode(cachedJson) as Map<String, dynamic>);
+        final data = NearCadeShop.fromJson(
+            jsonDecode(cachedJson) as Map<String, dynamic>);
         _applyShopData(data.shops);
         if (cachedTime != null) {
           _lastFetchTime = DateTime.fromMillisecondsSinceEpoch(cachedTime);
@@ -120,6 +122,7 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
   }
 
   void _applyShopData(List<Shop> shops) {
+    _clusterSignature = null;
     _shops.clear();
     _shops.addAll(shops);
 
@@ -130,7 +133,8 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
       for (final game in shop.games) {
         final name = game.name;
         if (name.isEmpty) continue;
-        final m = nameCountByTitle.putIfAbsent(game.titleId, () => <String, int>{});
+        final m =
+            nameCountByTitle.putIfAbsent(game.titleId, () => <String, int>{});
         m[name] = (m[name] ?? 0) + 1;
       }
     }
@@ -166,42 +170,47 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
 
   // ---- 简单的 Shop → JSON 序列化 ----
   Map<String, dynamic> _shopToJson(Shop s) => {
-    '_id': s.id,
-    'name': s.name,
-    'shopId': s.shopId,
-    'comment': s.comment,
-    'isClaimed': s.isClaimed,
-    'isLocked': s.isLocked,
-    'isOpen': s.isOpen,
-    'ownerId': s.ownerId,
-    'createdAt': s.createdAt.toIso8601String(),
-    'updatedAt': s.updatedAt.toIso8601String(),
-    'address': {
-      'detailed': s.address.detailed,
-      'general': s.address.general,
-      'region': s.address.region,
-    },
-    'location': {
-      'type': 'Point',
-      'coordinates': s.location.coordinates,
-    },
-    'games': s.games.map((g) => {
-      'gameId': g.gameId,
-      'name': g.name,
-      'titleId': g.titleId,
-      'version': g.version,
-      'quantity': g.quantity,
-      'comment': g.comment,
-      'cost': g.cost,
-    }).toList(),
-    'openingHours': s.openingHours.map((day) =>
-        day.map((h) => {'hour': h.hour, 'minute': h.minute}).toList()
-    ).toList(),
-    'timezone': s.timezone == null ? null : {
-      'name': s.timezone!.name,
-      'offset': s.timezone!.offset,
-    },
-  };
+        '_id': s.id,
+        'name': s.name,
+        'shopId': s.shopId,
+        'comment': s.comment,
+        'isClaimed': s.isClaimed,
+        'isLocked': s.isLocked,
+        'isOpen': s.isOpen,
+        'ownerId': s.ownerId,
+        'createdAt': s.createdAt.toIso8601String(),
+        'updatedAt': s.updatedAt.toIso8601String(),
+        'address': {
+          'detailed': s.address.detailed,
+          'general': s.address.general,
+          'region': s.address.region,
+        },
+        'location': {
+          'type': 'Point',
+          'coordinates': s.location.coordinates,
+        },
+        'games': s.games
+            .map((g) => {
+                  'gameId': g.gameId,
+                  'name': g.name,
+                  'titleId': g.titleId,
+                  'version': g.version,
+                  'quantity': g.quantity,
+                  'comment': g.comment,
+                  'cost': g.cost,
+                })
+            .toList(),
+        'openingHours': s.openingHours
+            .map((day) =>
+                day.map((h) => {'hour': h.hour, 'minute': h.minute}).toList())
+            .toList(),
+        'timezone': s.timezone == null
+            ? null
+            : {
+                'name': s.timezone!.name,
+                'offset': s.timezone!.offset,
+              },
+      };
 
   // ---- 筛选 ----
   List<Shop> get _filteredShops {
@@ -216,8 +225,8 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
       if (_selectedTitleIds.isNotEmpty) {
         // 按 titleId 匹配：用户点 "maimai DX" 时，所有 titleId=1 的店铺都命中，
         // 无论他们在源数据中写的是 "maimai DX" / "舞萌DX" / "maimai でらっくす" 等。
-        final hit = shop.games.any(
-            (g) => _selectedTitleIds.contains(g.titleId));
+        final hit =
+            shop.games.any((g) => _selectedTitleIds.contains(g.titleId));
         if (!hit) return false;
       }
       return true;
@@ -231,20 +240,95 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
 
   Color _getShopMarkerColor(List<Game> games) {
     final names = games.map((g) => g.name.toLowerCase()).toSet();
-    if (names.any((n) => n.contains('maimai') || n.contains('舞萌'))) return Colors.red;
-    if (names.any((n) => n.contains('chunithm') || n.contains('中二'))) return Colors.orange;
-    if (names.any((n) => n.contains('ongeki') || n.contains('音击'))) return Colors.purple;
-    if (names.any((n) => n.contains('taiko') || n.contains('太鼓'))) return Colors.blue;
-    if (names.any((n) => n.contains('sdvx') || n.contains('旋钮'))) return Colors.teal;
+    if (names.any((n) => n.contains('maimai') || n.contains('舞萌')))
+      return Colors.red;
+    if (names.any((n) => n.contains('chunithm') || n.contains('中二')))
+      return Colors.orange;
+    if (names.any((n) => n.contains('ongeki') || n.contains('音击')))
+      return Colors.purple;
+    if (names.any((n) => n.contains('taiko') || n.contains('太鼓')))
+      return Colors.blue;
+    if (names.any((n) => n.contains('sdvx') || n.contains('旋钮')))
+      return Colors.teal;
     return games.isNotEmpty ? Colors.green : Colors.grey;
   }
 
   List<Marker> _buildMarkers() {
     final markers = <Marker>[];
-    for (final shop in _filteredShops) {
-      if (shop.location.coordinates.length < 2) continue;
-      final point = LatLng(shop.location.coordinates[1], shop.location.coordinates[0]);
+    final zoomStep = (_zoom * 4).round();
+    final titles = _selectedTitleIds.toList()..sort();
+    final signature = (zoomStep, _searchQuery, titles.join(','));
+    if (_clusterSignature != signature) {
+      // 平移地图只筛选已有聚合点；缩放或筛选变化时才重算全量机厅。
+      _clusteredShops = clusterArcadeMarkers<Shop>(
+          _filteredShops
+              .where((shop) => shop.location.coordinates.length >= 2)
+              .toList(),
+          (shop) => LatLng(
+              shop.location.coordinates[1], shop.location.coordinates[0]),
+          zoomStep / 4);
+      _clusterSignature = signature;
+    }
+    final visibleClusters = _zoom >= 17
+        ? [
+            for (final cluster in _clusteredShops)
+              for (final item in cluster.items)
+                ArcadeMarkerCluster<Shop>(
+                  LatLng(item.location.coordinates[1],
+                      item.location.coordinates[0]),
+                  [item],
+                )
+          ]
+        : _clusteredShops;
+    for (final cluster in visibleClusters) {
+      final point = cluster.center;
+      final shop = cluster.items.first;
       if (_visibleBounds != null && !_visibleBounds!.contains(point)) continue;
+
+      if (cluster.items.length > 1) {
+        final scheme = Theme.of(context).colorScheme;
+        markers.add(Marker(
+            point: point,
+            width: 44,
+            height: 44,
+            child: Semantics(
+                button: true,
+                label: '${cluster.items.length} 家机厅，点击展开',
+                child: GestureDetector(
+                    onTap: () {
+                      if (_zoom >= 18) {
+                        showModalBottomSheet<void>(
+                            context: context,
+                            builder: (ctx) => SafeArea(
+                                    child: ListView(
+                                        padding: EdgeInsets.zero,
+                                        children: [
+                                      for (final item in cluster.items)
+                                        ListTile(
+                                            title: Text(item.name),
+                                            onTap: () {
+                                              Navigator.pop(ctx);
+                                              _showShopDetail(item);
+                                            })
+                                    ])));
+                      } else {
+                        _mapController.move(
+                            point, (_zoom + 2).clamp(2, 18).toDouble());
+                      }
+                    },
+                    child: Container(
+                        decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: scheme.primaryContainer,
+                            border:
+                                Border.all(color: scheme.primary, width: 2)),
+                        alignment: Alignment.center,
+                        child: Text('${cluster.items.length}',
+                            style: TextStyle(
+                                color: scheme.onPrimaryContainer,
+                                fontWeight: FontWeight.bold)))))));
+        continue;
+      }
 
       markers.add(Marker(
         point: point,
@@ -257,14 +341,17 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
               color: _getShopMarkerColor(shop.games).withOpacity(0.85),
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 1.5),
-              boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 3, offset: Offset(0, 1))],
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black26, blurRadius: 3, offset: Offset(0, 1))
+              ],
             ),
-            child: Center(child: Icon(Icons.videogame_asset, color: Colors.white, size: 12)),
+            child: Center(
+                child:
+                    Icon(Icons.videogame_asset, color: Colors.white, size: 12)),
           ),
         ),
       ));
-
-      if (markers.length >= _maxVisibleMarkers) break;
     }
     return markers;
   }
@@ -276,13 +363,14 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
       child: Material(
         color: Theme.of(context).colorScheme.surface,
         shape: CircleBorder(
-          side: BorderSide(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3)),
+          side: BorderSide(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3)),
         ),
         elevation: 3,
         child: Padding(
           padding: EdgeInsets.all(10),
-          child: Icon(Icons.my_location, size: 22,
-              color: Theme.of(context).colorScheme.onSurface),
+          child: Icon(Icons.my_location,
+              size: 22, color: Theme.of(context).colorScheme.onSurface),
         ),
       ),
     );
@@ -361,7 +449,9 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
 
   void _focusOnShop(Shop shop) {
     if (shop.location.coordinates.length < 2) return;
-    _mapController.move(LatLng(shop.location.coordinates[1], shop.location.coordinates[0]), 16.0);
+    _mapController.move(
+        LatLng(shop.location.coordinates[1], shop.location.coordinates[0]),
+        16.0);
     setState(() {
       _showSearchResults = false;
       _searchFocusNode.unfocus();
@@ -391,18 +481,21 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
     final visibleInBounds = _visibleBounds != null
         ? filtered.where((s) {
             if (s.location.coordinates.length < 2) return false;
-            return _visibleBounds!.contains(LatLng(s.location.coordinates[1], s.location.coordinates[0]));
+            return _visibleBounds!.contains(
+                LatLng(s.location.coordinates[1], s.location.coordinates[0]));
           }).length
         : filtered.length;
-    final shownCount = visibleInBounds.clamp(0, _maxVisibleMarkers);
     final isFiltering = _searchQuery.isNotEmpty || _selectedTitleIds.isNotEmpty;
-    final countLabel = isFiltering ? '${filtered.length}家' : '共${_shops.length}家';
+    final countLabel =
+        isFiltering ? '${filtered.length}家' : '共${_shops.length}家';
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
+          Positioned.fill(
+              child: ColoredBox(color: Theme.of(context).colorScheme.surface)),
           CommonWidgetUtil.buildCommonBgWidget(),
           CommonWidgetUtil.buildCommonChiffonBgWidget(context),
           Column(
@@ -410,11 +503,12 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
               PageTopBar(
                 title: '全球音游街机地图',
                 actions: [
-  IconButton(
-                        icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.onSurface),
-                        onPressed: _isLoading ? null : _refresh,
-                      ),
-],
+                  IconButton(
+                    icon: Icon(Icons.refresh,
+                        color: Theme.of(context).colorScheme.onSurface),
+                    onPressed: _isLoading ? null : _refresh,
+                  ),
+                ],
               ),
 
               // 状态栏
@@ -424,14 +518,24 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
                   child: Row(
                     children: [
                       Text(countLabel,
-                          style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant)),
                       if (isFiltering)
                         Text(' (筛选)',
-                            style: TextStyle(fontSize: 10, color: Colors.orange)),
-                      if (visibleInBounds > _maxVisibleMarkers)
-                        Text(' 显示$shownCount',
-                            style: TextStyle(fontSize: 10, color: Colors.orange)),
-                      const Spacer(),
+                            style:
+                                TextStyle(fontSize: 10, color: Colors.orange)),
+                      Expanded(
+                          child: Text(' 视野内 $visibleInBounds 家（邻近点自动合并）',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant))),
                       if (_lastFetchTime != null)
                         Text('上次更新: ${_formatLastFetchTime()}',
                             style: TextStyle(fontSize: 10, color: Colors.grey)),
@@ -450,13 +554,17 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3)),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.3)),
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: Stack(
                       children: [
                         _buildMapContent(),
-                        if (!_isLoading && _error == null) _buildFloatingSearch(filtered.length),
+                        if (!_isLoading && _error == null)
+                          _buildFloatingSearch(filtered.length),
                         // 定位按钮
                         Positioned(
                           bottom: 12,
@@ -491,9 +599,14 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
               color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.vertical(
                 top: Radius.circular(8),
-                bottom: results.isEmpty && !_showFilterPanel ? Radius.circular(8) : Radius.zero,
+                bottom: results.isEmpty && !_showFilterPanel
+                    ? Radius.circular(8)
+                    : Radius.zero,
               ),
-              boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))
+              ],
             ),
             child: Row(
               children: [
@@ -519,7 +632,8 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
                       });
                     },
                     onTap: () {
-                      if (_searchQuery.isNotEmpty) setState(() => _showSearchResults = true);
+                      if (_searchQuery.isNotEmpty)
+                        setState(() => _showSearchResults = true);
                     },
                   ),
                 ),
@@ -532,7 +646,8 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
                       color: Colors.red.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text('$filteredCount', style: TextStyle(fontSize: 11, color: Colors.red)),
+                    child: Text('$filteredCount',
+                        style: TextStyle(fontSize: 11, color: Colors.red)),
                   ),
                 if (_searchQuery.isNotEmpty)
                   GestureDetector(
@@ -546,11 +661,15 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
                     child: Icon(Icons.clear, size: 16, color: Colors.grey),
                   ),
                 GestureDetector(
-                  onTap: () => setState(() => _showFilterPanel = !_showFilterPanel),
+                  onTap: () =>
+                      setState(() => _showFilterPanel = !_showFilterPanel),
                   child: Container(
                     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                    child: Icon(Icons.filter_list, size: 16,
-                        color: _selectedTitleIds.isNotEmpty ? Colors.red : Colors.grey),
+                    child: Icon(Icons.filter_list,
+                        size: 16,
+                        color: _selectedTitleIds.isNotEmpty
+                            ? Colors.red
+                            : Colors.grey),
                   ),
                 ),
                 SizedBox(width: 4),
@@ -567,13 +686,19 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
                 borderRadius: results.isEmpty && !_showFilterPanel
                     ? null
                     : BorderRadius.vertical(bottom: Radius.circular(8)),
-                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 3, offset: Offset(0, 2))],
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 3,
+                      offset: Offset(0, 2))
+                ],
               ),
               child: ListView.separated(
                 shrinkWrap: true,
                 padding: EdgeInsets.zero,
                 itemCount: results.length,
-                separatorBuilder: (_, __) => Divider(height: 1, indent: 12, endIndent: 12),
+                separatorBuilder: (_, __) =>
+                    Divider(height: 1, indent: 12, endIndent: 12),
                 itemBuilder: (_, i) {
                   final shop = results[i];
                   final games = shop.games.map((g) => g.name).join(' / ');
@@ -581,7 +706,8 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
                   return InkWell(
                     onTap: () => _focusOnShop(shop),
                     child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
@@ -590,16 +716,24 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(shop.name,
-                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis),
                                 if (region.isNotEmpty)
                                   Text(region,
-                                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade600),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
                                 if (games.isNotEmpty)
                                   Text(games,
-                                      style: TextStyle(fontSize: 11, color: Colors.grey),
-                                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      style: TextStyle(
+                                          fontSize: 11, color: Colors.grey),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
                               ],
                             ),
                           ),
@@ -621,7 +755,12 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
                 borderRadius: BorderRadius.circular(8),
-                boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 4,
+                      offset: Offset(0, 2))
+                ],
               ),
               constraints: BoxConstraints(maxHeight: 200),
               child: Column(
@@ -630,12 +769,17 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
                 children: [
                   Row(
                     children: [
-                      Text('机台筛选', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      Text('机台筛选',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.bold)),
                       const Spacer(),
                       if (_selectedTitleIds.isNotEmpty)
                         GestureDetector(
-                          onTap: () => setState(() => _selectedTitleIds.clear()),
-                          child: Text('清除', style: TextStyle(fontSize: 12, color: Colors.red)),
+                          onTap: () =>
+                              setState(() => _selectedTitleIds.clear()),
+                          child: Text('清除',
+                              style:
+                                  TextStyle(fontSize: 12, color: Colors.red)),
                         ),
                     ],
                   ),
@@ -646,7 +790,8 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
                         spacing: 6,
                         runSpacing: 4,
                         children: _gameOptions.map((opt) {
-                          final selected = _selectedTitleIds.contains(opt.titleId);
+                          final selected =
+                              _selectedTitleIds.contains(opt.titleId);
                           return GestureDetector(
                             onTap: () {
                               setState(() {
@@ -656,14 +801,24 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
                               });
                             },
                             child: Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: selected ? Colors.red.withOpacity(0.15) : Colors.grey.withOpacity(0.1),
+                                color: selected
+                                    ? Colors.red.withOpacity(0.15)
+                                    : Colors.grey.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: selected ? Colors.red : Colors.grey.withOpacity(0.3)),
+                                border: Border.all(
+                                    color: selected
+                                        ? Colors.red
+                                        : Colors.grey.withOpacity(0.3)),
                               ),
                               child: Text('${opt.canonicalName} · ${opt.count}',
-                                  style: TextStyle(fontSize: 11, color: selected ? Colors.red : Colors.grey.shade700)),
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: selected
+                                          ? Colors.red
+                                          : Colors.grey.shade700)),
                             ),
                           );
                         }).toList(),
@@ -689,7 +844,9 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
             Icon(Icons.error_outline, size: 48, color: Colors.red),
             SizedBox(height: 12),
             Text('加载失败', style: TextStyle(fontSize: 16)),
-            Text(_error!, style: TextStyle(fontSize: 12, color: Colors.grey), textAlign: TextAlign.center),
+            Text(_error!,
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+                textAlign: TextAlign.center),
             SizedBox(height: 16),
             ElevatedButton(onPressed: _refresh, child: Text('重试')),
           ],
@@ -698,8 +855,13 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
     }
 
     if (_shops.isEmpty) {
-      return Center(child: Text('暂无店铺数据', style: TextStyle(color: Colors.grey)));
+      return Center(
+          child: Text('暂无店铺数据', style: TextStyle(color: Colors.grey)));
     }
+
+    final markerList = _buildMarkers();
+    final markerSignature =
+        '${_clusterSignature}_${_zoom.toStringAsFixed(2)}';
 
     return FlutterMap(
       mapController: _mapController,
@@ -710,25 +872,37 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
         maxZoom: 18,
         onMapEvent: (_) {
           final bounds = _mapController.camera.visibleBounds;
-          if (bounds != _visibleBounds) setState(() => _visibleBounds = bounds);
+          final zoom = _mapController.camera.zoom;
+          if (bounds != _visibleBounds || zoom != _zoom)
+            setState(() {
+              _visibleBounds = bounds;
+              _zoom = zoom;
+            });
         },
       ),
       children: [
         TileLayer(
-          urlTemplate: 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
+          urlTemplate:
+              'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
           subdomains: const ['1', '2', '3', '4'],
           // 必须与 android/app/build.gradle.kts 的 applicationId 一致：
           // 高德瓦片服务按 UA 区分调用方，写错等于以别人的身份请求。
           userAgentPackageName: 'cloud.chiffonmai.app',
         ),
-        MarkerLayer(markers: _buildMarkers()),
+        // 只保留一个 MarkerLayer，内部对新聚合结果做缩放+淡入，避免
+        // AnimatedSwitcher 同时挂载旧/新 MarkerLayer 时触发地图图层依赖错误。
+        _AnimatedMarkerLayer(
+          markers: markerList,
+          signature: markerSignature,
+        ),
       ],
     );
   }
 
   void _showShopDetail(Shop shop) {
     final gameList = shop.games
-        .map((g) => '${g.name}${g.version.isNotEmpty ? ' (${g.version})' : ''} x${g.quantity}')
+        .map((g) =>
+            '${g.name}${g.version.isNotEmpty ? ' (${g.version})' : ''} x${g.quantity}')
         .join('\n');
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
@@ -742,21 +916,84 @@ class _GlobalArcadeMapPageState extends State<GlobalArcadeMapPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(shop.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(shop.name,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               SizedBox(height: 8),
-              Text('📍 ${shop.address.detailed}', style: TextStyle(fontSize: 14)),
-              Text('🏙️ ${shop.address.general.join(' ')}', style: TextStyle(fontSize: 13, color: Colors.grey)),
+              Text('📍 ${shop.address.detailed}',
+                  style: TextStyle(fontSize: 14)),
+              Text('🏙️ ${shop.address.general.join(' ')}',
+                  style: TextStyle(fontSize: 13, color: Colors.grey)),
               if (shop.comment.isNotEmpty) ...[
                 SizedBox(height: 8),
                 Text('📝 ${shop.comment}', style: TextStyle(fontSize: 13)),
               ],
               SizedBox(height: 8),
-              Text('🎮 机台:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+              Text('🎮 机台:',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
               SizedBox(height: 4),
               Text(gameList, style: TextStyle(fontSize: 13)),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 聚合结果的单层过渡。用同一个状态组件承载 MarkerLayer，避免在地图缩放时
+/// 同时挂载旧/新图层；聚合点会从略小、透明的状态展开到目标位置。
+class _AnimatedMarkerLayer extends StatefulWidget {
+  final List<Marker> markers;
+  final String signature;
+
+  const _AnimatedMarkerLayer({required this.markers, required this.signature});
+
+  @override
+  State<_AnimatedMarkerLayer> createState() => _AnimatedMarkerLayerState();
+}
+
+class _AnimatedMarkerLayerState extends State<_AnimatedMarkerLayer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final CurvedAnimation _curve;
+  late final Animation<double> _scale;
+  late List<Marker> _markers;
+
+  @override
+  void initState() {
+    super.initState();
+    _markers = widget.markers;
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 240),
+      value: 1,
+    );
+    _curve = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+    _scale = Tween<double>(begin: .86, end: 1).animate(_curve);
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedMarkerLayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.signature == widget.signature) return;
+    _markers = widget.markers;
+    _controller.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _curve.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _curve,
+      child: ScaleTransition(
+        scale: _scale,
+        child: MarkerLayer(markers: _markers),
       ),
     );
   }

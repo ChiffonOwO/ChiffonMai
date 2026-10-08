@@ -91,6 +91,8 @@ class QrQuickFillButtons extends StatelessWidget {
       final pickedFile = await picker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 100,
+        maxWidth: 2560,
+        maxHeight: 2560,
       );
       if (pickedFile == null) return;
 

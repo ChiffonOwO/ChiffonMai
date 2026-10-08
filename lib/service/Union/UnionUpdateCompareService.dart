@@ -11,10 +11,8 @@ import '../../utils/SongFilterUtil.dart';
 ///     `Song.isExtra = true`（见 `MaimaiMusicDataManager.fetchAndUpdateMusicData`）；
 ///   * 于是「union 独有 且 id 比国服最新曲更大」= **下次更新最可能上的歌**。
 ///
-/// 判据（2026-09 用真实数据核对过）：排除 5 首超前上线曲目后，水鱼最新常规曲
-/// id = 11878（Pixel Galaxy），union 独有里 id > 11878 的常规曲 155 首，
-/// 从 11879 一路到最新 —— id 递增与日服上线顺序基本一致，
-/// 所以「最大 id 即最新」成立。
+/// 判据：先筛出国服常规曲，再按歌曲的首发日期从新到旧排列，第一首作为前沿。
+/// 日期缺失或格式异常时，才回退到数值 id 作为稳定的排序依据。
 ///
 /// ⚠️ 宴会场（6 位 id）必须排除在「最新」的判定之外：它的 id 是 1xxxxx，
 /// 一旦参与，前沿会被顶到十万位，所有常规新曲都会被误判成「国服已上线」。
@@ -31,7 +29,7 @@ class UnionUpdateCompare {
     required this.maidataCount,
   });
 
-  /// 国服（水鱼）当前最新的**常规**曲；曲库为空时为 null。
+  /// 国服（水鱼）当前首发日期最新的**常规**曲；曲库为空时为 null。
   final Song? frontier;
 
   /// union 独有、id 比 [frontier] 更大的常规曲 → 近期更新最可能上的歌（id 升序）。
@@ -55,13 +53,12 @@ class UnionUpdateCompare {
   /// 与 union 全量源（`/api/union/musics`）的条数一致（实测 1885 = 1394 + 491）。
   final int cnSongCount;
 
-  /// 水鱼里 id < 100000 的常规曲数 —— [frontier] 就是从这一堆里取的最大 id。
+  /// 水鱼里 id < 100000 的常规曲数 —— [frontier] 就是从这一堆里取的最新日期。
   final int cnRegularCount;
 
-  /// 水鱼（国服）的常规曲，**按 id 降序**：第一首就是 [frontier]。
+  /// 水鱼（国服）的常规曲，**按首发日期降序**：第一首就是 [frontier]。
   ///
-  /// 留着它是为了在「union 全量源」里就地看见前沿在哪 —— 用户从国服最新曲
-  /// 往回翻，再切到「待上线」就是紧挨着的下一批。
+  /// 留着它是为了在「union 全量源」里就地看见前沿在哪。
   /// **不含**超前上线曲目（那些在 [earlyReleases] 里）。
   final List<Song> cnSongs;
 
@@ -166,13 +163,32 @@ class UnionUpdateCompareService {
   /// 取数值 id；解析不出来算 0（排序时排最前，不会污染"最新"判定）。
   static int numericId(String songId) => int.tryParse(songId) ?? 0;
 
+  /// 将常见的 `YYYY-MM-DD` / `YYYYMMDD` 日期转成可比较的数字。
+  /// 日期缺失或无法解析时返回 0，调用方会用 id 做稳定回退。
+  static int releaseDateKey(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) return 0;
+    final parsed = DateTime.tryParse(value);
+    if (parsed != null) {
+      return parsed.year * 10000 + parsed.month * 100 + parsed.day;
+    }
+    final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length < 8) return 0;
+    return int.tryParse(digits.substring(0, 8)) ?? 0;
+  }
+
+  static int compareByReleaseDateDesc(Song a, Song b) {
+    final dateCompare = releaseDateKey(b.basicInfo.releaseDate)
+        .compareTo(releaseDateKey(a.basicInfo.releaseDate));
+    if (dateCompare != 0) return dateCompare;
+    return numericId(b.id).compareTo(numericId(a.id));
+  }
+
   /// 本地曲库 → 更新对照。
   static UnionUpdateCompare compare(Iterable<Song> songs) {
     final unionOnly = <Song>[];
     final cnRegular = <Song>[];
     final earlyReleases = <Song>[];
-    Song? frontier;
-    var frontierId = -1;
     var cnSongCount = 0;
     var maidataCount = 0;
 
@@ -199,12 +215,13 @@ class UnionUpdateCompareService {
         continue;
       }
       cnRegular.add(song);
-      final id = numericId(song.id);
-      if (id > frontierId) {
-        frontierId = id;
-        frontier = song;
-      }
     }
+
+    // 前沿只在已经筛出的国服常规曲中按首发日期判定，宴会场、maidata、
+    // 超前上线曲都不会参与。日期缺失时由 id 作为稳定回退。
+    cnRegular.sort(compareByReleaseDateDesc);
+    final frontier = cnRegular.isEmpty ? null : cnRegular.first;
+    final frontierId = frontier == null ? -1 : numericId(frontier.id);
 
     final upcoming = <Song>[];
     final skipped = <Song>[];
@@ -228,8 +245,6 @@ class UnionUpdateCompareService {
     upcoming.sort(byId);
     skipped.sort(byId);
     utage.sort(byId);
-    // 国服已上的那批按 id 降序：第一首就是前沿，紧接着就是"待上线"的第一首
-    cnRegular.sort((a, b) => byId(b, a));
     earlyReleases.sort(byId);
 
     return UnionUpdateCompare(

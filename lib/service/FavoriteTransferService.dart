@@ -26,8 +26,7 @@ class FavoriteImportBundle {
     this.formatVersion = 1,
   });
 
-  int get chartCount =>
-      folders.fold<int>(0, (sum, f) => sum + f.charts.length);
+  int get chartCount => folders.fold<int>(0, (sum, f) => sum + f.charts.length);
 }
 
 /// 收藏夹自定义格式的导入/导出服务。
@@ -47,6 +46,7 @@ class FavoriteImportBundle {
 /// 早期允许自定义后缀会劫持常见后缀的默认打开方式，已废弃）。
 /// 导入按「内容」校验而非按后缀校验，所以用户以前用别的后缀导出的备份照样能导回来。
 class FavoriteTransferService {
+  static const int maxImportBytes = 50 * 1024 * 1024;
   static final FavoriteTransferService _instance =
       FavoriteTransferService._internal();
   factory FavoriteTransferService() => _instance;
@@ -156,6 +156,11 @@ class FavoriteTransferService {
     final file = File(path);
     if (!await file.exists()) {
       throw FormatException('文件不存在：$path');
+    }
+    final length = await file.length();
+    if (length > maxImportBytes) {
+      throw FormatException(
+          '收藏夹文件过大（上限 ${maxImportBytes ~/ (1024 * 1024)} MB）');
     }
 
     final raw = await _readAsText(file);

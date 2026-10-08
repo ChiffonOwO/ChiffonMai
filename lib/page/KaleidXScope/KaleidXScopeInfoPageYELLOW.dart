@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import '../../utils/KaleidDateUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/service/KaleidXScope/KaleidXScopeInfoServiceYELLOW.dart'
@@ -11,7 +11,7 @@ import 'package:my_first_flutter_app/entity/KaleidXScope/KaleidXScopeGate.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/widgets/KaleidXScopeSourceNotice.dart';
-import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/BackgroundPageScaffold.dart';
 
 class KaleidXScopeInfoPageYELLOW extends StatefulWidget {
   const KaleidXScopeInfoPageYELLOW({
@@ -23,7 +23,8 @@ class KaleidXScopeInfoPageYELLOW extends StatefulWidget {
       _KaleidXScopeInfoPageYELLOWState();
 }
 
-class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW> {
+class _KaleidXScopeInfoPageYELLOWState
+    extends State<KaleidXScopeInfoPageYELLOW> {
   final yellowService.KaleidXScopeInfoServiceYELLOW _service =
       yellowService.KaleidXScopeInfoServiceYELLOW();
   List<Song> _songs = [];
@@ -40,15 +41,13 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
 
   // 自定义常量
   late double _borderRadiusSmall;
-  late double _defaultShadowBlurRadius;
-  late double _defaultShadowOffset;
+
 
   // 尺寸参数（基于MediaQuery）
   late double _paddingXS;
   late double _paddingS;
   late double _paddingM;
   late double _paddingL;
-  late double _paddingXL;
   late double _textSizeXS;
   late double _textSizeS;
   late double _textSizeM;
@@ -66,15 +65,13 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
     _borderRadiusSmall = 8.0 * scaleFactor;
 
     // 阴影
-    _defaultShadowBlurRadius = 5.0 * scaleFactor;
-    _defaultShadowOffset = 2.0 * scaleFactor;
+
 
     // 内边距
     _paddingXS = 4.0 * scaleFactor;
     _paddingS = 4.0 * scaleFactor;
     _paddingM = 12.0 * scaleFactor;
     _paddingL = 10.0 * scaleFactor;
-    _paddingXL = 48.0 * scaleFactor;
 
     // 字体大小
     _textSizeXS = 9.0 * scaleFactor;
@@ -90,11 +87,6 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
     _progressBarHeight = 24.0 * scaleFactor;
   }
 
-  BoxShadow defaultShadow(Brightness brightness) => BoxShadow(
-        color: brightness == Brightness.dark ? Colors.black.withOpacity(0.3) : Colors.black12,
-        blurRadius: _defaultShadowBlurRadius,
-        offset: Offset(_defaultShadowOffset, _defaultShadowOffset),
-      );
 
   // 获取标题
   String _getGateTitle() {
@@ -146,9 +138,13 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
     if (allSongs == null) return;
     for (final ss in _gateData!.specialSongs) {
       try {
-        final song = allSongs.firstWhere((s) => s.id.toString() == ss.songId.toString());
-        if (ss.role == 'perfect') { _specialSong11808 = song; }
-        else if (ss.role == 'hidden') { _specialSong11809 = song; }
+        final song =
+            allSongs.firstWhere((s) => s.id.toString() == ss.songId.toString());
+        if (ss.role == 'perfect') {
+          _specialSong11808 = song;
+        } else if (ss.role == 'hidden') {
+          _specialSong11809 = song;
+        }
       } catch (e) {}
     }
   }
@@ -313,7 +309,8 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
     final brightness = Theme.of(context).brightness;
     final String name = challenge.name;
     final List<ChallengePhase> phases = challenge.phases;
-    final double progressBarFontSize = 10.0 * (MediaQuery.of(context).size.width / 375.0);
+    final double progressBarFontSize =
+        10.0 * (MediaQuery.of(context).size.width / 375.0);
 
     return Container(
       decoration: BoxDecoration(
@@ -325,6 +322,7 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          KaleidDateUtil.currentHeader(context, [challenge]),
           Text(
             name,
             style: TextStyle(
@@ -340,7 +338,8 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
             height: _progressBarHeight,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(_progressBarHeight / 2),
-              border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
+              border: Border.all(
+                  color: AppColors.tableBorder(brightness), width: 1),
             ),
             child: Row(
               children: phases.map((phase) {
@@ -357,7 +356,9 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
                         style: TextStyle(
                           fontSize: progressBarFontSize,
                           fontWeight: FontWeight.bold,
-                          color: brightness == Brightness.dark ? Colors.white : Colors.black87,
+                          color: brightness == Brightness.dark
+                              ? Colors.white
+                              : Colors.black87,
                         ),
                       ),
                     ),
@@ -383,7 +384,7 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
                 child: Row(
                   children: [
                     Text(
-                      '${startDate}${endDate != null ? ' - $endDate' : ' - 后续'}:',
+                      '${KaleidDateUtil.range(startDate, endDate)}:',
                       style: TextStyle(
                         fontSize: _textSizeS,
                         color: AppColors.greyHint(brightness),
@@ -444,7 +445,8 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(_borderRadiusSmall),
-          border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
+          border:
+              Border.all(color: AppColors.tableBorder(brightness), width: 1),
         ),
         child: Center(child: CircularProgressIndicator()),
       );
@@ -466,7 +468,8 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
-            border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
+            border:
+                Border.all(color: AppColors.tableBorder(brightness), width: 1),
           ),
           padding: EdgeInsets.all(_paddingXS),
           child: Row(
@@ -474,8 +477,8 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
               Container(
                 width: _coverSize,
                 height: _coverSize,
-                child:
-                    CoverUtil.buildCoverWidgetWithContext(context, song.id, _coverSize),
+                child: CoverUtil.buildCoverWidgetWithContext(
+                    context, song.id, _coverSize),
               ),
               SizedBox(width: _paddingXS * 1.5),
               Expanded(
@@ -551,10 +554,12 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
         Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
-            border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
+            border:
+                Border.all(color: AppColors.tableBorder(brightness), width: 1),
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
           ),
-          padding: EdgeInsets.symmetric(horizontal: _paddingS, vertical: _paddingXS * 0.5),
+          padding: EdgeInsets.symmetric(
+              horizontal: _paddingS, vertical: _paddingXS * 0.5),
           child: Center(
             child: Text(
               '曲目池 | 总计 ${_songs.length} 首歌曲',
@@ -581,7 +586,7 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
           itemCount: _songs.length,
           itemBuilder: (context, index) {
             final song = _songs[index];
-            
+
             return GestureDetector(
               onTap: () {
                 Navigator.push(
@@ -714,10 +719,12 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
         Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
-            border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
+            border:
+                Border.all(color: AppColors.tableBorder(brightness), width: 1),
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
           ),
-          padding: EdgeInsets.symmetric(horizontal: _paddingS, vertical: _paddingXS * 0.5),
+          padding: EdgeInsets.symmetric(
+              horizontal: _paddingS, vertical: _paddingXS * 0.5),
           child: Center(
             child: Text(
               '${title} | 总计 ${songs.length} 首歌曲',
@@ -827,49 +834,20 @@ class _KaleidXScopeInfoPageYELLOWState extends State<KaleidXScopeInfoPageYELLOW>
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
     // 初始化尺寸参数
     _initSizeParams(context);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏（统一走 PageTopBar，标题随之变成 20 / primary / 居中）
-              PageTopBar(
-                title: _getGateTitle(),
-                bottom: const KaleidXScopeSourceNotice(),
-              ),
-
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(_borderRadiusSmall),
-                    boxShadow: [defaultShadow(brightness)],
-                  ),
-                  child: _isLoading
+    return BackgroundPageScaffold(
+      title: _getGateTitle(),
+      bottom: const KaleidXScopeSourceNotice(),
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: _isLoading
                       ? Center(child: CircularProgressIndicator())
                       : SingleChildScrollView(
                           padding: EdgeInsets.symmetric(
                               horizontal: _paddingL, vertical: _paddingS),
                           child: _buildSongList(),
                         ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

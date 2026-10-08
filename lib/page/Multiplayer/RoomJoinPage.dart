@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
-import 'package:my_first_flutter_app/utils/AppConstants.dart';
-import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/BackgroundPageScaffold.dart';
 
 class RoomJoinPage extends StatefulWidget {
   const RoomJoinPage({super.key});
@@ -52,32 +50,11 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
     final paddingL = 10.0 * scaleFactor;
     final borderRadiusSmall = 8.0 * scaleFactor;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '加入房间',
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
-              // 与 Best50 页、其余 50 多个页面同款。
-              PageTopBar(title: '加入房间'),
-
-              // 主内容区域 - 白色区域，使用 Expanded 占据剩余空间
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(paddingS, 0, paddingS, paddingL),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [AppConstants.defaultShadow(brightness)],
-                  ),
-                  child: SingleChildScrollView(
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: SingleChildScrollView(
                     padding: EdgeInsets.all(paddingM),
                     child: Padding(
                       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + paddingL),
@@ -149,12 +126,6 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
                       ),
                     ),
                   ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

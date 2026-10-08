@@ -14,6 +14,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../../widgets/ExportSuccessDialog.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -21,11 +22,13 @@ import '../../constant/CacheKeyConstant.dart';
 import '../../entity/Portable/PortableSong.dart';
 import '../../service/Portable/PortablePlayerController.dart';
 import '../../service/Portable/PortableSongLibrary.dart';
+import '../../service/Portable/PortableSongDownloadService.dart';
+import '../NextPlayQueuePage.dart';
+import '../../widgets/NextPlayAddDialog.dart';
 import '../../utils/AppDesignTokens.dart';
-import '../../utils/AppTheme.dart';
-import '../../utils/CommonWidgetUtil.dart';
 import '../../utils/PortablePlayerScope.dart';
-import '../../widgets/PageTopBar.dart';
+import '../../widgets/BackgroundPageScaffold.dart';
+import '../../widgets/PortablePlaybackModeButton.dart';
 import '../../widgets/PortablePlayerBadge.dart';
 import 'PortableNowPlayingPage.dart';
 
@@ -59,6 +62,8 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
 
   /// 点了但还没开始响的那一首（用于行内 loading）。
   int? _pendingLxnsId;
+  int? _downloadingLxnsId;
+  double? _downloadProgress;
 
   /// 拖动进度条时的临时值（0~1）。拖动期间以它为准，松手 seek 完再交还给
   /// positionStream —— 否则 200ms 一跳的流会把拇指拽回旧位置。
@@ -70,23 +75,35 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
   @override
   void initState() {
     super.initState();
+    unawaited(PortablePlayerScope.loadPreferences());
+    // 重新进入随身听是唤起悬浮球的明确入口。
+    PortablePlayerScope.wakeBall();
     // 告诉 AppShell 收掉悬浮球：这一页自己就是播放入口，不用球再来一个
     PortablePlayerScope.isLibraryPageOpen.value = true;
+    _player.addListener(_safeSetState);
     _eventSub = _player.events.listen(_onPlayerEvent);
     // 播放状态变化（切歌/暂停）要刷新「正在播放」那一行的样子
     _playerSubs.add(_player.currentIndexStream.listen((_) => _safeSetState()));
     _playerSubs.add(_player.playingStream.listen((_) => _safeSetState()));
     // 缓冲状态（loading / buffering → ready）也要刷：行内的 loading 靠它收尾
-    _playerSubs.add(_player.processingStateStream.listen((_) => _safeSetState()));
+    _playerSubs
+        .add(_player.processingStateStream.listen((_) => _safeSetState()));
     _loadLibrary();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAskNotification());
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _maybeAskNotification());
   }
 
   @override
   void dispose() {
     PortablePlayerScope.isLibraryPageOpen.value = false;
+    if (PortablePlayerScope.showBallOnLibraryExit.value) {
+      PortablePlayerScope.wakeBall();
+    } else {
+      PortablePlayerScope.hideBall();
+    }
     _searchTimer?.cancel();
     _eventSub?.cancel();
+    _player.removeListener(_safeSetState);
     for (final sub in _playerSubs) {
       sub.cancel();
     }
@@ -211,6 +228,47 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
     );
   }
 
+  Future<void> _downloadSong(PortableSong song) async {
+    if (_downloadingLxnsId != null) return;
+    setState(() {
+      _downloadingLxnsId = song.lxnsId;
+      _downloadProgress = null;
+    });
+    String? fallbackPath;
+    try {
+      final file = await PortableSongDownloadService.instance.download(
+        song,
+        onProgress: (progress) {
+          if (mounted && _downloadingLxnsId == song.lxnsId) {
+            setState(() => _downloadProgress = progress);
+          }
+        },
+        onFallback: (path) => fallbackPath = path,
+      );
+      if (mounted) {
+        await showExportSuccessDialog(
+          context,
+          filePath: file.path,
+          fileName: song.title,
+          title: '下载成功',
+          successPrefix: '已下载',
+          fallbackPath: fallbackPath,
+        );
+      }
+    } on AudioDownloadSourceException catch (e) {
+      if (mounted) _showHint(e.message);
+    } catch (e) {
+      if (mounted) _showHint('下载失败：$e');
+    } finally {
+      if (mounted && _downloadingLxnsId == song.lxnsId) {
+        setState(() {
+          _downloadingLxnsId = null;
+          _downloadProgress = null;
+        });
+      }
+    }
+  }
+
   void _openNowPlaying() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const PortableNowPlayingPage()),
@@ -258,8 +316,7 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
   /// 失效，所以才要跟着 [MediaQuery.textScalerOf] 走）。
   double _rowExtentOf(BuildContext context) {
     final scaler = MediaQuery.textScalerOf(context);
-    final textHeight =
-        scaler.scale(14.5) * 1.35 + 2 + scaler.scale(12) * 1.35;
+    final textHeight = scaler.scale(14.5) * 1.35 + 2 + scaler.scale(12) * 1.35;
     return math.max(44.0, textHeight) + 17;
   }
 
@@ -267,25 +324,11 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
-    // 正在播放条改到底部之后，键盘（搜索时）会正好盖住它，所以底边距要把
-    // 键盘高度也算进去一起顶起来（本页 `resizeToAvoidBottomInset: false`）。
-    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    final scheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          Column(
-            children: [
-              PageTopBar(
-                title: '随身听',
-                actions: [
+    return BackgroundPageScaffold(
+      title: '随身听',
+      actions: [
                   IconButton(
                     icon: const Icon(Icons.my_location),
                     tooltip: '定位到正在播放',
@@ -294,29 +337,31 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
                   IconButton(
                     icon: const Icon(Icons.refresh),
                     tooltip: '重建曲库',
-                    onPressed: _loading ? null : () => _loadLibrary(force: true),
+                    onPressed:
+                        _loading ? null : () => _loadLibrary(force: true),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.settings_outlined),
+                    tooltip: '随身听设置',
+                    onPressed: _showPortableSettings,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.queue_music),
+                    tooltip: '下次想玩',
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const NextPlayQueuePage()),
+                    ),
                   ),
                 ],
-              ),
-              Expanded(
-                child: Center(
+      resizeToAvoidBottomInset: false,
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(
                       maxWidth: AppDesignTokens.maxContentWidth,
                     ),
-                    child: Container(
-                      margin: EdgeInsets.fromLTRB(
-                        4,
-                        0,
-                        4,
-                        10 + safeBottom + keyboard,
-                      ),
-                      decoration: BoxDecoration(
-                        color: scheme.surface.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [AppColors.defaultShadow(theme.brightness)],
-                      ),
-                      child: Column(
+                    child: Column(
                         children: [
                           _buildSearchBar(scheme),
                           Divider(
@@ -335,14 +380,35 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
                             _buildCurrentBar(scheme),
                           ],
                         ],
-                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+    );
+  }
+
+  void _showPortableSettings() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('随身听设置'),
+          content: SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            value: PortablePlayerScope.showBallOnLibraryExit.value,
+            title: const Text('退出随身听页面时显示悬浮球'),
+            subtitle: const Text('关闭后，离开随身听页面也不会重新显示悬浮球'),
+            onChanged: (value) {
+              unawaited(PortablePlayerScope.setShowBallOnLibraryExit(value));
+              setDialogState(() {});
+            },
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('完成'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -467,8 +533,7 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
                                     thumbShape: const RoundSliderThumbShape(
                                       enabledThumbRadius: 6,
                                     ),
-                                    overlayShape:
-                                        const RoundSliderOverlayShape(
+                                    overlayShape: const RoundSliderOverlayShape(
                                       overlayRadius: 12,
                                     ),
                                     padding: const EdgeInsets.symmetric(
@@ -479,16 +544,13 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
                                     value: value,
                                     onChanged: totalMs <= 0
                                         ? null
-                                        : (v) =>
-                                            setState(() => _dragValue = v),
+                                        : (v) => setState(() => _dragValue = v),
                                     onChangeStart: totalMs <= 0
                                         ? null
-                                        : (v) =>
-                                            setState(() => _dragValue = v),
+                                        : (v) => setState(() => _dragValue = v),
                                     onChangeEnd: totalMs <= 0
                                         ? null
-                                        : (v) =>
-                                            unawaited(_seekToFraction(v)),
+                                        : (v) => unawaited(_seekToFraction(v)),
                                   ),
                                 ),
                               ),
@@ -516,6 +578,9 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
                     color: scheme.primary,
                   ),
                   onPressed: () => _player.togglePlayPause(),
+                ),
+                const PortablePlaybackModeButton(
+                  iconButtonKey: Key('portablePlaybackModeButton'),
                 ),
               ],
             ),
@@ -563,7 +628,8 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
               indent: 68,
               color: scheme.outlineVariant.withValues(alpha: 0.4),
             ),
-            itemBuilder: (context, index) => _buildRow(_filtered[index], scheme),
+            itemBuilder: (context, index) =>
+                _buildRow(_filtered[index], scheme),
           ),
         ),
         _buildFooter(scheme),
@@ -641,7 +707,8 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
                             fontSize: 14.5,
                             fontWeight:
                                 isCurrent ? FontWeight.w700 : FontWeight.w500,
-                            color: isCurrent ? scheme.primary : scheme.onSurface,
+                            color:
+                                isCurrent ? scheme.primary : scheme.onSurface,
                           ),
                         ),
                       ),
@@ -665,6 +732,46 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
               ),
             ),
             const SizedBox(width: 8),
+            IconButton(
+              tooltip: '下载歌曲',
+              icon: _downloadingLxnsId == song.lxnsId
+                  ? SizedBox(
+                      width: 21,
+                      height: 21,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        value: _downloadProgress,
+                      ),
+                    )
+                  : const Icon(Icons.download_outlined, size: 21),
+              onPressed: _downloadingLxnsId == null
+                  ? () => _downloadSong(song)
+                  : null,
+            ),
+            IconButton(
+              tooltip: '加入下次想玩',
+              icon: const Icon(Icons.playlist_add, size: 21),
+              onPressed: () async {
+                final added = await showNextPlayAddDialog(context,
+                    songId: song.divingFishId,
+                    title: song.title,
+                    artist: song.artist,
+                    type: song.hasDx ? 'DX' : 'SD',
+                    coverId: song.audioId,
+                    difficulties: NextPlayDifficultyOption.standard(
+                      count: song.difficultyConstants.isEmpty
+                          ? 5
+                          : song.difficultyConstants.length,
+                      constants: song.difficultyConstants
+                          .map((value) => value.toStringAsFixed(1))
+                          .toList(),
+                    ));
+                if (mounted && added) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('已加入下次想玩')));
+                }
+              },
+            ),
             // 行内 loading：只在这一首「还在建源 / 还在缓冲」时转。
             // 别只看 `_player.isLoading` —— 见 playAt 的注释：`play()` 的
             // future 挂满整首歌，用它会出现「已经播了，右边还在转圈」。

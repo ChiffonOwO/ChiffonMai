@@ -9,7 +9,6 @@ import 'package:media_scanner/media_scanner.dart';
 import '../../service/Collection/CollectionInfoService.dart';
 import '../../entity/LuoXue/Collection.dart';
 import '../../utils/LuoXueToDivingFishUtil.dart';
-import '../../utils/CommonWidgetUtil.dart';
 import '../../utils/CollectionsImageUtil.dart';
 import '../../utils/CoverUtil.dart';
 import '../../utils/StringUtil.dart';
@@ -17,7 +16,7 @@ import '../../utils/TranslationUtil.dart';
 import '../../utils/AppTheme.dart';
 import '../SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
-import '../../widgets/PageTopBar.dart';
+import '../../widgets/BackgroundPageScaffold.dart';
 
 class CollectionInfoPage extends StatefulWidget {
   final int collectionId;
@@ -189,7 +188,6 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
 
   // 自定义常量
   final Color themeColor = Colors.blue;
-  final double borderRadiusSmall = 8.0;
 
   @override
   void initState() {
@@ -900,42 +898,12 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false, // 防止键盘弹出时调整布局
-      body: Stack(
-        children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏
-              PageTopBar(
-                title: '${_getTypeLabel()}详情',
-                actions: [
-                // 占位按钮
-                IconButton(
-                icon: Icon(Icons.arrow_back, color: Colors.transparent),
-                onPressed: () {},
-                ),
-                ],
-              ),
-
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [AppColors.defaultShadow(brightness)],
-                  ),
-                  child: _isLoading
+    return BackgroundPageScaffold(
+      title: '${_getTypeLabel()}详情',
+      resizeToAvoidBottomInset: false,
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: _isLoading
                       ? Center(child: CircularProgressIndicator())
                       : _collection == null
                           ? Center(child: Text('未找到收藏品信息'))
@@ -943,6 +911,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                               padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
                               child: ListView(
                                 key: Key('collection_${widget.collectionId}_${widget.collectionType}'),
+                                padding: EdgeInsets.zero,
                                 children: [
                                   // 收藏品图片
                                   if (widget.collectionType == 'icons')
@@ -1333,12 +1302,6 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                 ],
                               ),
                             ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

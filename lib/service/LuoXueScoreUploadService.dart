@@ -2,12 +2,12 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/ApiUrls.dart';
 import '../constant/CacheKeyConstant.dart';
 import '../manager/LuoXue/LuoXueOAuthManager.dart';
 import '../utils/ApiClient.dart';
+import '../utils/SecureCredentialStore.dart';
 
 /// 把一条成绩同步到落雪咖啡屋（LXNS）。
 ///
@@ -93,13 +93,13 @@ class LuoXueScoreUploadService {
 
   /// 读取落雪个人 API 密钥（仅在 OAuth Bearer 拿不到时才用）。
   ///
-  /// 只能从本地缓存读。Hub 的 `/profile` 只返回 `hasLxnsImportToken` 这个
+  /// 只能从本地缓存读。maimai Score Hub 的 `/profile` 只返回 `hasLxnsImportToken` 这个
   /// **布尔值**，不返回密钥本身（后端 `PATCH /me` 是只写不读），所以
-  /// 「Hub 说已绑定」这条路在本方法里用不上 —— 这是上一版死磕 X-User-Token
+  /// 「maimai Score Hub 说已绑定」这条路在本方法里用不上 —— 这是上一版死磕 X-User-Token
   /// 时栽过的那个跟头。
   Future<String?> _getApiKey() async {
-    final prefs = await SharedPreferences.getInstance();
-    final t = prefs.getString(CacheKeyConstant.probeLxnsImportToken);
+    final t =
+        await SecureCredentialStore.read(CacheKeyConstant.probeLxnsImportToken);
     return (t == null || t.isEmpty) ? null : t;
   }
 
@@ -140,7 +140,8 @@ class LuoXueScoreUploadService {
   /// 水鱼的 `Song.type`（"DX"/"SD"）→ 落雪的 `SongType`
   ///
   /// 宴会场单独判：它靠 id 区间（>= 100000）识别，而不是靠 type。
-  static String toLxnsSongType({required int divingFishId, required String type}) {
+  static String toLxnsSongType(
+      {required int divingFishId, required String type}) {
     if (divingFishId >= 100000) return 'utage';
     return type.toUpperCase() == 'DX' ? 'dx' : 'standard';
   }
@@ -172,8 +173,7 @@ class LuoXueScoreUploadService {
     // 落雪的 Score 用它自己的 LevelIndex 枚举（0-4），与水鱼一致。
     // 宴会场不在 0-4 体系里，直接传会写错谱面，所以这里挡掉。
     if (type == 'utage') {
-      throw const LuoXueUploadException(
-          '宴会场谱面不支持同步：落雪的难度索引体系与宴会场不通用');
+      throw const LuoXueUploadException('宴会场谱面不支持同步：落雪的难度索引体系与宴会场不通用');
     }
     if (levelIndex < 0 || levelIndex > 4) {
       throw LuoXueUploadException('难度索引 $levelIndex 超出落雪值域（0-4）');
@@ -243,8 +243,7 @@ class LuoXueScoreUploadService {
       if (resp.statusCode == 401) {
         // token 拿到了但被拒。OAuth 写权限缺失/过期、个人密钥错误或过期
         // 都会走这里 —— 用户得重新授权或粘一个新密钥。
-        throw LuoXueUploadException(
-            detail ?? '落雪授权已失效或密钥无效，请重新授权或粘贴密钥');
+        throw LuoXueUploadException(detail ?? '落雪授权已失效或密钥无效，请重新授权或粘贴密钥');
       }
       if (resp.statusCode == 403) {
         throw LuoXueUploadException(detail ?? '落雪拒绝了这次写入（权限不足）');
@@ -306,12 +305,16 @@ class LuoXueUploadResult {
   final int songId;
   final String? songName;
   final String? level;
+
   /// 同步前的达成率（服务端原值）；未同步过则为 null。
   final double? oldAchievement;
+
   /// 同步后的达成率。
   final double? newAchievement;
+
   /// 同步前的 DX 分。
   final int? oldDxScore;
+
   /// 同步后的 DX 分。
   final int? newDxScore;
 

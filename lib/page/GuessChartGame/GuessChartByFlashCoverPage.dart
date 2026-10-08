@@ -12,11 +12,11 @@ import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CommonCacheUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/SongFilterUtil.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import '../../utils/ExternalLaunchUtil.dart';
 import 'package:my_first_flutter_app/page/GuessChartGame/GuessChartLoadingView.dart';
-import '../../widgets/PageTopBar.dart';
+import '../../widgets/BackgroundPageScaffold.dart';
 
 /// 曲绘快闪猜歌：曲绘只在开局瞬间显示一小段时间（可设置，默认 0.3s），
 /// 之后消失，凭记忆在和无提示猜歌相同的交互页面中猜歌。
@@ -851,15 +851,19 @@ class _GuessChartByFlashCoverPageState
                 GestureDetector(
                   onTap: () async {
                     final url = Uri.parse('https://maimai.yukineko2233.top/');
-                    if (await canLaunchUrl(url)) {
-                      await launchUrl(
-                        url,
-                        mode: LaunchMode.externalApplication,
+
+                    if (!await ExternalLaunchUtil.open(url) && context.mounted) {
+
+                      await ExternalLaunchUtil.copyFallback(
+
+                        context,
+
+                        url.toString(),
+
+                        message: '无法打开该链接，链接已复制到剪贴板',
+
                       );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('无法打开该链接')),
-                      );
+
                     }
                   },
                   child: Text(
@@ -1116,41 +1120,15 @@ class _GuessChartByFlashCoverPageState
     final brightness = Theme.of(context).brightness;
     // 获取屏幕尺寸
     final screenWidth = MediaQuery.of(context).size.width;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
     final screenHeight = MediaQuery.of(context).size.height;
 
     // 自定义常量
-    final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false, // 防止键盘弹出时挤压背景
-      body: Stack(
-        children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏
-              PageTopBar(
-                title: '猜歌（曲绘快闪）',
-              ),
-
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color:
-                        Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
-                  ),
-                  child: LayoutBuilder(
+    return BackgroundPageScaffold(
+      title: '猜歌（曲绘快闪）',
+      resizeToAvoidBottomInset: false,
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: LayoutBuilder(
                     builder: (context, constraints) {
                       // 边距
                       double padding = screenWidth * 0.04;
@@ -1725,12 +1703,6 @@ class _GuessChartByFlashCoverPageState
                       );
                     },
                   ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

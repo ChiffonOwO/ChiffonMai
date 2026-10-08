@@ -2,24 +2,32 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:my_first_flutter_app/utils/UpdateNotifier.dart';
+import 'package:my_first_flutter_app/utils/ExternalLaunchUtil.dart';
+
+void _updateLog(String message) {
+  if (kDebugMode) debugPrint(message);
+}
 
 class LZYCheckUpdateManager {
-  static final LZYCheckUpdateManager _instance = LZYCheckUpdateManager._internal();
+  static final LZYCheckUpdateManager _instance =
+      LZYCheckUpdateManager._internal();
   factory LZYCheckUpdateManager() => _instance;
   LZYCheckUpdateManager._internal();
 
   // ==================== 检查更新配置 =====================
   final String pastebinRawUrl = ApiUrls.checkUpdateApi;
   final bool forceUpdate = false;
+
   /// 兜底下载地址（检查更新失败时仍可复制）
-  static const String defaultDownloadUrl = 'https://wward.lanzouw.com/chiffonmai';
+  static const String defaultDownloadUrl =
+      'https://wward.lanzouw.com/chiffonmai';
   // ======================================================
 
   /// 从 pastebin 获取在线配置
@@ -31,31 +39,32 @@ class LZYCheckUpdateManager {
         final response = await client.get(
           Uri.parse(pastebinRawUrl),
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'application/json',
           },
         ).timeout(const Duration(seconds: 10));
-        
+
         if (response.statusCode == 200) {
           final jsonStr = response.body.trim();
-          debugPrint("获取配置成功：$jsonStr");
+          _updateLog('获取更新配置成功（已隐藏响应正文）');
           return jsonDecode(jsonStr);
         } else {
-          debugPrint("获取配置失败，状态码：${response.statusCode}");
+          _updateLog("获取配置失败，状态码：${response.statusCode}");
         }
       } on SocketException catch (e) {
-        debugPrint("网络连接失败：$e");
+        _updateLog("网络连接失败：$e");
       } on HttpException catch (e) {
-        debugPrint("HTTP异常：$e");
+        _updateLog("HTTP异常：$e");
       } on FormatException catch (e) {
-        debugPrint("数据格式错误：$e");
+        _updateLog("数据格式错误：$e");
       } catch (e) {
-        debugPrint("获取配置失败：$e");
+        _updateLog("获取配置失败：$e");
       } finally {
         client.close();
       }
     } catch (e) {
-      debugPrint("获取配置失败：$e");
+      _updateLog("获取配置失败：$e");
     }
     return null;
   }
@@ -72,12 +81,12 @@ class LZYCheckUpdateManager {
       if (cached != null &&
           at != null &&
           DateTime.now().difference(at) < checkUpdateCooldown) {
-        debugPrint("检查更新：命中缓存，跳过网络请求");
+        _updateLog("检查更新：命中缓存，跳过网络请求");
         return cached;
       }
       final inFlight = _inFlight;
       if (inFlight != null) {
-        debugPrint("检查更新：已有请求在飞，复用同一个 Future");
+        _updateLog("检查更新：已有请求在飞，复用同一个 Future");
         return inFlight;
       }
     }
@@ -104,17 +113,17 @@ class LZYCheckUpdateManager {
   Future<Map<String, dynamic>>? _inFlight;
 
   Future<Map<String, dynamic>> _checkUpdateOnce() async {
-    debugPrint("开始检查更新...");
+    _updateLog("开始检查更新...");
     try {
       PackageInfo packageInfo = await PackageInfo.fromPlatform();
       int localBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
-      debugPrint("当前版本：${packageInfo.version} (build: $localBuild)");
+      _updateLog("当前版本：${packageInfo.version} (build: $localBuild)");
 
       final cloudConfig = await _getCloudConfig();
-      
+
       // 如果网络请求失败，返回网络错误状态
       if (cloudConfig == null) {
-        debugPrint("无法获取云端配置，可能是网络问题");
+        _updateLog("无法获取云端配置，可能是网络问题");
         return {
           "hasUpdate": false,
           "networkError": true, // 标记网络错误
@@ -127,10 +136,10 @@ class LZYCheckUpdateManager {
       String updateLog = cloudConfig["updateLog"] ?? "优化体验";
       String downloadUrl = cloudConfig["downloadUrl"] ?? "";
 
-      debugPrint("最新版本：$latestVersion (build: $latestBuild)");
+      _updateLog("最新版本：$latestVersion (build: $latestBuild)");
 
       if (latestBuild > localBuild) {
-        debugPrint("发现新版本");
+        _updateLog("发现新版本");
         return {
           "hasUpdate": true,
           "currentVersion": packageInfo.version,
@@ -141,7 +150,7 @@ class LZYCheckUpdateManager {
           "downloadUrl": downloadUrl,
         };
       } else {
-        debugPrint("已是最新版本");
+        _updateLog("已是最新版本");
         // 返回版本信息，以便在弹窗中显示
         return {
           "hasUpdate": false,
@@ -154,7 +163,7 @@ class LZYCheckUpdateManager {
         };
       }
     } catch (e) {
-      debugPrint("检查更新失败：$e");
+      _updateLog("检查更新失败：$e");
       return {
         "hasUpdate": false,
         "networkError": true,
@@ -166,8 +175,10 @@ class LZYCheckUpdateManager {
   /// 打开下载页
   Future<void> openDownloadPage(String url) async {
     final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (uri.scheme == 'https' &&
+        (uri.host == 'wward.lanzouw.com' || uri.host == 'chiffonmai.cloud') &&
+        await ExternalLaunchUtil.open(uri)) {
+      return;
     }
   }
 
@@ -183,7 +194,8 @@ class LZYCheckUpdateManager {
         copyDownloadUrl(url);
         Navigator.pop(c);
         ScaffoldMessenger.of(c).showSnackBar(
-          const SnackBar(content: Text('下载链接已复制到剪贴板'), duration: Duration(seconds: 2)),
+          const SnackBar(
+              content: Text('下载链接已复制到剪贴板'), duration: Duration(seconds: 2)),
         );
       },
       child: const Text('复制下载链接'),
@@ -194,7 +206,8 @@ class LZYCheckUpdateManager {
     final prefs = await SharedPreferences.getInstance();
     final lastDismissTime = prefs.getInt('lastUpdateDismissTime');
     if (lastDismissTime != null) {
-      final threeDaysAgo = DateTime.now().subtract(Duration(days: 3)).millisecondsSinceEpoch;
+      final threeDaysAgo =
+          DateTime.now().subtract(Duration(days: 3)).millisecondsSinceEpoch;
       if (lastDismissTime > threeDaysAgo) return false;
     }
     return true;
@@ -202,12 +215,14 @@ class LZYCheckUpdateManager {
 
   Future<void> recordDismissTime() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('lastUpdateDismissTime', DateTime.now().millisecondsSinceEpoch);
+    await prefs.setInt(
+        'lastUpdateDismissTime', DateTime.now().millisecondsSinceEpoch);
   }
 
   /// 显示更新弹窗
   /// [force] 为 true 时强制显示，忽略3天内不提示的设置
-  Future<void> showUpdateDialog(BuildContext context, {bool force = false}) async {
+  Future<void> showUpdateDialog(BuildContext context,
+      {bool force = false}) async {
     if (!force && !await shouldShowUpdateDialog()) return;
 
     // force=true（用户点了「检查更新」/「发现新版本」）时强制走网络，
@@ -220,13 +235,13 @@ class LZYCheckUpdateManager {
     if (info["networkError"] != true) {
       UpdateNotifier.setResult(info);
     }
-    
+
     // 如果上下文已销毁，直接返回
     if (!context.mounted) return;
-    
+
     // 使用 Completer 确保 Future 在对话框关闭后才完成
     final completer = Completer<void>();
-    
+
     // 如果有网络错误或其他异常，显示错误提示
     if (info["networkError"] == true) {
       showDialog(
@@ -250,7 +265,7 @@ class LZYCheckUpdateManager {
       });
       return completer.future;
     }
-    
+
     // 如果没有更新，显示已是最新版本提示（仅在强制检查时显示）
     if (!info["hasUpdate"] && force) {
       showDialog(
@@ -264,8 +279,10 @@ class LZYCheckUpdateManager {
             children: [
               Text("当前已是最新版本"),
               SizedBox(height: 10),
-              Text("当前版本：${info["currentVersion"]} (build: ${info["currentBuild"]})"),
-              Text("最新版本：${info["latestVersion"]} (build: ${info["latestBuild"]})"),
+              Text(
+                  "当前版本：${info["currentVersion"]} (build: ${info["currentBuild"]})"),
+              Text(
+                  "最新版本：${info["latestVersion"]} (build: ${info["latestBuild"]})"),
               SizedBox(height: 10),
               Container(
                 constraints: BoxConstraints(maxHeight: 150),
@@ -276,7 +293,8 @@ class LZYCheckUpdateManager {
             ],
           ),
           actions: [
-            _buildCopyDownloadButton(c, info["downloadUrl"] ?? defaultDownloadUrl),
+            _buildCopyDownloadButton(
+                c, info["downloadUrl"] ?? defaultDownloadUrl),
             TextButton(
               onPressed: () {
                 Navigator.pop(c);
@@ -328,7 +346,8 @@ class LZYCheckUpdateManager {
                 },
                 child: Text("3天内不提示"),
               ),
-            _buildCopyDownloadButton(c, info["downloadUrl"] ?? defaultDownloadUrl),
+            _buildCopyDownloadButton(
+                c, info["downloadUrl"] ?? defaultDownloadUrl),
             TextButton(
               onPressed: () {
                 Navigator.pop(c);
@@ -343,7 +362,7 @@ class LZYCheckUpdateManager {
       });
       return completer.future;
     }
-    
+
     // 如果没有显示任何对话框，直接完成
     completer.complete();
     return completer.future;

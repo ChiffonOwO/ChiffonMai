@@ -6,7 +6,12 @@
 //   DIVING_FISH_OAUTH_CLIENT_ID     水鱼账号 OAuth 应用 client_id
 //   DIVING_FISH_OAUTH_CLIENT_SECRET 水鱼账号 OAuth 应用 client_secret
 //   GATEWAY_API_KEY                 App↔后端 OAuth 代理的 API key
+//   LUOXUE_OAUTH_CLIENT_ID          落雪 OAuth 应用 client_id
+//   LUOXUE_OAUTH_CLIENT_SECRET      落雪 OAuth 应用 client_secret（只在服务端）
+//   LUOXUE_OAUTH_REDIRECT_URI       落雪 OAuth 回调地址，默认 OOB
 //   PROBER_SUBJECT_MODE             可选 'ref'(默认、长期) / 'qq'(仅过渡期)
+//   AWMC_GATEWAY_TOKEN               AWMC 网关开发者令牌（只在服务端）
+//   AWMC_NET_DEVELOPER_KEY           AWMC NET 开发者令牌（只在服务端）
 // ===========================================================================
 const express = require('express');
 const http = require('http');
@@ -14,20 +19,84 @@ const https = require('https');
 const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
 const mysql = require('mysql2/promise');
+const redis = require('redis');
 
 const app = express();
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: false }));
+// Redis 凭据仅从环境变量读取；原统计 LIST 键名不变，历史样本继续可读。
+const statsRedis = redis.createClient({
+  url: process.env.REDIS_URL || 'redis://localhost:6379',
+  password: process.env.REDIS_PASSWORD || undefined,
+});
+statsRedis.on('error', () => console.warn('同步统计 Redis 暂不可用'));
+statsRedis.connect().catch(() => console.warn('同步统计 Redis 连接失败'));
+require('./sync-stats').installSyncStats(app, () => statsRedis);
+require('./awmc-proxy').installAwmcProxy(app);
+require('./awmc-net-proxy').installAwmcNetProxy(app);
+const loadingTips = require('./loading-tips');
+loadingTips.installLoadingTips(app, () => db);
+require('./special-rankings').installSpecialRankings(app, () => db, () => statsRedis);
+// 生产环境应由 HTTPS 反向代理终止 TLS；应用本身只监听内网端口。
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 3000;
+const GATEWAY_API_KEY = process.env.GATEWAY_API_KEY || '';
+const LUOXUE_OAUTH_CLIENT_ID = process.env.LUOXUE_OAUTH_CLIENT_ID || '56a76019-2e7b-4650-abeb-082b8d5dede6';
+const LUOXUE_OAUTH_CLIENT_SECRET = process.env.LUOXUE_OAUTH_CLIENT_SECRET || '';
+const LUOXUE_OAUTH_REDIRECT_URI = process.env.LUOXUE_OAUTH_REDIRECT_URI || 'urn:ietf:wg:oauth:2.0:oob';
 
-// MySQL 数据库配置
+// 落雪 OAuth 换票代理：client_secret 只在服务端环境变量中保存，绝不下发到 App。
+app.post('/api/luoxue/oauth/token', async (req, res) => {
+  if (!LUOXUE_OAUTH_CLIENT_SECRET) {
+    return res.status(503).json({ error: 'luoxue_oauth_not_configured' });
+  }
+  const grantType = String(req.body?.grant_type || '');
+  const code = String(req.body?.code || '');
+  const refreshToken = String(req.body?.refresh_token || '');
+  if (grantType !== 'authorization_code' && grantType !== 'refresh_token') {
+    return res.status(400).json({ error: 'unsupported_grant_type' });
+  }
+  if ((grantType === 'authorization_code' && !code) ||
+      (grantType === 'refresh_token' && !refreshToken)) {
+    return res.status(400).json({ error: 'invalid_request' });
+  }
+  const form = new URLSearchParams({
+    grant_type: grantType,
+    code,
+    refresh_token: refreshToken,
+    client_id: LUOXUE_OAUTH_CLIENT_ID,
+    client_secret: LUOXUE_OAUTH_CLIENT_SECRET,
+    redirect_uri: LUOXUE_OAUTH_REDIRECT_URI,
+  }).toString();
+  const upstream = https.request('https://maimai.lxns.net/api/v0/oauth/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Length': Buffer.byteLength(form),
+    },
+  }, (upstreamResponse) => {
+    const chunks = [];
+    upstreamResponse.on('data', (chunk) => chunks.push(chunk));
+    upstreamResponse.on('end', () => {
+      let body;
+      try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch (_) { body = { error: 'invalid_upstream_response' }; }
+      res.status(upstreamResponse.statusCode || 502).json(body);
+    });
+  });
+  upstream.on('error', () => res.status(502).json({ error: 'upstream_unavailable' }));
+  upstream.end(form);
+});
+
+// MySQL 数据库配置（生产环境必须通过环境变量注入）
 const dbConfig = {
-  host: '替换为你的数据库主机地址',
+  host: process.env.DB_HOST || '替换为你的数据库主机地址',
   port: 3306,
-  user: '替换为你的数据库用户名',
-  password: '替换为你的数据库密码',
-  database: '替换为你的数据库名称',
+  user: process.env.DB_USER || '替换为你的数据库用户名',
+  password: process.env.DB_PASSWORD || '替换为你的数据库密码',
+  database: process.env.DB_NAME || '替换为你的数据库名称',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
@@ -242,6 +311,7 @@ async function handleGetUserRank(ws, data) {
 // 启动服务器
 async function startServer() {
   await connectDB();
+  await loadingTips.ensureLoadingTipsTable(() => db);
   
   server.listen(PORT, () => {
     console.log(`服务器运行在 http://localhost:${PORT}`);

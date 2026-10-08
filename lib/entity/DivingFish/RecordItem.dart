@@ -1,35 +1,37 @@
-class RecordItem {
-    final num achievements; // 达成率
-    final double ds; // 定数（14.9）
-    final int dxScore; // DX分数
-    final String fc; // 连击
-    final String fs; // 同步
-    final String level; // 难度标级（14+）
-    final int levelIndex; // 难度索引
-    final String levelLabel; // 难度（Master）
-    final int ra; // Rating
-    final String rate; // 评级类型
-    final int songId; // 曲目id
-    final String title; // 曲目名称
-    final String type; // 音乐类型（SD/DX）
-    
-    RecordItem({
-      required this.achievements,
-      required this.ds,
-      required this.dxScore,
-      required this.fc,
-      required this.fs,
-      required this.level,
-      required this.levelIndex,
-      required this.levelLabel,
-      required this.ra,
-      required this.rate,
-      required this.songId,
-      required this.title,
-      required this.type,
-    });
+import '../../utils/SongFilterUtil.dart';
 
-    Map<String, dynamic> toJson() {
+class RecordItem {
+  final num achievements; // 达成率
+  final double ds; // 定数（14.9）
+  final int dxScore; // DX分数
+  final String fc; // 连击
+  final String fs; // 同步
+  final String level; // 难度标级（14+）
+  final int levelIndex; // 难度索引
+  final String levelLabel; // 难度（Master）
+  final int ra; // Rating
+  final String rate; // 评级类型
+  final int songId; // 曲目id
+  final String title; // 曲目名称
+  final String type; // 音乐类型（SD/DX）
+
+  RecordItem({
+    required this.achievements,
+    required this.ds,
+    required this.dxScore,
+    required this.fc,
+    required this.fs,
+    required this.level,
+    required this.levelIndex,
+    required this.levelLabel,
+    required this.ra,
+    required this.rate,
+    required this.songId,
+    required this.title,
+    required this.type,
+  });
+
+  Map<String, dynamic> toJson() {
     return {
       'achievements': achievements,
       'ds': ds,
@@ -48,6 +50,7 @@ class RecordItem {
   }
 
   factory RecordItem.fromJson(Map<String, dynamic> json) {
+    final songId = json['song_id'] ?? 0;
     return RecordItem(
       achievements: json['achievements'] ?? 0,
       ds: json['ds'] ?? 0.0,
@@ -57,9 +60,11 @@ class RecordItem {
       level: json['level'] ?? '',
       levelIndex: json['level_index'] ?? 0,
       levelLabel: json['level_label'] ?? '',
-      ra: json['ra'] ?? 0,
+      // 宴会场谱面不参与正式 Rating；即使旧缓存或接口错误地带了高分，
+      // 归一化时也必须钉为 0，避免污染所有 Best50 变体。
+      ra: SongFilterUtil.isUtageSong(songId.toString()) ? 0 : (json['ra'] ?? 0),
       rate: json['rate'] ?? '',
-      songId: json['song_id'] ?? 0,
+      songId: songId,
       title: json['title'] ?? '未知歌曲',
       type: json['type'] ?? '',
     );

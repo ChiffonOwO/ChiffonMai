@@ -1,10 +1,11 @@
+import '../../widgets/AnimatedChoiceBar.dart';
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
+import '../../widgets/EmptyState.dart';
 import 'package:my_first_flutter_app/service/RankingList/SpecialRankingListService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import '../SongInfoPage.dart';
-import '../../widgets/PageTopBar.dart';
+import '../../widgets/BackgroundPageScaffold.dart';
 
 class SpecialRankingListPage extends StatefulWidget {
   const SpecialRankingListPage({super.key});
@@ -29,9 +30,9 @@ enum RankingType {
 class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
   final SpecialRankingListService _service = SpecialRankingListService();
   bool _isLoading = true;
-  bool _isRecalculating = false;
-  int _progress = 0;
   RankingType _currentRankingType = RankingType.breakCount;
+  int _requestGeneration = 0;
+  bool _usingCachedData = false;
   bool _isReverse = false; // 当前排行榜是否为反向（仅对支持的排行榜生效）
   List<SpecialRankingEntry> _rankingList = [];
   String? _errorMessage;
@@ -42,62 +43,36 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
     _loadRanking();
   }
 
-  Future<void> _loadRanking() async {
-    // Phase 1: 快速读取缓存，无论是否为空都立即展示页面
+  Future<void> _loadRanking({bool forceRefresh = false}) async {
+    final generation = ++_requestGeneration;
+    if (forceRefresh) {
+      _service.forceRefreshNextRead = true;
+    }
     setState(() {
       _isLoading = true;
-      _isRecalculating = false;
-      _progress = 0;
       _errorMessage = null;
+      // 刷新开始后先移除旧的缓存提示；如果本次请求只能回退到缓存，
+      // 成功回调会再把它显示回来。
+      _usingCachedData = false;
     });
-
     try {
-      List<SpecialRankingEntry> ranking = await _fetchCachedRanking();
-
+      final ranking = await _fetchCachedRanking();
+      if (!mounted || generation != _requestGeneration) return;
       setState(() {
         _rankingList = ranking;
+        _usingCachedData = _service.lastReadWasCached;
         _isLoading = false;
       });
-
-      // Phase 2: 如果缓存为空，后台触发重新计算，不阻塞页面交互
-      if (ranking.isEmpty) {
-        setState(() {
-          _isRecalculating = true;
-          _progress = 0;
-        });
-
-        try {
-          await _recalculateRankingWithProgress();
-
-          // 重新计算完成后，重新读取缓存并更新列表
-          List<SpecialRankingEntry> newRanking = await _fetchCachedRanking();
-          if (mounted) {
-            setState(() {
-              _rankingList = newRanking;
-              _isRecalculating = false;
-            });
-          }
-        } catch (e) {
-          if (mounted) {
-            setState(() {
-              _errorMessage = '重新计算排行榜失败: $e';
-              _isRecalculating = false;
-            });
-          }
-        }
-      }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = '获取排行榜失败: $e';
-          _isLoading = false;
-          _isRecalculating = false;
-        });
-      }
+      if (!mounted || generation != _requestGeneration) return;
+      setState(() {
+        _errorMessage = '获取排行榜失败: $e';
+        _isLoading = false;
+      });
     }
   }
 
-  /// 仅从缓存读取排行榜，不触发重新计算
+  /// 通过 HTTP 获取排行榜，缓存与计算统一交给服务端。
   Future<List<SpecialRankingEntry>> _fetchCachedRanking() async {
     switch (_currentRankingType) {
       case RankingType.breakCount:
@@ -146,27 +121,6 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
   /// 当前排行榜是否支持正反向切换（所有排行榜都支持）
   bool _rankingSupportsReverse(RankingType type) {
     return true;
-  }
-
-  /// 后台触发重新计算（目前仅绝赞数排行榜支持独立重新计算）
-  Future<void> _recalculateRankingWithProgress() async {
-    // 目前仅 breakCount 有独立的重新计算方法，其他类型由缓存读取方法内部处理
-    switch (_currentRankingType) {
-      case RankingType.breakCount:
-        await _service.recalculateBreakCountRanking(
-          onProgress: (progress) {
-            if (mounted) {
-              setState(() {
-                _progress = progress;
-              });
-            }
-          },
-        );
-        break;
-      // 其他排行榜类型暂时保持原有行为（缓存为空时由 service 内部计算）
-      default:
-        break;
-    }
   }
 
   String _getRankingTypeName(RankingType type) {
@@ -263,7 +217,13 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: Text('选择排行榜类型', style: TextStyle(color: AppColors.primaryText(brightness))),
+          title: Text('选择排行榜类型',
+              style: TextStyle(color: AppColors.primaryText(brightness))),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('关闭'))
+          ],
           backgroundColor: AppColors.cardBackground(brightness),
           content: SizedBox(
             width: double.maxFinite,
@@ -338,10 +298,15 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
     );
   }
 
-  Widget _buildDialogTile(Brightness brightness, String title, String subtitle, RankingType type) {
+  Widget _buildDialogTile(
+      Brightness brightness, String title, String subtitle, RankingType type) {
     return ListTile(
-      title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryText(brightness))),
-      subtitle: Text(subtitle, style: TextStyle(color: AppColors.secondaryText(brightness))),
+      title: Text(title,
+          style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: AppColors.primaryText(brightness))),
+      subtitle: Text(subtitle,
+          style: TextStyle(color: AppColors.secondaryText(brightness))),
       trailing: _currentRankingType == type
           ? Icon(Icons.check, color: AppColors.linkBlue(brightness))
           : null,
@@ -428,9 +393,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.bold,
-            color: brightness == Brightness.dark
-                ? Colors.red[300]
-                : Colors.red,
+            color: brightness == Brightness.dark ? Colors.red[300] : Colors.red,
           ),
         ),
       );
@@ -468,17 +431,16 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.bold,
-            color: brightness == Brightness.dark
-                ? Colors.blue[300]
-                : Colors.blue,
+            color:
+                brightness == Brightness.dark ? Colors.blue[300] : Colors.blue,
           ),
         ),
       );
     }
   }
 
-  Widget _buildDifficultyTag(
-      String difficultyLabel, int difficultyIndex, String songId, Brightness brightness) {
+  Widget _buildDifficultyTag(String difficultyLabel, int difficultyIndex,
+      String songId, Brightness brightness) {
     Color bgColor;
     Color textColor;
 
@@ -486,9 +448,7 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
       bgColor = brightness == Brightness.dark
           ? Colors.red.withValues(alpha: 0.2)
           : Colors.red.shade100;
-      textColor = brightness == Brightness.dark
-          ? Colors.red[300]!
-          : Colors.red;
+      textColor = brightness == Brightness.dark ? Colors.red[300]! : Colors.red;
     } else {
       switch (difficultyIndex) {
         case 0:
@@ -511,9 +471,8 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
           bgColor = brightness == Brightness.dark
               ? Colors.red.withValues(alpha: 0.2)
               : Colors.red.shade100;
-          textColor = brightness == Brightness.dark
-              ? Colors.red[300]!
-              : Colors.red;
+          textColor =
+              brightness == Brightness.dark ? Colors.red[300]! : Colors.red;
           break;
         case 3:
           bgColor = brightness == Brightness.dark
@@ -561,20 +520,13 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          Column(
-            children: [
-              // 头部
-              PageTopBar(title: '特殊排行榜'),
 
-              // 排行榜类型选择 + 刷新行
+    return BackgroundPageScaffold(
+      title: '特殊排行榜',
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: Column(children: [
+// 排行榜类型选择 + 刷新行
               Padding(
                 padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
                 child: Row(
@@ -584,15 +536,22 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                         onTap: _showRankingTypeDialog,
                         borderRadius: BorderRadius.circular(8),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest
+                                .withValues(alpha: 0.7),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.tableBorder(brightness)),
+                            border: Border.all(
+                                color: AppColors.tableBorder(brightness)),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.filter_list, size: 18, color: AppColors.primaryText(brightness)),
+                              Icon(Icons.filter_list,
+                                  size: 18,
+                                  color: AppColors.primaryText(brightness)),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -605,7 +564,9 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              Icon(Icons.arrow_drop_down, size: 20, color: AppColors.primaryText(brightness)),
+                              Icon(Icons.arrow_drop_down,
+                                  size: 20,
+                                  color: AppColors.primaryText(brightness)),
                             ],
                           ),
                         ),
@@ -613,67 +574,65 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                     ),
                     const SizedBox(width: 8),
                     IconButton(
-                      icon: Icon(Icons.refresh, size: 20, color: AppColors.primaryText(brightness)),
-                      onPressed: _loadRanking,
+                      icon: Icon(Icons.refresh,
+                          size: 20, color: AppColors.primaryText(brightness)),
+                      onPressed: () => _loadRanking(forceRefresh: true),
                       tooltip: '刷新',
                       style: IconButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+                        backgroundColor: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest
+                            .withValues(alpha: 0.7),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(color: AppColors.tableBorder(brightness)),
+                          side: BorderSide(
+                              color: AppColors.tableBorder(brightness)),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-
-              // 正反向切换（仅对支持的排行榜显示）
+// 正反向切换（仅对支持的排行榜显示）
               if (_rankingSupportsReverse(_currentRankingType))
                 Padding(
                   padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
                   child: SizedBox(
                     width: double.infinity,
-                    child: SegmentedButton<bool>(
-                      segments: const [
-                        ButtonSegment<bool>(
-                          value: false,
-                          label: Text('正向'),
-                          icon: Icon(Icons.arrow_upward, size: 16),
-                        ),
-                        ButtonSegment<bool>(
-                          value: true,
-                          label: Text('反向'),
-                          icon: Icon(Icons.arrow_downward, size: 16),
-                        ),
-                      ],
-                      selected: {_isReverse},
-                      showSelectedIcon: false,
-                      onSelectionChanged: (selection) {
-                        setState(() => _isReverse = selection.first);
-                        _loadRanking();
-                      },
+                    child: AnimatedChoiceBar<bool>(
+                      values: const [false, true],
+                      value: _isReverse,
+                      label: (reverse) => reverse ? '反向' : '正向',
+                      onChanged: _isLoading
+                          ? null
+                          : (reverse) {
+                              if (reverse == _isReverse) return;
+                              setState(() => _isReverse = reverse);
+                              _loadRanking();
+                            },
                     ),
                   ),
                 ),
+if (_usingCachedData)
+                Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Text('当前展示上次保存的数据，联网后可刷新。',
+                        style: TextStyle(
+                            color: AppColors.warningOrange(brightness)))),
 
               // 排行榜列表
               Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardBackgroundTranslucent(brightness),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [AppColors.defaultShadow(brightness)],
-                  ),
-                  child: _isLoading
+                child: _isLoading
                       ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               const CircularProgressIndicator(),
                               const SizedBox(height: 16),
-                              Text('正在加载...', style: TextStyle(color: AppColors.primaryText(brightness))),
+                              Text('正在加载...',
+                                  style: TextStyle(
+                                      color:
+                                          AppColors.primaryText(brightness))),
                             ],
                           ),
                         )
@@ -689,18 +648,22 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                             MainAxisAlignment.center,
                                         children: [
                                           Icon(Icons.error_outline,
-                                              size: 48, color: AppColors.errorRed(brightness)),
+                                              size: 48,
+                                              color: AppColors.errorRed(
+                                                  brightness)),
                                           const SizedBox(height: 16),
                                           Text(
                                             _errorMessage!,
                                             textAlign: TextAlign.center,
                                             style: TextStyle(
                                                 fontSize: 16,
-                                                color: AppColors.errorRed(brightness)),
+                                                color: AppColors.errorRed(
+                                                    brightness)),
                                           ),
                                           const SizedBox(height: 16),
                                           ElevatedButton(
-                                            onPressed: _loadRanking,
+                                            onPressed: () =>
+                                                _loadRanking(forceRefresh: true),
                                             child: const Text('重试'),
                                           ),
                                         ],
@@ -708,70 +671,10 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                     ),
                                   )
                                 : _rankingList.isEmpty
-                                    ? Center(
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              _isRecalculating
-                                                  ? Icons.cloud_download
-                                                  : Icons.music_note,
-                                              size: 48,
-                                              color: _isRecalculating
-                                                  ? Colors.purple
-                                                  : AppColors.secondaryText(brightness),
-                                            ),
-                                            const SizedBox(height: 16),
-                                            Text(
-                                              _isRecalculating
-                                                  ? '正在重新计算排行数据...'
-                                                  : '暂无排行数据',
-                                              style: TextStyle(
-                                                  fontSize: 16,
-                                                  color: AppColors.primaryText(brightness)),
-                                            ),
-                                            if (_isRecalculating) ...[
-                                              Text(
-                                                '解析maidata中，请耐心等待',
-                                                style: TextStyle(
-                                                    fontSize: 14,
-                                                    color: AppColors.secondaryText(brightness)),
-                                              ),
-                                              const SizedBox(height: 20),
-                                              SizedBox(
-                                                width: 200,
-                                                child: LinearProgressIndicator(
-                                                  value: _progress / 100,
-                                                  backgroundColor:
-                                                      AppColors.buttonBackground(brightness),
-                                                  valueColor:
-                                                      const AlwaysStoppedAnimation<
-                                                          Color>(Colors.purple),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 8),
-                                              Text(
-                                                '$_progress%',
-                                                style: TextStyle(
-                                                    fontSize: 14,
-                                                    color: AppColors.secondaryText(brightness)),
-                                              ),
-                                            ] else ...[
-                                              const SizedBox(height: 8),
-                                              Text(
-                                                '获取数据后点击右上角刷新按钮生成',
-                                                style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: AppColors.secondaryText(brightness)),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      )
+                                    ? const EmptyState(
+                                        message: '暂无排行榜数据，稍后刷新试试吧')
                                     : ListView.builder(
-                                        padding: EdgeInsets.only(
-                                            top: _isRecalculating ? 56 : 0),
+                                        padding: EdgeInsets.zero,
                                         itemCount: _rankingList.length,
                                         itemBuilder: (context, index) {
                                           SpecialRankingEntry entry =
@@ -804,7 +707,9 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                               1
                                                       ? Border(
                                                           bottom: BorderSide(
-                                                            color: AppColors.tableBorder(brightness),
+                                                            color: AppColors
+                                                                .tableBorder(
+                                                                    brightness),
                                                             width: 0.5,
                                                           ),
                                                         )
@@ -813,7 +718,8 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                 child: Row(
                                                   children: [
                                                     // 排名
-                                                    _buildRankBadge(entry.rank, brightness),
+                                                    _buildRankBadge(
+                                                        entry.rank, brightness),
                                                     const SizedBox(width: 12),
 
                                                     // 封面
@@ -842,7 +748,8 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                               _buildTypeTag(
                                                                   entry
                                                                       .songType,
-                                                                  entry.songId, brightness),
+                                                                  entry.songId,
+                                                                  brightness),
                                                               const SizedBox(
                                                                   width: 6),
                                                               Expanded(
@@ -856,7 +763,9 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                                     fontWeight:
                                                                         FontWeight
                                                                             .bold,
-                                                                    color: AppColors.primaryText(brightness),
+                                                                    color: AppColors
+                                                                        .primaryText(
+                                                                            brightness),
                                                                   ),
                                                                   maxLines: 1,
                                                                   overflow:
@@ -868,7 +777,9 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                           ),
                                                           const SizedBox(
                                                               height: 4),
-                                                          if (_currentRankingType != RankingType.bpmRanking)
+                                                          if (_currentRankingType !=
+                                                              RankingType
+                                                                  .bpmRanking)
                                                             Row(
                                                               children: [
                                                                 _buildDifficultyTag(
@@ -876,15 +787,20 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                                         .difficultyLabel,
                                                                     entry
                                                                         .difficultyIndex,
-                                                                    entry.songId, brightness),
+                                                                    entry
+                                                                        .songId,
+                                                                    brightness),
                                                                 const SizedBox(
                                                                     width: 8),
                                                                 Text(
                                                                   '${entry.ds}',
                                                                   style:
                                                                       TextStyle(
-                                                                    fontSize: 12,
-                                                                    color: AppColors.secondaryText(brightness),
+                                                                    fontSize:
+                                                                        12,
+                                                                    color: AppColors
+                                                                        .secondaryText(
+                                                                            brightness),
                                                                   ),
                                                                 ),
                                                               ],
@@ -904,7 +820,9 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                       decoration: BoxDecoration(
                                                         color: Color.lerp(
                                                           _getRankingValueColor(),
-                                                          AppColors.cardBackground(brightness),
+                                                          AppColors
+                                                              .cardBackground(
+                                                                  brightness),
                                                           0.85,
                                                         ),
                                                         borderRadius:
@@ -925,16 +843,18 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                                               fontWeight:
                                                                   FontWeight
                                                                       .bold,
-                                                              color:
-                                                                  AppColors.primaryText(brightness),
+                                                              color: AppColors
+                                                                  .primaryText(
+                                                                      brightness),
                                                             ),
                                                           ),
                                                           Text(
                                                             _getRankingValueLabel(),
                                                             style: TextStyle(
                                                               fontSize: 10,
-                                                              color:
-                                                                  AppColors.secondaryText(brightness),
+                                                              color: AppColors
+                                                                  .secondaryText(
+                                                                      brightness),
                                                             ),
                                                           ),
                                                         ],
@@ -945,84 +865,10 @@ class _SpecialRankingListPageState extends State<SpecialRankingListPage> {
                                               ));
                                         },
                                       ),
-
-                            // 重新计算进度横幅：显示在列表顶部，不遮挡列表内容
-                            if (_isRecalculating)
-                              Positioned(
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: brightness == Brightness.dark
-                                        ? Colors.purple.withValues(alpha: 0.15)
-                                        : Colors.purple.shade50,
-                                    borderRadius: const BorderRadius.only(
-                                      topLeft: Radius.circular(12),
-                                      topRight: Radius.circular(12),
-                                    ),
-                                    border: Border(
-                                      bottom: BorderSide(
-                                          color: brightness == Brightness.dark
-                                              ? Colors.purple.withValues(alpha: 0.3)
-                                              : Colors.purple.shade200,
-                                          width: 1),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                                  brightness == Brightness.dark
-                                                      ? Colors.purple[300]!
-                                                      : Colors.purple.shade400),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          '正在重新计算... $_progress%',
-                                          style: TextStyle(
-                                              fontSize: 13,
-                                              color: brightness == Brightness.dark
-                                                  ? Colors.purple[200]
-                                                  : Colors.purple.shade700),
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: 100,
-                                        child: LinearProgressIndicator(
-                                          value: _progress / 100,
-                                          backgroundColor:
-                                              brightness == Brightness.dark
-                                                  ? Colors.purple.withValues(alpha: 0.2)
-                                                  : Colors.purple.shade100,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                                  brightness == Brightness.dark
-                                                      ? Colors.purple[300]!
-                                                      : Colors.purple.shade400),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
                           ],
                         ),
-                ),
               ),
-            ],
-          ),
-        ],
-      ),
+]),
     );
   }
 }

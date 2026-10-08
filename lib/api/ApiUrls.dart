@@ -4,11 +4,17 @@ class ApiUrls {
   // ── 后端 OAuth 代理 ────────────────────────────────────────────────────
   // 水鱼成绩读取走本后端 /api/prober（后端持有 client_secret 换票并代理），
   // 其余第三方数据源 App 直连。
-  static const String BackendBaseUrl = 'http://chiffonmai.cloud:3000';
+  static const String BackendBaseUrl = 'https://chiffonmai.cloud';
   static const String ProberBaseUrl = '$BackendBaseUrl/api/prober';
 
+  /// 同步耗时统计代理。Redis 凭据只保留在服务端，App 不再直连 Redis。
+  static const String SyncStatsUrl = '$BackendBaseUrl/api/sync-stats';
+  static const String LoadingTipsUrl = '$BackendBaseUrl/api/loading-tips';
+
   /// App ↔ 后端 OAuth 代理的 API key（与 server 端环境变量 GATEWAY_API_KEY 保持一致）
-  static const String ProberApiKey = 'chiffonmaiowo';
+  /// 只从构建参数注入，源码与默认 APK 不再携带共享密钥。
+  static const String ProberApiKey =
+      String.fromEnvironment('PROBER_API_KEY', defaultValue: '');
 
   // ── 水鱼查分器数据（直连） ─────────────────────────────────────────────
   static const String DiffMusicDataApi =
@@ -50,8 +56,8 @@ class ApiUrls {
   // 官网 https://net.wmc.pub/ ，API 文档 https://net.wmc.pub/docs
   //
   // ⚠️ 与「AWMC 网关」是两个不同的服务，别搞混：
-  //   * api.wmc.pub —— 机台账号网关，qrcode + `gw_` 令牌读写机台数据（见 lib/service/AWMC/）；
-  //   * net.wmc.pub —— 第三方**查分器**，开发者密钥按 QQ **只读**查成绩（本段）。
+  //   * api.wmc.pub —— 机台账号网关；App 通过服务端代理访问，开发者令牌不下发客户端；
+  //   * net.wmc.pub —— 第三方**查分器**；开发者密钥由服务端按 QQ **只读**代理查成绩（本段）。
   static const String AwmcNetBaseUrl = 'https://net.wmc.pub';
 
   /// 设置页：成绩导入 Token 的生成入口。
@@ -62,7 +68,7 @@ class ApiUrls {
 
   /// 全量成绩（返回结构与水鱼 `/player/records` **逐字段一致**）。
   ///
-  /// 鉴权：请求头 `Developer-Token: <awmc_sk_...>`。
+  /// 鉴权：由自家服务端注入 `Developer-Token`，客户端只提交 QQ。
   /// 查询：`?qq=488581724` 或 `?username=ChiffonOwO`（二选一；都没有 → 400 `需要 username 或 qq`）。
   ///
   /// 返回 `{username, nickname, rating, plate, additional_rating, records:[...]}`，
@@ -72,6 +78,10 @@ class ApiUrls {
   /// （实测：按现有 Best50 算法取 old-top35 + new-top15 求得的和，
   ///  与接口自身的 `old_rating + new_rating` 完全一致。）
   static const String AwmcNetRecordsApi = '$AwmcNetBaseUrl/dev/player/records';
+
+  /// AWMC NET 开发者查询代理；Developer-Token 只保存在服务端。
+  static const String AwmcNetRecordsProxyApi =
+      '$BackendBaseUrl/api/awmc-net/records';
 
   /// 曲库（水鱼 `music_data` 兼容格式）。App 用自家曲库缓存，留作备用。
   static const String AwmcNetMusicDataApi = '$AwmcNetBaseUrl/api/music_data';
@@ -104,10 +114,8 @@ class ApiUrls {
       '$AwmcNetTrendBaseUrl/api/player/$qqid/trend?days=$days';
 
   // ── 服务器状态 / 街机厅（直连） ────────────────────────────────────────
-  static const String ServerStatusApi =
-      'https://status.awmc.cc/api/status-page/heartbeat/maimai';
-  static const String ServerStatusTitleApi =
-      'https://status.awmc.cc/api/status-page/maimai';
+  static const String ServerStatusApi = 'https://mai.chongxi.us/api/bot';
+  static const String ServerStatusTitleApi = 'https://mai.chongxi.us/api/bot';
   static const String NearCadeShopsApi = 'https://nearcade.cn/api/shops';
   static const String NearCadeRegionsApi = 'https://nearcade.cn/api/regions';
 
@@ -149,8 +157,8 @@ class ApiUrls {
       'https://chiffonmai.cloud/app_version.json';
 
   // 多人游戏服务器地址
-  static const String MultiplayerServerUrl = 'ws://chiffonmai.cloud:3000';
-  static const String MultiplayerGameServerUrl = 'ws://chiffonmai.cloud:3000';
+  static const String MultiplayerServerUrl = 'wss://chiffonmai.cloud';
+  static const String MultiplayerGameServerUrl = 'wss://chiffonmai.cloud';
 
   // Maidata 服务器地址
   static const String MaidataServerBaseUrl = 'https://chiffonmai.cloud';
@@ -180,6 +188,10 @@ class ApiUrls {
   static const String LuoXueApiBaseUrl = 'https://maimai.lxns.net/api/v0';
   static const String LuoXueOAuthTokenUrl =
       'https://maimai.lxns.net/api/v0/oauth/token';
+
+  /// 落雪 OAuth 换票代理；client_secret 只留在服务端环境变量，不进入 APK。
+  static const String LuoXueOAuthProxyTokenUrl =
+      '$BackendBaseUrl/api/luoxue/oauth/token';
   static const String LuoXueOAuthAuthorizeUrl =
       'https://maimai.lxns.net/oauth/authorize';
 
@@ -190,13 +202,14 @@ class ApiUrls {
       'https://maimai.lxns.net/api/v0/user/maimai/player/scores';
 
   // 排行榜 API 地址（自家后端）
-  static const String RankingsBaseUrl =
-      'http://chiffonmai.cloud:3000/api/rankings';
+  static const String RankingsBaseUrl = 'https://chiffonmai.cloud/api/rankings';
+  static const String SpecialRankingsUrl =
+      'https://chiffonmai.cloud/api/special-rankings';
   static const String RankingsUpdateUrl = '$RankingsBaseUrl/update';
 
   // 单曲排行榜 API 地址（达成率/DX分数）（自家后端）
   static const String SongRankingsBaseUrl =
-      'http://chiffonmai.cloud:3000/api/song-rankings';
+      'https://chiffonmai.cloud/api/song-rankings';
   static const String SongRankingsBulkUpdateUrl =
       '$SongRankingsBaseUrl/bulk-update';
 
@@ -211,15 +224,15 @@ class ApiUrls {
 
   /// 拟合总Rating排行榜（服务端拉取最新 chart_stats 并按 A/B/C 模式计算）
   /// GET /api/song-rankings/fitted-ranking?mode=a|b|c&userId=... -> { success, data: [...], total, currentUser }
-  static const String SongRankingsFittedUrl = '$SongRankingsBaseUrl/fitted-ranking';
+  static const String SongRankingsFittedUrl =
+      '$SongRankingsBaseUrl/fitted-ranking';
 
   // 万花镜 API 地址（自家后端）
   static const String KaleidXScopeBaseUrl =
-      'http://chiffonmai.cloud:3000/api/kaleidxscope';
+      'https://chiffonmai.cloud/api/kaleidxscope';
 
   // 歌曲评论 API 地址（自家后端）
-  static const String CommentsBaseUrl =
-      'http://chiffonmai.cloud:3000/api/comments';
+  static const String CommentsBaseUrl = 'https://chiffonmai.cloud/api/comments';
   static const String CommentsBySongUrl = '$CommentsBaseUrl/song';
   static const String CommentsByUserUrl = '$CommentsBaseUrl/user';
   static const String CommentsCreateUrl = '$CommentsBaseUrl/create';
@@ -228,7 +241,7 @@ class ApiUrls {
 
   // B站播放量 Redis 缓存 API（自家后端）
   static const String BiliRedisBaseUrl =
-      'http://chiffonmai.cloud:3000/api/bilibili';
+      'https://chiffonmai.cloud/api/bilibili';
   static const String BiliRedisSaveUrl = '$BiliRedisBaseUrl/play-count';
   static const String BiliRedisGetUrl = '$BiliRedisBaseUrl/play-count';
   static const String BiliRedisUploadBvUrl = '$BiliRedisBaseUrl/upload-bv';
@@ -239,14 +252,13 @@ class ApiUrls {
       '$BiliRedisBaseUrl/reference-duration';
 
   // 谱面评分 API 地址（自家后端）
-  static const String RatingsBaseUrl =
-      'http://chiffonmai.cloud:3000/api/ratings';
+  static const String RatingsBaseUrl = 'https://chiffonmai.cloud/api/ratings';
 
   // 注：自家后端的成绩截图 OCR（POST /api/ocr/score，转发百度/腾讯）已废弃，
-  // 识别改走 MaimaiHub 的专用模型，见 MaimaiHubOcrRecognizeUrl。
+  // 识别改走 maimai Score Hub 的专用模型，见 MaimaiHubOcrRecognizeUrl。
 
-  // Maimai Score Hub API 地址（QR码查分 → 同步水鱼）（第三方，有独立鉴权，保持直连）
-  // 基于 assets/maimaihubapi.yaml (v1.0.0)
+  // maimai Score Hub API 地址（QR码查分 → 同步水鱼）（第三方，有独立鉴权，保持直连）
+  // 基于 assets/maimai-score-hub-api.yaml (v1.0.0)
   static const String MaimaiHubBaseUrl = 'https://maimai.bakapiano.com/api/v1';
 
   // ── Auth 认证 ──
@@ -296,15 +308,16 @@ class ApiUrls {
 
   // ── Catalog / 曲目目录与别名 ──
   /// 曲目目录：`[{ id, title, ... }]`。用来把别名接口的 musicId 映射成曲名。
-  static const String MaimaiHubMusicCatalogUrl = '$MaimaiHubBaseUrl/catalog/music';
+  static const String MaimaiHubMusicCatalogUrl =
+      '$MaimaiHubBaseUrl/catalog/music';
 
   /// 曲目别名：`{ revision, aliases: [{ musicId, aliases: [...] }] }`
   static const String MaimaiHubMusicAliasesUrl =
       '$MaimaiHubBaseUrl/catalog/music/aliases';
 
   // ── OCR / 结算画面识别 ──
-  // MaimaiHub 的 OCR 是独立 FastAPI 服务（仓库 ocr-api/），只监听 127.0.0.1:19100，
-  // **App 无法直连**，必须经 backend 的 /me/ocr/recognize 代理，用 MaimaiHub 用户 token 鉴权。
+  // maimai Score Hub 的 OCR 是独立 FastAPI 服务（仓库 ocr-api/），只监听 127.0.0.1:19100，
+  // **App 无法直连**，必须经 backend 的 /me/ocr/recognize 代理，用 maimai Score Hub 用户 token 鉴权。
   //
   // 注意：这条路径**不在 maimaihubapi.yaml 里**——ts-rest 代码生成不覆盖 multipart 接口，
   // 所以 spec 里搜不到 ocr，但接口是真实存在的（无 token 时返回 401 "Missing bearer token"）。
@@ -314,7 +327,8 @@ class ApiUrls {
       '$MaimaiHubBaseUrl/me/ocr/recognize';
 
   /// 确认后的成绩更新：`{ scores: [{ musicId, chartIndex, achievement, dxScore, fc, fs }] }`，单次 ≤500
-  static const String MaimaiHubSyncScoresUrl = '$MaimaiHubBaseUrl/me/sync/scores';
+  static const String MaimaiHubSyncScoresUrl =
+      '$MaimaiHubBaseUrl/me/sync/scores';
 
   // ── App / 状态 ──
   static const String MaimaiHubHealthUrl = '$MaimaiHubBaseUrl/health';

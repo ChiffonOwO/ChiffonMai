@@ -15,12 +15,12 @@ import 'SongInfoPage.dart';
 /// 让用户一眼看到「日服已上、国服还没上」的歌 = 下次更新最可能补上的曲目。
 ///
 /// 为什么需要这个页面：曲目详情页的「首次上线」是**日服**首发时间，
-/// 国服玩家光看这个日期判断不出这首歌自己这边上了没有。本页把国服最新曲
-/// 标成前沿，比它 id 更大的 union 独有曲就是候选。
+/// 国服玩家光看这个日期判断不出这首歌自己这边上了没有。本页先按筛选后的
+/// 国服常规曲首发日期确定前沿，再用 id 区间整理 union 独有候选。
 ///
 /// 口径与取舍全部写在 [UnionUpdateCompareService] 的类注释里；页面只负责展示，
-/// 并在页内用「口径说明」弹窗把不确定性如实讲清楚（判据是"id 越大越新"这条
-/// 近似规律，不是官方数据）。
+/// 并在页内用「口径说明」弹窗把不确定性如实讲清楚（首发日期来自曲库元数据，
+/// 不代表国服实际开放日期）。
 ///
 /// 数据完全来自本地已合并曲库（`MaimaiMusicDataManager.getCachedSongs()`），
 /// **不需要额外网络**：union 独有曲在合并时已经打了 `Song.isExtra` 标记。
@@ -180,7 +180,6 @@ class _UnionUpdateComparePageState extends State<UnionUpdateComparePage> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground(brightness),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: scheme.outlineVariant),
       ),
@@ -246,7 +245,7 @@ class _UnionUpdateComparePageState extends State<UnionUpdateComparePage> {
           const SizedBox(height: 8),
           Text(
             '「首次上线」显示的是**日服**首发时间，不是国服上线时间。'
-            'id 越大越新（宴会场是 6 位 id，不参与比较），所以比上面这首 id 更大、'
+            '前沿按国服常规曲中首发日期最新的一首确定；在此基础上，id 更大、'
             '又不在国服曲库里的，就是下次更新最可能补上的曲目。',
             style: TextStyle(
                 fontSize: 11, height: 1.5, color: AppColors.secondaryText(brightness)),
@@ -330,8 +329,7 @@ class _UnionUpdateComparePageState extends State<UnionUpdateComparePage> {
       case _Section.utage:
         hint = '宴会场不随版本更新，列在这里仅供参考。';
       case _Section.cn:
-        hint = '水鱼（国服）的常规曲，按 id 降序 —— 第一首就是本页的「更新前沿」，'
-            '再往前（id 更大）的都在「下次更新候选」里。';
+        hint = '水鱼（国服）的常规曲，按首发日期从新到旧排列 —— 第一首就是本页的「更新前沿」。';
       case _Section.early:
         hint = '这些是**国服先于日服**上线的曲子：国服已经有了，id 却排在最新。'
             '它们不能当前沿（会把真正待补的那批顶出候选），所以单独列在这里。';
@@ -352,7 +350,7 @@ class _UnionUpdateComparePageState extends State<UnionUpdateComparePage> {
   Widget _buildSongRow(Brightness brightness, Song song, int order) {
     final scheme = Theme.of(context).colorScheme;
     final isUpcoming = _section == _Section.upcoming;
-    // 「国服已上」段按 id 降序，第一行就是前沿 —— 这就是「在 union 全量源里
+    // 「国服已上」段按首发日期降序，第一行就是前沿 —— 这就是「在 union 全量源里
     // 标注出水鱼最新歌曲」的那一处标注。
     final isFrontierRow =
         _section == _Section.cn && order == 1 && song.id == _compare?.frontier?.id;
@@ -369,7 +367,6 @@ class _UnionUpdateComparePageState extends State<UnionUpdateComparePage> {
         child: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: AppColors.cardBackground(brightness),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: isUpcoming
@@ -488,8 +485,8 @@ class _UnionUpdateComparePageState extends State<UnionUpdateComparePage> {
               Text('2. 更新前沿怎么定', style: TextStyle(fontWeight: FontWeight.w700)),
               SizedBox(height: 4),
               Text(
-                '取水鱼曲库里 id 最大的常规曲作为「国服最新」。'
-                'id 是随日服上线顺序递增的，所以这条前沿近似等于「国服已经追到哪」。\n'
+                '先筛出水鱼曲库里的国服常规曲，再按首发日期从新到旧排列，第一首作为「国服最新」。'
+                '日期缺失或格式异常时才回退到 id，所以这条前沿近似等于「国服已经追到哪」。\n'
                 '宴会场（6 位 id）与 maidata 追加曲不参与判定。\n'
                 '国服**超前上线**的曲目（国服先于日服上，id 却排最新）也不参与 —— '
                 '它们会把前沿顶高，让真正待补的曲子排不进候选。',
@@ -499,7 +496,7 @@ class _UnionUpdateComparePageState extends State<UnionUpdateComparePage> {
               Text('3. 已知偏差', style: TextStyle(fontWeight: FontWeight.w700)),
               SizedBox(height: 4),
               Text(
-                '「id 越大越新」是近似规律，不是官方保证：\n'
+                '「首发日期」来自曲库元数据，不代表国服实际开放日期：\n'
                 '· union 独有但 id 更小的曲子会归到「国服未收录旧曲」，'
                 '其中多数是区域限定/联动独占，也可能只是 id 顺序与上线顺序不一致；\n'
                 '· 国服也可能一次补上多首，实际更新以官方公告为准。',

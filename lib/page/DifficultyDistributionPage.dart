@@ -5,12 +5,11 @@ import '../entity/DivingFish/UserPlayDataEntity.dart';
 import '../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../manager/DivingFish/UserPlayDataManager.dart';
 import '../service/DifficultyDistributionService.dart';
-import '../utils/CommonWidgetUtil.dart';
 import '../utils/AppTheme.dart';
 import '../utils/CoverUtil.dart';
 import '../utils/StringUtil.dart';
 import 'SongInfoPage.dart';
-import '../widgets/PageTopBar.dart';
+import '../widgets/BackgroundPageScaffold.dart';
 
 /// 谱面定数分布柱状图页面
 class DifficultyDistributionPage extends StatefulWidget {
@@ -81,20 +80,13 @@ class _DifficultyDistributionPageState
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final textColor = Theme.of(context).colorScheme.onSurface;
-    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
+    return BackgroundPageScaffold(
+      title: '定数分布',
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
+      ),
+      child: Column(
         children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          Column(
-            children: [
-              // 标题栏
-              PageTopBar(
-                title: '定数分布',
-              ),
               // 难度分段控件
               Padding(
                 padding:
@@ -110,15 +102,9 @@ class _DifficultyDistributionPageState
                   ),
                 ),
               ),
-              // 图表区域
+              // 图表区域直接铺在背景上，保留内部留白以维持图表可读性。
               Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [AppColors.defaultShadow(brightness)],
-                  ),
+                child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 20, 12, 12),
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator())
@@ -142,10 +128,8 @@ class _DifficultyDistributionPageState
                     ],
                   ),
                 ),
-            ],
-          ),
-        ],
-      ),
+          ],
+        ),
     );
   }
 

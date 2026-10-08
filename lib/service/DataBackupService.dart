@@ -14,6 +14,7 @@ import '../utils/LoginStateNotifier.dart';
 import '../utils/SyncRouteNotifier.dart';
 import '../utils/ThemeManager.dart';
 import '../utils/UserProfileNotifier.dart';
+import '../utils/SecureCredentialStore.dart';
 import 'Best50/CustomBest50Store.dart';
 import 'ChartNoteService.dart';
 import 'ChartPackageHistoryStore.dart';
@@ -32,6 +33,7 @@ import 'PersonalizedScoreService.dart';
 /// 从而继续用过期数据。排除掉之后备份文件只剩真正的用户数据，
 /// 恢复后由各 Manager 按需重新拉取。
 class DataBackupService {
+  static const int maxImportBytes = 50 * 1024 * 1024;
   static final DataBackupService _instance = DataBackupService._internal();
   factory DataBackupService() => _instance;
   DataBackupService._internal();
@@ -104,9 +106,8 @@ class DataBackupService {
   /// 等同于账户操作权限与余额（能改机台数据、能花钱），一旦随备份流出
   /// 后果不可逆。因此导出与导入两端都跳过它。
   ///
-  /// 注意这与 `probeDivingFishToken` 等登录凭据的取舍不同：那些是
-  /// 「恢复后省一次登录」的便利性凭据，用户自己决定要不要备份；
-  /// AWMC 令牌是可直接扣费的凭据，默认不给导出。
+  /// 登录凭据统一迁移到系统安全存储，因此也不会进入明文备份；
+  /// AWMC 令牌与审计日志同样不导出。
   static const Set<String> _neverBackupKeys = {
     CacheKeyConstant.awmcToken,
     CacheKeyConstant.awmcAuditLog,
@@ -157,7 +158,8 @@ class DataBackupService {
 
       for (final key in keys) {
         // 敏感凭据（AWMC 网关令牌等）永远不进备份文件
-        if (isNeverBackupKey(key)) {
+        if (isNeverBackupKey(key) ||
+            SecureCredentialStore.isCredentialKey(key)) {
           secretSkipped++;
           continue;
         }
@@ -179,8 +181,7 @@ class DataBackupService {
         }
       }
 
-      debugPrint(
-          'DataBackup: 导出 ${data.length} 个用户数据键，跳过 $skipped 个缓存键、'
+      debugPrint('DataBackup: 导出 ${data.length} 个用户数据键，跳过 $skipped 个缓存键、'
           '$secretSkipped 个敏感凭据键');
 
       // 2. 构建备份元数据
@@ -291,6 +292,10 @@ class DataBackupService {
 
       // 2. 读取文件
       final file = File(result.files.single.path!);
+      final fileLength = await file.length();
+      if (fileLength > maxImportBytes) {
+        throw Exception('备份文件过大（上限 ${maxImportBytes ~/ (1024 * 1024)} MB）');
+      }
       final jsonStr = await file.readAsString();
 
       // 3. 解析 JSON
@@ -340,11 +345,10 @@ class DataBackupService {
   /// 注意随之而来的三个后果（都属于预期行为，不是 bug）：
   /// 1. 缓存键（cachedSongs / maidata / 各排行榜缓存等）会被清掉，
   ///    恢复后首次进相关页面会重新拉取，会慢一点。
-  /// 2. 若备份里不含登录凭据，恢复后需要重新登录对应账号。
-  ///    本项目的凭据键（probeDivingFishToken / probeLxnsImportToken /
-  ///    luoxue_* 等）都**不在** [_cacheExactKeys] 里，会被正常备份与还原。
+  /// 2. 登录凭据保存在系统安全存储，不进入明文备份；若备份来自迁移前版本，
+  ///    首次启动会先把旧凭据迁移到安全存储，再执行备份/恢复。
   /// 3. [_neverBackupKeys]（AWMC 网关令牌与调用日志）**既不导出也不还原**，
-  ///    恢复后需要在「系统 → AWMC 网关」里重新设置令牌。
+  ///    开发者令牌由服务端管理，恢复后无需在客户端设置；用户平台凭据按平台流程重新授权。
   ///
   /// 返回成功恢复的键数量。
   Future<int> restoreData(
@@ -379,7 +383,8 @@ class DataBackupService {
         final value = entry.value;
 
         // 敏感凭据不允许由备份写入（防止别人分享的备份里塞一个令牌进来）
-        if (isNeverBackupKey(key)) {
+        if (isNeverBackupKey(key) ||
+            SecureCredentialStore.isCredentialKey(key)) {
           debugPrint('DataBackup: 跳过敏感键 $key（不随备份恢复）');
           continue;
         }
@@ -447,17 +452,19 @@ class DataBackupService {
       final prefs = await SharedPreferences.getInstance();
       // 清掉「恢复过程中新写进去、而快照里本来没有」的键。
       for (final key in prefs.getKeys()) {
-        if (!snapshot.containsKey(key)) {
+        if (!snapshot.containsKey(key) ||
+            SecureCredentialStore.isCredentialKey(key)) {
           await prefs.remove(key);
         }
       }
       var restored = 0;
       for (final entry in snapshot.entries) {
+        if (SecureCredentialStore.isCredentialKey(entry.key)) continue;
         final wrapped = _encodePreferenceValue(entry.value);
         if (wrapped == null) continue;
         try {
-          if (await _writeOne(prefs, entry.key, wrapped['type'] as String,
-              wrapped['value'])) {
+          if (await _writeOne(
+              prefs, entry.key, wrapped['type'] as String, wrapped['value'])) {
             restored++;
           }
         } catch (e) {

@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import '../../service/Best50/PersonalizedBest50Service.dart';
@@ -20,7 +19,7 @@ import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import '../../widgets/B50GameCardWidget.dart';
-import '../../widgets/PageTopBar.dart';
+import '../../widgets/BackgroundPageScaffold.dart';
 
 class PersonalizedBest50Page extends StatefulWidget {
   const PersonalizedBest50Page({super.key});
@@ -488,6 +487,8 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
         estimatedPngSize: ImageEncodeUtil.estimatePngSize(
           songCount: _personalizedSongs.isNotEmpty ? _personalizedSongs.length : 50,
         ),
+        exportingLabel: '个性化 Best50',
+        enableThunderMode: true,
       );
       if (quality == null) {
         return; // 用户取消
@@ -527,6 +528,8 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
         _personalizedSongs,
         _maimaiMusicData,
         jpegQuality: quality.jpegQuality,
+        thunderMode: quality.thunderMode,
+        thunderVertical: quality.thunderVertical,
       );
 
       // 关闭加载指示器
@@ -595,46 +598,20 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
+      return const BackgroundPageScaffold(
+        title: '个性化Best50',
+        resizeToAvoidBottomInset: false,
+        child: Center(child: CircularProgressIndicator()),
       );
     }
 
     final brightness = Theme.of(context).brightness;
 
-    final double borderRadiusSmall = 8.0;
-    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '个性化Best50',
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏
-              PageTopBar(
-                title: '个性化Best50',
-              ),
-
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [AppColors.defaultShadow(brightness)],
-                  ),
-                  child: SingleChildScrollView(
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: SingleChildScrollView(
                     padding: EdgeInsets.all(MediaQuery.of(context).size.width * 0.03),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -709,12 +686,6 @@ class _PersonalizedBest50PageState extends State<PersonalizedBest50Page> {
                       ],
                     ),
                   ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 

@@ -5,7 +5,9 @@ import '../constant/CacheKeyConstant.dart';
 import '../manager/DivingFishProbeManager.dart';
 import '../widgets/ThemeAwareBackground.dart';
 import '../utils/UserProfileNotifier.dart';
+import '../utils/SecureCredentialStore.dart';
 import 'HubComponents.dart';
+import '../widgets/ErrorMessageDialog.dart';
 
 class AccountSyncPage extends StatefulWidget {
   const AccountSyncPage({super.key});
@@ -17,7 +19,15 @@ class AccountSyncPage extends StatefulWidget {
 class _AccountSyncPageState extends State<AccountSyncPage> {
   bool _loggedIn = false;
   String _cachedQQ = '';
+  final _awmcTokenController = TextEditingController();
+  String? _awmcToken;
   bool _loading = true;
+
+  @override
+  void dispose() {
+    _awmcTokenController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -27,14 +37,47 @@ class _AccountSyncPageState extends State<AccountSyncPage> {
 
   Future<void> _loadAccountState() async {
     final prefs = await SharedPreferences.getInstance();
+    final jwt =
+        await SecureCredentialStore.read(CacheKeyConstant.probeDivingFishToken);
+    final awmcToken = await SecureCredentialStore.read(
+        CacheKeyConstant.awmcNetImportToken);
     if (!mounted) return;
+    _awmcTokenController.text = awmcToken ?? '';
     setState(() {
-      _loggedIn = (prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '')
-          .isNotEmpty;
-      _cachedQQ = prefs.getString(CacheKeyConstant.probeDivingFishBindQQ) ??
-          '';
+      _loggedIn = jwt?.isNotEmpty == true;
+      _cachedQQ = prefs.getString(CacheKeyConstant.probeDivingFishBindQQ) ?? '';
+      _awmcToken = awmcToken?.isNotEmpty == true ? awmcToken : null;
       _loading = false;
     });
+  }
+
+  Future<void> _saveAwmcToken() async {
+    final token = _awmcTokenController.text.trim();
+    if (token.isEmpty) {
+      await showErrorMessageDialog(
+        context,
+        title: '无法保存',
+        message: '请输入 AWMC NET 成绩导入 Token。',
+      );
+      return;
+    }
+    await SecureCredentialStore.write(
+        CacheKeyConstant.awmcNetImportToken, token);
+    if (!mounted) return;
+    setState(() => _awmcToken = token);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('AWMC NET 成绩导入 Token 已保存')),
+    );
+  }
+
+  Future<void> _clearAwmcToken() async {
+    await SecureCredentialStore.delete(CacheKeyConstant.awmcNetImportToken);
+    if (!mounted) return;
+    _awmcTokenController.clear();
+    setState(() => _awmcToken = null);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('AWMC NET 成绩导入 Token 已清除')),
+    );
   }
 
   Future<void> _login() async {
@@ -62,8 +105,10 @@ class _AccountSyncPageState extends State<AccountSyncPage> {
     if (!mounted) return;
     if (response == null) {
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('登录失败，请检查用户名和密码')),
+      await showErrorMessageDialog(
+        context,
+        title: '登录失败',
+        message: '请检查用户名和密码',
       );
       return;
     }
@@ -79,7 +124,9 @@ class _AccountSyncPageState extends State<AccountSyncPage> {
     try {
       await UserProfileNotifier.clearShuiyuAccountCache();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('登出失败：$e')));
+      if (mounted) {
+        await showErrorMessageDialog(context, message: '登出失败：$e');
+      }
       return;
     }
     await _loadAccountState();
@@ -115,6 +162,49 @@ class _AccountSyncPageState extends State<AccountSyncPage> {
                     iconColor: Theme.of(context).colorScheme.error,
                     onTap: _logout,
                   ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            HubSection(
+              title: 'AWMC NET',
+              subtitle: _awmcToken == null
+                  ? '未设置成绩导入 Token'
+                  : '成绩导入 Token 已设置',
+              icon: Icons.cloud_outlined,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                  child: TextField(
+                    controller: _awmcTokenController,
+                    obscureText: true,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    decoration: InputDecoration(
+                      labelText: '成绩导入 Token',
+                      hintText: '粘贴 AWMC NET 设置页生成的 Token',
+                      suffixIcon: _awmcToken == null
+                          ? null
+                          : IconButton(
+                              tooltip: '清除 Token',
+                              icon: const Icon(Icons.clear),
+                              onPressed: _clearAwmcToken,
+                            ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: _saveAwmcToken,
+                        icon: const Icon(Icons.save_outlined),
+                        label: const Text('保存 Token'),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 24),

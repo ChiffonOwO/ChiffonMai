@@ -13,6 +13,7 @@
 // 「游离的库文档注释」（dangling_library_doc_comments）而报警告。
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +23,7 @@ import '../../entity/Portable/PortableSong.dart';
 import '../../service/Portable/PortablePlayerController.dart';
 import '../../utils/PortablePlayerScope.dart';
 import 'DxRatingCoverImage.dart';
+import 'PortablePlaybackModeButton.dart';
 import '../page/Portable/PortableNowPlayingPage.dart';
 
 // ===========================================================================
@@ -139,6 +141,8 @@ class _PortablePlayerBallState extends State<PortablePlayerBall>
     PortablePlayerScope.isLibraryPageOpen.addListener(_onPlayerChanged);
     // 同理：SongInfoPage 的「播放音乐」流程压住悬浮球时也要刷一下。
     PortablePlayerScope.isSongInfoPlayback.addListener(_onPlayerChanged);
+    // 用户从迷你卡片中隐藏悬浮球后，继续播放仍要保留后台状态。
+    PortablePlayerScope.isBallHidden.addListener(_onPlayerChanged);
     _positionSub = _player.positionStream.listen((_) {
       if (mounted && _player.isPlaying) setState(() {});
     });
@@ -148,8 +152,10 @@ class _PortablePlayerBallState extends State<PortablePlayerBall>
 
   @override
   void dispose() {
+    PortablePlayerScope.isBallDragging.value = false;
     PortablePlayerScope.isLibraryPageOpen.removeListener(_onPlayerChanged);
     PortablePlayerScope.isSongInfoPlayback.removeListener(_onPlayerChanged);
+    PortablePlayerScope.isBallHidden.removeListener(_onPlayerChanged);
     _positionSub?.cancel();
     _player.removeListener(_onPlayerChanged);
     _pulse.dispose();
@@ -239,6 +245,9 @@ class _PortablePlayerBallState extends State<PortablePlayerBall>
   Widget build(BuildContext context) {
     // 卡片开着时先把球收起来（理由见 [_miniCardOpen]）
     if (_miniCardOpen) return const SizedBox.shrink();
+    if (PortablePlayerScope.isBallHidden.value) {
+      return const SizedBox.shrink();
+    }
     // 随身听曲库页自己就是播放入口，球在那上面只会碍事。
     // 这个判断刻意放在**球自己**身上（而不是让外面的 AppShell 包一层
     // ValueListenableBuilder）——球的宿主是 `main.dart` 的 MaterialApp.builder，
@@ -274,19 +283,34 @@ class _PortablePlayerBallState extends State<PortablePlayerBall>
               left: clamped.dx,
               top: clamped.dy,
               child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                dragStartBehavior: DragStartBehavior.down,
                 onTap: _openMiniCard,
-                onPanStart: (_) => setState(() => _dragging = true),
+                onPanStart: (_) {
+                  PortablePlayerScope.isBallDragging.value = true;
+                  setState(() {
+                    _offset = clamped;
+                    _dragging = true;
+                  });
+                },
                 onPanUpdate: (details) {
+                  final current = _offset ?? clamped;
                   final next = Offset(
-                    (clamped.dx + details.delta.dx).clamp(0.0, maxX),
-                    (clamped.dy + details.delta.dy).clamp(0.0, maxY),
+                    (current.dx + details.delta.dx).clamp(0.0, maxX),
+                    (current.dy + details.delta.dy).clamp(0.0, maxY),
                   );
                   setState(() => _offset = next);
                 },
                 onPanEnd: (_) {
+                  PortablePlayerScope.isBallDragging.value = false;
                   setState(() => _dragging = false);
                   final settled = _offset ?? clamped;
                   _saveOffset(settled);
+                },
+                onPanCancel: () {
+                  PortablePlayerScope.isBallDragging.value = false;
+                  if (!mounted) return;
+                  setState(() => _dragging = false);
                 },
                 child: AnimatedBuilder(
                   animation: _pulse,
@@ -409,7 +433,8 @@ class PortableMiniCard extends StatefulWidget {
 
 class _PortableMiniCardState extends State<PortableMiniCard> {
   final PortablePlayerController _player = PortablePlayerController();
-  final List<StreamSubscription<dynamic>> _subs = <StreamSubscription<dynamic>>[];
+  final List<StreamSubscription<dynamic>> _subs =
+      <StreamSubscription<dynamic>>[];
 
   /// 拖动进度条期间的本地值；null = 没在拖，用播放器的真实位置。
   double? _dragValue;
@@ -457,7 +482,8 @@ class _PortableMiniCardState extends State<PortableMiniCard> {
         decoration: BoxDecoration(
           color: scheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.7)),
+          border:
+              Border.all(color: scheme.outlineVariant.withValues(alpha: 0.7)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.22),
@@ -469,7 +495,7 @@ class _PortableMiniCardState extends State<PortableMiniCard> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 顶部细条：左边一句状态，右边进曲库列表
+            // 顶部细条：左边状态，右边是播放列表与悬浮球操作
             Row(
               children: [
                 Icon(
@@ -478,14 +504,28 @@ class _PortableMiniCardState extends State<PortableMiniCard> {
                   color: scheme.primary,
                 ),
                 const SizedBox(width: 5),
-                Text(
-                  _player.isPlaying ? '随身听 · 正在播放' : '随身听 · 已暂停',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: scheme.onSurfaceVariant,
+                // 收紧一点：这一行右边现在还有「播放模式 / 播放列表 / 隐藏球」三个入口，
+                // 窄屏上不给它弹性的话会直接溢出。
+                Flexible(
+                  child: Text(
+                    _player.isPlaying ? '随身听 · 正在播放' : '随身听 · 已暂停',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
                 const Spacer(),
+                // 播放模式（顺序/随机/单曲 + 循环次数）：和随身听曲库页共用同一个
+                // 控制器单例，所以在哪儿改都是同一份状态。
+                PortablePlaybackModeButton(
+                  iconButtonKey:
+                      const Key('portableMiniCardPlaybackModeButton'),
+                  iconSize: 19,
+                  density: VisualDensity.compact,
+                ),
                 if (widget.onOpenLibrary != null)
                   InkWell(
                     onTap: () {
@@ -515,6 +555,12 @@ class _PortableMiniCardState extends State<PortableMiniCard> {
                       ),
                     ),
                   ),
+                IconButton(
+                  tooltip: '隐藏悬浮球',
+                  icon: Icon(Icons.visibility_off_outlined,
+                      size: 19, color: scheme.primary),
+                  onPressed: () => _confirmHideBall(context),
+                ),
               ],
             ),
             const SizedBox(height: 6),
@@ -560,7 +606,8 @@ class _PortableMiniCardState extends State<PortableMiniCard> {
                 IconButton(
                   tooltip: '上一首',
                   icon: Icon(Icons.skip_previous, color: scheme.onSurface),
-                  onPressed: _player.hasPrevious ? () => _player.previous() : null,
+                  onPressed:
+                      _player.hasPrevious ? () => _player.previous() : null,
                 ),
                 IconButton(
                   tooltip: _player.isPlaying ? '暂停' : '播放',
@@ -582,7 +629,8 @@ class _PortableMiniCardState extends State<PortableMiniCard> {
               children: [
                 Text(
                   _fmt(Duration(milliseconds: (value * totalMs).round())),
-                  style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+                  style:
+                      TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
                 ),
                 Expanded(
                   child: SliderTheme(
@@ -609,7 +657,8 @@ class _PortableMiniCardState extends State<PortableMiniCard> {
                 ),
                 Text(
                   _fmt(duration),
-                  style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+                  style:
+                      TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -626,9 +675,39 @@ class _PortableMiniCardState extends State<PortableMiniCard> {
     );
   }
 
+  Future<void> _confirmHideBall(BuildContext context) async {
+    final choice = await showDialog<_BallHideChoice>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('隐藏悬浮球'),
+        content: const Text('可以继续播放并稍后回到随身听重新唤起，或同时暂停播放并移除通知栏音乐。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext)
+                .pop(_BallHideChoice.continuePlaying),
+            child: const Text('继续播放'),
+          ),
+          FilledButton.tonal(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(_BallHideChoice.pausePlaying),
+            child: const Text('暂停并移除'),
+          ),
+        ],
+      ),
+    );
+    if (choice == null || !context.mounted) return;
+    Navigator.of(context).pop();
+    PortablePlayerScope.hideBall();
+    if (choice == _BallHideChoice.pausePlaying) {
+      await _player.stop();
+    }
+  }
+
   static String _fmt(Duration d) {
     final minutes = d.inMinutes;
     final seconds = d.inSeconds % 60;
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 }
+
+enum _BallHideChoice { continuePlaying, pausePlaying }

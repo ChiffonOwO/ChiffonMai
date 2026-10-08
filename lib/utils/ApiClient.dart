@@ -44,7 +44,7 @@ class ApiClient {
     final merged = <String, String>{
       'Accept-Encoding': 'gzip',
     };
-    if (url.host == 'chiffonmai.cloud') {
+    if (url.host == 'chiffonmai.cloud' && ApiUrls.ProberApiKey.isNotEmpty) {
       merged['x-prober-key'] = ApiUrls.ProberApiKey;
     }
     if (headers != null) {
@@ -61,6 +61,16 @@ class ApiClient {
     return _client
         .get(url, headers: _mergeHeaders(url, headers))
         .timeout(timeout);
+  }
+
+  /// 音源等大文件按流读取，避免先把完整文件加载进内存。
+  static Future<http.StreamedResponse> getStream(
+    Uri url, {
+    Duration timeout = _defaultTimeout,
+  }) {
+    final request = http.Request('GET', url)
+      ..headers.addAll(_mergeHeaders(url, null));
+    return _client.send(request).timeout(timeout);
   }
 
   /// HEAD：只要响应头，不要正文。
@@ -83,7 +93,8 @@ class ApiClient {
     Object? body,
     Encoding? encoding,
     Duration timeout = _defaultTimeout,
-  }) {    return _client
+  }) {
+    return _client
         .post(url,
             headers: _mergeHeaders(url, headers),
             body: body,

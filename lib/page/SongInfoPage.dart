@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../widgets/SmoothLinearProgressIndicator.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:marquee/marquee.dart';
@@ -21,11 +23,10 @@ import 'package:my_first_flutter_app/service/SongInfoService.dart';
 import 'package:my_first_flutter_app/service/SongPlayService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CommentTextValidator.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/MaidataDecodeUtil.dart';
 import 'package:my_first_flutter_app/utils/TextStyleUtil.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:my_first_flutter_app/utils/ExternalLaunchUtil.dart';
 import 'package:my_first_flutter_app/utils/ExportQualitySelector.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
 import 'Collection/CollectionInfoPage.dart';
@@ -49,7 +50,8 @@ import 'package:my_first_flutter_app/service/AWMC/AwmcPlayCountStore.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/ScoreInputValidator.dart';
 import 'package:my_first_flutter_app/utils/SongFilterUtil.dart';
-import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/BackgroundPageScaffold.dart';
+import 'package:my_first_flutter_app/widgets/NextPlayAddDialog.dart';
 import 'package:my_first_flutter_app/widgets/ChartHistorySection.dart';
 import 'package:my_first_flutter_app/widgets/CommunityAvatar.dart';
 
@@ -69,6 +71,46 @@ class SongInfoPage extends StatefulWidget {
 }
 
 class _SongInfoPageState extends State<SongInfoPage> {
+  Future<void> _addToNextPlayQueue() async {
+    final basic = _songData?['basic_info'];
+    if (basic is! Map) return;
+    final levels = _songData?['level'] as List?;
+    final constants = _songData?['ds'] as List?;
+    final difficultyCount = levels?.length ?? 0;
+    final difficultyConstants = constants
+            ?.map((value) => value == null ? null : '$value')
+            .toList()
+            .cast<String?>() ??
+        const <String?>[];
+    final isUtage = widget.songId.length == 6 || difficultyCount <= 2;
+    final difficulties = isUtage
+        ? List.generate(
+            difficultyCount > 0 ? difficultyCount : 1,
+            (index) => NextPlayDifficultyOption(
+              index: 5,
+              name: 'UTAGE',
+              constant: index < difficultyConstants.length
+                  ? difficultyConstants[index]
+                  : null,
+            ),
+          )
+        : NextPlayDifficultyOption.standard(
+            count: difficultyCount > 0 ? difficultyCount : 5,
+            constants: difficultyConstants,
+          );
+    if (!mounted) return;
+    final added = await showNextPlayAddDialog(context,
+        songId: widget.songId,
+        title: '${basic['title'] ?? ''}',
+        artist: '${basic['artist'] ?? ''}',
+        type: '${_songData?['type'] ?? 'SD'}',
+        coverId: int.tryParse(widget.songId),
+        difficulties: difficulties);
+    if (mounted && added)
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已加入下次想玩')));
+  }
+
   // 数据加载状态
   bool _isLoading = true;
   Map<String, dynamic>? _songData;
@@ -198,6 +240,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
   double _selectedRating = 3.0;
   int? _userTotalRating;
   int? _theoreticalRating;
+  String? _best50OpportunityText;
 
   @override
   void initState() {
@@ -340,7 +383,147 @@ class _SongInfoPageState extends State<SongInfoPage> {
       _checkBookmarkStatus();
       // 检查当前谱面是否有笔记
       _checkNoteStatus();
+      _loadBest50Opportunity();
     }
+  }
+
+  /// 判断当前谱面在理论上能否挤进对应的 Best35 / Best15。
+  /// 使用推荐页同一套 Rating 权重和最低达成率算法，避免两个页面给出不同结论。
+  Future<void> _loadBest50Opportunity() async {
+    if (mounted) setState(() => _best50OpportunityText = null);
+    final song = _songData;
+    // 宴会场歌曲（UTAGE）不属于普通 Best35/15，不能套用普通谱面的
+    // Rating 门槛计算。六位数 ID 是项目现有的主判定，genre 作为曲库字段兜底。
+    final isUtage = widget.songId.length == 6 ||
+        song?['basic_info']?['genre']?.toString() == '宴会场' ||
+        song?['genre']?.toString() == '宴会场';
+    if (isUtage) {
+      if (mounted) {
+        setState(() => _best50OpportunityText = '宴会场歌曲不参与Best50');
+      }
+      return;
+    }
+    final user = _userData;
+    if (song == null || user == null || user['records'] is! List) return;
+    final dsList = song['ds'];
+    if (dsList is! List || _currentDiffIndex >= dsList.length) return;
+    final ds = double.tryParse(dsList[_currentDiffIndex].toString());
+    if (ds == null) return;
+
+    final allSongs = await MaimaiMusicDataManager().getCachedSongs() ?? [];
+    Song? sourceSong;
+    for (final item in allSongs) {
+      if (item.id == widget.songId) {
+        sourceSong = item;
+        break;
+      }
+    }
+    if (sourceSong == null) return;
+    if (sourceSong.basicInfo.genre == '宴会场') {
+      if (mounted) {
+        setState(() => _best50OpportunityText = '宴会场歌曲不参与Best50');
+      }
+      return;
+    }
+    final isNew = sourceSong.basicInfo.isNew;
+    final limit = isNew ? 15 : 35;
+    final categoryRecords = <Map<String, dynamic>>[];
+    for (final raw in (user['records'] as List)) {
+      if (raw is! Map) continue;
+      final id = raw['song_id']?.toString();
+      final levelIndex = int.tryParse(raw['level_index']?.toString() ?? '');
+      if (id == null || levelIndex == null) continue;
+      Song? matched;
+      for (final item in allSongs) {
+        if (item.id == id) {
+          matched = item;
+          break;
+        }
+      }
+      if (matched == null || matched.basicInfo.isNew != isNew) continue;
+      categoryRecords.add(Map<String, dynamic>.from(raw));
+    }
+    categoryRecords.sort((a, b) =>
+        ((b['ra'] as num?)?.toInt() ?? 0).compareTo((a['ra'] as num?)?.toInt() ?? 0));
+    final cutoff = categoryRecords.length >= limit
+        ? ((categoryRecords[limit - 1]['ra'] as num?)?.toInt() ?? 0)
+        : 0;
+    final threshold = cutoff + 1;
+    final current = _getUserBestRecord();
+    final currentAchievement = (current?['achievements'] as num?)?.toDouble() ?? 0;
+    final currentRa = (current?['ra'] as num?)?.toInt() ?? 0;
+    final bestLabel = 'Best${isNew ? 15 : 35}';
+    // 下限成绩也属于 Best 区间，不能只比较「进入区间需要的下一分」。
+    final alreadyInBest = current != null && currentRa >= cutoff;
+    final maxRa = _calculateSingleRating(ds, 100.5);
+    if (alreadyInBest && maxRa <= currentRa) {
+      if (mounted) {
+        setState(() => _best50OpportunityText = '该谱面已在${bestLabel}区间内且无提升空间');
+      }
+      return;
+    }
+    final targetAchievement = _findMinimumAchievementForRating(
+      ds,
+      alreadyInBest ? currentRa + 1 : threshold,
+      currentAchievement,
+    );
+    if (targetAchievement == null) {
+      if (mounted) {
+        setState(() => _best50OpportunityText = alreadyInBest
+            ? '该谱面已在${bestLabel}区间内且无提升空间'
+            : '该谱面无法进入$bestLabel');
+      }
+      return;
+    }
+    final targetRa = _calculateSingleRating(ds, targetAchievement);
+    // 区间外谱面替换的是末位成绩，区间内谱面提升的是自己的成绩。
+    final increase = targetRa - (alreadyInBest ? currentRa : cutoff);
+    if (mounted) {
+      setState(() {
+        _best50OpportunityText =
+            '推到${targetAchievement.toStringAsFixed(4)}%可${alreadyInBest ? '提升' : '进入'}$bestLabel\n加${increase < 0 ? 0 : increase}分';
+      });
+    }
+  }
+
+  /// 按下方「达成率 - Rating」表中的全部倍率区间，寻找达到目标 Rating 的最小达成率。
+  /// 不能只尝试 100% / 100.5%，因为不少谱面在 97%～100% 的区间就能跨过门槛。
+  double? _findMinimumAchievementForRating(
+      double difficulty, int targetRating, double currentAchievement) {
+    if (difficulty <= 0 || targetRating <= 0) return null;
+    final lower = math.max(0.0, currentAchievement + 0.0001);
+    if (lower > 100.5) return null;
+    double? best;
+
+    for (var index = 0; index < maimaiRatingMultiplier.length; index++) {
+      final item = maimaiRatingMultiplier[index];
+      final threshold = (item['completion'] as num).toDouble();
+      final multiplier = (item['multiplier'] as num).toDouble();
+      // 当前倍率区间的上界。表格按达成率从高到低排列，边界本身属于当前行。
+      final upper = index == 0
+          ? 100.5
+          : (maimaiRatingMultiplier[index - 1]['completion'] as num)
+                  .toDouble() -
+              0.0001;
+      if (upper < threshold || upper < lower) continue;
+
+      var candidate = math.max(
+        math.max(threshold, lower),
+        targetRating / (difficulty * multiplier),
+      );
+      candidate = (candidate * 10000).ceil() / 10000;
+      if (candidate > upper) continue;
+      // floor 取整可能让理论边界差 1 分，向上补一个最小可显示步进。
+      while (candidate <= upper &&
+          _calculateSingleRating(difficulty, candidate) < targetRating) {
+        candidate += 0.0001;
+      }
+      if (candidate <= upper &&
+          _calculateSingleRating(difficulty, candidate) >= targetRating) {
+        if (best == null || candidate < best) best = candidate;
+      }
+    }
+    return best;
   }
 
   // 加载定数历史静态数据
@@ -355,7 +538,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
   // 难度索引 → dxrating 难度名
   static const List<String> _dxDifficultyNames = [
-    'basic', 'advanced', 'expert', 'master', 'remaster',
+    'basic',
+    'advanced',
+    'expert',
+    'master',
+    'remaster',
   ];
 
   // 定数历史起始版本：maimai でらっくす PLUS（DX PLUS）及之后
@@ -370,17 +557,46 @@ class _SongInfoPageState extends State<SongInfoPage> {
     final songTitle = songData['basic_info']?['title']?.toString() ?? '';
     final songType = songData['type']?.toString() ?? '';
     final sheetType = songType == 'DX' ? 'dx' : 'std';
-    final difficultyName = _dxDifficultyNames[_currentDiffIndex.clamp(0, 4).toInt()];
+    final difficultyName =
+        _dxDifficultyNames[_currentDiffIndex.clamp(0, 4).toInt()];
+    final localSongId = _normalizeDxInternalId(widget.songId);
+    final localExactId = int.tryParse(widget.songId.trim());
+    final titleMatches = <DXDataSheet>[];
+    DXDataSheet? legacyIdMatch;
 
+    // 优先使用谱面 internalId。仅按曲名匹配会在同名曲、不同版本或宴会场
+    // 谱面上拿到另一张谱面的定数，这是历史定数错乱的主要来源。
     for (final song in dxData.songs) {
       if (song.title != songTitle) continue;
       for (final sheet in song.sheets) {
         if (sheet.type != sheetType) continue;
         if (sheet.difficulty != difficultyName) continue;
-        return sheet;
+        // 先用官网目录的完整 internalId 精确匹配。只有旧目录仍使用
+        // 10000 偏移编号时，才走归一化兜底；否则两个不同谱面可能被归一化
+        // 成同一个编号，取到错误的定数或地区信息。
+        if (localExactId != null && sheet.internalId == localExactId) {
+          return sheet;
+        }
+        if (legacyIdMatch == null &&
+            _normalizeDxInternalId('${sheet.internalId}') == localSongId) {
+          legacyIdMatch = sheet;
+        }
+        titleMatches.add(sheet);
       }
     }
-    return null;
+
+    // 旧目录或个别特殊谱面可能仍使用偏移后的 internalId；再退回标题唯一
+    // 匹配，避免把一个不确定的定数显示成确定答案。
+    return legacyIdMatch ??
+        (titleMatches.length == 1 ? titleMatches.single : null);
+  }
+
+  /// 对齐 DXRating 与水鱼使用的 5 位 DX 谱面编号：DX 条目可能带 10000 偏移。
+  static String _normalizeDxInternalId(String raw) {
+    final value = int.tryParse(raw.trim());
+    if (value == null) return raw.trim();
+    if (value >= 10000 && value < 20000) return '${value - 10000}';
+    return '$value';
   }
 
   // 构建当前歌曲（标题 + 类型 + 当前难度）的定数历史
@@ -390,11 +606,17 @@ class _SongInfoPageState extends State<SongInfoPage> {
     final matchedSheet = _findMatchedSheet();
     if (matchedSheet == null) return [];
 
-    // 版本 → 定数（multiverInternalLevelValue 为主，补上自身版本）
+    // 版本 → 定数。DXRating 的 `internalLevelValue` 是谱面原始基准值，
+    // `multiverInternalLevelValue` 才是各版本校正后的历史值；同一版本同时
+    // 存在时必须保留后者，否则会把官网的历史定数（例如 [X] 的 FESTiVAL
+    // 14.0）覆盖成谱面原始值 13.8。
     final Map<String, double> versionValue = {
       ...matchedSheet.multiverInternalLevelValue,
-      matchedSheet.version: matchedSheet.internalLevelValue,
     };
+    versionValue.putIfAbsent(
+      matchedSheet.version,
+      () => matchedSheet.internalLevelValue,
+    );
 
     final versionOrder = <String, int>{};
     final versionReleaseDate = <String, String>{};
@@ -407,7 +629,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
     // 只保留 DX PLUS（含）之后的版本
     final entries = versionValue.entries
         .where((e) =>
-            (versionReleaseDate[e.key] ?? '').compareTo(_dxHistoryStartDate) >= 0)
+            (versionReleaseDate[e.key] ?? '').compareTo(_dxHistoryStartDate) >=
+            0)
         .toList()
       ..sort((a, b) =>
           (versionOrder[a.key] ?? 999).compareTo(versionOrder[b.key] ?? 999));
@@ -576,7 +799,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
               Row(
                 children: [
                   for (int i = 0; i < entries.length; i++)
-                    valueCell(entries[i].value.toStringAsFixed(1), directions[i]),
+                    valueCell(
+                        entries[i].value.toStringAsFixed(1), directions[i]),
                 ],
               ),
             ],
@@ -898,7 +1122,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
         debugPrint('[RefDuration] $source 落盘成功: $cachedFilePath');
         return cachedFilePath;
       } else {
-        debugPrint('[RefDuration] $source 下载非 200: ${response.statusCode}, url=$url');
+        debugPrint(
+            '[RefDuration] $source 下载非 200: ${response.statusCode}, url=$url');
       }
     } catch (e) {
       debugPrint('[RefDuration] $source 下载失败: $e, url=$url');
@@ -929,10 +1154,14 @@ class _SongInfoPageState extends State<SongInfoPage> {
       final rawId = widget.songId;
       final candidates = <String>{
         rawId,
-        CoverUtil.buildCoverPath(rawId).replaceAll(RegExp(r'assets/cover/|\.webp'), ''),
-        CoverUtil.getLocalCoverPath(rawId).replaceAll(RegExp(r'assets/cover/|\.webp'), ''),
-        CoverUtil.getLocalCoverPathRetry1(rawId).replaceAll(RegExp(r'assets/cover/|\.webp'), ''),
-        CoverUtil.getLocalCoverPathRetry2(rawId).replaceAll(RegExp(r'assets/cover/|\.webp'), ''),
+        CoverUtil.buildCoverPath(rawId)
+            .replaceAll(RegExp(r'assets/cover/|\.webp'), ''),
+        CoverUtil.getLocalCoverPath(rawId)
+            .replaceAll(RegExp(r'assets/cover/|\.webp'), ''),
+        CoverUtil.getLocalCoverPathRetry1(rawId)
+            .replaceAll(RegExp(r'assets/cover/|\.webp'), ''),
+        CoverUtil.getLocalCoverPathRetry2(rawId)
+            .replaceAll(RegExp(r'assets/cover/|\.webp'), ''),
       }.where((id) => id.isNotEmpty && id != '0').toList();
 
       String? foundId;
@@ -945,7 +1174,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
       if (foundId != null) {
         final info = lookup[foundId]!;
-        debugPrint('[SongInfoPage] 通过 $foundId 找到 union 数据 (cn=${info.cn}, jp=${info.jp})');
+        debugPrint(
+            '[SongInfoPage] 通过 $foundId 找到 union 数据 (cn=${info.cn}, jp=${info.jp})');
 
         // 合并 union albums 到歌曲别名列表并去重
         if (info.albums.isNotEmpty && _songData != null) {
@@ -961,7 +1191,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
             }
             if (added.isNotEmpty) {
               aliasMgr.aliases[title] = existing.toList();
-              debugPrint('[SongInfoPage] 从 union albums 补充 ${added.length} 个别名: $added');
+              debugPrint(
+                  '[SongInfoPage] 从 union albums 补充 ${added.length} 个别名: $added');
             }
           }
         }
@@ -1006,7 +1237,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
         diffIndex: targetDiffIndex,
       );
 
-      if (cached != null && mounted && _biliLoadedDiffIndex == targetDiffIndex) {
+      if (cached != null &&
+          mounted &&
+          _biliLoadedDiffIndex == targetDiffIndex) {
         final cachedPlayCount = cached['play_count'] as int?;
         final cachedBvid = cached['bvid'] as String?;
         final source = cached['source'] as String?;
@@ -1018,7 +1251,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
             _biliFromUser = source == 'user_upload';
             _biliPlayCountLoading = false;
           });
-          debugPrint('[BiliRedis] 使用 Redis 缓存播放量: $cachedPlayCount, BV: $cachedBvid, source: $source');
+          debugPrint(
+              '[BiliRedis] 使用 Redis 缓存播放量: $cachedPlayCount, BV: $cachedBvid, source: $source');
           return;
         }
       }
@@ -1172,8 +1406,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
                       if (_biliBvid != null) Text('BV号: ${_biliBvid}'),
                       Text('来源: ${_getBiliSourceLabel()}',
                           style: TextStyle(
-                            color: _biliFromUser ? AppColors.linkBlue(brightness)
-                                : (_biliFromRedis ? AppColors.warningOrange(brightness) : AppColors.successGreen(brightness)),
+                            color: _biliFromUser
+                                ? AppColors.linkBlue(brightness)
+                                : (_biliFromRedis
+                                    ? AppColors.warningOrange(brightness)
+                                    : AppColors.successGreen(brightness)),
                             fontSize: 12,
                           )),
                       const Divider(),
@@ -1182,7 +1419,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                       const SizedBox(height: 8),
                     ] else ...[
                       Text('暂无播放量数据',
-                          style: TextStyle(color: AppColors.errorRed(brightness))),
+                          style:
+                              TextStyle(color: AppColors.errorRed(brightness))),
                       const Divider(),
                     ],
                     // 手动上传区域
@@ -1191,7 +1429,10 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     const SizedBox(height: 4),
                     Text(
                       '当自动获取播放量失败时，可手动输入该歌曲谱面确认视频的 BV 号',
-                      style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                          fontSize: 12,
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                     const SizedBox(height: 8),
                     TextField(
@@ -1255,7 +1496,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                       ),
                     ],
                     // 校验通过后显示播放量
-                    if (validatedPlayCount != null && validationPassed == true) ...[
+                    if (validatedPlayCount != null &&
+                        validationPassed == true) ...[
                       const SizedBox(height: 4),
                       Text(
                         '播放量: ${validatedPlayCount! >= 10000 ? "${(validatedPlayCount! / 10000).toStringAsFixed(1)}万" : validatedPlayCount.toString()}',
@@ -1308,14 +1550,16 @@ class _SongInfoPageState extends State<SongInfoPage> {
                               });
                             } else if (result.passed) {
                               setDialogState(() {
-                                validationMessage = '校验通过！视频标题: "${result.videoInfo.title}"';
+                                validationMessage =
+                                    '校验通过！视频标题: "${result.videoInfo.title}"';
                                 validationPassed = true;
                                 validatedPlayCount = result.videoInfo.playCount;
                                 isValidating = false;
                               });
                             } else {
                               setDialogState(() {
-                                validationMessage = '校验失败: 视频标题 "${result.videoInfo.title}" 不包含歌曲名 "$songTitle"';
+                                validationMessage =
+                                    '校验失败: 视频标题 "${result.videoInfo.title}" 不包含歌曲名 "$songTitle"';
                                 validationPassed = false;
                                 isValidating = false;
                               });
@@ -1534,10 +1778,12 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
     // 对于只有1或2个难度的歌曲，所有难度的背景全部采用粉色
     if (difficultyCount <= 2) {
-      return AppColors.difficultyBackgroundByIndex(3, brightness: brightness); // Master
+      return AppColors.difficultyBackgroundByIndex(3,
+          brightness: brightness); // Master
     }
 
-    return AppColors.difficultyBackgroundByIndex(diffIndex, brightness: brightness);
+    return AppColors.difficultyBackgroundByIndex(diffIndex,
+        brightness: brightness);
   }
 
   // 根据难度索引获取次要主题颜色
@@ -1555,10 +1801,12 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
     // 对于只有1或2个难度的歌曲，所有难度的背景全部采用粉色
     if (difficultyCount <= 2) {
-      return AppColors.difficultySecondaryBgByIndex(3, brightness: brightness); // Master
+      return AppColors.difficultySecondaryBgByIndex(3,
+          brightness: brightness); // Master
     }
 
-    return AppColors.difficultySecondaryBgByIndex(diffIndex, brightness: brightness);
+    return AppColors.difficultySecondaryBgByIndex(diffIndex,
+        brightness: brightness);
   }
 
   // 根据难度索引获取强调颜色
@@ -1576,10 +1824,12 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
     // 对于只有1或2个难度的歌曲，所有难度的背景全部采用粉色
     if (difficultyCount <= 2) {
-      return AppColors.difficultyForegroundByIndex(3, brightness: brightness); // Master
+      return AppColors.difficultyForegroundByIndex(3,
+          brightness: brightness); // Master
     }
 
-    return AppColors.difficultyForegroundByIndex(diffIndex, brightness: brightness);
+    return AppColors.difficultyForegroundByIndex(diffIndex,
+        brightness: brightness);
   }
 
   // 计算单曲Rating
@@ -1625,8 +1875,20 @@ class _SongInfoPageState extends State<SongInfoPage> {
       {"star": 5, "rate": 0.97, "color": Colors.yellow},
       {"star": 4, "rate": 0.95, "color": AppColors.warningOrange(brightness)},
       {"star": 3, "rate": 0.93, "color": AppColors.warningOrange(brightness)},
-      {"star": 2, "rate": 0.90, "color": brightness == Brightness.dark ? Colors.green.shade300 : Colors.green.shade300},
-      {"star": 1, "rate": 0.85, "color": brightness == Brightness.dark ? Colors.green.shade300 : Colors.green.shade300},
+      {
+        "star": 2,
+        "rate": 0.90,
+        "color": brightness == Brightness.dark
+            ? Colors.green.shade300
+            : Colors.green.shade300
+      },
+      {
+        "star": 1,
+        "rate": 0.85,
+        "color": brightness == Brightness.dark
+            ? Colors.green.shade300
+            : Colors.green.shade300
+      },
     ];
 
     // 计算每个星星等级的最低DX分
@@ -1702,7 +1964,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                   ),
                 ),
                 Icon(
-                  _starScoreTableExpanded ? Icons.expand_less : Icons.expand_more,
+                  _starScoreTableExpanded
+                      ? Icons.expand_less
+                      : Icons.expand_more,
                   color: _getAccentColor(_currentDiffIndex, brightness),
                 ),
               ],
@@ -1717,25 +1981,35 @@ class _SongInfoPageState extends State<SongInfoPage> {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.tableBorder(brightness))),
+              border: Border(
+                  bottom: BorderSide(color: AppColors.tableBorder(brightness))),
             ),
             child: Row(
               children: [
                 Expanded(
                   flex: 3, // 星数列占3份
                   child: Text('星数',
-                      style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                      style: TextStyle(
+                          fontSize: 16,
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant)),
                 ),
                 Expanded(
                   flex: 2, // DX分数列占2份
                   child: Text('DX分数',
-                      style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                          fontSize: 16,
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant),
                       textAlign: TextAlign.center),
                 ),
                 Expanded(
                   flex: 1, // MAX-列占1份
                   child: Text('MAX-',
-                      style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                          fontSize: 16,
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant),
                       textAlign: TextAlign.end),
                 ),
               ],
@@ -1756,9 +2030,12 @@ class _SongInfoPageState extends State<SongInfoPage> {
               return Container(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: AppColors.tableBorder(brightness))),
-                  color:
-                      isUserRecord ? AppColors.linkBlue(brightness) : Colors.transparent,
+                  border: Border(
+                      bottom:
+                          BorderSide(color: AppColors.tableBorder(brightness))),
+                  color: isUserRecord
+                      ? AppColors.linkBlue(brightness)
+                      : Colors.transparent,
                 ),
                 child: Row(
                   children: [
@@ -1774,7 +2051,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                               color: isUserRecord ? Colors.white : color,
                               shadows: [
                                 Shadow(
-                                  color: isUserRecord ? Colors.white.withOpacity(0.5) : color.withOpacity(0.5),
+                                  color: isUserRecord
+                                      ? Colors.white.withOpacity(0.5)
+                                      : color.withOpacity(0.5),
                                   blurRadius: 2,
                                 ),
                               ],
@@ -1784,7 +2063,10 @@ class _SongInfoPageState extends State<SongInfoPage> {
                           Text(
                             '${(rate * 100).toStringAsFixed(1)}%',
                             style: TextStyle(
-                                fontSize: 16, color: isUserRecord ? Colors.white : Theme.of(context).colorScheme.onSurface),
+                                fontSize: 16,
+                                color: isUserRecord
+                                    ? Colors.white
+                                    : Theme.of(context).colorScheme.onSurface),
                           ),
                         ],
                       ),
@@ -1798,13 +2080,20 @@ class _SongInfoPageState extends State<SongInfoPage> {
                             Text(
                               '↑$delta',
                               style: TextStyle(
-                                  fontSize: 14, color: isUserRecord ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant),
+                                  fontSize: 14,
+                                  color: isUserRecord
+                                      ? Colors.white
+                                      : Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant),
                             ),
                           Text(
                             minScore.toString(),
                             style: TextStyle(
                               fontSize: 16,
-                              color: isUserRecord ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                              color: isUserRecord
+                                  ? Colors.white
+                                  : Theme.of(context).colorScheme.onSurface,
                               fontWeight: isUserRecord
                                   ? FontWeight.bold
                                   : FontWeight.normal,
@@ -1822,7 +2111,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                             '-${maxScore - minScore}',
                             style: TextStyle(
                               fontSize: 16,
-                              color: isUserRecord ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                              color: isUserRecord
+                                  ? Colors.white
+                                  : Theme.of(context).colorScheme.onSurface,
                               fontWeight: isUserRecord
                                   ? FontWeight.bold
                                   : FontWeight.normal,
@@ -1897,16 +2188,14 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
       // 把每个区间内所有可达 score 的边界都加进 scoreData
       void addBoundariesInRange(double baseCompletion, double upperCompletion) {
-        int baseScore =
-            _calculateSingleRating(difficulty, baseCompletion);
-        int upperScore =
-            _calculateSingleRating(difficulty, upperCompletion);
+        int baseScore = _calculateSingleRating(difficulty, baseCompletion);
+        int upperScore = _calculateSingleRating(difficulty, upperCompletion);
         if (upperScore <= baseScore + 1) return; // 没有中间可达 score
 
         double lowerBound = baseCompletion;
         for (int target = baseScore + 1; target < upperScore; target++) {
-          final mid = binarySearchMinCompletion(
-              lowerBound, upperCompletion, target);
+          final mid =
+              binarySearchMinCompletion(lowerBound, upperCompletion, target);
           if (_calculateSingleRating(difficulty, mid) < target) {
             // 该 score 在本区间不可达（安全兜底，正常不应发生）
             break;
@@ -1988,8 +2277,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
         InkWell(
           onTap: () {
             setState(() {
-              _achievementScoreTableExpanded =
-                  !_achievementScoreTableExpanded;
+              _achievementScoreTableExpanded = !_achievementScoreTableExpanded;
             });
           },
           borderRadius: BorderRadius.circular(8),
@@ -2024,15 +2312,20 @@ class _SongInfoPageState extends State<SongInfoPage> {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.tableBorder(brightness))),
+              border: Border(
+                  bottom: BorderSide(color: AppColors.tableBorder(brightness))),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('达成率',
-                    style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                    style: TextStyle(
+                        fontSize: 16,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 Text('得分',
-                    style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                    style: TextStyle(
+                        fontSize: 16,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ],
             ),
           ),
@@ -2084,9 +2377,12 @@ class _SongInfoPageState extends State<SongInfoPage> {
               return Container(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: AppColors.tableBorder(brightness))),
-                  color:
-                      isUserRecord ? AppColors.linkBlue(brightness) : Colors.transparent,
+                  border: Border(
+                      bottom:
+                          BorderSide(color: AppColors.tableBorder(brightness))),
+                  color: isUserRecord
+                      ? AppColors.linkBlue(brightness)
+                      : Colors.transparent,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2101,7 +2397,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                             color: ratingColor,
                             shadows: [
                               Shadow(
-                                color: isUserRecord ? Colors.white.withOpacity(0.5) : ratingColor.withOpacity(0.5),
+                                color: isUserRecord
+                                    ? Colors.white.withOpacity(0.5)
+                                    : ratingColor.withOpacity(0.5),
                                 blurRadius: 2,
                               ),
                             ],
@@ -2111,7 +2409,10 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         Text(
                           '${completion.toStringAsFixed(4)}%',
                           style: TextStyle(
-                              fontSize: 16, color: isUserRecord ? Colors.white : Theme.of(context).colorScheme.onSurface),
+                              fontSize: 16,
+                              color: isUserRecord
+                                  ? Colors.white
+                                  : Theme.of(context).colorScheme.onSurface),
                         ),
                       ],
                     ),
@@ -2122,13 +2423,20 @@ class _SongInfoPageState extends State<SongInfoPage> {
                           Text(
                             '↑$delta',
                             style: TextStyle(
-                                fontSize: 14, color: isUserRecord ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant),
+                                fontSize: 14,
+                                color: isUserRecord
+                                    ? Colors.white
+                                    : Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant),
                           ),
                         Text(
                           score.toString(),
                           style: TextStyle(
                             fontSize: 16,
-                            color: isUserRecord ? Colors.white : Theme.of(context).colorScheme.onSurface,
+                            color: isUserRecord
+                                ? Colors.white
+                                : Theme.of(context).colorScheme.onSurface,
                             fontWeight: isUserRecord
                                 ? FontWeight.bold
                                 : FontWeight.normal,
@@ -2149,10 +2457,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading || _songData == null) {
-      return Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
+      return const BackgroundPageScaffold(
+        title: '歌曲详情',
+        child: Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -2170,37 +2477,16 @@ class _SongInfoPageState extends State<SongInfoPage> {
     // 获取当前难度的主题颜色
     final brightness = Theme.of(context).brightness;
     final themeColor = _getThemeColor(_currentDiffIndex, brightness);
-    final secondaryThemeColor = _getSecondaryThemeColor(_currentDiffIndex, brightness);
+    final secondaryThemeColor =
+        _getSecondaryThemeColor(_currentDiffIndex, brightness);
     final accentColor = _getAccentColor(_currentDiffIndex, brightness);
 
-    // 自定义常量
-    final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
-    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
 
     // 曲绘将使用CoverPathUtil工具类加载
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏统一走公共组件（右侧两个真按钮走 actions 槽）
-              //
-              // 这里不再传 `fontSize: 24`：全 App 的 AppBar 标题现在是同一套
-              // 规格（思源黑体 20 / bold / colorScheme.primary / 居中），
-              // 见 AppTheme.font + PageTopBar；单独放大到 24 会让这一页的
-              // 标题比别人粗一圈，与「统一标题字体」的目标相悖。
-              PageTopBar(
-                title: '歌曲详情',
-                actions: [
+    return BackgroundPageScaffold(
+      title: '歌曲详情',
+      actions: [
                 IconButton(
                 icon: const Icon(Icons.image_outlined),
                 tooltip: '导出歌曲信息',
@@ -2212,19 +2498,15 @@ class _SongInfoPageState extends State<SongInfoPage> {
                 tooltip: '计算工具',
                 onPressed: _openCalculator,
                 ),
-                ],
-              ),
-
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
+                  IconButton(
+                    icon: const Icon(Icons.playlist_add),
+                    tooltip: '加入下次想玩',
+                    onPressed: _isLoading ? null : _addToNextPlayQueue,
                   ),
-                  child: SingleChildScrollView(
+                ],
+      resizeToAvoidBottomInset: false,
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: SingleChildScrollView(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2320,7 +2602,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                         child: Text('关闭'),
                                                         style: ElevatedButton
                                                             .styleFrom(
-                                                          backgroundColor: AppColors.greyHint(brightness),
+                                                          backgroundColor:
+                                                              AppColors.greyHint(
+                                                                  brightness),
                                                           foregroundColor:
                                                               Colors.white,
                                                         ),
@@ -2344,8 +2628,10 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                         borderRadius: BorderRadius.circular(12),
                                         boxShadow: [
                                           BoxShadow(
-                                            color:
-                                                Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withOpacity(0.1),
                                             blurRadius: 4,
                                             offset: Offset(0, 2),
                                           ),
@@ -2506,15 +2792,20 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                     ? Color(0xFFFF6B8B)
                                                     : (_songData!['type'] ==
                                                             'SD'
-                                                        ? AppColors.linkBlue(brightness)
-                                                        : AppColors.warningOrange(brightness)),
+                                                        ? AppColors.linkBlue(
+                                                            brightness)
+                                                        : AppColors
+                                                            .warningOrange(
+                                                                brightness)),
                                               ),
                                             ),
                                             Text(
                                               '  #${widget.songId}',
                                               style: TextStyle(
                                                 fontSize: 14,
-                                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurfaceVariant,
                                               ),
                                             ),
                                             // 如果存在另一种谱面，显示切换按钮
@@ -2546,14 +2837,21 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                   decoration: BoxDecoration(
                                                     color: _songData!['type'] ==
                                                             'SD'
-                                                        ? AppColors.warningOrange(brightness)
-                                                        : AppColors.linkBlue(brightness),
+                                                        ? AppColors
+                                                            .warningOrange(
+                                                                brightness)
+                                                        : AppColors.linkBlue(
+                                                            brightness),
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                             8),
                                                     boxShadow: [
                                                       BoxShadow(
-                                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12),
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .onSurface
+                                                            .withValues(
+                                                                alpha: 0.12),
                                                         blurRadius: 2,
                                                         offset: Offset(1, 1),
                                                       ),
@@ -2617,6 +2915,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                         _checkBookmarkStatus();
                                         _checkNoteStatus();
                                         _loadBiliPlayCount();
+                                        _loadBest50Opportunity();
                                       },
                                       child: Container(
                                         margin: const EdgeInsets.symmetric(
@@ -2642,12 +2941,14 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                 maxLines: 1,
                                                 softWrap: false,
                                                 style: TextStyle(
-                                                  fontSize: MediaQuery.of(context)
+                                                  fontSize:
+                                                      MediaQuery.of(context)
                                                           .size
                                                           .width *
                                                       0.025,
                                                   fontWeight: FontWeight.bold,
-                                                  color: _currentDiffIndex == index
+                                                  color:
+                                                      _currentDiffIndex == index
                                                       ? Colors.white
                                                       : accentColor,
                                                 ),
@@ -2705,10 +3006,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                   _buildStatItem(
                                       '版本',
                                       StringUtil.formatVersion2WithFlag(
-                                          basicInfo['from'],
-                                          _isExtraSong)),
-                                  _buildStatItem(
-                                      '谱师', currentChart['charter']),
+                                          basicInfo['from'], _isExtraSong)),
+                                  _buildStatItem('谱师', currentChart['charter']),
                                 ],
                               ),
 
@@ -2754,15 +3053,20 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                       if (currentDiffData == null) {
                                         return _buildStatItem('定数差值', '-');
                                       }
-                                      final ds = (_songData!['ds'][_currentDiffIndex] as num).toDouble();
+                                    final ds = (_songData!['ds']
+                                            [_currentDiffIndex] as num)
+                                        .toDouble();
                                       final fd = currentDiffData is DiffData
                                           ? currentDiffData.fitDiff
-                                          : (currentDiffData['fit_diff'] as num).toDouble();
+                                        : (currentDiffData['fit_diff'] as num)
+                                            .toDouble();
                                       final diff = fd - ds;
                                       return _buildStatItem(
                                         '定数差值',
                                         '${diff >= 0 ? "+" : ""}${diff.toStringAsFixed(2)}',
-                                        valueColor: diff < 0 ? AppColors.successGreen(brightness) : AppColors.errorRed(brightness),
+                                      valueColor: diff < 0
+                                          ? AppColors.successGreen(brightness)
+                                          : AppColors.errorRed(brightness),
                                       );
                                     }),
                                   _buildStatItem(
@@ -2783,7 +3087,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                   }
                                   return Column(
                                     mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       const SizedBox(height: 2),
                                       _buildDxHistoryTable(),
@@ -2873,8 +3178,13 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                           child: Text(
                                             '玩家最佳成绩',
                                             style: TextStyle(
-                                              fontSize: MediaQuery.of(context).size.width * 0.035,
-                                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                              fontSize: MediaQuery.of(context)
+                                                      .size
+                                                      .width *
+                                                  0.035,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
                                             ),
                                           ),
                                         ),
@@ -2886,18 +3196,28 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                               levels: levels,
                                             ),
                                             child: Container(
-                                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                              padding: EdgeInsets.symmetric(
+                                                  horizontal: 10, vertical: 5),
                                               decoration: BoxDecoration(
                                                 gradient: LinearGradient(
                                                   colors: [
-                                                    Theme.of(context).colorScheme.primary,
-                                                    Theme.of(context).colorScheme.primary.withOpacity(0.85),
+                                                    Theme.of(context)
+                                                        .colorScheme
+                                                        .primary,
+                                                    Theme.of(context)
+                                                        .colorScheme
+                                                        .primary
+                                                        .withOpacity(0.85),
                                                   ],
                                                 ),
-                                                borderRadius: BorderRadius.circular(14),
+                                                borderRadius:
+                                                    BorderRadius.circular(14),
                                                 boxShadow: [
                                                   BoxShadow(
-                                                    color: Theme.of(context).colorScheme.primary.withAlpha(60),
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .primary
+                                                        .withAlpha(60),
                                                     blurRadius: 6,
                                                     offset: Offset(0, 2),
                                                   ),
@@ -2906,12 +3226,21 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
-                                                  Icon(Icons.share, size: 14, color: Theme.of(context).colorScheme.onPrimary),
+                                                  Icon(Icons.share,
+                                                      size: 14,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .onPrimary),
                                                   SizedBox(width: 4),
                                                   Text('分享成绩',
-                                                    style: TextStyle(fontSize: 12,
-                                                        fontWeight: FontWeight.w600,
-                                                        color: Theme.of(context).colorScheme.onPrimary)),
+                                                      style: TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color:
+                                                              Theme.of(context)
+                                                                  .colorScheme
+                                                                  .onPrimary)),
                                                 ],
                                               ),
                                             ),
@@ -2939,25 +3268,26 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                           ? '${(userRecord['achievements'] as num).toDouble().toStringAsFixed(4)}%'
                                                           : '无记录',
                                                       style: TextStyle(
-                                                        fontSize:
-                                                            MediaQuery.of(context)
+                                                        fontSize: MediaQuery.of(
+                                                                    context)
                                                                     .size
                                                                     .width *
                                                                 0.08,
                                                         fontWeight:
                                                             FontWeight.bold,
                                                         foreground: Paint()
-                                                          ..shader = LinearGradient(
+                                                          ..shader =
+                                                              LinearGradient(
                                                             colors: [
-                                                              AppColors.errorRed(brightness),
+                                                              AppColors.errorRed(
+                                                                  brightness),
                                                               Colors.yellow,
                                                             ],
                                                             begin: Alignment
                                                                 .centerLeft,
                                                             end: Alignment
                                                                 .centerRight,
-                                                          ).createShader(
-                                                              Rect.fromLTWH(
+                                                          ).createShader(Rect.fromLTWH(
                                                                   0,
                                                                   0,
                                                                   MediaQuery.of(
@@ -2970,24 +3300,41 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                     ),
                                                   ),
                                                   Row(
-                                                    mainAxisSize: MainAxisSize.min,
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
                                                     children: [
                                                       GestureDetector(
-                                                        onTap: () => _showBookmarkDialog(),
+                                                        onTap: () =>
+                                                            _showBookmarkDialog(),
                                                         child: Padding(
-                                                          padding: EdgeInsets.all(3),
+                                                          padding:
+                                                              EdgeInsets.all(3),
                                                           child: Icon(
-                                                            _isBookmarked ? Icons.favorite : Icons.favorite_border,
-                                                            color: Colors.pink.shade400, size: 23),
+                                                              _isBookmarked
+                                                                  ? Icons
+                                                                      .favorite
+                                                                  : Icons
+                                                                      .favorite_border,
+                                                              color: Colors.pink
+                                                                  .shade400,
+                                                              size: 23),
                                                         ),
                                                       ),
                                                       GestureDetector(
-                                                        onTap: () => _showNoteDialog(),
+                                                        onTap: () =>
+                                                            _showNoteDialog(),
                                                         child: Padding(
-                                                          padding: EdgeInsets.all(3),
+                                                          padding:
+                                                              EdgeInsets.all(3),
                                                           child: Icon(
-                                                            _hasNote ? Icons.note : Icons.note_add_outlined,
-                                                            color: Colors.amber.shade700, size: 23),
+                                                              _hasNote
+                                                                  ? Icons.note
+                                                                  : Icons
+                                                                      .note_add_outlined,
+                                                              color: Colors
+                                                                  .amber
+                                                                  .shade700,
+                                                              size: 23),
                                                         ),
                                                       ),
                                                     ],
@@ -3005,7 +3352,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                               .size
                                                               .width *
                                                           0.042,
-                                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .onSurfaceVariant,
                                                 ),
                                               ),
                                               // 游玩次数（来自 AWMC 网关 /v1/user/music
@@ -3013,7 +3362,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                               // 单起一行放在 Rating 下面，没有该难度的
                                               // 记录时整行不显示
                                               if (userRecord != null &&
-                                                  _currentPlayCount != null) ...[
+                                                  _currentPlayCount !=
+                                                      null) ...[
                                                 const SizedBox(height: 8),
                                                 Text(
                                                   '游玩次数: ${_currentPlayCount!}',
@@ -3051,7 +3401,10 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                                   .size
                                                                   .width *
                                                               0.042,
-                                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                          color: Theme.of(
+                                                                  context)
+                                                              .colorScheme
+                                                              .onSurfaceVariant,
                                                         ),
                                                       ),
                                                       TextStyleUtil.span(
@@ -3062,7 +3415,10 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                                   .size
                                                                   .width *
                                                               0.042,
-                                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                          color: Theme.of(
+                                                                  context)
+                                                              .colorScheme
+                                                              .onSurfaceVariant,
                                                         ),
                                                       ),
                                                     ],
@@ -3082,8 +3438,10 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                                       .size
                                                                       .width *
                                                                   0.042,
-                                                              color:
-                                                                  Theme.of(context).colorScheme.onSurfaceVariant,
+                                                              color: Theme.of(
+                                                                      context)
+                                                                  .colorScheme
+                                                                  .onSurfaceVariant,
                                                             ),
                                                           ),
                                                           TextStyleUtil.span(
@@ -3094,13 +3452,17 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                                       .size
                                                                       .width *
                                                                   0.042,
-                                                              color: _getStarsColor(_calculateStars(
-                                                                  int.parse(widget
+                                                              color: _getStarsColor(
+                                                                  _calculateStars(
+                                                                      int.parse(
+                                                                          widget
                                                                       .songId),
                                                                   _currentDiffIndex,
                                                                   userRecord[
                                                                       'dxScore']),
-                                                              Theme.of(context).brightness),
+                                                                  Theme.of(
+                                                                          context)
+                                                                      .brightness),
                                                             ),
                                                           ),
                                                         ],
@@ -3140,7 +3502,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                                   _currentDiffIndex,
                                                                   userRecord[
                                                                       'dxScore']),
-                                                              Theme.of(context).brightness),
+                                                              Theme.of(context)
+                                                                  .brightness),
                                                         ),
                                                       ),
                                                     ),
@@ -3175,6 +3538,40 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                   ],
                                 ),
                               ),
+
+                              if (_best50OpportunityText != null) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primaryContainer
+                                        .withValues(alpha: 0.7),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.trending_up,
+                                          size: 18,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(_best50OpportunityText!,
+                                            style: TextStyle(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onPrimaryContainer,
+                                                fontWeight: FontWeight.w600)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
 
                               // 成绩趋势：**独立于「玩家最佳成绩」卡片之外的板块**。
                               // 没有历史时它整块高度为 0（见 _buildChartHistoryCard），
@@ -3223,7 +3620,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                           onPressed: _playMusic,
                                           child: const Text('播放音乐'),
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: AppColors.linkBlue(brightness),
+                                            backgroundColor:
+                                                AppColors.linkBlue(brightness),
                                             foregroundColor: Colors.white,
                                             padding: EdgeInsets.symmetric(
                                                 vertical: 6, horizontal: 12),
@@ -3238,7 +3636,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                           onPressed: _viewMaidata,
                                           child: const Text('查看谱面代码'),
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: AppColors.successGreen(brightness),
+                                            backgroundColor:
+                                                AppColors.successGreen(
+                                                    brightness),
                                             foregroundColor: Colors.white,
                                             padding: EdgeInsets.symmetric(
                                                 vertical: 6, horizontal: 12),
@@ -3269,7 +3669,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                           onPressed: _viewAchievementRanking,
                                           child: const Text('达成率排行榜'),
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: AppColors.warningOrange(brightness),
+                                            backgroundColor:
+                                                AppColors.warningOrange(
+                                                    brightness),
                                             foregroundColor: Colors.white,
                                             padding: EdgeInsets.symmetric(
                                                 vertical: 6, horizontal: 12),
@@ -3284,7 +3686,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                           onPressed: _viewDxScoreRanking,
                                           child: const Text('DX分数排行榜'),
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: AppColors.linkBlue(brightness),
+                                            backgroundColor:
+                                                AppColors.linkBlue(brightness),
                                             foregroundColor: Colors.white,
                                             padding: EdgeInsets.symmetric(
                                                 vertical: 6, horizontal: 12),
@@ -3328,7 +3731,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                       },
                                       borderRadius: BorderRadius.circular(8),
                                       child: Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 8),
                                         child: Row(
                                           mainAxisAlignment:
                                               MainAxisAlignment.spaceBetween,
@@ -3418,7 +3822,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                                             16,
                                                                         fontWeight:
                                                                             FontWeight.bold,
-                                                                        color: Theme.of(ctx).colorScheme.onSurface,
+                                                                        color: Theme.of(ctx)
+                                                                            .colorScheme
+                                                                            .onSurface,
                                                                       ),
                                                                     ),
                                                                     const SizedBox(
@@ -3430,7 +3836,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                                           TextStyle(
                                                                         fontSize:
                                                                             14,
-                                                                        color: Theme.of(ctx).colorScheme.onSurface,
+                                                                        color: Theme.of(ctx)
+                                                                            .colorScheme
+                                                                            .onSurface,
                                                                       ),
                                                                     ),
                                                                     const SizedBox(
@@ -3460,9 +3868,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                                             recognizer: TapGestureRecognizer()
                                                                               ..onTap = () async {
                                                                                 final uri = Uri.parse('https://dxrating.net/');
-                                                                                if (await canLaunchUrl(uri)) {
-                                                                                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                                                                }
+                                                                                await ExternalLaunchUtil.open(uri);
                                                                               },
                                                                           ),
                                                                         ],
@@ -3532,7 +3938,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                 '当前分类暂无标签',
                                                 style: TextStyle(
                                                   fontSize: 12,
-                                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .onSurfaceVariant,
                                                 ),
                                               ),
                                             const SizedBox(height: 12),
@@ -3575,12 +3983,6 @@ class _SongInfoPageState extends State<SongInfoPage> {
                       ],
                     ),
                   ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -3643,7 +4045,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
             }
           }
           // 优先使用从 MySQL 直接查询的用户评分行数据
-          _chartUserRatingData = userRatingFromMySQL ?? result['userRating'] as Map<String, dynamic>?;
+          _chartUserRatingData = userRatingFromMySQL ??
+              result['userRating'] as Map<String, dynamic>?;
           _chartUserScore = _chartUserRatingData != null &&
                   _chartUserRatingData!['score'] != null
               ? (_chartUserRatingData!['score'] as num).toDouble()
@@ -3803,7 +4206,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                 Fluttertoast.showToast(msg: '评分删除失败');
               }
             },
-            child: Text('删除', style: TextStyle(color: AppColors.errorRed(brightness))),
+              child: Text('删除',
+                  style: TextStyle(color: AppColors.errorRed(brightness))),
           ),
         ],
       );
@@ -3821,7 +4225,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.05) : AppColors.greyHint(brightness).withOpacity(0.1),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white.withOpacity(0.05)
+                : AppColors.greyHint(brightness).withOpacity(0.1),
             spreadRadius: 1,
             blurRadius: 6,
             offset: const Offset(0, 2),
@@ -3852,12 +4258,16 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     children: [
                       Text(
                         '($_chartTotalVotes人评分)',
-                        style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        style: TextStyle(
+                            fontSize: 14,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant),
                       ),
                       const SizedBox(width: 4),
                       if (_chartRatingDistribution != null)
                         GestureDetector(
-                          onTap: () => _showRatingDistributionDialog(accentColor),
+                          onTap: () =>
+                              _showRatingDistributionDialog(accentColor),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 4),
@@ -3883,16 +4293,6 @@ class _SongInfoPageState extends State<SongInfoPage> {
                             ),
                           ),
                         ),
-                      IconButton(
-                        constraints: const BoxConstraints(
-                          minWidth: 28,
-                          minHeight: 28,
-                        ),
-                        padding: EdgeInsets.zero,
-                        icon: Icon(Icons.refresh, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                        onPressed: _loadChartRating,
-                        tooltip: '刷新评分',
-                      ),
                     ],
                   ),
                 ),
@@ -3908,12 +4308,14 @@ class _SongInfoPageState extends State<SongInfoPage> {
             ),
             child: Row(
               children: [
-                Icon(Icons.info_outline, size: 14, color: AppColors.linkBlue(brightness)),
+                Icon(Icons.info_outline,
+                    size: 14, color: AppColors.linkBlue(brightness)),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     '评分仅供参考，请客观公正地评价谱面，自觉维护社区环境',
-                    style: TextStyle(fontSize: 11, color: AppColors.linkBlue(brightness)),
+                    style: TextStyle(
+                        fontSize: 11, color: AppColors.linkBlue(brightness)),
                   ),
                 ),
               ],
@@ -3933,40 +4335,68 @@ class _SongInfoPageState extends State<SongInfoPage> {
             // 总评分显示
             Row(
               children: [
-                Text(
-                  _chartAverageScore != null
-                      ? _chartAverageScore!.toStringAsFixed(2)
-                      : '-',
-                  style: TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: _chartAverageScore != null
-                        ? _getRatingColor(_chartAverageScore!)
-                        : AppColors.ratingColor("D"),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                if (_chartAverageScore != null)
-                  Row(
-                    children: List.generate(
-                      5,
-                      (index) {
-                        double fill = _chartAverageScore! - index;
-                        if (fill >= 1) {
-                          return Icon(Icons.star_rounded,
-                              color: _getRatingColor(_chartAverageScore!),
-                              size: 24);
-                        } else if (fill > 0) {
-                          return Icon(Icons.star_half_rounded,
-                              color: _getRatingColor(_chartAverageScore!),
-                              size: 24);
-                        } else {
-                          return Icon(Icons.star_outline_rounded,
-                              color: AppColors.greyHint(brightness), size: 24);
-                        }
-                      },
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _chartAverageScore != null
+                              ? _chartAverageScore!.toStringAsFixed(2)
+                              : '-',
+                          style: TextStyle(
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                            color: _chartAverageScore != null
+                                ? _getRatingColor(_chartAverageScore!)
+                                : AppColors.ratingColor("D"),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        if (_chartAverageScore != null)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: List.generate(
+                              5,
+                              (index) {
+                                final fill = _chartAverageScore! - index;
+                                if (fill >= 1) {
+                                  return Icon(Icons.star_rounded,
+                                      color: _getRatingColor(_chartAverageScore!),
+                                      size: 24);
+                                } else if (fill > 0) {
+                                  return Icon(Icons.star_half_rounded,
+                                      color: _getRatingColor(_chartAverageScore!),
+                                      size: 24);
+                                } else {
+                                  return Icon(Icons.star_outline_rounded,
+                                      color: AppColors.greyHint(brightness),
+                                      size: 24);
+                                }
+                              },
+                            ),
+                          ),
+                      ],
                     ),
                   ),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  constraints:
+                      const BoxConstraints.tightFor(width: 32, height: 32),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  splashRadius: 18,
+                  icon: Icon(
+                    Icons.refresh,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  onPressed: _loadChartRating,
+                  tooltip: '刷新评分',
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -3993,7 +4423,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                           '我的最近评分',
                           style: TextStyle(
                             fontSize: 13,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -4043,7 +4474,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                           size: 16);
                                     } else {
                                       return Icon(Icons.star_outline_rounded,
-                                          color: AppColors.greyHint(brightness), size: 16);
+                                          color: AppColors.greyHint(brightness),
+                                          size: 16);
                                     }
                                   },
                                 ),
@@ -4059,14 +4491,17 @@ class _SongInfoPageState extends State<SongInfoPage> {
                             decoration: BoxDecoration(
                               color: Theme.of(context).colorScheme.surface,
                               borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: AppColors.greyHint(brightness)),
+                              border: Border.all(
+                                  color: AppColors.greyHint(brightness)),
                             ),
                             child: Text(
                               _formatChartRatingTime(
                                   _chartUserRatingData!['createdAt']),
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                               ),
                             ),
                           ),
@@ -4142,7 +4577,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                 child: Row(
                                   children: [
                                     Icon(Icons.warning_amber_rounded,
-                                        size: 16, color: AppColors.errorRed(brightness)),
+                                        size: 16,
+                                        color: AppColors.errorRed(brightness)),
                                     const SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
@@ -4163,7 +4599,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                   TextButton(
                                     onPressed: _deleteChartRating,
                                     style: TextButton.styleFrom(
-                                      foregroundColor: AppColors.errorRed(brightness),
+                                      foregroundColor:
+                                          AppColors.errorRed(brightness),
                                     ),
                                     child: const Text('删除评分'),
                                   ),
@@ -4177,8 +4614,10 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: accentColor,
                                       foregroundColor: Colors.white,
-                                      disabledBackgroundColor: AppColors.greyHint(brightness),
-                                      disabledForegroundColor: brightness == Brightness.dark
+                                      disabledBackgroundColor:
+                                          AppColors.greyHint(brightness),
+                                      disabledForegroundColor:
+                                          brightness == Brightness.dark
                                           ? Colors.white54
                                           : Colors.white70,
                                       padding: const EdgeInsets.symmetric(
@@ -4211,7 +4650,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                 decoration: BoxDecoration(
                   color: AppColors.warningOrange(brightness),
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: AppColors.warningOrange(brightness)),
+                  border:
+                      Border.all(color: AppColors.warningOrange(brightness)),
                 ),
                 child: Row(
                   children: [
@@ -4221,7 +4661,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     Expanded(
                       child: Text(
                         '请在首页刷新数据以获取身份后再评分',
-                        style: const TextStyle(fontSize: 13, color: Colors.white),
+                        style:
+                            const TextStyle(fontSize: 13, color: Colors.white),
                       ),
                     ),
                   ],
@@ -4253,8 +4694,15 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
     // 评分等级从高到低（5.0 到 1.0）
     final List<String> scoreKeys = [
-      '5.0', '4.5', '4.0', '3.5', '3.0',
-      '2.5', '2.0', '1.5', '1.0'
+      '5.0',
+      '4.5',
+      '4.0',
+      '3.5',
+      '3.0',
+      '2.5',
+      '2.0',
+      '1.5',
+      '1.0'
     ];
 
     // 找到最大样本数用于计算进度条长度
@@ -4286,8 +4734,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
               children: [
                 // 总评分人数
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
                     color: accentColor.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(8),
@@ -4324,8 +4772,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         final double percentage =
                             maxCount > 0 ? count / maxCount : 0.0;
                         final double ratingValue = double.parse(key);
-                        final Color barColor =
-                            _getRatingColor(ratingValue);
+                        final Color barColor = _getRatingColor(ratingValue);
 
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 6),
@@ -4347,7 +4794,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                       style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.w500,
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
                                       ),
                                     ),
                                   ],
@@ -4356,30 +4805,15 @@ class _SongInfoPageState extends State<SongInfoPage> {
                               const SizedBox(width: 8),
                               // 进度条
                               Expanded(
-                                child: Stack(
-                                  children: [
-                                    Container(
-                                      height: 20,
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.surface,
-                                        borderRadius:
-                                            BorderRadius.circular(4),
-                                      ),
-                                    ),
-                                    FractionallySizedBox(
-                                      widthFactor: percentage > 0
-                                          ? percentage.clamp(0.02, 1.0)
-                                          : 0.0,
-                                      child: Container(
-                                        height: 20,
-                                        decoration: BoxDecoration(
-                                          color: barColor.withOpacity(0.85),
-                                          borderRadius:
-                                              BorderRadius.circular(4),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                child: SmoothLinearProgressIndicator(
+                                  value: percentage > 0
+                                      ? percentage.clamp(0.02, 1.0)
+                                      : 0.0,
+                                  minHeight: 20,
+                                  color: barColor.withOpacity(0.85),
+                                  backgroundColor:
+                                      Theme.of(context).colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(4),
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -4391,7 +4825,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
                                   ),
                                   textAlign: TextAlign.right,
                                 ),
@@ -4555,7 +4991,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text('删除', style: TextStyle(color: AppColors.errorRed(brightness))),
+              child: Text('删除',
+                  style: TextStyle(color: AppColors.errorRed(brightness))),
           ),
         ],
       );
@@ -4638,7 +5075,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
         ),
         child: Icon(icon,
             size: 20,
-            color: enabled ? AppColors.linkBlue(brightness) : AppColors.greyHint(brightness)),
+            color: enabled
+                ? AppColors.linkBlue(brightness)
+                : AppColors.greyHint(brightness)),
       ),
     );
   }
@@ -4654,7 +5093,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.05) : AppColors.greyHint(brightness).withOpacity(0.1),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white.withOpacity(0.05)
+                : AppColors.greyHint(brightness).withOpacity(0.1),
             spreadRadius: 1,
             blurRadius: 6,
             offset: const Offset(0, 2),
@@ -4666,7 +5107,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
         children: [
           Row(
             children: [
-              Icon(Icons.comment, color: AppColors.linkBlue(brightness), size: 20),
+              Icon(Icons.comment,
+                  color: AppColors.linkBlue(brightness), size: 20),
               const SizedBox(width: 8),
               Text(
                 '评论',
@@ -4679,7 +5121,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
               const SizedBox(width: 8),
               Text(
                 '(${_comments.length})',
-                style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                style: TextStyle(
+                    fontSize: 14,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
               const Spacer(),
               IconButton(
@@ -4718,12 +5162,14 @@ class _SongInfoPageState extends State<SongInfoPage> {
             ),
             child: Row(
               children: [
-                Icon(Icons.info_outline, size: 14, color: AppColors.linkBlue(brightness)),
+                Icon(Icons.info_outline,
+                    size: 14, color: AppColors.linkBlue(brightness)),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     '他人评论仅供参考，请文明发言，自觉维护网络环境',
-                    style: TextStyle(fontSize: 11, color: AppColors.linkBlue(brightness)),
+                    style: TextStyle(
+                        fontSize: 11, color: AppColors.linkBlue(brightness)),
                   ),
                 ),
               ],
@@ -4772,7 +5218,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     decoration: BoxDecoration(
                       color: AppColors.warningOrange(brightness),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: AppColors.warningOrange(brightness)),
+                      border: Border.all(
+                          color: AppColors.warningOrange(brightness)),
                     ),
                     child: Row(
                       children: [
@@ -4797,21 +5244,24 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     hintText: '输入您的评论内容...',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: AppColors.tableBorder(brightness)),
+                      borderSide:
+                          BorderSide(color: AppColors.tableBorder(brightness)),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: AppColors.tableBorder(brightness)),
+                      borderSide:
+                          BorderSide(color: AppColors.tableBorder(brightness)),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: AppColors.linkBlue(brightness)),
+                      borderSide:
+                          BorderSide(color: AppColors.linkBlue(brightness)),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 10),
                     isDense: true,
-                    counterStyle:
-                        TextStyle(fontSize: 11, color: AppColors.greyHint(brightness)),
+                    counterStyle: TextStyle(
+                        fontSize: 11, color: AppColors.greyHint(brightness)),
                   ),
                   style: const TextStyle(fontSize: 14),
                 ),
@@ -4820,7 +5270,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     padding: const EdgeInsets.only(top: 6),
                     child: Text(
                       _commentError!,
-                      style: TextStyle(fontSize: 12, color: AppColors.errorRed(brightness)),
+                      style: TextStyle(
+                          fontSize: 12, color: AppColors.errorRed(brightness)),
                     ),
                   ),
                 const SizedBox(height: 10),
@@ -4833,7 +5284,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         onPressed: _submitComment,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.linkBlue(brightness),
-                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                          foregroundColor:
+                              Theme.of(context).colorScheme.onPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -4859,7 +5311,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
             Center(
               child: Padding(
                 padding: EdgeInsets.all(20),
-                child: CircularProgressIndicator(color: AppColors.linkBlue(brightness)),
+                child: CircularProgressIndicator(
+                    color: AppColors.linkBlue(brightness)),
               ),
             )
           else if (_comments.isEmpty)
@@ -4873,7 +5326,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                   const SizedBox(height: 12),
                   Text(
                     '暂无评论，快来发表第一条评论吧！',
-                    style: TextStyle(fontSize: 14, color: AppColors.greyHint(brightness)),
+                    style: TextStyle(
+                        fontSize: 14, color: AppColors.greyHint(brightness)),
                   ),
                 ],
               ),
@@ -4885,7 +5339,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
               itemCount: _pageComments.length,
               separatorBuilder: (ctx, idx) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Divider(color: AppColors.greyHint(brightness), height: 1),
+                child:
+                    Divider(color: AppColors.greyHint(brightness), height: 1),
               ),
               itemBuilder: (ctx, idx) {
                 final comment = _pageComments[idx];
@@ -4911,7 +5366,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.bold,
-                                      color: Theme.of(context).colorScheme.onSurface,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface,
                                     ),
                                   ),
                                 ),
@@ -4939,7 +5396,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                 Text(
                                   _formatDateTime(comment.createdAt),
                                   style: TextStyle(
-                                      fontSize: 11, color: AppColors.greyHint(brightness)),
+                                      fontSize: 11,
+                                      color: AppColors.greyHint(brightness)),
                                 ),
                               ],
                             ),
@@ -4961,7 +5419,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                   child: Text(
                                     '删除',
                                     style: TextStyle(
-                                        fontSize: 12, color: AppColors.errorRed(brightness)),
+                                        fontSize: 12,
+                                        color: AppColors.errorRed(brightness)),
                                   ),
                                 ),
                               ),
@@ -5202,8 +5661,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
         InkWell(
           onTap: () {
             setState(() {
-              _toleranceCalculationExpanded =
-                  !_toleranceCalculationExpanded;
+              _toleranceCalculationExpanded = !_toleranceCalculationExpanded;
             });
           },
           borderRadius: BorderRadius.circular(8),
@@ -5249,7 +5707,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _selectedNoteType == noteType
                             ? _getAccentColor(_currentDiffIndex, brightness)
-                            : Theme.of(context).colorScheme.surfaceContainerHighest,
+                            : Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
                         foregroundColor: _selectedNoteType == noteType
                             ? Colors.white
                             : Theme.of(context).colorScheme.onSurface,
@@ -5275,7 +5735,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('音符类型:', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                    Text('音符类型:',
+                        style: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant)),
                     Text(_selectedNoteType,
                         style: TextStyle(fontWeight: FontWeight.bold)),
                   ],
@@ -5284,7 +5748,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('占总权重比例:', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                    Text('占总权重比例:',
+                        style: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant)),
                     Text('${(weightRatio * 100).toStringAsFixed(2)}%',
                         style: TextStyle(fontWeight: FontWeight.bold)),
                   ],
@@ -5299,7 +5767,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     decoration: BoxDecoration(
                       color: AppColors.warningOrange(brightness),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.warningOrange(brightness)),
+                      border: Border.all(
+                          color: AppColors.warningOrange(brightness)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -5493,8 +5962,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         if (breakInputError != null) ...[
                           const SizedBox(height: 4),
                           Text(breakInputError,
-                              style:
-                                  TextStyle(color: AppColors.errorRed(brightness), fontSize: 12)),
+                              style: TextStyle(
+                                  color: AppColors.errorRed(brightness),
+                                  fontSize: 12)),
                         ],
                         // BREAK损失摘要
                         if (_break50Count > 0 ||
@@ -5509,70 +5979,90 @@ class _SongInfoPageState extends State<SongInfoPage> {
                             children: [
                               Text('BREAK总损失: ',
                                   style: TextStyle(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                      fontSize: 12)),
                               Text('${breakInputLoss.toStringAsFixed(4)}%',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 12,
                                       color: breakInputLoss >= 2.0
                                           ? AppColors.errorRed(brightness)
-                                          : AppColors.warningOrange(brightness))),
+                                          : AppColors.warningOrange(
+                                              brightness))),
                             ],
                           ),
                           Row(
                             children: [
                               Text('剩余预算(SSS+): ',
                                   style: TextStyle(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                      fontSize: 12)),
                               Text('${remainingBudget05.toStringAsFixed(4)}%',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 12,
                                       color: remainingBudget05 <= 0
                                           ? AppColors.errorRed(brightness)
-                                          : AppColors.successGreen(brightness))),
+                                          : AppColors.successGreen(
+                                              brightness))),
                             ],
                           ),
                           Row(
                             children: [
                               Text('剩余预算(SSS): ',
                                   style: TextStyle(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                      fontSize: 12)),
                               Text('${remainingBudget10.toStringAsFixed(4)}%',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 12,
                                       color: remainingBudget10 <= 0
                                           ? AppColors.errorRed(brightness)
-                                          : AppColors.successGreen(brightness))),
+                                          : AppColors.successGreen(
+                                              brightness))),
                             ],
                           ),
                           Row(
                             children: [
                               Text('剩余预算(SS+): ',
                                   style: TextStyle(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                      fontSize: 12)),
                               Text('${remainingBudget15.toStringAsFixed(4)}%',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 12,
                                       color: remainingBudget15 <= 0
                                           ? AppColors.errorRed(brightness)
-                                          : AppColors.successGreen(brightness))),
+                                          : AppColors.successGreen(
+                                              brightness))),
                             ],
                           ),
                           Row(
                             children: [
                               Text('剩余预算(SS): ',
                                   style: TextStyle(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                      fontSize: 12)),
                               Text('${remainingBudget20.toStringAsFixed(4)}%',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 12,
                                       color: remainingBudget20 <= 0
                                           ? AppColors.errorRed(brightness)
-                                          : AppColors.successGreen(brightness))),
+                                          : AppColors.successGreen(
+                                              brightness))),
                             ],
                           ),
                         ],
@@ -5586,15 +6076,24 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     children: [
                       Expanded(
                           child: Text('GREAT损失',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('GOOD损失',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('MISS损失',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                     ],
                   ),
@@ -5623,15 +6122,24 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     children: [
                       Expanded(
                           child: Text('SSS+容错(GREAT)',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('SSS+容错(GOOD)',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('SSS+容错(MISS)',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                     ],
                   ),
@@ -5678,15 +6186,24 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     children: [
                       Expanded(
                           child: Text('SSS容错(GREAT)',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('SSS容错(GOOD)',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('SSS容错(MISS)',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                     ],
                   ),
@@ -5733,15 +6250,24 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     children: [
                       Expanded(
                           child: Text('SS+容错(GREAT)',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('SS+容错(GOOD)',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('SS+容错(MISS)',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                     ],
                   ),
@@ -5788,15 +6314,24 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     children: [
                       Expanded(
                           child: Text('SS容错(GREAT)',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('SS容错(GOOD)',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('SS容错(MISS)',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                     ],
                   ),
@@ -5846,11 +6381,17 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     children: [
                       Expanded(
                           child: Text('50落损失',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('100落损失',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                     ],
                   ),
@@ -5874,15 +6415,24 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     children: [
                       Expanded(
                           child: Text('80%GREAT损失',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('60%GREAT损失',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('50%GREAT损失',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                     ],
                   ),
@@ -5910,11 +6460,17 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     children: [
                       Expanded(
                           child: Text('GOOD损失',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('MISS损失',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                     ],
                   ),
@@ -5939,15 +6495,24 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     children: [
                       Expanded(
                           child: Text('-0.5%容错80%GREAT',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('-0.5%容错60%GREAT',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('-0.5%容错50%GREAT',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                     ],
                   ),
@@ -5977,10 +6542,16 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         child: Column(
                           children: [
                             Text('-0.5%容错',
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant),
                                 textAlign: TextAlign.center),
                             Text('GOOD',
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant),
                                 textAlign: TextAlign.center),
                           ],
                         ),
@@ -5989,10 +6560,16 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         child: Column(
                           children: [
                             Text('-0.5%容错',
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant),
                                 textAlign: TextAlign.center),
                             Text('MISS',
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant),
                                 textAlign: TextAlign.center),
                           ],
                         ),
@@ -6020,15 +6597,24 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     children: [
                       Expanded(
                           child: Text('-1%容错80%GREAT',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('-1%容错60%GREAT',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                       Expanded(
                           child: Text('-1%容错50%GREAT',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                               textAlign: TextAlign.center)),
                     ],
                   ),
@@ -6058,10 +6644,16 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         child: Column(
                           children: [
                             Text('-1%容错',
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant),
                                 textAlign: TextAlign.center),
                             Text('GOOD',
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant),
                                 textAlign: TextAlign.center),
                           ],
                         ),
@@ -6070,10 +6662,16 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         child: Column(
                           children: [
                             Text('-1%容错',
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant),
                                 textAlign: TextAlign.center),
                             Text('MISS',
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant),
                                 textAlign: TextAlign.center),
                           ],
                         ),
@@ -6144,7 +6742,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
     final brightness = Theme.of(context).brightness;
     final isDark = brightness == Brightness.dark;
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.018, vertical: 2),
+      padding:
+          EdgeInsets.symmetric(horizontal: screenWidth * 0.018, vertical: 2),
       decoration: BoxDecoration(
         color: active
             ? AppColors.successGreen(brightness)
@@ -6528,7 +7127,10 @@ class _SongInfoPageState extends State<SongInfoPage> {
     required Map<String, dynamic> basicInfo,
     required List<dynamic> levels,
   }) async {
-    final quality = await ExportQualitySelector.show(context, estimatedPngSize: ImageEncodeUtil.estimatePngSize(songCount: 1, hasHeader: false, cardsPerRow: 1));
+    final quality = await ExportQualitySelector.show(context,
+        estimatedPngSize: ImageEncodeUtil.estimatePngSize(
+            songCount: 1, hasHeader: false, cardsPerRow: 1),
+        exportingLabel: '谱面成绩卡');
     if (quality == null) return;
 
     // 显示加载对话框
@@ -6566,8 +7168,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
       final rawRate = userRecord['rate'] ?? '';
       final genre = basicInfo['genre'] ?? '';
       final bpm = _safeToInt(basicInfo['bpm']);
-      final ds = _safeToDouble(
-        _songData!['ds'] != null && (_songData!['ds'] as List).length > _currentDiffIndex
+      final ds = _safeToDouble(_songData!['ds'] != null &&
+              (_songData!['ds'] as List).length > _currentDiffIndex
             ? (_songData!['ds'] as List)[_currentDiffIndex]
             : 0.0);
 
@@ -6678,7 +7280,10 @@ class _SongInfoPageState extends State<SongInfoPage> {
   Future<void> _exportSongInfoToImage() async {
     if (_songData == null) return;
 
-    final quality = await ExportQualitySelector.show(context, estimatedPngSize: ImageEncodeUtil.estimatePngSize(songCount: 1, hasHeader: false, cardsPerRow: 1));
+    final quality = await ExportQualitySelector.show(context,
+        estimatedPngSize: ImageEncodeUtil.estimatePngSize(
+            songCount: 1, hasHeader: false, cardsPerRow: 1),
+        exportingLabel: '歌曲信息');
     if (quality == null) return;
 
     // 显示加载对话框
@@ -7261,15 +7866,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
         'bilibili://search?keyword=${Uri.encodeComponent(searchQuery)}');
 
     // 尝试打开B站应用
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-    } else {
+    if (!await ExternalLaunchUtil.open(url)) {
       // 如果无法打开B站应用，尝试在浏览器中打开
       final webUrl = Uri.parse(
           'https://search.bilibili.com/all?keyword=${Uri.encodeComponent(searchQuery)}');
-      if (await canLaunchUrl(webUrl)) {
-        await launchUrl(webUrl);
-      }
+      await ExternalLaunchUtil.open(webUrl);
     }
   }
 
@@ -7390,7 +7991,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
     final isUtage = widget.songId.length == 6;
     final rawLevel = (levels[_currentDiffIndex] ?? '').toString();
     const diffNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'Re:MASTER'];
-    final diffName = isUtage ? 'UTAGE' : diffNames[_currentDiffIndex.clamp(0, 4)];
+    final diffName =
+        isUtage ? 'UTAGE' : diffNames[_currentDiffIndex.clamp(0, 4)];
 
     final TextEditingController controller = TextEditingController(
       text: existingNote?.content ?? '',
@@ -7431,7 +8033,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: CoverUtil.buildCoverWidgetWithContext(context, widget.songId, 60),
+                            child: CoverUtil.buildCoverWidgetWithContext(
+                                context, widget.songId, 60),
                           ),
                           SizedBox(width: 12),
                           Expanded(
@@ -7445,8 +8048,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                     SizedBox(width: 6),
                                     Expanded(
                                       child: Text(songTitle,
-                                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 15),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis),
                                     ),
                                   ],
                                 ),
@@ -7457,7 +8063,11 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                 // 第三行：类别
                                 Text(
                                   basicInfo['genre'] ?? '',
-                                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant),
                                 ),
                               ],
                             ),
@@ -7472,10 +8082,12 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         maxLength: 2000,
                         decoration: InputDecoration(
                           hintText: '在这里写下你对这个谱面的笔记...\n例如：结尾的滑星要注意手顺',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8)),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.amber.shade700, width: 2)),
+                              borderSide: BorderSide(
+                                  color: Colors.amber.shade700, width: 2)),
                         ),
                         onChanged: (_) => setDialogState(() {}),
                       ),
@@ -7485,7 +8097,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         Text(
                           '创建于: ${_formatTimestamp(existingNote.createdAt)}'
                           '${existingNote.updatedAt != existingNote.createdAt ? '\n更新于: ${_formatTimestamp(existingNote.updatedAt)}' : ''}',
-                          style: TextStyle(fontSize: 11, color: AppColors.greyHint(brightness))),
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.greyHint(brightness))),
                       ],
                     ],
                   ),
@@ -7596,13 +8210,23 @@ class _SongInfoPageState extends State<SongInfoPage> {
   Widget _buildNoteTypeTag() {
     final isUtage = widget.songId.length == 6;
     if (isUtage) {
-      return Text('UT', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.red));
+      return Text('UT',
+          style: TextStyle(
+              fontSize: 15, fontWeight: FontWeight.w600, color: Colors.red));
     }
     final songType = _songData!['type'] ?? 'SD';
     if (songType == 'DX') {
-      return Text('DX', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.warningOrange(Theme.of(context).brightness)));
+      return Text('DX',
+          style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppColors.warningOrange(Theme.of(context).brightness)));
     }
-    return Text('ST', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.linkBlue(Theme.of(context).brightness)));
+    return Text('ST',
+        style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: AppColors.linkBlue(Theme.of(context).brightness)));
   }
 
   // 笔记对话框：难度标签
@@ -7616,24 +8240,45 @@ class _SongInfoPageState extends State<SongInfoPage> {
       textColor = isDark ? const Color(0xFFEF5350) : Colors.red;
     } else {
       switch (_currentDiffIndex) {
-        case 0: bgColor = isDark ? const Color(0xFF1B3D1B) : Colors.green.shade100; textColor = isDark ? const Color(0xFF66BB6A) : Colors.green.shade700; break;
-        case 1: bgColor = isDark ? const Color(0xFF3D2E00) : Colors.orange.shade100; textColor = isDark ? const Color(0xFFFFB74D) : Colors.orange.shade700; break;
-        case 2: bgColor = isDark ? const Color(0xFF4A2020) : Colors.red.shade100; textColor = isDark ? const Color(0xFFEF5350) : Colors.red; break;
-        case 3: bgColor = isDark ? const Color(0xFF2A1A3D) : Colors.purple.shade100; textColor = isDark ? const Color(0xFFCE93D8) : Colors.purple.shade700; break;
-        case 4: bgColor = isDark ? const Color(0xFF2A1A3D) : Colors.purple.shade100; textColor = isDark ? const Color(0xFFCE93D8) : Colors.purple.shade300; break;
-        default: bgColor = isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100; textColor = isDark ? Colors.grey.shade400 : Colors.grey.shade700;
+        case 0:
+          bgColor = isDark ? const Color(0xFF1B3D1B) : Colors.green.shade100;
+          textColor = isDark ? const Color(0xFF66BB6A) : Colors.green.shade700;
+          break;
+        case 1:
+          bgColor = isDark ? const Color(0xFF3D2E00) : Colors.orange.shade100;
+          textColor = isDark ? const Color(0xFFFFB74D) : Colors.orange.shade700;
+          break;
+        case 2:
+          bgColor = isDark ? const Color(0xFF4A2020) : Colors.red.shade100;
+          textColor = isDark ? const Color(0xFFEF5350) : Colors.red;
+          break;
+        case 3:
+          bgColor = isDark ? const Color(0xFF2A1A3D) : Colors.purple.shade100;
+          textColor = isDark ? const Color(0xFFCE93D8) : Colors.purple.shade700;
+          break;
+        case 4:
+          bgColor = isDark ? const Color(0xFF2A1A3D) : Colors.purple.shade100;
+          textColor = isDark ? const Color(0xFFCE93D8) : Colors.purple.shade300;
+          break;
+        default:
+          bgColor = isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100;
+          textColor = isDark ? Colors.grey.shade400 : Colors.grey.shade700;
       }
     }
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(4)),
-      child: Text(diffLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textColor)),
+      decoration:
+          BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(4)),
+      child: Text(diffLabel,
+          style: TextStyle(
+              fontSize: 11, fontWeight: FontWeight.bold, color: textColor)),
     );
   }
 
   Future<void> _checkBookmarkStatus() async {
     final uniqueKey = '${widget.songId}_$_currentDiffIndex';
-    final folderIds = await FavoriteFolderService().findFoldersContainingChart(uniqueKey);
+    final folderIds =
+        await FavoriteFolderService().findFoldersContainingChart(uniqueKey);
     if (mounted) {
       setState(() {
         _isBookmarked = folderIds.isNotEmpty;
@@ -7721,7 +8366,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                             padding: EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               border: Border.all(
-                                color: Theme.of(context).brightness == Brightness.dark
+                                color: Theme.of(context).brightness ==
+                                        Brightness.dark
                                     ? Colors.grey.shade700
                                     : Colors.grey.shade200,
                               ),
@@ -7758,14 +8404,18 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 16,
-                                          color: Theme.of(context).colorScheme.onSurface,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface,
                                         ),
                                       ),
                                     ),
                                     Icon(
                                       Icons.arrow_forward_ios,
                                       size: 16,
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
                                     ),
                                   ],
                                 ),
@@ -7776,7 +8426,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                     child: Text(
                                       item['description'],
                                       style: TextStyle(
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
                                         fontSize: 14,
                                       ),
                                     ),
@@ -7938,14 +8590,17 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(ratingLabels[i],
-                              style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryText(brightness))),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primaryText(brightness))),
                           Text(
                               '${dist[i]} / ${total > 0 ? ((dist[i] / total) * 100).toStringAsFixed(2) : '0.00'}%',
-                              style: TextStyle(color: AppColors.primaryText(brightness))),
+                              style: TextStyle(
+                                  color: AppColors.primaryText(brightness))),
                         ],
                       ),
                       SizedBox(height: 4),
-                      LinearProgressIndicator(
+                      SmoothLinearProgressIndicator(
                         value: dist[i] > 0 ? dist[i] / total : 0,
                         backgroundColor: AppColors.tableBorder(brightness),
                         valueColor: AlwaysStoppedAnimation<Color>(
@@ -8042,14 +8697,17 @@ class _SongInfoPageState extends State<SongInfoPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(comboLabels[i],
-                              style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryText(brightness))),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primaryText(brightness))),
                           Text(
                               '${fcDist[i].toInt()} / ${total > 0 ? ((fcDist[i] / total) * 100).toStringAsFixed(2) : '0.00'}%',
-                              style: TextStyle(color: AppColors.primaryText(brightness))),
+                              style: TextStyle(
+                                  color: AppColors.primaryText(brightness))),
                         ],
                       ),
                       SizedBox(height: 4),
-                      LinearProgressIndicator(
+                      SmoothLinearProgressIndicator(
                         value: fcDist[i] > 0 ? fcDist[i] / total : 0,
                         backgroundColor: AppColors.tableBorder(brightness),
                         valueColor: AlwaysStoppedAnimation<Color>(
@@ -8110,8 +8768,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     ...aliases.map((alias) => InkWell(
                           borderRadius: BorderRadius.circular(6),
                           onTap: () async {
-                            await Clipboard.setData(
-                                ClipboardData(text: alias));
+                            await Clipboard.setData(ClipboardData(text: alias));
                             Fluttertoast.showToast(msg: '已复制：$alias');
                           },
                           child: Padding(
@@ -8155,7 +8812,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
+          border:
+              Border.all(color: AppColors.tableBorder(brightness), width: 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -8208,9 +8866,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
           fitDiff: fitDiffValue,
           noteCounts: _getNoteCounts(currentChart),
           userAchievement: (record?['achievements'] as num?)?.toDouble(),
-          userRating: (record?['ra'] is num)
-              ? (record!['ra'] as num).toInt()
-              : null,
+          userRating:
+              (record?['ra'] is num) ? (record!['ra'] as num).toInt() : null,
         ),
       ),
     );
@@ -8422,7 +9079,14 @@ class _BookmarkFolderSelectorDialogState
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
-    final levelNames = ['BASIC', 'ADVANCED', 'EXPERT', 'MASTER', 'Re:MASTER', 'UTAGE'];
+    final levelNames = [
+      'BASIC',
+      'ADVANCED',
+      'EXPERT',
+      'MASTER',
+      'Re:MASTER',
+      'UTAGE'
+    ];
     final bool isUtage = widget.chart.songId.length == 6;
     final String levelName;
     if (isUtage) {
@@ -8448,7 +9112,9 @@ class _BookmarkFolderSelectorDialogState
               margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: brightness == Brightness.dark ? const Color(0xFF2A2010) : Colors.amber.shade50,
+                color: brightness == Brightness.dark
+                    ? const Color(0xFF2A2010)
+                    : Colors.amber.shade50,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -8467,7 +9133,8 @@ class _BookmarkFolderSelectorDialogState
                         // 第一行：类型标签 + 歌名
                         Row(
                           children: [
-                            _buildTypeTag(widget.chart.songType, widget.chart.songId),
+                            _buildTypeTag(
+                                widget.chart.songType, widget.chart.songId),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
@@ -8486,14 +9153,17 @@ class _BookmarkFolderSelectorDialogState
                         // 第二行：难度标签 + 定数
                         Row(
                           children: [
-                            _buildDifficultyTag(levelName, widget.chart.levelIndex, widget.chart.songId),
+                            _buildDifficultyTag(levelName,
+                                widget.chart.levelIndex, widget.chart.songId),
                             const SizedBox(width: 6),
                             Text(
                               'Lv.${widget.chart.ds.toStringAsFixed(1)}',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -8519,18 +9189,23 @@ class _BookmarkFolderSelectorDialogState
                         child: Column(
                           children: [
                             Icon(Icons.favorite_border,
-                                size: 48, color: AppColors.greyHint(brightness)),
+                                size: 48,
+                                color: AppColors.greyHint(brightness)),
                             const SizedBox(height: 8),
                             Text(
                               '还没有收藏夹',
                               style: TextStyle(
-                                  fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                  fontSize: 14,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               '请先创建收藏夹',
                               style: TextStyle(
-                                  fontSize: 12, color: AppColors.greyHint(brightness)),
+                                  fontSize: 12,
+                                  color: AppColors.greyHint(brightness)),
                             ),
                           ],
                         ),
@@ -8553,7 +9228,10 @@ class _BookmarkFolderSelectorDialogState
                               subtitle: Text(
                                 '${folder.charts.length} 个谱面',
                                 style: TextStyle(
-                                    fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                    fontSize: 12,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant),
                               ),
                               value: isSelected,
                               dense: true,
@@ -8633,7 +9311,8 @@ class _BookmarkFolderSelectorDialogState
   }
 
   /// 构建难度标签（Basic/Advanced/Expert/Master/Re:MASTER）
-  Widget _buildDifficultyTag(String difficultyLabel, int levelIndex, String songId) {
+  Widget _buildDifficultyTag(
+      String difficultyLabel, int levelIndex, String songId) {
     final brightness = Theme.of(context).brightness;
     final isDark = brightness == Brightness.dark;
     Color bgColor;

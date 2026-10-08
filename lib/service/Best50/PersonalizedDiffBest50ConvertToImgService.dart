@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'ThunderBest50Export.dart';
 import 'package:my_first_flutter_app/utils/ExportUserInfoWidget.dart';
 import 'dart:io';
 import 'dart:typed_data';
@@ -18,7 +19,7 @@ import 'package:my_first_flutter_app/widgets/MetaRowWidget.dart';
 
 class PersonalizedDiffBest50ConvertToImg {
   // 导出为图片的方法
-  static Future<File?> convertToImage(BuildContext context, String title, Map<String, dynamic>? diffBest50Data, List<Map<String, dynamic>> diffSongs, List<dynamic>? maimaiMusicData, {int? jpegQuality}) async {
+  static Future<File?> convertToImage(BuildContext context, String title, Map<String, dynamic>? diffBest50Data, List<Map<String, dynamic>> diffSongs, List<dynamic>? maimaiMusicData, {int? jpegQuality, bool thunderMode = false, bool thunderVertical = true}) async {
     OverlayEntry? overlayEntry;
     try {
       debugPrint('=== STARTING PERSONALIZED DIFF B50 IMAGE CONVERSION ===');
@@ -31,14 +32,17 @@ class PersonalizedDiffBest50ConvertToImg {
 
       Widget imageWidget = RepaintBoundary(
         key: globalKey,
-        child: await _buildExportImageWidget(context, title, diffBest50Data, diffSongs, maimaiMusicData),
+        child: await _buildExportImageWidget(context, title, diffBest50Data, diffSongs, maimaiMusicData, thunderMode: thunderMode, thunderVertical: thunderVertical),
       );
+      final exportWidth = thunderMode
+          ? ThunderBest50Export.widthFor(diffSongs.length, thunderVertical)
+          : 1700.0;
 
       overlayEntry = OverlayEntry(
         builder: (context) => Positioned(
           left: -9999,
           top: -9999,
-          width: 1700, // 与 Best50ConvertToImgService 对齐：姓名框 1150 + gap 16 + metaRow 494 + 20*2 padding = 1700
+          width: exportWidth,
           child: Material(
             type: MaterialType.transparency,
             child: imageWidget,
@@ -193,7 +197,7 @@ class PersonalizedDiffBest50ConvertToImg {
   }
 
   // 构建用于导出的Widget
-  static Future<Widget> _buildExportImageWidget(BuildContext context, String title, Map<String, dynamic>? diffBest50Data, List<Map<String, dynamic>> diffSongs, List<dynamic>? maimaiMusicData) async {
+  static Future<Widget> _buildExportImageWidget(BuildContext context, String title, Map<String, dynamic>? diffBest50Data, List<Map<String, dynamic>> diffSongs, List<dynamic>? maimaiMusicData, {bool thunderMode = false, bool thunderVertical = true}) async {
     int diffRatingSum = diffBest50Data?['diffRatingSum'] ?? 0;
     double diffRatingAverage = diffSongs.isNotEmpty ? diffRatingSum / diffSongs.length : 0.0;
 
@@ -209,7 +213,19 @@ class PersonalizedDiffBest50ConvertToImg {
     });
     double averageScoreRate = diffSongs.isNotEmpty ? scoreRateSum / diffSongs.length : 0.0;
 
-    const double containerWidth = 1700.0; // 与 Best50ConvertToImgService 对齐：容纳姓名框 + metaRow 横排布局
+    if (thunderMode) {
+      final maxIdLength = diffSongs.any((song) => '${song['song_id']}'.length == 6) ? 6 : 5;
+      return ThunderBest50Export.build(
+        title: title,
+        vertical: thunderVertical,
+        count: diffSongs.length,
+        statistics: '拟合 Rating $diffRatingSum\n平均 Rating ${diffRatingAverage.toStringAsFixed(1)}\n'
+            '平均达成率 ${averageAchievement.toStringAsFixed(4)}%\n'
+            '平均 DX 分达成率 ${(averageScoreRate * 100).toStringAsFixed(2)}%',
+        cardBuilder: (index) => _buildDataGameCard(context, diffSongs[index], maimaiMusicData, maxIdLength),
+      );
+    }
+    const double containerWidth = 1700.0;
 
     return Container(
       width: containerWidth,
@@ -252,7 +268,7 @@ class PersonalizedDiffBest50ConvertToImg {
                 _buildSectionTitle(context, title),
                 SizedBox(height: 16.0),
 
-                _buildDataCardGrid(context, diffSongs, 1.85, 5, maimaiMusicData),
+                _buildDataCardGrid(context, diffSongs, thunderMode ? 1.25 : 1.85, thunderMode ? (thunderVertical ? 1 : 50) : 5, maimaiMusicData),
                 SizedBox(height: 20.0),
               ],
             ),
@@ -486,7 +502,7 @@ class PersonalizedDiffBest50ConvertToImg {
       }
     }
     return Container(
-      width: 1700,
+      width: crossAxisCount == 50 ? 17000 : 1700,
       child: GridView.builder(
         shrinkWrap: true,
         physics: NeverScrollableScrollPhysics(),

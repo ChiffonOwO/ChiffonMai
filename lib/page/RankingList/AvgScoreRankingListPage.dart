@@ -6,6 +6,7 @@ import '../../utils/AppTheme.dart';
 import '../../utils/ColorUtil.dart';
 import '../../utils/StringUtil.dart';
 import '../../widgets/PageTopBar.dart';
+import '../../widgets/ThemeAwareBackground.dart';
 import '../../widgets/CommunityAvatar.dart';
 import '../../utils/CurrentDataSourceNotifier.dart';
 import '../../utils/RankingRowExtent.dart';
@@ -323,6 +324,8 @@ class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
             child: CommunityPlayerIdentity(
               avatarId: item.avatarId,
               dataSource: item.dataSource,
+              // 开发者白名单按 `<source>:<id>` 整串匹配，见 DataSourceTag
+              playerId: item.playerId,
               name: item.playerName.isEmpty ? '未知玩家' : item.playerName,
               // 头像高度对齐「玩家名 + 数据源标签」两行文字的总高
               avatarMatchesTextHeight: true,
@@ -390,9 +393,16 @@ class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     return Scaffold(
-      backgroundColor: AppColors.cardBackground(brightness),
-      body: Column(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        fit: StackFit.expand,
         children: [
+          Positioned.fill(
+            child: ColoredBox(color: Theme.of(context).colorScheme.surface),
+          ),
+          const ThemeAwareBackground(),
+          Column(
+            children: [
           // 顶部栏统一走公共组件（标题 = 思源黑体 20 / bold / primary / 居中）。
           // 以前是 `Scaffold.appBar: AppBar`，标题被 `Text('…')` 自带的空
           // TextStyle 顶掉了全局字体族，会渲染成系统 Roboto —— 与其它页面不一致。
@@ -506,6 +516,7 @@ class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
                     child: CommunityPlayerIdentity(
                       avatarId: _currentUserRankItem!.avatarId,
                       dataSource: _currentUserRankItem!.dataSource,
+                      playerId: _currentUserRankItem!.playerId,
                       name: _currentUserRankItem!.playerName.isEmpty
                           ? '未知玩家'
                           : _currentUserRankItem!.playerName,
@@ -528,6 +539,8 @@ class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
                 ],
               ),
             ),
+            ],
+          ),
         ],
       ),
     );

@@ -4,9 +4,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:marquee/marquee.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import '../utils/CommonWidgetUtil.dart';
 import '../utils/AppTheme.dart';
-import '../widgets/PageTopBar.dart';
+import '../widgets/BackgroundPageScaffold.dart';
 
 /// 友情链接页面：以卡片形式展示推广同行的项目，点击通过外部浏览器打开。
 class FriendLinksPage extends StatefulWidget {
@@ -88,37 +87,21 @@ class _FriendLinksPageState extends State<FriendLinksPage> {
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
     final safeBottom = MediaQuery.of(context).padding.bottom;
     final Color textSecondaryColor =
         Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7);
-    final Color cardBgColor =
-        Theme.of(context).colorScheme.surface.withValues(alpha: 0.9);
-    final BoxShadow defaultShadow = AppColors.defaultShadow(brightness);
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '友情链接',
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          Column(
-            children: [
-              const PageTopBar(title: '友情链接'),
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: cardBgColor,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [defaultShadow],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.all(screenWidth * 0.04),
+      contentPadding: EdgeInsets.only(bottom: safeBottom + 10),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          screenWidth * 0.04,
+          16,
+          screenWidth * 0.04,
+          20,
+        ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -149,13 +132,6 @@ class _FriendLinksPageState extends State<FriendLinksPage> {
                         ],
                       ),
                     ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }
@@ -174,25 +150,15 @@ class _FriendLinkCard extends StatelessWidget {
     final Color textPrimaryColor = Theme.of(context).colorScheme.onSurface;
     final Color textSecondaryColor =
         Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7);
-    final BoxShadow shadow = AppColors.defaultShadow(brightness);
 
     return Container(
       decoration: BoxDecoration(
-        // 外层用 Container 带 decoration（color + border + boxShadow），
-        // 自身的 borderRadius 自然裁出圆角，让四角都填满 color。
-        // 原本用 Material > InkWell > Ink + Ink 带 decoration 的写法，
-        // Ink 的圆角是 borderRadius=12 的内边界，外层 Material 默认 clipBehavior=Clip.none
-        // 用矩形 bounds，不会按 Ink 的圆角裁——会在圆角处漏出一圈父容器底色。
-        color: Theme.of(context)
-            .colorScheme
-            .surface
-            .withValues(alpha: brightness == Brightness.dark ? 0.7 : 1.0),
+        // 用透明外框划分链接条目，点击效果仍由内部 Material 承载。
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppColors.tableBorder(brightness),
+          color: Theme.of(context).colorScheme.outlineVariant,
           width: 1,
         ),
-        boxShadow: [shadow],
       ),
       child: Material(
         color: Colors.transparent,

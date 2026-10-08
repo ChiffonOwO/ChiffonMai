@@ -164,6 +164,9 @@ class AppTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: Colors.transparent,
       pageTransitionsTheme: _backGestureSafeTransitions(),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        borderRadius: BorderRadius.all(Radius.circular(999)),
+      ),
       cardTheme: CardThemeData(
         color: scheme.surfaceContainerLow,
         elevation: 0,
@@ -175,13 +178,15 @@ class AppTheme {
         elevation: 0,
         backgroundColor: scheme.surface,
         indicatorColor: scheme.primaryContainer,
-        labelTextStyle: WidgetStatePropertyAll(TextStyle(fontWeight: FontWeight.w600)),
+        labelTextStyle:
+            WidgetStatePropertyAll(TextStyle(fontWeight: FontWeight.w600)),
       ),
       listTileTheme: ListTileThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
-      dividerTheme: DividerThemeData(color: scheme.outlineVariant, thickness: 1),
+      dividerTheme:
+          DividerThemeData(color: scheme.outlineVariant, thickness: 1),
       chipTheme: ChipThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         side: BorderSide(color: scheme.outlineVariant),
@@ -238,6 +243,9 @@ class AppTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: const Color(0xFF121220),
       pageTransitionsTheme: _backGestureSafeTransitions(),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        borderRadius: BorderRadius.all(Radius.circular(999)),
+      ),
       cardTheme: CardThemeData(
         color: scheme.surfaceContainerLow,
         elevation: 0,
@@ -249,13 +257,15 @@ class AppTheme {
         elevation: 0,
         backgroundColor: scheme.surface,
         indicatorColor: scheme.primaryContainer,
-        labelTextStyle: WidgetStatePropertyAll(TextStyle(fontWeight: FontWeight.w600)),
+        labelTextStyle:
+            WidgetStatePropertyAll(TextStyle(fontWeight: FontWeight.w600)),
       ),
       listTileTheme: ListTileThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
-      dividerTheme: DividerThemeData(color: scheme.outlineVariant, thickness: 1),
+      dividerTheme:
+          DividerThemeData(color: scheme.outlineVariant, thickness: 1),
       chipTheme: ChipThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         side: BorderSide(color: scheme.outlineVariant),
@@ -312,6 +322,9 @@ class AppTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: Colors.black,
       pageTransitionsTheme: _backGestureSafeTransitions(),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        borderRadius: BorderRadius.all(Radius.circular(999)),
+      ),
       cardTheme: CardThemeData(
         color: scheme.surfaceContainerLow,
         elevation: 0,
@@ -323,13 +336,15 @@ class AppTheme {
         elevation: 0,
         backgroundColor: scheme.surface,
         indicatorColor: scheme.primaryContainer,
-        labelTextStyle: WidgetStatePropertyAll(TextStyle(fontWeight: FontWeight.w600)),
+        labelTextStyle:
+            WidgetStatePropertyAll(TextStyle(fontWeight: FontWeight.w600)),
       ),
       listTileTheme: ListTileThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
-      dividerTheme: DividerThemeData(color: scheme.outlineVariant, thickness: 1),
+      dividerTheme:
+          DividerThemeData(color: scheme.outlineVariant, thickness: 1),
       chipTheme: ChipThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         side: BorderSide(color: scheme.outlineVariant),
@@ -453,35 +468,25 @@ class AppColors {
 
   /// 语义红色（错误、危险）
   static Color errorRed(Brightness brightness) =>
-      brightness == Brightness.dark
-          ? const Color(0xFFEF5350)
-          : Colors.red;
+      brightness == Brightness.dark ? const Color(0xFFEF5350) : Colors.red;
 
   /// 语义绿色（成功）
   static Color successGreen(Brightness brightness) =>
-      brightness == Brightness.dark
-          ? const Color(0xFF66BB6A)
-          : Colors.green;
+      brightness == Brightness.dark ? const Color(0xFF66BB6A) : Colors.green;
 
   // ========== 猜歌游戏颜色（主题感知） ==========
 
   /// 猜歌 - 正确（绿色）背景色
   static Color guessCorrectBg(Brightness brightness) =>
-      brightness == Brightness.dark
-          ? const Color(0xFF2E7D32)
-          : Colors.green;
+      brightness == Brightness.dark ? const Color(0xFF2E7D32) : Colors.green;
 
   /// 猜歌 - 接近（黄色）背景色
   static Color guessCloseBg(Brightness brightness) =>
-      brightness == Brightness.dark
-          ? const Color(0xFFE6A000)
-          : Colors.yellow;
+      brightness == Brightness.dark ? const Color(0xFFE6A000) : Colors.yellow;
 
   /// 猜歌 - 错误（灰色）背景色
   static Color guessWrongBg(Brightness brightness) =>
-      brightness == Brightness.dark
-          ? const Color(0xFF616161)
-          : Colors.grey;
+      brightness == Brightness.dark ? const Color(0xFF616161) : Colors.grey;
 
   /// 猜歌 - 答案卡片背景色（游戏结束后显示正确答案的区域）
   static Color guessAnswerCardBg(Brightness brightness) =>
@@ -526,15 +531,11 @@ class AppColors {
 
   /// 语义蓝色（链接、信息）
   static Color linkBlue(Brightness brightness) =>
-      brightness == Brightness.dark
-          ? const Color(0xFF64B5F6)
-          : Colors.blue;
+      brightness == Brightness.dark ? const Color(0xFF64B5F6) : Colors.blue;
 
   /// 语义橙色（警告）
   static Color warningOrange(Brightness brightness) =>
-      brightness == Brightness.dark
-          ? const Color(0xFFFFB74D)
-          : Colors.orange;
+      brightness == Brightness.dark ? const Color(0xFFFFB74D) : Colors.orange;
 
   // ========== 语义颜色（不随主题变化 — 代表游戏内固定概念） ==========
 
@@ -754,7 +755,8 @@ class AppColors {
   }
 
   /// 难度索引 → 前景色（通过 index 0-4）
-  static Color difficultyForegroundByIndex(int index, {Brightness brightness = Brightness.light}) {
+  static Color difficultyForegroundByIndex(int index,
+      {Brightness brightness = Brightness.light}) {
     if (brightness == Brightness.dark) {
       const colors = [
         Color(0xFF81C784),
@@ -776,7 +778,8 @@ class AppColors {
   }
 
   /// 难度索引 → 背景色（通过 index 0-4）
-  static Color difficultyBackgroundByIndex(int index, {Brightness brightness = Brightness.light}) {
+  static Color difficultyBackgroundByIndex(int index,
+      {Brightness brightness = Brightness.light}) {
     if (brightness == Brightness.dark) {
       const colors = [
         Color(0xFF1B3D1B),
@@ -798,7 +801,8 @@ class AppColors {
   }
 
   /// 难度索引 → 二级背景色（通过 index 0-4）
-  static Color difficultySecondaryBgByIndex(int index, {Brightness brightness = Brightness.light}) {
+  static Color difficultySecondaryBgByIndex(int index,
+      {Brightness brightness = Brightness.light}) {
     if (brightness == Brightness.dark) {
       const colors = [
         Color(0xFF2E5C2E),

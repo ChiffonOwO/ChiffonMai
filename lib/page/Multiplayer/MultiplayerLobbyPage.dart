@@ -5,10 +5,8 @@ import 'package:my_first_flutter_app/manager/MultiplayerManager.dart';
 import 'package:my_first_flutter_app/page/Multiplayer/RoomCreatePage.dart';
 import 'package:my_first_flutter_app/page/Multiplayer/RoomJoinPage.dart';
 import 'package:my_first_flutter_app/page/Multiplayer/GameRoomPage.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
-import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/entity/Multiplayer/RoomEntity.dart';
-import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/BackgroundPageScaffold.dart';
 
 class MultiplayerLobbyPage extends StatefulWidget {
   const MultiplayerLobbyPage({super.key, this.manager});
@@ -192,36 +190,16 @@ class _MultiplayerLobbyPageState extends State<MultiplayerLobbyPage> {
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
     final screenWidth = MediaQuery.of(context).size.width;
     final scaleFactor = screenWidth / 375.0;
-    final paddingS = 4.0 * scaleFactor;
     final paddingM = 12.0 * scaleFactor;
     final paddingL = 10.0 * scaleFactor;
     final borderRadiusSmall = 8.0 * scaleFactor;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          Column(
-            children: [
-              // 标题栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
-              // 与 Best50 页、其余 50 多个页面同款。
-              PageTopBar(title: '多人游戏'),
-
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(paddingS, 0, paddingS, paddingL),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [AppConstants.defaultShadow(brightness)],
-                  ),
-                  child: SingleChildScrollView(
+    return BackgroundPageScaffold(
+      title: '多人游戏',
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: SingleChildScrollView(
                     padding: EdgeInsets.all(paddingM),
                     child: Column(
                       children: [
@@ -294,12 +272,6 @@ class _MultiplayerLobbyPageState extends State<MultiplayerLobbyPage> {
                       ],
                     ),
                   ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 

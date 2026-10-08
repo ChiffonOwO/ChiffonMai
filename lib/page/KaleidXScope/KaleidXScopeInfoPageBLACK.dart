@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../utils/KaleidDateUtil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/service/KaleidXScope/KaleidXScopeInfoServiceBLACK.dart'
@@ -12,7 +12,7 @@ import 'package:my_first_flutter_app/entity/KaleidXScope/KaleidXScopeGate.dart';
 import 'package:my_first_flutter_app/page/SongInfoPage.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/widgets/KaleidXScopeSourceNotice.dart';
-import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/BackgroundPageScaffold.dart';
 
 class KaleidXScopeInfoPageBLACK extends StatefulWidget {
   const KaleidXScopeInfoPageBLACK({
@@ -42,15 +42,13 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
 
   // 自定义常量
   late double _borderRadiusSmall;
-  late double _defaultShadowBlurRadius;
-  late double _defaultShadowOffset;
+
 
   // 尺寸参数（基于MediaQuery）
   late double _paddingXS;
   late double _paddingS;
   late double _paddingM;
   late double _paddingL;
-  late double _paddingXL;
   late double _textSizeXS;
   late double _textSizeS;
   late double _textSizeM;
@@ -65,14 +63,12 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
     final double scaleFactor = screenWidth / 375.0;
 
     _borderRadiusSmall = 8.0 * scaleFactor;
-    _defaultShadowBlurRadius = 5.0 * scaleFactor;
-    _defaultShadowOffset = 2.0 * scaleFactor;
+
 
     _paddingXS = 4.0 * scaleFactor;
     _paddingS = 4.0 * scaleFactor;
     _paddingM = 12.0 * scaleFactor;
     _paddingL = 10.0 * scaleFactor;
-    _paddingXL = 48.0 * scaleFactor;
 
     _textSizeXS = 9.0 * scaleFactor;
     _textSizeS = 11.0 * scaleFactor;
@@ -84,11 +80,6 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
     _progressBarHeight = 24.0 * scaleFactor;
   }
 
-  BoxShadow defaultShadow(Brightness brightness) => BoxShadow(
-        color: brightness == Brightness.dark ? Colors.black.withOpacity(0.3) : Colors.black12,
-        blurRadius: _defaultShadowBlurRadius,
-        offset: Offset(_defaultShadowOffset, _defaultShadowOffset),
-      );
 
   // 获取标题
   String _getGateTitle() {
@@ -138,7 +129,8 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
   Future<void> _loadMarkedSongsFromPrefs() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cachedMarkedSongs = prefs.getString(CacheKeyConstant.kaleidXBlackGateMarkedSongs);
+      final cachedMarkedSongs =
+          prefs.getString(CacheKeyConstant.kaleidXBlackGateMarkedSongs);
       if (cachedMarkedSongs != null && cachedMarkedSongs.isNotEmpty) {
         setState(() {
           _manualMarkedIds = Set.from(cachedMarkedSongs.split(','));
@@ -169,7 +161,8 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
 
     for (final ss in _gateData!.specialSongs) {
       try {
-        final song = allSongs.firstWhere((s) => s.id.toString() == ss.songId.toString());
+        final song =
+            allSongs.firstWhere((s) => s.id.toString() == ss.songId.toString());
         if (ss.role == 'perfect') {
           _specialSong11752 = song;
         } else if (ss.role == 'hidden') {
@@ -331,99 +324,108 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
     if (challenges.isEmpty) return const SizedBox.shrink();
 
     return Column(
-      children: challenges.map((challenge) {
-        final String name = challenge.name;
-        final phases = challenge.phases;
-        final double progressBarFontSize = 10.0 * (MediaQuery.of(context).size.width / 375.0);
+      children: [
+        ...challenges.map((challenge) {
+          final String name = challenge.name;
+          final phases = challenge.phases;
+          final double progressBarFontSize =
+              10.0 * (MediaQuery.of(context).size.width / 375.0);
 
-        return Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(_borderRadiusSmall),
-            border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
-          ),
-          padding: EdgeInsets.all(_paddingM),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                style: TextStyle(
-                  fontSize: _textSizeL,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
+          return Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(_borderRadiusSmall),
+              border: Border.all(
+                  color: AppColors.tableBorder(brightness), width: 1),
+            ),
+            padding: EdgeInsets.all(_paddingM),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                KaleidDateUtil.currentHeader(context, [challenge]),
+                Text(
+                  name,
+                  style: TextStyle(
+                    fontSize: _textSizeL,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
-              ),
-              SizedBox(height: _paddingS),
-              Container(
-                height: _progressBarHeight,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(_progressBarHeight / 2),
-                  border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
-                ),
-                child: Row(
-                  children: phases.map((phase) {
-                    final Color color = _getDifficultyColor(phase.difficulty);
-                    return Expanded(
-                      child: Container(
-                        color: color,
-                        child: Center(
-                          child: Text(
-                            phase.difficulty,
-                            style: TextStyle(
-                              fontSize: progressBarFontSize,
-                              fontWeight: FontWeight.bold,
-                              color: brightness == Brightness.dark ? Colors.white : Colors.black87,
+                SizedBox(height: _paddingS),
+                Container(
+                  height: _progressBarHeight,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(_progressBarHeight / 2),
+                    border: Border.all(
+                        color: AppColors.tableBorder(brightness), width: 1),
+                  ),
+                  child: Row(
+                    children: phases.map((phase) {
+                      final Color color = _getDifficultyColor(phase.difficulty);
+                      return Expanded(
+                        child: Container(
+                          color: color,
+                          child: Center(
+                            child: Text(
+                              phase.difficulty,
+                              style: TextStyle(
+                                fontSize: progressBarFontSize,
+                                fontWeight: FontWeight.bold,
+                                color: brightness == Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black87,
+                              ),
                             ),
                           ),
                         ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                SizedBox(height: _paddingXS),
+                Column(
+                  children: phases.map((phase) {
+                    final Color textColor =
+                        _getDifficultyTextColor(phase.difficulty);
+                    return Padding(
+                      padding: EdgeInsets.symmetric(vertical: _paddingXS * 0.5),
+                      child: Row(
+                        children: [
+                          Text(
+                            '${KaleidDateUtil.range(phase.startDate, phase.endDate)}:',
+                            style: TextStyle(
+                              fontSize: _textSizeS,
+                              color: AppColors.greyHint(brightness),
+                            ),
+                          ),
+                          SizedBox(width: _paddingXS),
+                          Text(
+                            phase.difficulty,
+                            style: TextStyle(
+                              fontSize: _textSizeS,
+                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                            ),
+                          ),
+                          SizedBox(width: _paddingXS),
+                          Text(
+                            'LIFE ${phase.lifeTarget}',
+                            style: TextStyle(
+                              fontSize: _textSizeS,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   }).toList(),
                 ),
-              ),
-              SizedBox(height: _paddingXS),
-              Column(
-                children: phases.map((phase) {
-                  final Color textColor = _getDifficultyTextColor(phase.difficulty);
-                  return Padding(
-                    padding: EdgeInsets.symmetric(vertical: _paddingXS * 0.5),
-                    child: Row(
-                      children: [
-                        Text(
-                          '${phase.startDate}${phase.endDate != null ? ' - ${phase.endDate}' : ' - 后续'}:',
-                          style: TextStyle(
-                            fontSize: _textSizeS,
-                            color: AppColors.greyHint(brightness),
-                          ),
-                        ),
-                        SizedBox(width: _paddingXS),
-                        Text(
-                          phase.difficulty,
-                          style: TextStyle(
-                            fontSize: _textSizeS,
-                            fontWeight: FontWeight.bold,
-                            color: textColor,
-                          ),
-                        ),
-                        SizedBox(width: _paddingXS),
-                        Text(
-                          'LIFE ${phase.lifeTarget}',
-                          style: TextStyle(
-                            fontSize: _textSizeS,
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
+              ],
+            ),
+          );
+        }),
+      ],
     );
   }
 
@@ -476,7 +478,8 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(_borderRadiusSmall),
-          border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
+          border:
+              Border.all(color: AppColors.tableBorder(brightness), width: 1),
         ),
         child: Center(child: CircularProgressIndicator()),
       );
@@ -498,7 +501,8 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
-            border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
+            border:
+                Border.all(color: AppColors.tableBorder(brightness), width: 1),
           ),
           padding: EdgeInsets.all(_paddingXS),
           child: Row(
@@ -506,8 +510,8 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
               Container(
                 width: _coverSize,
                 height: _coverSize,
-                child:
-                    CoverUtil.buildCoverWidgetWithContext(context, song.id, _coverSize),
+                child: CoverUtil.buildCoverWidgetWithContext(
+                    context, song.id, _coverSize),
               ),
               SizedBox(width: _paddingXS * 1.5),
               Expanded(
@@ -579,10 +583,12 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
         Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
-            border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
+            border:
+                Border.all(color: AppColors.tableBorder(brightness), width: 1),
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
           ),
-          padding: EdgeInsets.symmetric(horizontal: _paddingS, vertical: _paddingXS * 0.5),
+          padding: EdgeInsets.symmetric(
+              horizontal: _paddingS, vertical: _paddingXS * 0.5),
           child: Center(
             child: Text(
               '曲目池 | 总计 ${_songs.length} 首歌曲',
@@ -611,8 +617,11 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
                       });
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _isMarkMode ? Colors.green : AppColors.tableBorder(brightness),
-                      foregroundColor: _isMarkMode ? Colors.white : Colors.black,
+                      backgroundColor: _isMarkMode
+                          ? Colors.green
+                          : AppColors.tableBorder(brightness),
+                      foregroundColor:
+                          _isMarkMode ? Colors.white : Colors.black,
                       padding: EdgeInsets.symmetric(
                         horizontal: _paddingM,
                         vertical: _paddingXS,
@@ -665,7 +674,7 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
           itemBuilder: (context, index) {
             final song = _songs[index];
             final bool isMarked = _manualMarkedIds.contains(song.id.toString());
-            
+
             return GestureDetector(
               onTap: () {
                 if (_isMarkMode) {
@@ -695,10 +704,14 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
               },
               child: Container(
                 decoration: BoxDecoration(
-                  color: isMarked ? Colors.lightGreen[100] : Theme.of(context).colorScheme.surface,
+                  color: isMarked
+                      ? Colors.lightGreen[100]
+                      : Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(_borderRadiusSmall),
                   border: Border.all(
-                    color: isMarked ? Colors.green : AppColors.greyHint(brightness),
+                    color: isMarked
+                        ? Colors.green
+                        : AppColors.greyHint(brightness),
                     width: 1,
                   ),
                 ),
@@ -776,7 +789,6 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
               ),
             ),
             SizedBox(height: _paddingXS),
-
             _buildTrackSection('Track 1', _track1Songs),
             SizedBox(height: _paddingS),
             _buildTrackSection('Track 2', _track2Songs),
@@ -802,10 +814,12 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
         Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
-            border: Border.all(color: AppColors.tableBorder(brightness), width: 1),
+            border:
+                Border.all(color: AppColors.tableBorder(brightness), width: 1),
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
           ),
-          padding: EdgeInsets.symmetric(horizontal: _paddingS, vertical: _paddingXS * 0.5),
+          padding: EdgeInsets.symmetric(
+              horizontal: _paddingS, vertical: _paddingXS * 0.5),
           child: Center(
             child: Text(
               '${title} | 总计 ${songs.length} 首歌曲',
@@ -915,43 +929,19 @@ class _KaleidXScopeInfoPageBLACKState extends State<KaleidXScopeInfoPageBLACK> {
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
     _initSizeParams(context);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          Column(
-            children: [
-              // 标题栏（统一走 PageTopBar，标题随之变成 20 / primary / 居中）
-              PageTopBar(
-                title: _getGateTitle(),
-                bottom: const KaleidXScopeSourceNotice(),
-              ),
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(_paddingS, 0, _paddingS, _paddingL),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(_borderRadiusSmall),
-                    boxShadow: [defaultShadow(brightness)],
-                  ),
-                  child: _isLoading
+    return BackgroundPageScaffold(
+      title: _getGateTitle(),
+      bottom: const KaleidXScopeSourceNotice(),
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: _isLoading
                       ? Center(child: CircularProgressIndicator())
                       : SingleChildScrollView(
                           padding: EdgeInsets.symmetric(
                               horizontal: _paddingL, vertical: _paddingS),
                           child: _buildSongList(),
                         ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

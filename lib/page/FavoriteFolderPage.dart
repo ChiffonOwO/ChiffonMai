@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
+import '../widgets/SmoothLinearProgressIndicator.dart';
 import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/entity/FavoriteFolder.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
 import 'package:my_first_flutter_app/service/FavoriteFolderService.dart';
 import 'package:my_first_flutter_app/service/FavoriteTransferService.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
-import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/FavoriteImportFlow.dart';
-import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/BackgroundPageScaffold.dart';
 import 'package:my_first_flutter_app/manager/MaiTagsManager.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/UserPlayDataManager.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/UserPlayDataEntity.dart';
@@ -144,33 +143,12 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
 
   @override
   Widget build(BuildContext context) {
-    final safeBottom = MediaQuery.of(context).padding.bottom; // 系统底部导航栏高度
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: '收藏夹',
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏统一走公共组件
-              const PageTopBar(title: '收藏夹'),
-
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [AppConstants.defaultShadow(Theme.of(context).brightness)],
-                  ),
-                  child: Column(
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: Column(children: [Expanded(child: Column(
                     children: [
                       // 新建 / 导入按钮
                       Padding(
@@ -219,13 +197,7 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
                                 : _buildFolderList(),
                       ),
                     ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+                  )),]),
     );
   }
 
@@ -275,8 +247,12 @@ class _FavoriteFolderPageState extends State<FavoriteFolderPage> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 0,
+      color: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => _viewFolder(folder),
@@ -477,35 +453,18 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final safeBottom = MediaQuery.of(context).padding.bottom;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏：批量模式是操作工具栏（也给它同样的底色），
-              // 普通模式统一走公共组件
-              if (_isBatchMode)
-                Container(
+    return BackgroundPageScaffold(
+      title: widget.folderName,
+      headerOverride: _isBatchMode ? Container(
                   padding: EdgeInsets.fromLTRB(16, 48, 16, 8),
                   decoration: BoxDecoration(
                     color: AppColors.cardBackground(
                         Theme.of(context).brightness),
                   ),
                   child: _buildBatchAppBar(),
-                )
-              else
-                PageTopBar(
-                  title: widget.folderName,
-                  actions: [
+                ) : null,
+      actions: [
                     // 排序按钮
                     PopupMenuButton<FavoriteSortOption>(
                       icon: const Icon(Icons.sort, size: 22),
@@ -543,18 +502,9 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
                       onPressed: _exportFolder,
                     ),
                   ],
-                ),
-
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [AppConstants.defaultShadow(Theme.of(context).brightness)],
-                  ),
-                  child: Column(
+      resizeToAvoidBottomInset: false,
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: Column(children: [Expanded(child: Column(
                     children: [
                       // 标签统计按钮（样式、宽度与新建收藏夹一致）
                       Padding(
@@ -585,13 +535,7 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
                                 : _buildChartList(),
                       ),
                     ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+                  )),]),
     );
   }
 
@@ -694,7 +638,7 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
                                     Expanded(
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(4),
-                                        child: LinearProgressIndicator(
+                                        child: SmoothLinearProgressIndicator(
                                           value: tagEntry.value / _charts.length,
                                           minHeight: 18,
                                           backgroundColor: Theme.of(context).colorScheme.surface,
@@ -983,12 +927,15 @@ class _FavoriteFolderDetailPageState extends State<_FavoriteFolderDetailPage> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      color: isSelected ? Colors.blue.shade50 : null,
+      elevation: 0,
+      color: isSelected
+          ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: .35)
+          : Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: isSelected
-            ? BorderSide(color: Colors.blue.shade300, width: 1.5)
-            : BorderSide.none,
+            ? BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5)
+            : BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),

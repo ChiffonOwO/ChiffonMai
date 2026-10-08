@@ -19,11 +19,9 @@ import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/page/GuessChartGame/GuessChartByChartPeekPage.dart';
 import 'package:my_first_flutter_app/service/GuessChartGame/GuessChartByInfoService.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
-import 'package:my_first_flutter_app/utils/AppConstants.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
-import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/widgets/BackgroundPageScaffold.dart';
 import 'package:my_first_flutter_app/utils/GameSeedUtil.dart';
 import 'package:my_first_flutter_app/utils/LuoXueSongUtil.dart';
 import 'package:my_first_flutter_app/widgets/TileRevealImage.dart';
@@ -3827,27 +3825,12 @@ class _GameRoomPageState extends State<GameRoomPage> {
     final paddingL = 10.0 * scaleFactor;
     final borderRadiusSmall = 8.0 * scaleFactor;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return BackgroundPageScaffold(
+      title: _currentRoom?.gameType.name ?? '多人猜歌',
+      onBack: _showLeaveRoomConfirmDialog,
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
-              // 与 Best50 页、其余 50 多个页面同款。
-              // 返回按钮走 onBack：离开房间前需要二次确认，不能直接 pop。
-              PageTopBar(
-                title: _currentRoom?.gameType.name ?? '多人猜歌',
-                onBack: _showLeaveRoomConfirmDialog,
-              ),
-
-              // 房主变更提示
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: Column(children: [// 房主变更提示
               if (_hostChangeMessage != null)
                 Container(
                   padding: EdgeInsets.symmetric(vertical: paddingS, horizontal: paddingM),
@@ -3867,17 +3850,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
                     ),
                   ),
                 ),
-
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(paddingS, 0, paddingS, paddingL),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [AppConstants.defaultShadow(brightness)],
-                  ),
-                  child: SingleChildScrollView(
+Expanded(child: SingleChildScrollView(
                     padding: EdgeInsets.all(paddingM),
                     child: Padding(
                       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + paddingL),
@@ -3971,13 +3944,7 @@ class _GameRoomPageState extends State<GameRoomPage> {
                         ],
                       ),
                     ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+                  )),]),
     );
   }
 }

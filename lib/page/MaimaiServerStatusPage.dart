@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:my_first_flutter_app/service/MaimaiServerStatusService.dart';
-import 'package:my_first_flutter_app/entity/AWMC/MaimaiServerStatusModel.dart';
+import 'package:my_first_flutter_app/entity/chongxi/MaimaiServerStatusModel.dart';
+import 'package:my_first_flutter_app/service/chongxi/MaimaiServerStatusService.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
-import 'package:my_first_flutter_app/utils/AppConstants.dart';
-import 'package:my_first_flutter_app/utils/CommonWidgetUtil.dart';
-import '../widgets/PageTopBar.dart';
+import 'package:my_first_flutter_app/utils/ExternalLaunchUtil.dart';
+import '../widgets/BackgroundPageScaffold.dart';
 
-// 服务器状态页面
+/// 舞萌服务器状态页面。
+///
+/// 数据来自 mai.chongxi.us 的机器人状态接口，页面直接展示接口提供的总览、
+/// 各服务状态、延迟和最近上报记录。
 class MaimaiServerStatusPage extends StatefulWidget {
   const MaimaiServerStatusPage({super.key});
 
@@ -16,7 +18,6 @@ class MaimaiServerStatusPage extends StatefulWidget {
 
 class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
   MaimaiServerStatusEntity? _serverStatus;
-  Map<String, String> _serverNameMap = {};
   bool _isLoading = true;
   String _errorMessage = '';
 
@@ -26,418 +27,334 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
     _loadServerStatus();
   }
 
-  // 加载服务器状态
   Future<void> _loadServerStatus() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = '';
+      });
+    }
 
     try {
-      // 并行加载服务器状态和服务器名称映射
-      final statusFuture = MaimaiServerStatusService.getServerStatus();
-      final nameMapFuture = MaimaiServerStatusService.getServerIdToNameMap();
-      
-      final status = await statusFuture;
-      final nameMap = await nameMapFuture;
-      
+      final status = await MaimaiServerStatusService.getServerStatus();
+      if (!mounted) return;
+      if (status == null) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = '暂时无法获取服务器状态';
+        });
+        return;
+      }
       setState(() {
         _serverStatus = status;
-        _serverNameMap = nameMap;
         _isLoading = false;
       });
-      
-      // 调试：打印服务器名称映射状态
-      debugPrint('[MaimaiServerStatusPage] nameMap: $nameMap');
-      if (status != null) {
-        final serverIds = status.heartbeatList.getServerIds();
-        debugPrint('[MaimaiServerStatusPage] serverIds: $serverIds');
-        for (final id in serverIds) {
-          debugPrint('[MaimaiServerStatusPage] 服务器 $id -> 名称: ${nameMap[id] ?? "未找到"}');
-        }
-      }
     } catch (e) {
+      debugPrint('[MaimaiServerStatusPage] 加载失败: $e');
+      if (!mounted) return;
       setState(() {
-        _errorMessage = '加载服务器状态失败: $e';
         _isLoading = false;
+        _errorMessage = '加载服务器状态失败';
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    // 获取屏幕尺寸
-    final safeBottom = MediaQuery.of(context).padding.bottom;
-    
-    // 字体大小
-    
-    // 自定义常量
-    final double borderRadiusSmall = 8.0;
-    final BoxShadow defaultShadow = AppConstants.defaultShadow(brightness);
+    return BackgroundPageScaffold(
+      title: '服务器状态',
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
+      ),
+      child: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage.isNotEmpty
+              ? _buildErrorState()
+              : _buildServerStatusContent(),
+    );
+  }
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 背景
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-
-          // 页面内容
-          Column(
-            children: [
-              // 标题栏
-              PageTopBar(
-                title: '服务器状态',
-              ),
-
-              // 主内容区域
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(borderRadiusSmall),
-                    boxShadow: [defaultShadow],
-                  ),
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _errorMessage.isNotEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    _errorMessage,
-                                    style: TextStyle(color: AppColors.errorRed(brightness)),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  ElevatedButton(
-                                    onPressed: _loadServerStatus,
-                                    child: const Text('重试'),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : _buildServerStatusContent(),
-                ),
-              ),
-            ],
+          Icon(
+            Icons.cloud_off_outlined,
+            size: 48,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: 12),
+          Text(_errorMessage),
+          const SizedBox(height: 12),
+          FilledButton.tonal(
+            onPressed: _loadServerStatus,
+            child: const Text('重试'),
           ),
         ],
       ),
     );
   }
 
-  // 构建图例卡片
-  Widget _buildLegendCard() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final smallFontSize = screenWidth * 0.03;
-    
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 3,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
+  Widget _buildServerStatusContent() {
+    final status = _serverStatus;
+    if (status == null) return const SizedBox.shrink();
+
+    return RefreshIndicator(
+      onRefresh: _loadServerStatus,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        children: [
+          TextButton.icon(
+            onPressed: () => ExternalLaunchUtil.open(
+              Uri.parse('https://mai.chongxi.us/'),
+            ),
+            icon: const Icon(Icons.open_in_new_rounded, size: 17),
+            label: const Text('数据来源于 isMaiDown by Chongxi'),
+            style: TextButton.styleFrom(
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            ),
+          ),
+          _buildOverviewCard(status),
+          const SizedBox(height: 16),
+          Text(
+            '服务状态',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 8),
+          ...status.services.map(_buildServiceCard),
+          if (status.recentLogs.isNotEmpty) ...[
+            const SizedBox(height: 16),
             Text(
-              '状态图例',
-              style: TextStyle(
-                fontSize: screenWidth * 0.04,
-                fontWeight: FontWeight.bold,
-              ),
+              '最近上报',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
             ),
             const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // 故障（红色）
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: Color(int.parse('#ff0000'.substring(1), radix: 16) + 0xFF000000),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text('故障', style: TextStyle(fontSize: smallFontSize)),
-                    ],
-                  ),
-                ),
-                // 正常（绿色）
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: Color(int.parse('#00ff00'.substring(1), radix: 16) + 0xFF000000),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text('正常', style: TextStyle(fontSize: smallFontSize)),
-                    ],
-                  ),
-                ),
-                // 重试中（橙色）
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: Color(int.parse('#ffaa00'.substring(1), radix: 16) + 0xFF000000),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text('重试中', style: TextStyle(fontSize: smallFontSize)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            _buildRecentLogs(status.recentLogs),
           ],
-        ),
-      ),
-    );
-  }
-
-  // 构建服务器状态内容
-  Widget _buildServerStatusContent() {
-    if (_serverStatus == null) {
-      return const Center(child: Text('服务器状态数据为空'));
-    }
-
-    final serverIds = _serverStatus!.heartbeatList.getServerIds();
-    if (serverIds.isEmpty) {
-      return const Center(child: Text('没有服务器数据'));
-    }
-
-    // 构建服务器卡片列表
-    final serverCards = serverIds.map((serverId) {
-      final latestHeartbeat = _serverStatus!.heartbeatList.getLatestHeartbeat(serverId);
-      return _buildServerCard(serverId, latestHeartbeat);
-    }).toList();
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          // 图例卡片
-          _buildLegendCard(),
-          // 服务器卡片列表
-          ...serverCards,
         ],
       ),
     );
   }
 
-  // 根据在线率获取颜色
-  Color _getUptimeColor(double uptime) {
-    if (uptime >= 90) {
-      return Colors.green; // 90-100% 为绿色
-    } else if (uptime >= 70) {
-      return Colors.orange; // 70-90% 为橙色
-    } else {
-      return Colors.red; // 其余为红色
-    }
-  }
-
-  // 根据延迟获取颜色
-  Color _getLatencyColor(int ping) {
-    if (ping < 50) {
-      return Colors.green; // <50ms 为绿色
-    } else if (ping < 100) {
-      return Colors.orange; // 50-100ms 为橙色
-    } else {
-      return Colors.red; // >100ms 为红色
-    }
-  }
-
-  // 构建服务器卡片
-  Widget _buildServerCard(String serverId, HeartbeatItem? heartbeat) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final contentFontSize = screenWidth * 0.04;
-    final smallFontSize = screenWidth * 0.03;
-
-    // 获取服务器名称
-    final serverName = _serverNameMap[serverId] ?? '服务器 $serverId';
-
-    // 获取最近50条心跳记录
-    List<HeartbeatItem> recentHeartbeats = [];
-    if (_serverStatus != null) {
-      final serverHeartbeats = _serverStatus!.heartbeatList.items[serverId];
-      if (serverHeartbeats != null) {
-        // 取最近的50条记录
-        recentHeartbeats = serverHeartbeats.reversed.take(50).toList().reversed.toList();
-      }
-    }
-
-    // 获取对应服务器的uptime数据
-    double uptimePercentage = 0.0;
-    if (_serverStatus != null) {
-      final uptimeList = _serverStatus!.uptimeList;
-      // 根据serverId获取对应的uptime数据
-      switch (serverId) {
-        case '1':
-          uptimePercentage = uptimeList.uptime1_24.toDouble();
-          break;
-        case '4':
-          uptimePercentage = uptimeList.uptime4_24.toDouble();
-          break;
-        case '5':
-          uptimePercentage = uptimeList.uptime5_24.toDouble();
-          break;
-        case '6':
-          uptimePercentage = uptimeList.uptime6_24.toDouble();
-          break;
-        case '7':
-          uptimePercentage = uptimeList.uptime7_24.toDouble();
-          break;
-        case '8':
-          uptimePercentage = uptimeList.uptime8_24.toDouble();
-          break;
-        case '9':
-          uptimePercentage = uptimeList.uptime9_24.toDouble();
-          break;
-        case '10':
-          uptimePercentage = uptimeList.uptime10_24.toDouble();
-          break;
-        case '11':
-          uptimePercentage = uptimeList.uptime11_24.toDouble();
-          break;
-        case '12':
-          uptimePercentage = uptimeList.uptime12_24.toDouble();
-          break;
-        case '13':
-          uptimePercentage = uptimeList.uptime13_24.toDouble();
-          break;
-        case '14':
-          uptimePercentage = uptimeList.uptime14_24.toDouble();
-          break;
-        case '15':
-          uptimePercentage = uptimeList.uptime15_24.toDouble();
-          break;
-        case '16':
-          uptimePercentage = uptimeList.uptime16_24.toDouble();
-          break;
-        case '17':
-          uptimePercentage = uptimeList.uptime17_24.toDouble();
-          break;
-        case '18':
-          uptimePercentage = uptimeList.uptime18_24.toDouble();
-          break;
-      }
-    }
-
-
+  Widget _buildOverviewCard(MaimaiServerStatusEntity status) {
+    final color = _statusColor(status.status);
+    final latency = status.latency.currentMs;
+    final reports = status.reports;
+    final statusLabel = status.statusText.isEmpty
+        ? (status.isHealthy ? '好' : '坏')
+        : status.statusText;
 
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 3,
+      elevation: 0,
+      color: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 第一行：服务器名称
-            Text(
-              serverName,
-              style: TextStyle(
-                fontSize: contentFontSize,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            
-            // 第二行：20个带颜色的小格子
             Row(
-              children: recentHeartbeats.map((item) {
-                return Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 1),
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: Color(int.parse(item.getStatusColor().substring(1), radix: 16) + 0xFF000000),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 8),
-            
-
-            
-            // 第三行：最后更新时间
-            if (heartbeat != null)
-              Text(
-                '最后更新: ${heartbeat.time}',
-                style: TextStyle(fontSize: smallFontSize, color: Theme.of(context).colorScheme.onSurfaceVariant),
-              ),
-            
-            // 第四行：延迟和在线率（左对齐）
-            Row(
-              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: heartbeat != null && heartbeat.ping != null ? _getLatencyColor(heartbeat.ping!) : Colors.grey,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      '延迟: ${heartbeat != null && heartbeat.ping != null ? '${heartbeat.ping} ms' : '-- ms'}',
-                      style: TextStyle(
-                        fontSize: smallFontSize,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                Icon(Icons.dns_outlined, color: color, size: 30),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        status.verdictText,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _getUptimeColor(uptimePercentage * 100),
-                    borderRadius: BorderRadius.circular(4),
+                _buildStatusChip(statusLabel, color),
+              ],
+            ),
+            if (status.summary.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Text(
+                status.summary,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildMetricChip(
+                  Icons.speed_outlined,
+                  latency == null ? '延迟 --' : '延迟 $latency ms',
+                  _latencyColor(latency),
+                ),
+                if (status.latency.loadText.isNotEmpty)
+                  _buildMetricChip(
+                    Icons.swap_vert_rounded,
+                    status.latency.loadText,
+                    Theme.of(context).colorScheme.primary,
                   ),
-                  child: Text(
-                    '在线率: ${(uptimePercentage * 100).toStringAsFixed(2)}%',
-                    style: TextStyle(
-                      fontSize: smallFontSize,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                _buildMetricChip(
+                  Icons.check_circle_outline,
+                  '正常 ${reports.normalCount}',
+                  AppColors.successGreen(Theme.of(context).brightness),
+                ),
+                _buildMetricChip(
+                  Icons.warning_amber_rounded,
+                  '异常 ${reports.anomalyCount}',
+                  AppColors.warningOrange(Theme.of(context).brightness),
                 ),
               ],
             ),
-            
-            // 消息（如果有）
-            if (heartbeat != null && heartbeat.msg.isNotEmpty)
+            if (status.timestamp.isNotEmpty) ...[
+              const SizedBox(height: 12),
               Text(
-                '消息: ${heartbeat.msg}',
-                style: TextStyle(fontSize: smallFontSize, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                '更新时间：${status.timestamp}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildServiceCard(MaimaiServiceStatus service) {
+    final color = _statusColor(service.state);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      color: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: ListTile(
+        leading: CircleAvatar(
+          radius: 18,
+          backgroundColor: color.withValues(alpha: 0.14),
+          child: Icon(Icons.circle, color: color, size: 13),
+        ),
+        title: Text(service.name.isEmpty ? service.key : service.name),
+        subtitle:
+            service.durationText.isEmpty ? null : Text(service.durationText),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              service.stateText,
+              style: TextStyle(color: color, fontWeight: FontWeight.w600),
+            ),
+            if (service.latency != null)
+              Text(
+                '${service.latency} ms',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildRecentLogs(List<MaimaiRecentLog> logs) {
+    return Card(
+      elevation: 0,
+      color: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < logs.length; i++) ...[
+            ListTile(
+              dense: true,
+              leading: const Icon(Icons.history_rounded, size: 20),
+              title: Text(logs[i].type),
+              subtitle: Text(logs[i].region),
+              trailing: Text(logs[i].timeAgo),
+            ),
+            if (i != logs.length - 1) const Divider(height: 1),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusChip(String text, Color color) {
+    return CircleAvatar(
+      radius: 16,
+      backgroundColor: color.withValues(alpha: 0.16),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetricChip(IconData icon, String text, Color color) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 5),
+            Text(text, style: TextStyle(color: color)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _statusColor(String state) {
+    switch (state) {
+      case 'ok':
+      case 'normal':
+      case 'up':
+        return AppColors.successGreen(Theme.of(context).brightness);
+      case 'warning':
+      case 'degraded':
+        return AppColors.warningOrange(Theme.of(context).brightness);
+      default:
+        return AppColors.errorRed(Theme.of(context).brightness);
+    }
+  }
+
+  Color _latencyColor(int? latency) {
+    if (latency == null) return Theme.of(context).colorScheme.onSurfaceVariant;
+    if (latency < 50) {
+      return AppColors.successGreen(Theme.of(context).brightness);
+    }
+    if (latency < 100) {
+      return AppColors.warningOrange(Theme.of(context).brightness);
+    }
+    return AppColors.errorRed(Theme.of(context).brightness);
   }
 }

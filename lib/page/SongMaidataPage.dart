@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:my_first_flutter_app/widgets/ExportSuccessDialog.dart';
 import 'package:flutter/services.dart';
 import 'package:archive/archive.dart';
 import 'package:path_provider/path_provider.dart';
-import '../utils/CommonWidgetUtil.dart';
 import '../utils/CoverUtil.dart';
 import '../utils/AppTheme.dart';
 import '../utils/ExportPathUtil.dart';
@@ -12,7 +12,7 @@ import '../service/SongMaidataPageService.dart';
 import '../service/DxRatingCoverService.dart';
 import '../service/SongPlayService.dart';
 import '../manager/MaidataManager.dart';
-import '../widgets/PageTopBar.dart';
+import '../widgets/BackgroundPageScaffold.dart';
 import 'ChartPlayPage.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
 
@@ -324,123 +324,13 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
     String filePath,
     String fileName, {
     String? warning,
-  }) async {
-    await showDialog(
-      context: context,
-      builder: (ctx) {
-        bool copied = false;
-        return StatefulBuilder(
-          builder: (ctx, setLocalState) => AlertDialog(
-            title: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.green.shade600, size: 22),
-                const SizedBox(width: 8),
-                const Text('导出成功'),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '已导出 $fileName',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '文件已保存到：',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  width: double.maxFinite,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: Theme.of(ctx).dividerColor,
-                      width: 1,
-                    ),
-                  ),
-                  child: SelectableText(
-                    filePath,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontFamily: 'monospace',
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-                if (_fallbackPath != null || warning != null) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    width: double.maxFinite,
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                      border:
-                          Border.all(color: Colors.orange.withValues(alpha: 0.4)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_fallbackPath != null)
-                          const Text(
-                            '公开目录不可写，文件已保存到应用私有目录，'
-                            '可能无法在系统文件管理器中直接找到。',
-                            style: TextStyle(fontSize: 12, height: 1.4),
-                          ),
-                        if (_fallbackPath != null && warning != null)
-                          const SizedBox(height: 4),
-                        if (warning != null)
-                          Text(
-                            warning,
-                            style: const TextStyle(fontSize: 12, height: 1.4),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            actions: [
-              TextButton.icon(
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: filePath));
-                  if (!ctx.mounted) return;
-                  setLocalState(() => copied = true);
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('路径已复制到剪贴板')),
-                  );
-                },
-                icon: Icon(
-                  copied ? Icons.check : Icons.copy,
-                  size: 16,
-                  color: copied ? Colors.green.shade600 : null,
-                ),
-                label: Text(
-                  copied ? '已复制' : '复制路径',
-                  style: copied
-                      ? TextStyle(color: Colors.green.shade600)
-                      : null,
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('关闭'),
-              ),
-            ],
-          ),
-        );
-      },
+  }) {
+    return showExportSuccessDialog(
+      context,
+      filePath: filePath,
+      fileName: fileName,
+      fallbackPath: _fallbackPath,
+      warning: warning,
     );
   }
 
@@ -819,21 +709,10 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
   Widget build(BuildContext context) {
     final themeColor = Theme.of(context).colorScheme.primary;
     final brightness = Theme.of(context).brightness;
-    final safeBottom = MediaQuery.of(context).padding.bottom;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          CommonWidgetUtil.buildCommonBgWidget(),
-          CommonWidgetUtil.buildCommonChiffonBgWidget(context),
-          Column(
-            children: [
-              // 顶部栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
-              // 与 Best50 页、其余 50 多个页面同款。
-              PageTopBar(
-                title: '谱面代码',
-                actions: (_isLoading || _maidataContent.isEmpty)
+    return BackgroundPageScaffold(
+      title: '谱面代码',
+      actions: (_isLoading || _maidataContent.isEmpty)
                     ? const <Widget>[]
                     : [
                         IconButton(
@@ -867,16 +746,16 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                           constraints: const BoxConstraints(),
                         ),
                       ],
-              ),
-              Container(
+      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: Column(children: [Container(
                 margin: const EdgeInsets.fromLTRB(4, 0, 4, 8),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    AppColors.defaultShadow(brightness),
-                  ],
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -998,17 +877,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                   ],
                 ),
               ),
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(4, 0, 4, 10 + safeBottom),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      AppColors.defaultShadow(brightness),
-                    ],
-                  ),
-                  child: _isFetchingFullCache
+Expanded(child: _isFetchingFullCache
                       ? Center(
                           child: Padding(
                             padding: const EdgeInsets.all(16),
@@ -1087,13 +956,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                                       textAlign: TextAlign.left,
                                     ),
                                   ),
-                                ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+                                )),]),
     );
   }
 }

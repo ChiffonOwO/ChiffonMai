@@ -50,9 +50,12 @@ class SyncRouteFooter extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             // 统计跟着**当前线路**走，所以 slot 在这里现算（不能提到 build 外面）
-            SyncStatsFooter.line(
-              context,
-              slot: (notifier.lineOf(platform), platform),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SyncStatsFooter.line(
+                context,
+                slot: (notifier.lineOf(platform), platform),
+              ),
             ),
           ],
         );

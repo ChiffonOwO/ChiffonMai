@@ -8,6 +8,7 @@ import '../constant/CacheKeyConstant.dart';
 import '../manager/LuoXue/LuoXueOAuthManager.dart';
 import '../utils/ApiClient.dart';
 import '../utils/CurrentDataSourceNotifier.dart';
+import '../utils/SecureCredentialStore.dart';
 
 /// 头像同步的语义级别：UI 按它给状态文案着色，不要靠文案字符串反推。
 enum AvatarSyncLevel {
@@ -53,6 +54,8 @@ class CommunityAvatarStore extends ValueNotifier<AvatarSyncState> {
   final Set<String> _syncing = {};
   final Set<String> _resync = {};
   int _activation = 0;
+  Future<void>? _activationFuture;
+  String? _lastActivatedPlayer;
 
   Future<T> _queue<T>(Future<T> Function() action) {
     final operation = _writes.then((_) => action());
@@ -88,9 +91,12 @@ class CommunityAvatarStore extends ValueNotifier<AvatarSyncState> {
     }
     // 登录已确认的绑定 QQ 不依赖成绩刷新生成的排行榜身份标记。
     // 不用共享 cachedQQ，避免把其它来源或查询对象当作当前水鱼账号。
-    if (source == RefreshDataSource.shuiyu &&
-        (prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '')
-            .isNotEmpty) {
+    final hasDivingFishToken = source == RefreshDataSource.shuiyu &&
+        ((await SecureCredentialStore.read(
+                    CacheKeyConstant.probeDivingFishToken)) ??
+                '')
+            .isNotEmpty;
+    if (hasDivingFishToken) {
       final qq =
           prefs.getString(CacheKeyConstant.probeDivingFishBindQQ)?.trim();
       if (qq != null && RegExp(r'^[1-9]\d{4,11}$').hasMatch(qq)) {
@@ -100,14 +106,11 @@ class CommunityAvatarStore extends ValueNotifier<AvatarSyncState> {
     return null;
   }
 
-  String _localOnlyMessage(SharedPreferences prefs) {
+  String _localOnlyMessage(SharedPreferences prefs, bool hasDivingFishToken) {
     final source = RefreshDataSource.fromKey(
         prefs.getString(CacheKeyConstant.lastDataSource));
     if (source == RefreshDataSource.shuiyu) {
-      return (prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '')
-              .isEmpty
-          ? '仅本机保存 · 登录水鱼后自动同步'
-          : '仅本机保存 · 请先绑定水鱼 QQ';
+      return !hasDivingFishToken ? '仅本机保存 · 登录水鱼后自动同步' : '仅本机保存 · 请先绑定水鱼 QQ';
     }
     return source == RefreshDataSource.awmc
         ? '仅本机保存 · 请先设置 AWMC QQ'
@@ -126,13 +129,24 @@ class CommunityAvatarStore extends ValueNotifier<AvatarSyncState> {
         level: level);
   }
 
-  Future<void> activate() async {
+  Future<void> activate() {
+    final current = _activationFuture;
+    if (current != null) return current;
+
+    final future = _runActivation();
+    _activationFuture = future;
+    future.whenComplete(() {
+      if (identical(_activationFuture, future)) _activationFuture = null;
+    });
+    return future;
+  }
+
+  Future<void> _runActivation() async {
     try {
       await _queue(_activate);
     } catch (_) {
       value = const AvatarSyncState(
-          message: '头像未能读取，请重新打开此页',
-          level: AvatarSyncLevel.error);
+          message: '头像未能读取，请重新打开此页', level: AvatarSyncLevel.error);
     }
   }
 
@@ -140,11 +154,16 @@ class CommunityAvatarStore extends ValueNotifier<AvatarSyncState> {
     final activation = ++_activation;
     final prefs = await SharedPreferences.getInstance();
     final player = await _activePlayer(prefs);
+    final hasDivingFishToken = (await SecureCredentialStore.read(
+                CacheKeyConstant.probeDivingFishToken))
+            ?.isNotEmpty ==
+        true;
     if (activation != _activation) return;
     if (player == null) {
+      _lastActivatedPlayer = null;
       value = AvatarSyncState(
           avatarId: prefs.getInt('selectedAvatarId') ?? 1,
-          message: _localOnlyMessage(prefs),
+          message: _localOnlyMessage(prefs, hasDivingFishToken),
           level: AvatarSyncLevel.localOnly);
       return;
     }
@@ -166,6 +185,8 @@ class CommunityAvatarStore extends ValueNotifier<AvatarSyncState> {
       await prefs.setString(_legacyOwner, player);
     }
     if (activation != _activation) return;
+    if (_lastActivatedPlayer == player && value.playerId == player) return;
+    _lastActivatedPlayer = player;
     final waitSync = entry['pending'] == true;
     value = AvatarSyncState(
         playerId: player,
@@ -224,7 +245,8 @@ class CommunityAvatarStore extends ValueNotifier<AvatarSyncState> {
     }
     final String? token;
     if (source == 'shuiyu') {
-      token = prefs.getString(CacheKeyConstant.probeDivingFishToken);
+      token = await SecureCredentialStore.read(
+          CacheKeyConstant.probeDivingFishToken);
     } else if (source == 'luoxue') {
       token = await LuoXueOAuthManager().getAccessToken();
     } else {
@@ -374,8 +396,8 @@ class CommunityAvatarStore extends ValueNotifier<AvatarSyncState> {
       }
     } catch (_) {
       final prefs = await SharedPreferences.getInstance();
-      _publish(player, _entry(prefs, player), '头像待同步 · 点击重试',
-          AvatarSyncLevel.error);
+      _publish(
+          player, _entry(prefs, player), '头像待同步 · 点击重试', AvatarSyncLevel.error);
     } finally {
       await _writes;
       final prefs = await SharedPreferences.getInstance();

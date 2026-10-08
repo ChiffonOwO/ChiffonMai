@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../api/ApiUrls.dart';
 import '../utils/AppTheme.dart';
+import '../utils/ExternalLaunchUtil.dart';
 
 /// 水鱼账号在 App 里的「身份标识」状态。
 ///
@@ -192,8 +192,8 @@ class DivingFishAccountSection extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             // 描边统一走主题的 outlineVariant（见 AGENTS.md §7），
             // 不要用写死的中性灰
-            border: Border.all(
-                color: Theme.of(context).colorScheme.outlineVariant),
+            border:
+                Border.all(color: Theme.of(context).colorScheme.outlineVariant),
           ),
           child: Row(
             children: [
@@ -315,8 +315,7 @@ class DivingFishAccountSection extends StatelessWidget {
 
   Widget _body(String text, Brightness brightness) => Text(
         text,
-        style:
-            TextStyle(fontSize: 12, color: AppColors.greyHint(brightness)),
+        style: TextStyle(fontSize: 12, color: AppColors.greyHint(brightness)),
       );
 
   Widget _step(String text, Brightness brightness) => Padding(
@@ -330,8 +329,7 @@ class DivingFishAccountSection extends StatelessWidget {
   Future<void> _openProberHome(BuildContext context) async {
     const url = ApiUrls.DivingFishProberHomeUrl;
     try {
-      if (await canLaunchUrl(Uri.parse(url))) {
-        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      if (await ExternalLaunchUtil.openString(url)) {
         return;
       }
     } catch (e) {

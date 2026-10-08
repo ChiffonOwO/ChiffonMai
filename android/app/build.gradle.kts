@@ -74,9 +74,9 @@ android {
                 // `flutter run`（debug）一起搞挂。
                 signingConfigs.getByName("debug")
             }
-            // 禁用混淆，避免网络请求代码被破坏
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // release 使用 R8，避免把编译期配置和实现细节原样暴露在 APK 中。
+            isMinifyEnabled = true
+            isShrinkResources = true
         }
     }
 }

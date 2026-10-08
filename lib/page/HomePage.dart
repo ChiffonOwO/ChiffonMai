@@ -8,7 +8,6 @@ import 'package:my_first_flutter_app/page/RankingList/RatingRankListPage.dart';
 import 'package:my_first_flutter_app/page/RankingList/SpecialRankingListPage.dart';
 import 'package:my_first_flutter_app/service/RankingList/AvgRankingListService.dart';
 import 'dart:convert';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api/ApiUrls.dart';
 import '../constant/CacheKeyConstant.dart';
@@ -16,9 +15,12 @@ import '../constant/AppLinks.dart';
 import '../constant/LoadingTipsConstant.dart';
 import '../service/HomeService.dart';
 import '../manager/LZYCheckUpdateManager.dart';
-import '../utils/ThemeManager.dart';
+import '../widgets/ThemePreferenceControls.dart';
+import '../widgets/SmoothLinearProgressIndicator.dart';
 import '../utils/AppTheme.dart';
 import '../utils/AppConstants.dart';
+import '../utils/SecureCredentialStore.dart';
+import '../utils/ExternalLaunchUtil.dart';
 import 'DifficultyDistributionPage.dart';
 import 'SettingsPage.dart';
 import '../manager/DivingFish/MaimaiMusicDataManager.dart';
@@ -52,9 +54,12 @@ import 'Multiplayer/MultiplayerLobbyPage.dart';
 import 'PaiziProgressPage.dart';
 import 'PersonalizedChartPlayConfigure.dart';
 import 'Portable/PortablePlayerPage.dart';
+import 'NextPlayQueuePage.dart';
+import 'LoadingTipsPage.dart';
 import 'PersonalizedScorePage.dart';
 import 'RankTable/RankTablePage.dart';
 import 'RandomChartPage.dart';
+import 'AttendanceWheelPage.dart';
 import 'RatingRecommendPage.dart';
 import 'DsRangeRecommendPage.dart';
 import 'RecommendByTagsPage.dart';
@@ -97,6 +102,7 @@ import '../widgets/QrQuickFillButtons.dart';
 import '../service/SyncStatsService.dart';
 import '../utils/SyncRouteNotifier.dart';
 import '../utils/RefreshErrorPresenter.dart';
+import '../widgets/ErrorMessageDialog.dart';
 import '../utils/UpdateNotifier.dart';
 import '../widgets/SyncRouteFooter.dart';
 import '../widgets/SyncStatsFooter.dart';
@@ -143,11 +149,10 @@ class HomeGreetingText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final base = theme.textTheme.headlineSmall
-        ?.copyWith(fontWeight: FontWeight.w800);
+    final base =
+        theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800);
     final baseSize = base?.fontSize ?? 24;
-    final text =
-        nickname.trim().isEmpty ? '请前往系统页获取账号数据' : '欢迎回来，$nickname';
+    final text = nickname.trim().isEmpty ? '请前往系统页获取账号数据' : '欢迎回来，$nickname';
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -427,8 +432,9 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
   }
 
   Future<void> _checkDivingFishLoginStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jwt = prefs.getString(CacheKeyConstant.probeDivingFishToken) ?? '';
+    final jwt = await SecureCredentialStore.read(
+            CacheKeyConstant.probeDivingFishToken) ??
+        '';
     // 只更新 ValueNotifier；登录态变化本身就是触发重建的信号，不需要再 setState
     final loggedIn = jwt.isNotEmpty;
     _loginStateNotifier.value = loggedIn;
@@ -466,7 +472,7 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
       debugPrint('登出水鱼账号失败：$e');
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
-        Fluttertoast.showToast(msg: '登出失败：$e');
+        await showErrorMessageDialog(context, message: '登出失败：$e');
       }
       return;
     }
@@ -534,7 +540,7 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
                   ),
                 ),
                 IconButton(
-                  tooltip: '切换主题',
+                  tooltip: '主题与导航设置',
                   onPressed: _showThemeDialog,
                   icon: const Icon(Icons.brightness_6_outlined),
                 ),
@@ -580,7 +586,10 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
         Material(
           type: MaterialType.transparency,
           child: InkWell(
-            onTap: _openAdvancedRefreshData,
+            onTap: anySyncBusy ? null : _openAdvancedRefreshData,
+            splashFactory: NoSplash.splashFactory,
+            highlightColor: Colors.transparent,
+            hoverColor: Colors.transparent,
             borderRadius: BorderRadius.circular(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -648,29 +657,25 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
   Widget _summaryMetric(BuildContext context, String label, String value,
       {VoidCallback? onTap, IconData? trailingIcon}) {
     final onPrimary = Theme.of(context).colorScheme.onPrimary;
-    final content = Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label,
+    final content =
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label,
+          style:
+              TextStyle(color: onPrimary.withValues(alpha: .68), fontSize: 12)),
+      const SizedBox(height: 3),
+      Row(children: [
+        Flexible(
+          child: Text(value,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                  color: onPrimary.withValues(alpha: .68), fontSize: 12)),
-          const SizedBox(height: 3),
-          Row(children: [
-            Flexible(
-              child: Text(value,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      color: onPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15)),
-            ),
-            if (trailingIcon != null) ...[
-              const SizedBox(width: 2),
-              Icon(trailingIcon,
-                  size: 14, color: onPrimary.withValues(alpha: .8)),
-            ],
-          ]),
-        ]);
+                  color: onPrimary, fontWeight: FontWeight.w700, fontSize: 15)),
+        ),
+        if (trailingIcon != null) ...[
+          const SizedBox(width: 2),
+          Icon(trailingIcon, size: 14, color: onPrimary.withValues(alpha: .8)),
+        ],
+      ]),
+    ]);
     return Expanded(
       child: onTap == null
           ? content
@@ -711,8 +716,8 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
               _homeAction(context, Icons.score_outlined, '查成绩', '游玩记录', '查成绩')),
       const SizedBox(width: 12),
       Expanded(
-          child: _homeAction(context, Icons.leaderboard_outlined, 'Best50',
-              '评分构成', 'Best50')),
+          child: _homeAction(
+              context, Icons.leaderboard_outlined, 'Best50', '评分构成', 'Best50')),
       const SizedBox(width: 12),
       Expanded(child: _homeAction(context, Icons.search, '查歌曲', '曲库搜索', '查歌曲')),
       const SizedBox(width: 12),
@@ -1147,11 +1152,11 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
                             currentStage != SyncStage.cancelled) ...[
                           const SizedBox(height: 10),
                           if (progress != null)
-                            LinearProgressIndicator(
+                            SmoothLinearProgressIndicator(
                                 value: progress,
                                 color: AppColors.linkBlue(brightness))
                           else
-                            LinearProgressIndicator(
+                            SmoothLinearProgressIndicator(
                                 color: AppColors.linkBlue(brightness)),
                           const SizedBox(height: 12),
                           Center(
@@ -1255,7 +1260,7 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
                               }
 
                               // 绑定成功 → 同步缓存水鱼 JWT（用于后续 fetchBindQQ）
-                              _log('Hub 绑定成功，同步直登水鱼以缓存 JWT...');
+                              _log('maimai Score Hub 绑定成功，同步直登水鱼以缓存 JWT...');
                               await DivingFishProbeManager()
                                   .loginDivingFishDirect(username, password);
 
@@ -1274,7 +1279,8 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
                                 setState(() {
                                   statusText = '同步成功！正在刷新本地数据...';
                                 });
-                                String? qq = await DivingFishProbeManager().fetchBindQQ();
+                                String? qq = await DivingFishProbeManager()
+                                    .fetchBindQQ();
                                 if (qq == null) {
                                   qq = await DivingFishProbeManager()
                                       .fetchBindQQ();
@@ -1375,7 +1381,8 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
                               const Duration(milliseconds: 300));
 
                           // 确保 QQ 已保存
-                          String? qq = await DivingFishProbeManager().fetchBindQQ();
+                          String? qq =
+                              await DivingFishProbeManager().fetchBindQQ();
                           if (qq == null) {
                             qq = await DivingFishProbeManager().fetchBindQQ();
                           }
@@ -1667,153 +1674,28 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
     );
   }
 
-  // 显示主题切换对话框
+  // 与「主题与交互偏好」页面使用同一组控件和缓存。
   void _showThemeDialog() {
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final currentMode = ThemeManager().themeMode;
-          final isDarkSelected = currentMode == ThemeMode.dark;
-          final pureBlackEnabled = ThemeManager().pureBlackEnabled;
-          final overlayOpacity = ThemeManager().lightOverlayOpacity;
-          final brightness = Theme.of(context).brightness;
-          return AlertDialog(
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            title: Text('主题设置',
-                style:
-                    TextStyle(color: Theme.of(context).colorScheme.onSurface)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 背景透明度（浅色/深色模式共用）
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('背景透明度',
-                              style: TextStyle(
-                                  color:
-                                      Theme.of(context).colorScheme.onSurface,
-                                  fontSize: 14)),
-                          Text('${(overlayOpacity * 100).round()}%',
-                              style: TextStyle(
-                                  color: AppColors.linkBlue(brightness),
-                                  fontSize: 13)),
-                        ],
-                      ),
-                      Slider(
-                        value: overlayOpacity,
-                        min: 0.0,
-                        max: 1.0,
-                        divisions: 20,
-                        label: '${(overlayOpacity * 100).round()}%',
-                        onChanged: (value) {
-                          ThemeManager().setLightOverlayOpacity(value);
-                          setDialogState(() {});
-                        },
-                      ),
-                      Text(
-                        isDarkSelected
-                            ? '数值越高背景越暗，0% 为原始背景图'
-                            : '数值越高背景越淡，0% 为原始背景图',
-                        style: TextStyle(
-                            fontSize: 11,
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(),
-                // 浅色模式
-                _buildThemeOption(Icons.light_mode, '浅色模式', '始终使用浅色主题',
-                    ThemeMode.light, currentMode, setDialogState),
-                const Divider(),
-                // 深色模式
-                _buildThemeOption(Icons.dark_mode, '深色模式', '始终使用深色主题',
-                    ThemeMode.dark, currentMode, setDialogState),
-                // 纯黑模式开关 — 仅深色模式可用
-                if (isDarkSelected) ...[
-                  const Divider(),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('纯黑背景',
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontSize: 14)),
-                    subtitle: Text('使用真正的纯黑背景（#000000），隐藏背景图',
-                        style: TextStyle(
-                            fontSize: 11,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant)),
-                    value: pureBlackEnabled,
-                    onChanged: (value) {
-                      ThemeManager().setPureBlackEnabled(value);
-                      setDialogState(() {});
-                    },
-                  ),
-                ],
-                const Divider(),
-                // 跟随系统
-                _buildThemeOption(Icons.settings_suggest, '跟随系统', '根据系统设置自动切换',
-                    ThemeMode.system, currentMode, setDialogState),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SettingsPage()),
-                  );
-                },
-                child: Text('更多设置',
-                    style: TextStyle(color: AppColors.linkBlue(brightness))),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text('完成',
-                    style: TextStyle(color: AppColors.linkBlue(brightness))),
-              ),
-            ],
-          );
-        },
+      builder: (ctx) => AlertDialog(
+        title: const Text('主题设置'),
+        content: const SingleChildScrollView(child: ThemePreferenceControls()),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const SettingsPage()));
+            },
+            child: const Text('更多设置'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('完成'),
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildThemeOption(IconData icon, String title, String subtitle,
-      ThemeMode mode, ThemeMode currentMode, StateSetter setDialogState) {
-    final brightness = Theme.of(context).brightness;
-    final isSelected = currentMode == mode;
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon,
-          color: isSelected
-              ? AppColors.linkBlue(brightness)
-              : Theme.of(context).colorScheme.onSurface),
-      title: Text(title,
-          style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface, fontSize: 14)),
-      subtitle: Text(subtitle,
-          style: TextStyle(
-              fontSize: 11,
-              color: Theme.of(context).colorScheme.onSurfaceVariant)),
-      trailing: isSelected
-          ? Icon(Icons.check, color: AppColors.linkBlue(brightness), size: 20)
-          : null,
-      selected: isSelected,
-      onTap: () {
-        ThemeManager().setThemeMode(mode);
-        setDialogState(() {});
-      },
     );
   }
 
@@ -1836,10 +1718,24 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
     final messenger = ScaffoldMessenger.of(context);
     // SnackBar 同一时刻只保留一条，所以每次进度更新前先清空旧的，
     // 否则高频 onProgress 会把 SnackBar 排成长队。
-    void showProgress(String text) {
+    void showProgress(String text, [double? value]) {
       messenger.clearSnackBars();
       messenger.showSnackBar(SnackBar(
-        content: Text(text),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(text),
+            const SizedBox(height: 8),
+            SmoothLinearProgressIndicator(
+              value: value,
+              minHeight: 4,
+              color: Theme.of(context).colorScheme.onInverseSurface,
+              backgroundColor:
+                  Theme.of(context).colorScheme.onInverseSurface.withValues(alpha: 0.2),
+            ),
+          ],
+        ),
         duration: const Duration(minutes: 10),
       ));
     }
@@ -1849,12 +1745,12 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
     try {
       await executeRefreshData(request, onProgress: (p, t) {
         if (!mounted) return;
-        showProgress('$t ($p%)');
+        showProgress('$t ($p%)', (p / 100).clamp(0.0, 1.0));
       });
     } catch (e) {
       failed = true;
       // 水鱼未授权时直接拉起授权页（与「系统」Tab 的刷新入口行为一致）
-      if (mounted) await presentRefreshError(e, qq: request.qq);
+      if (mounted) await presentRefreshError(context, e, qq: request.qq);
     } finally {
       messenger.clearSnackBars();
     }
@@ -1869,7 +1765,8 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
   /// SnackBar 的写法（同一时刻只留一条，避免高频进度排成长队）。
   bool _isAdvancedRefreshing = false;
 
-  Future<void> _openAdvancedRefreshData({RefreshDataSource? initialSource}) async {
+  Future<void> _openAdvancedRefreshData(
+      {RefreshDataSource? initialSource}) async {
     if (_isAdvancedRefreshing) return;
     final request = await showAdvancedRefreshDataDialog(
       context,
@@ -1879,10 +1776,24 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
 
     setState(() => _isAdvancedRefreshing = true);
     final messenger = ScaffoldMessenger.of(context);
-    void showProgress(String text) {
+    void showProgress(String text, [double? value]) {
       messenger.clearSnackBars();
       messenger.showSnackBar(SnackBar(
-        content: Text(text),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(text),
+            const SizedBox(height: 8),
+            SmoothLinearProgressIndicator(
+              value: value,
+              minHeight: 4,
+              color: Theme.of(context).colorScheme.onInverseSurface,
+              backgroundColor:
+                  Theme.of(context).colorScheme.onInverseSurface.withValues(alpha: 0.2),
+            ),
+          ],
+        ),
         duration: const Duration(minutes: 10),
       ));
     }
@@ -1892,11 +1803,11 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
     try {
       await executeAdvancedRefreshData(request, onProgress: (p, t) {
         if (!mounted) return;
-        showProgress('$t ($p%)');
+        showProgress('$t ($p%)', (p / 100).clamp(0.0, 1.0));
       });
     } catch (e) {
       failed = true;
-      if (mounted) await presentRefreshError(e, qq: request.qq);
+      if (mounted) await presentRefreshError(context, e, qq: request.qq);
     } finally {
       messenger.clearSnackBars();
       if (mounted) setState(() => _isAdvancedRefreshing = false);
@@ -1940,6 +1851,25 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
                         : Column(mainAxisSize: MainAxisSize.min, children: [
                             // 已登录水鱼：显示账号信息 + 水鱼授权状态
                             if (profile != null) ...[
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(
+                                      top: 4, bottom: 6),
+                                  child: Text(
+                                    '水鱼-个人信息',
+                                    style: Theme.of(dialogContext)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(
+                                          color: Theme.of(dialogContext)
+                                              .colorScheme
+                                              .primary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                  ),
+                                ),
+                              ),
                               _buildAccountInfo(profile, dialogContext),
                               _buildDivingFishAuthSection(
                                   dialogContext, brightness, profile),
@@ -1975,8 +1905,8 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
 
   /// 本地检查落雪 importToken 是否已缓存
   Future<bool> _checkLxnsTokenLocal() async {
-    final prefs = await SharedPreferences.getInstance();
-    final local = prefs.getString(CacheKeyConstant.probeLxnsImportToken);
+    final local =
+        await SecureCredentialStore.read(CacheKeyConstant.probeLxnsImportToken);
     return local != null && local.isNotEmpty;
   }
 
@@ -2089,7 +2019,7 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
     );
   }
 
-  /// 管理落雪 API 密钥（Hub 侧）
+  /// 管理落雪 API 密钥（maimai Score Hub 侧）
   Widget _buildLxnsTokenSection(Brightness brightness) {
     final tokenCtrl = TextEditingController();
     bool? hasToken;
@@ -2098,7 +2028,7 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
 
     return StatefulBuilder(
       builder: (ctx, setState) {
-        // 初次检查：优先本地缓存，其次 Hub 查询
+        // 初次检查：优先本地缓存，其次查询 maimai Score Hub
         if (checking) {
           _checkLxnsTokenLocal().then((localHas) {
             if (localHas) {
@@ -2172,9 +2102,8 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
                     final uri = Uri.parse(
                         'https://maimai.lxns.net/user/profile?tab=thirdparty');
                     try {
-                      if (await canLaunchUrl(uri)) {
-                        await launchUrl(uri,
-                            mode: LaunchMode.externalApplication);
+                      if (await ExternalLaunchUtil.open(uri)) {
+                        return;
                       } else {
                         launchUrlFallback(uri.toString(), context);
                       }
@@ -2234,11 +2163,10 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
                               return;
                             }
                             setState(() => saving = true);
-                            // 先本地缓存（无需 Hub 登录）
-                            final prefs = await SharedPreferences.getInstance();
-                            await prefs.setString(
+                            // 先本地缓存（无需登录 maimai Score Hub）
+                            await SecureCredentialStore.write(
                                 CacheKeyConstant.probeLxnsImportToken, t);
-                            // 尝试同步绑定到 Hub
+                            // 尝试同步绑定到 maimai Score Hub
                             final ok = await DivingFishProbeManager()
                                 .setLxnsImportToken(t);
                             setState(() => saving = false);
@@ -2269,9 +2197,9 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
                 TextButton(
                   onPressed: () async {
                     // 清除本地缓存
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.remove(CacheKeyConstant.probeLxnsImportToken);
-                    // 尝试清除 Hub 侧绑定
+                    await SecureCredentialStore.delete(
+                        CacheKeyConstant.probeLxnsImportToken);
+                    // 尝试清除 maimai Score Hub 侧绑定
                     await DivingFishProbeManager().setLxnsImportToken(null);
                     hasToken = false;
                     Fluttertoast.showToast(msg: '落雪 API 密钥已清除');
@@ -2290,8 +2218,8 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
   }
 
   Future<Map<String, dynamic>?> _fetchAccountProfile() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jwt = prefs.getString(CacheKeyConstant.probeDivingFishToken);
+    final jwt =
+        await SecureCredentialStore.read(CacheKeyConstant.probeDivingFishToken);
     if (jwt == null || jwt.isEmpty) {
       // 未登录水鱼：返回 null，由弹窗决定渲染降级 UI；
       // 落雪 token 区块始终会渲染，不受影响。
@@ -2368,14 +2296,19 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
                     onPressed: () async {
                       setState(() => isRefreshing = true);
                       final newToken = await _refreshImportToken();
+                      if (!mounted) return;
                       if (newToken != null) {
                         displayToken = newToken.length > 20
                             ? '${newToken.substring(0, 16)}...'
                             : newToken;
                         Fluttertoast.showToast(msg: 'ImportToken 已刷新');
                       } else {
-                        Fluttertoast.showToast(msg: '刷新失败');
+                        await showErrorMessageDialog(
+                          context,
+                          message: 'ImportToken 刷新失败，请稍后重试',
+                        );
                       }
+                      if (!mounted) return;
                       setState(() => isRefreshing = false);
                     },
                   ),
@@ -2426,8 +2359,8 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
   }
 
   Future<String?> _refreshImportToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jwt = prefs.getString(CacheKeyConstant.probeDivingFishToken);
+    final jwt =
+        await SecureCredentialStore.read(CacheKeyConstant.probeDivingFishToken);
     if (jwt == null || jwt.isEmpty) return null;
 
     try {
@@ -2442,7 +2375,7 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
         final data = json.decode(response.body) as Map<String, dynamic>;
         final newToken = data.tryGet<String>('token') ?? '';
         if (newToken.isNotEmpty) {
-          await prefs.setString(
+          await SecureCredentialStore.write(
               CacheKeyConstant.probeDivingFishImportToken, newToken);
           return newToken;
         }
@@ -2633,7 +2566,7 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
           debugPrint('[HomePage] 刷新maidata失败: $e');
           if (mounted) Navigator.of(context).pop();
           if (mounted) {
-            Fluttertoast.showToast(msg: '刷新失败: $e');
+            await showErrorMessageDialog(context, message: '刷新失败: $e');
           }
         }
       }
@@ -2649,6 +2582,10 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
         context,
         MaterialPageRoute(builder: (context) => DiffBest50Page()),
       );
+    }
+    if (item.title == '出勤转盘') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const AttendanceWheelPage()));
+      return;
     }
     if (item.title == '随机乐曲') {
       Navigator.push(
@@ -2764,6 +2701,18 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
         MaterialPageRoute(builder: (context) => const PortablePlayerPage()),
       );
     }
+    if (item.title == '下次想玩') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const NextPlayQueuePage()),
+      );
+    }
+    if (item.title == '加载语录管理') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const LoadingTipsPage()),
+      );
+    }
     if (item.title == '自定义谱面播放') {
       Navigator.push(
         context,
@@ -2786,8 +2735,8 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
     if (item.title == '问卷调查') {
       final uri = Uri.parse(AppLinks.surveyUrl);
       try {
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (await ExternalLaunchUtil.open(uri)) {
+          return;
         } else {
           launchUrlFallback(uri.toString(), context);
         }
@@ -2799,8 +2748,8 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
     if (item.title == '访问官方网站') {
       final uri = Uri.parse(AppLinks.officialSite);
       try {
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (await ExternalLaunchUtil.open(uri)) {
+          return;
         } else {
           launchUrlFallback(
             uri.toString(),
@@ -2825,8 +2774,8 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
       const failMessage = '没能跳转到 QQ，群号 ${AppLinks.qqGroupNumber} '
           '已复制到剪贴板，可在 QQ 里搜索加入';
       try {
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (await ExternalLaunchUtil.open(uri)) {
+          return;
         } else {
           launchUrlFallback(
             uri.toString(),
@@ -2911,8 +2860,8 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) =>
-              const AvgScoreRankingListPage(initialMetric: AvgMetric.achievement),
+          builder: (context) => const AvgScoreRankingListPage(
+              initialMetric: AvgMetric.achievement),
         ),
       );
     }
@@ -2993,7 +2942,7 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
             builder: (context) => const DifficultyDistributionPage()),
       );
     }
-    if (item.title == '主题与背景') {
+    if (item.title == '主题与交互偏好') {
       _showThemeDialog();
     }
     if (item.title == '收藏夹') {
@@ -3012,6 +2961,9 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
       // 等待进度与另外两个同步入口一样显示在**按钮**上，不锁住整个页面。
       await syncToAwmcNetWithButton();
     }
+    if (item.title == '同步成绩到多端') {
+      await syncToMultiplePlatforms();
+    }
     if (item.title == '每日推荐') {
       Navigator.push(
         context,
@@ -3027,8 +2979,8 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
     if (item.title == '全国音游地图') {
       final uri = Uri.parse('https://map.bemanicn.com/');
       try {
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (await ExternalLaunchUtil.open(uri)) {
+          return;
         } else {
           launchUrlFallback(uri.toString(), context);
         }
@@ -3113,8 +3065,7 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
               valueListenable: UpdateNotifier.available,
               builder: (context, update, _) {
                 final isUpdate = UpdateNotifier.isUpdateEntry(item.title);
-                final effective =
-                    isUpdate && update != null ? update : null;
+                final effective = isUpdate && update != null ? update : null;
                 return HubActionTile(
                   // ⚠️ 必须判 isUpdate：`UpdateNotifier.titleFor(null)` 返回的是
                   // 「检查更新」（[UpdateNotifier.idleTitle]），不是"原样返回"。
@@ -3122,14 +3073,13 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
                   title: isUpdate
                       ? UpdateNotifier.titleFor(effective)
                       : item.title,
-                  subtitle: UpdateNotifier.subtitleFor(
-                      effective, item.subtitle),
+                  subtitle:
+                      UpdateNotifier.subtitleFor(effective, item.subtitle),
                   icon: isUpdate ? Icons.arrow_upward_rounded : item.icon,
                   titleColor:
                       effective == null ? null : UpdateAvailableIcon.green,
-                  leading: effective == null
-                      ? null
-                      : const UpdateAvailableIcon(),
+                  leading:
+                      effective == null ? null : const UpdateAvailableIcon(),
                   isFavorited: true,
                   onToggleFavorite: () => _toggleFavorite(item.title),
                   onTap: () => _handleFeatureTap(item),
@@ -3138,6 +3088,11 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
                   // 状态由 SyncFlowMixin 提供，两边读的是同一份。
                   loading: _syncBusyFor(item.title),
                   loadingText: _syncTextFor(item.title),
+                  showProgress: true,
+                  progressValue: _syncProgressFor(item.title),
+                  disabled: _isSyncBlockedFeature(item.title) &&
+                      anySyncBusy &&
+                      !_syncBusyFor(item.title),
                   // 纯统计行要贴紧按钮（线路切换器那两行不用，见 SyncStatsFooter）
                   footerLift: item.title == '同步成绩到 AWMC NET'
                       ? SyncStatsFooter.footerLift
@@ -3159,15 +3114,38 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
     if (title == '同步成绩到水鱼') return syncingDivingFish;
     if (title == '同步成绩到落雪') return syncingLuoXue;
     if (title == '同步成绩到 AWMC NET') return syncingAwmcNet;
+    if (title == '同步成绩到多端') return syncingMulti;
     return false;
   }
+
+  bool _isSyncFeature(String title) =>
+      title == '同步成绩到水鱼' ||
+      title == '同步成绩到落雪' ||
+      title == '同步成绩到 AWMC NET' ||
+      title == '同步成绩到多端';
+
+  bool _isSyncBlockedFeature(String title) =>
+      _isSyncFeature(title) ||
+      title == '登录水鱼' ||
+      title == '登出水鱼账号' ||
+      title == '刷新数据' ||
+      title == '刷新数据（高级）';
 
   /// 收藏区某个同步入口按钮上的进度文案。
   String _syncTextFor(String title) {
     if (title == '同步成绩到水鱼') return syncText;
     if (title == '同步成绩到落雪') return luoXueText;
     if (title == '同步成绩到 AWMC NET') return awmcNetText;
+    if (title == '同步成绩到多端') return multiSyncText;
     return '';
+  }
+
+  double? _syncProgressFor(String title) {
+    if (title == '同步成绩到水鱼') return divingFishProgress;
+    if (title == '同步成绩到落雪') return luoXueProgress;
+    if (title == '同步成绩到 AWMC NET') return awmcNetProgress;
+    if (title == '同步成绩到多端') return multiSyncProgress;
+    return null;
   }
 
   /// 收藏区里「同步成绩」入口的附加区；其它功能返回 null（不占位置）。
@@ -3295,5 +3273,4 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
       ),
     );
   }
-
 }

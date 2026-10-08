@@ -176,35 +176,43 @@ SongRankingPage _songRankingPage(RankingType type) => SongRankingPage(
       difficultyDs: 13.5,
     );
 
-/// 断言某一个玩家身份块里：头像高 == 两行文字（玩家名 + 数据源标签）的总高。
+/// 断言某一个玩家身份块里：头像高 == 两行文字（玩家名 + 标签行）的总高。
+///
+/// 标签行可能有一颗胶囊（普通玩家），也可能有两颗（开发者：数据源 + 开发者喵），
+/// 所以这里取所有标签的**并集高度**——两颗标签同处一个 `Row`，高度本来就相同，
+/// 并集是为了让「多一颗标签」这件事本身不会把断言写法顶坏。
 void expectAvatarMatchesTextRows(WidgetTester tester, Finder identity) {
   final widget = tester.widget<CommunityPlayerIdentity>(identity);
   final avatar =
       find.descendant(of: identity, matching: find.byType(CommunityAvatar));
-  final tag = find.descendant(of: identity, matching: find.byType(DataSourceTag));
+  final tags = find.descendant(of: identity, matching: find.byType(DataSourceTag));
   final nameLine =
       find.descendant(of: identity, matching: find.text(widget.name));
 
   expect(avatar, findsOneWidget, reason: '每个玩家身份块都要有头像');
-  expect(tag, findsOneWidget, reason: '每个玩家身份块都要有数据源标签');
+  expect(tags, findsWidgets, reason: '每个玩家身份块都要有数据源标签');
   expect(nameLine, findsOneWidget);
 
   final avatarRect = tester.getRect(avatar);
   final nameRect = tester.getRect(nameLine);
-  final tagRect = tester.getRect(tag);
+  final tagRects = [
+    for (var i = 0; i < tags.evaluate().length; i++) tester.getRect(tags.at(i)),
+  ];
+  final tagTop = tagRects.map((r) => r.top).reduce(math.min);
+  final tagBottom = tagRects.map((r) => r.bottom).reduce(math.max);
   final textBlockHeight = nameRect.height +
       CommunityPlayerIdentity.nameTagGap +
-      tagRect.height;
+      (tagBottom - tagTop);
 
   expect(avatarRect.height, closeTo(textBlockHeight, 0.01),
       reason: '头像高（${avatarRect.height}）必须等于「玩家名那一行 + 行距 + '
-          '数据源标签那一行」（$textBlockHeight）');
+          '标签行」（$textBlockHeight）');
   expect(avatarRect.width, closeTo(avatarRect.height, 0.01),
       reason: '头像必须是正方形');
   expect(avatarRect.top, closeTo(nameRect.top, 0.01),
       reason: '头像上边缘要贴住第一行（玩家名）的顶');
-  expect(avatarRect.bottom, closeTo(tagRect.bottom, 0.01),
-      reason: '头像下边缘要贴住第二行（数据源标签）的底');
+  expect(avatarRect.bottom, closeTo(tagBottom, 0.01),
+      reason: '头像下边缘要贴住第二行（标签行）的底');
   expect(avatarRect.height, greaterThan(CommunityAvatar.defaultSize),
       reason: '两行文字本来就比固定的 ${CommunityAvatar.defaultSize}dp 高，'
           '头像必须跟着变大而不是还是 32');
@@ -227,6 +235,7 @@ Widget _harness({
   bool avatarMatchesTextHeight = false,
   String name = '玩家一号',
   String dataSource = 'awmc',
+  String? playerId,
 }) {
   return MaterialApp(
     theme: AppTheme.lightTheme(),
@@ -244,6 +253,7 @@ Widget _harness({
                     avatarId: 1234,
                     name: name,
                     dataSource: dataSource,
+                    playerId: playerId,
                     avatarMatchesTextHeight: avatarMatchesTextHeight,
                   ),
                 ),
@@ -379,6 +389,59 @@ void main() {
           tester, const AvgScoreRankingListPage(initialMetric: AvgMetric.dx));
 
       expectAllIdentitiesAligned(tester);
+    });
+
+    testWidgets('Rating 排行榜：白名单玩家的行端到端多出「开发者喵」', (tester) async {
+      // 其余玩家用「玩家N」，开发者单独给一个能对上的名字：
+      // 名字重复的话 find.text 会撞车（底部固定条与榜单行会同时命中）。
+      RatingRankListService.debugRankingsLoader = () async => [
+            RankItem(
+              rank: 1,
+              userId: 'shuiyu:488581724',
+              dataSource: 'shuiyu',
+              originalId: '488581724',
+              nickname: '开发者玩家',
+              avatarId: 73,
+              totalRating: 17000,
+              best35Rating: 12000,
+              best15Rating: 5000,
+            ),
+            RankItem(
+              rank: 2,
+              userId: 'shuiyu:1',
+              dataSource: 'shuiyu',
+              originalId: '1',
+              nickname: '普通玩家',
+              avatarId: 73,
+              totalRating: 16000,
+              best35Rating: 11000,
+              best15Rating: 5000,
+            ),
+          ];
+
+      await pumpPage(tester, const RatingRankListPage());
+
+      // 白名单里那一条：数据源标签 + 开发者喵
+      final developerRow = find.ancestor(
+        of: find.text('开发者玩家'),
+        matching: find.byType(CommunityPlayerIdentity),
+      );
+      expect(
+        find.descendant(
+            of: developerRow, matching: find.text('开发者喵')),
+        findsOneWidget,
+        reason: 'playerId 要走 `RankItem.userId` 传进身份块，白名单命中后多一颗胶囊',
+      );
+
+      // 普通玩家不受影响，仍然只有数据源标签
+      final normalRow = find.ancestor(
+        of: find.text('普通玩家'),
+        matching: find.byType(CommunityPlayerIdentity),
+      );
+      expect(
+        find.descendant(of: normalRow, matching: find.byType(DataSourceTag)),
+        findsOneWidget,
+      );
     });
   });
 
@@ -566,6 +629,68 @@ void main() {
         expectAvatarMatchesTextRows(
             tester, find.byType(CommunityPlayerIdentity));
       }
+    });
+  });
+
+  group('开发者喵标签（排行榜行）', () {
+    const developerId = 'shuiyu:488581724';
+
+    for (final scale in [1.0, 1.3, 1.5]) {
+      testWidgets('开发者多挂一个「开发者喵」，头像仍然等于两行文字高 @ textScale $scale',
+          (tester) async {
+        await tester.pumpWidget(_harness(
+          textScale: scale,
+          avatarMatchesTextHeight: true,
+          dataSource: 'shuiyu',
+          playerId: developerId,
+        ));
+
+        expect(find.text('开发者喵'), findsOneWidget,
+            reason: '白名单里的 playerId 要在数据源标签后面多出一个「开发者喵」');
+        expect(find.byType(DataSourceTag), findsNWidgets(2),
+            reason: '数据源标签 + 开发者喵，一共两颗胶囊');
+        expectAvatarMatchesTextRows(
+            tester, find.byType(CommunityPlayerIdentity));
+      });
+    }
+
+    testWidgets('普通玩家只有数据源标签，没有「开发者喵」', (tester) async {
+      await tester.pumpWidget(_harness(
+        playerId: 'shuiyu:1',
+        dataSource: 'shuiyu',
+        avatarMatchesTextHeight: true,
+      ));
+
+      expect(find.text('开发者喵'), findsNothing);
+      expect(find.byType(DataSourceTag), findsOneWidget);
+      expectAvatarMatchesTextRows(
+          tester, find.byType(CommunityPlayerIdentity));
+    });
+
+    testWidgets('不传 playerId 时也不显示「开发者喵」', (tester) async {
+      await tester.pumpWidget(_harness(avatarMatchesTextHeight: true));
+
+      expect(find.text('开发者喵'), findsNothing);
+    });
+
+    testWidgets('两个标签在同一个 FittedBox 里，不会撑破身份块宽度', (tester) async {
+      await tester.pumpWidget(_harness(
+        playerId: developerId,
+        dataSource: 'shuiyu',
+        avatarMatchesTextHeight: true,
+      ));
+
+      expect(tester.takeException(), isNull);
+      final identity = find.byType(CommunityPlayerIdentity);
+      final tags = find.descendant(
+          of: identity, matching: find.byType(DataSourceTag));
+      // 「开发者喵」必须紧跟在数据源标签后面（横坐标递增）
+      final first = tester.getRect(tags.at(0));
+      final second = tester.getRect(tags.at(1));
+      expect(second.left, greaterThanOrEqualTo(first.right - 0.01),
+          reason: '开发者喵要排在数据源标签后面，不能重叠');
+      expect(second.right, lessThanOrEqualTo(tester.getRect(identity).right + 0.01),
+          reason: '两个标签都要待在身份块内（超宽时由 FittedBox 整体缩放）');
     });
   });
 

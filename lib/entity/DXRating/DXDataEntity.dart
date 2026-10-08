@@ -217,6 +217,7 @@ class DXDataSheet {
   final String noteDesigner;
   final DXDataNoteCounts noteCounts;
   final List<String> serverIds;
+  final Map<String, DXDataServerOverride> serverOverrides;
   final bool isSpecial;
   final String version;
   final int internalId;
@@ -232,6 +233,7 @@ class DXDataSheet {
     required this.noteDesigner,
     required this.noteCounts,
     required this.serverIds,
+    required this.serverOverrides,
     required this.isSpecial,
     required this.version,
     required this.internalId,
@@ -253,12 +255,22 @@ class DXDataSheet {
       serverIds: (json['serverIds'] as List<dynamic>)
           .map((e) => e as String)
           .toList(),
+      serverOverrides: _parseServerOverrides(json['serverOverrides']),
       isSpecial: json['isSpecial'] as bool,
       version: json['version'] as String,
       internalId: json['internalId'] as int? ?? 0,
       releaseDate: json['releaseDate'] as String,
     );
   }
+}
+
+/// DXRating 针对不同地区的当前定数/版本覆盖信息。
+class DXDataServerOverride {
+  final String? level;
+  final double? levelValue;
+  final String? version;
+
+  const DXDataServerOverride({this.level, this.levelValue, this.version});
 }
 
 class DXDataNoteCounts {
@@ -384,6 +396,21 @@ Map<String, double> _parseMultiverLevel(dynamic raw) {
     if (value is num) {
       result[key.toString()] = value.toDouble();
     }
+  });
+  return result;
+}
+
+Map<String, DXDataServerOverride> _parseServerOverrides(dynamic raw) {
+  if (raw is! Map) return const {};
+  final result = <String, DXDataServerOverride>{};
+  raw.forEach((key, value) {
+    if (value is! Map) return;
+    final levelValue = value['levelValue'];
+    result[key.toString()] = DXDataServerOverride(
+      level: value['level']?.toString(),
+      levelValue: levelValue is num ? levelValue.toDouble() : null,
+      version: value['version']?.toString(),
+    );
   });
   return result;
 }

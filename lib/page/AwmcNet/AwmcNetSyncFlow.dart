@@ -1,15 +1,16 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../../constant/CacheKeyConstant.dart';
 import '../../service/AWMC/AwmcPlayCountStore.dart';
 import '../../service/AwmcNetScoreUploadService.dart';
 import '../../service/SyncStatsService.dart';
 import '../../utils/CurrentDataSourceNotifier.dart';
 import '../../utils/SyncRouteNotifier.dart';
-import 'SyncToAwmcNetPage.dart' show showAwmcNetSyncInputDialog;
+import '../../utils/SecureCredentialStore.dart';
+import 'SyncToAwmcNetPage.dart'
+    show showAwmcNetSyncInputDialog, AwmcNetSyncInput;
+import '../../widgets/RefreshDataDialog.dart' show executeAdvancedRefreshData;
 
 /// 一次「同步成绩到 AWMC NET」的结果。
 class AwmcNetSyncOutcome {
@@ -21,11 +22,13 @@ class AwmcNetSyncOutcome {
 
   /// 接口原始结果（取消时为 null）。
   final AwmcNetQrImportResult? result;
+  final String? refreshError;
 
   const AwmcNetSyncOutcome({
     this.cancelled = false,
     this.ok = false,
     this.result,
+    this.refreshError,
   });
 
   static const AwmcNetSyncOutcome userCancelled =
@@ -45,7 +48,7 @@ class AwmcNetSyncOutcome {
 ///   onBusy: (label) => setState(() { _busy = true; _text = label; }),
 ///   onIdle: () => setState(() { _busy = false; _text = ''; }),
 /// );
-/// if (!outcome.cancelled) Fluttertoast.showToast(msg: AwmcNetSyncFlow.toastFor(outcome));
+/// 调用方应把成功结果作为短提示，把失败结果放进错误弹窗。
 /// ```
 class AwmcNetSyncFlow {
   AwmcNetSyncFlow._();
@@ -57,11 +60,23 @@ class AwmcNetSyncFlow {
   static Future<AwmcNetSyncOutcome> run(
     BuildContext context, {
     void Function(String label)? onBusy,
+    void Function(double progress, String text)? onProgress,
     VoidCallback? onIdle,
   }) async {
     // 1. 输入：二维码 + 成绩导入 Token（对话框只收集，不发请求）
     final input = await showAwmcNetSyncInputDialog(context);
     if (input == null) return AwmcNetSyncOutcome.userCancelled;
+
+    return runWithInput(input, onBusy: onBusy, onProgress: onProgress, onIdle: onIdle);
+  }
+
+  /// 使用已经收集好的输入执行导入，供「同步成绩到多端」复用同一张二维码。
+  static Future<AwmcNetSyncOutcome> runWithInput(
+    AwmcNetSyncInput input, {
+    void Function(String label)? onBusy,
+    void Function(double progress, String text)? onProgress,
+    VoidCallback? onIdle,
+  }) async {
 
     // 2. 顺手刷新**AWMC NET 这个账号自己的**游玩次数。
     //
@@ -103,14 +118,32 @@ class AwmcNetSyncFlow {
 
       // Token 被服务端判为无效：清掉本机那份，否则用户下次点还是同一个错
       if (result.tokenInvalid) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove(CacheKeyConstant.awmcNetImportToken);
+        await SecureCredentialStore.delete(CacheKeyConstant.awmcNetImportToken);
       }
 
       if (attempt.finish(ok: result.ok)) {
         SyncRouteNotifier.instance.refreshStatsSoon();
       }
-      return AwmcNetSyncOutcome(ok: result.ok, result: result);
+      String? refreshError;
+      if (result.ok && input.refreshRequest != null) {
+        ticker.cancel();
+        try {
+          await executeAdvancedRefreshData(
+            input.refreshRequest!,
+            onProgress: (p, text) {
+              onBusy?.call(text);
+              onProgress?.call(p / 100, text);
+            },
+          );
+        } catch (e) {
+          refreshError = '$e';
+        }
+      }
+      return AwmcNetSyncOutcome(
+        ok: result.ok,
+        result: result,
+        refreshError: refreshError,
+      );
     } finally {
       ticker.cancel();
       onIdle?.call();
@@ -120,7 +153,7 @@ class AwmcNetSyncFlow {
   /// 按钮上的进度文案（[HubActionTile.loadingText] / 首页收藏区同一行）。
   static String _busyLabel(int seconds) => '正在导入成绩…已等待 $seconds 秒';
 
-  /// 结果 toast：与另外两个同步入口同口径 —— **只给一个小提示**，不弹结果面板。
+  /// 生成结果文案。成功可以作为短提示，失败应在错误弹窗中完整显示。
   ///
   /// 计数用 `新增/更新/跳过`：实测一次 `新增 9 / 更新 1106 / 跳过 593`，
   /// 「更新」才是大多数，只报「新增」会让用户以为成绩没导进去。
