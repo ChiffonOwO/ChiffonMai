@@ -80,6 +80,8 @@ class _AboutAppPageState extends State<AboutAppPage> {
     _Credit('Pokcet', '感谢对本项目的捐献支持'),
     _Credit('ListaQwQ', '感谢对本项目的捐献支持'),
     _Credit('迪拉熊重度依赖', '感谢对本项目的捐献支持'),
+    _Credit('白嫖万岁', '感谢对本项目的捐献支持'),
+    _Credit('鱼好呆', '感谢对本项目的捐献支持'),
   ];
 
   String _version = '';

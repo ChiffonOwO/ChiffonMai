@@ -167,6 +167,7 @@ class HubSection extends StatelessWidget {
         // ===== 内容卡片 =====
         DecoratedBox(
           decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(AppDesignTokens.radiusMedium),
             border: Border.all(color: scheme.outlineVariant),
           ),

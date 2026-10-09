@@ -74,9 +74,11 @@ android {
                 // `flutter run`（debug）一起搞挂。
                 signingConfigs.getByName("debug")
             }
-            // release 使用 R8，避免把编译期配置和实现细节原样暴露在 APK 中。
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // 暂不启用 R8 混淆和资源压缩：项目包含多处网络请求、动态 JSON 解析、
+            // 反射和第三方登录/同步流程，当前 keep 规则无法覆盖全部路径，混淆后
+            // 可能出现请求参数、响应模型或回调被破坏的间歇性网络问题。
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
