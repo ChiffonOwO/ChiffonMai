@@ -82,7 +82,7 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   bool _fontsLoaded = false;
   bool _themeLoaded = false;
@@ -98,6 +98,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initTheme();
     ConnectivityService().start();
     // 应用启动时一次性加载跨页面共享状态，
@@ -110,6 +111,19 @@ class _MyAppState extends State<MyApp> {
     NavigationPreferences.instance.load();
     _initFileOpenHandling();
     _checkUpdateForBadge();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(NavigationPreferences.instance.applySystemUiMode());
+    }
   }
 
   /// App 进入时检查一次更新，把结果写进 [UpdateNotifier]。
@@ -240,15 +254,15 @@ class _MyAppState extends State<MyApp> {
           ThemeManager().seedColorNotifier,
         ]),
         builder: (context, _) => MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme(seedColor: ThemeManager().seedColor),
-        darkTheme: ThemeManager().pureBlackEnabled
-            ? AppTheme.pureBlackTheme(seedColor: ThemeManager().seedColor)
-            : AppTheme.darkTheme(seedColor: ThemeManager().seedColor),
-        themeMode: ThemeManager().isLoaded
-            ? ThemeManager().themeMode
-            : ThemeMode.system,
-        home: const SplashPage(),
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme(seedColor: ThemeManager().seedColor),
+          darkTheme: ThemeManager().pureBlackEnabled
+              ? AppTheme.pureBlackTheme(seedColor: ThemeManager().seedColor)
+              : AppTheme.darkTheme(seedColor: ThemeManager().seedColor),
+          themeMode: ThemeManager().isLoaded
+              ? ThemeManager().themeMode
+              : ThemeMode.system,
+          home: const SplashPage(),
         ),
       );
     }
@@ -282,6 +296,7 @@ class _MyAppState extends State<MyApp> {
             return MaterialApp(
               debugShowCheckedModeBanner: false,
               navigatorKey: _navigatorKey,
+              navigatorObservers: [_FocusClearingNavigatorObserver()],
               home: AppShell(onFirstFrameRendered: _loadFonts),
               theme: forceDark ? darkThemeData : lightThemeData,
               darkTheme: darkThemeData,
@@ -342,5 +357,31 @@ class _MyAppState extends State<MyApp> {
         );
       },
     );
+  }
+}
+
+class _FocusClearingNavigatorObserver extends NavigatorObserver {
+  void _clearFocusForPageRoute(Route<dynamic>? route) {
+    if (route is PageRoute<dynamic>) {
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _clearFocusForPageRoute(route);
+    super.didPush(route, previousRoute);
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    super.didPop(route, previousRoute);
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    _clearFocusForPageRoute(newRoute);
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
   }
 }

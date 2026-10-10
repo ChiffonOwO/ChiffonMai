@@ -3,7 +3,7 @@
 <div align="center">
   <img src="https://img.shields.io/badge/Platform-Android-blue.svg" alt="Platform">
   <img src="https://img.shields.io/badge/Flutter-3.x-02569B.svg?logo=flutter&logoColor=white" alt="Flutter">
-  <img src="https://img.shields.io/badge/Version-2.6.0%2B45-6C63FF.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Version-2.7.0%2B46-6C63FF.svg" alt="Version">
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
 </div>
 
@@ -160,6 +160,13 @@ iOS 版本目前尚未正式发布。
 - **Bakapiano**：提供水鱼查分器和落雪查分器成绩同步支持。[项目地址](https://github.com/bakapiano/maimai-score-hub)
 - **k4641321**：提供落雪查分器成绩同步支持。[项目地址](https://github.com/k4641321/chusearchsong_flutter/tree/master)
 - **Union**：提供曲目数据库。[官网](https://union.godserver.cn/)
+
+### 设计思路借鉴
+
+- [**EasyMai**](https://github.com/Lista233/EasyMai)：设计思路借鉴。
+- [**舞萌猜猜呗之潘一把**](https://github.com/yukineko2233/v0-maimai-wordle)：设计思路借鉴。[在线体验](https://maimai.yukineko2233.top/)
+- [**MaiScan Rev**](https://github.com/PojavAnge/MaiScan-Rev)：设计思路借鉴。
+- [**中二查歌**](https://github.com/k4641321/chusearchsong_flutter)：设计思路借鉴。
 
 ### 捐献致谢
 

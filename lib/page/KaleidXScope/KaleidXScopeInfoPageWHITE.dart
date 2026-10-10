@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/LxnsAssetImage.dart';
 import '../../utils/KaleidDateUtil.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
@@ -58,6 +59,9 @@ class _KaleidXScopeInfoPageWHITEState extends State<KaleidXScopeInfoPageWHITE> {
   late double _textSizeXL;
   late double _coverSize;
   late double _progressBarHeight;
+
+  // 歌曲卡片高度：在 375px 宽度下为 54px，随曲绘尺寸同步缩放。
+  double get _songCardHeight => _coverSize + (_paddingXS * 2) + 6;
 
   // 初始化尺寸参数
   void _initSizeParams(BuildContext context) {
@@ -280,6 +284,7 @@ class _KaleidXScopeInfoPageWHITEState extends State<KaleidXScopeInfoPageWHITE> {
                   height: 100 * (MediaQuery.of(context).size.width / 375.0),
                   margin: EdgeInsets.symmetric(vertical: _paddingS),
                   child: CachedNetworkImage(
+                    cacheManager: lxnsAssetCacheManager,
                     imageUrl:
                         'https://assets2.lxns.net/maimai/frame/459504.png',
                     fit: BoxFit.contain,
@@ -374,7 +379,7 @@ class _KaleidXScopeInfoPageWHITEState extends State<KaleidXScopeInfoPageWHITE> {
 
     if (song == null) {
       return Container(
-        height: 50 * (MediaQuery.of(context).size.width / 375.0),
+        height: _songCardHeight,
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -398,6 +403,7 @@ class _KaleidXScopeInfoPageWHITEState extends State<KaleidXScopeInfoPageWHITE> {
           );
         },
         child: Container(
+          constraints: BoxConstraints(minHeight: _songCardHeight),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -617,6 +623,7 @@ class _KaleidXScopeInfoPageWHITEState extends State<KaleidXScopeInfoPageWHITE> {
             crossAxisSpacing: _paddingXS,
             mainAxisSpacing: _paddingXS,
             childAspectRatio: 2.0,
+            mainAxisExtent: _songCardHeight,
           ),
           itemCount: _songs.length,
           itemBuilder: (context, index) {
@@ -768,6 +775,7 @@ class _KaleidXScopeInfoPageWHITEState extends State<KaleidXScopeInfoPageWHITE> {
             crossAxisSpacing: _paddingXS,
             mainAxisSpacing: _paddingXS,
             childAspectRatio: 2.0,
+            mainAxisExtent: _songCardHeight,
           ),
           itemCount: songs.length,
           itemBuilder: (context, index) {

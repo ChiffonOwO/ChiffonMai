@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:my_first_flutter_app/constant/CacheKeyConstant.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'CurrentDataSourceNotifier.dart';
+import '../widgets/LxnsAssetImage.dart';
 
 /// 导出图片共享个人信息组件
 class ExportUserInfoWidget {
@@ -63,6 +64,7 @@ class ExportUserInfoWidget {
                 // 不会被 cover 裁剪（原图 4:1，1150×230 是 5:1，cover 会裁掉两侧）
                 if (plateId != null)
                   CachedNetworkImage(
+                    cacheManager: lxnsAssetCacheManager,
                     imageUrl:
                         'https://assets2.lxns.net/maimai/plate/$plateId.png',
                     fit: BoxFit.contain,
@@ -100,6 +102,7 @@ class ExportUserInfoWidget {
                           ),
                           child: avatarUrl.isNotEmpty
                               ? CachedNetworkImage(
+                                  cacheManager: lxnsAssetCacheManager,
                                   imageUrl: avatarUrl,
                                   fit: BoxFit.cover,
                                   errorWidget: (_, __, ___) => const Icon(

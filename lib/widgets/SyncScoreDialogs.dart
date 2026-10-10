@@ -409,8 +409,10 @@ Future<LuoXueSyncInput?> showLuoXueSyncInputDialog(BuildContext context) async {
 Future<int> executeLuoXueSync(
   LuoXueSyncInput input, {
   required void Function(double progress, String text) onProgress,
+  void Function(int durationMs)? onSyncFinished,
 }) async {
   onProgress(0.05, '准备同步...');
+  final syncStopwatch = Stopwatch()..start();
   final result = await DivingFishProbeManager().syncByCabinetQrToLxns(
     input.qrCode,
     lxnsImportToken: input.lxnsImportToken,
@@ -419,6 +421,8 @@ Future<int> executeLuoXueSync(
   if (!result.isSuccess) {
     throw SyncFlowException(result.errorMessage ?? '同步失败');
   }
+  syncStopwatch.stop();
+  onSyncFinished?.call(syncStopwatch.elapsedMilliseconds);
   if (input.refreshRequest != null) {
     onProgress(0.72, '同步完成，正在刷新本地数据...');
     try {
@@ -447,8 +451,10 @@ Future<DivingFishSyncOutcome> executeDivingFishSync(
   SyncCallbacks callbacks,
   DivingFishSyncInput input, {
   required void Function(double progress, String text) onProgress,
+  void Function(int durationMs)? onSyncFinished,
 }) async {
   onProgress(0.05, '准备同步...');
+  final syncStopwatch = Stopwatch()..start();
   final result = await DivingFishProbeManager().syncByCabinetQr(
     input.qrCode,
     onProgress: (p) => onProgress(divingFishStageProgress(p), p.message),
@@ -465,6 +471,8 @@ Future<DivingFishSyncOutcome> executeDivingFishSync(
     }
     throw SyncFlowException(msg);
   }
+  syncStopwatch.stop();
+  onSyncFinished?.call(syncStopwatch.elapsedMilliseconds);
 
   onProgress(
     0.70,

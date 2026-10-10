@@ -30,6 +30,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 
 import '../../entity/Portable/PortableSong.dart';
 import '../DxRatingCoverService.dart';
+import 'PortableAudioCache.dart';
 
 /// 播给 UI 看的一次性提示（SnackBar / Toast 用）。
 class PortablePlayerEvent {
@@ -470,7 +471,7 @@ class PortablePlayerController extends ChangeNotifier {
     }
 
     _emit(PortablePlayerEvent(
-      '《$title》音源加载失败，已跳过',
+      '《$title》当前暂无可用音源，已跳过',
       isError: true,
     ));
     unawaited(_autoSkipAfterFailure());
@@ -579,9 +580,21 @@ class PortablePlayerController extends ChangeNotifier {
       // 但必须先于通知栏出现才有意义。
       await preloadNotificationArt(song);
 
+      var cacheStatusShown = false;
+      final cachedAudioPath = await PortableAudioCache.instance.ensure(
+        song,
+        onProgress: (progress, speed, status) {
+          if (progress != null && progress >= 1) return;
+          if (cacheStatusShown) return;
+          cacheStatusShown = true;
+          _emit(PortablePlayerEvent(status));
+        },
+      );
+
       final queueChanged =
           _sourceRevision != _queueRevision || _player.audioSource == null;
-      if (!queueChanged) {
+      final switchingSong = _player.currentIndex != index;
+      if (!queueChanged && !switchingSong) {
         // 队列没变，直接跳（just_audio 按需加载这一首）
         await _player.seek(Duration.zero, index: index);
         // 顺手把循环/随机再推一次：上一首「次数用完」时可能把单曲循环关掉了
@@ -602,7 +615,9 @@ class PortablePlayerController extends ChangeNotifier {
         // 所以通知栏的歌名/曲绘/上一首下一首按钮依然完整。
         final playlist = ConcatenatingAudioSource(
           children: <AudioSource>[
-            for (final s in _queue) _buildSource(s),
+            for (final s in _queue)
+              _buildSource(s,
+                  localPath: s == song ? cachedAudioPath.path : null),
           ],
           useLazyPreparation: true,
         );
@@ -713,21 +728,21 @@ class PortablePlayerController extends ChangeNotifier {
     await _cachedArtPath(song);
   }
 
-  AudioSource _buildSource(PortableSong song) {
-    return AudioSource.uri(
-      Uri.parse(song.audioUrl),
-      tag: MediaItem(
-        id: song.portableKey,
-        title: song.title,
-        artist: song.artist.isEmpty ? '未知艺术家' : song.artist,
-        album: song.genre.isEmpty ? 'ChiffonMai 随身听' : song.genre,
-        artUri: Uri.parse(_notificationArtUri(song)),
-        extras: <String, dynamic>{
-          'lxnsId': song.lxnsId,
-          'divingFishId': song.divingFishId,
-        },
-      ),
+  AudioSource _buildSource(PortableSong song, {String? localPath}) {
+    final tag = MediaItem(
+      id: song.portableKey,
+      title: song.title,
+      artist: song.artist.isEmpty ? '未知艺术家' : song.artist,
+      album: song.genre.isEmpty ? 'ChiffonMai 随身听' : song.genre,
+      artUri: Uri.parse(_notificationArtUri(song)),
+      extras: <String, dynamic>{
+        'lxnsId': song.lxnsId,
+        'divingFishId': song.divingFishId,
+      },
     );
+    return localPath == null
+        ? AudioSource.uri(Uri.parse(song.audioUrl), tag: tag)
+        : AudioSource.file(localPath, tag: tag);
   }
 
   void _setLoading(bool value) {

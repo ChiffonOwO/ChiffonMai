@@ -1,5 +1,5 @@
 /*
- * 随身听曲库仓库：拉齐「落雪曲库 + 水鱼曲库」，交给
+ * 随身听曲库仓库：以「落雪曲库」为基础，再追加 AWMC/Union 独有曲目，交给
  * [buildPortableLibrary] 做映射，结果进程内缓存 + 落盘缓存。
  *
  * 为什么要自己落盘缓存：
@@ -24,6 +24,7 @@ import '../../manager/DivingFish/MaimaiMusicDataManager.dart';
 import '../../manager/LuoXue/LuoXueSongsManager.dart';
 import '../../manager/SongAliasManager.dart';
 import '../../utils/ApiClient.dart';
+import '../../utils/LuoXueSongUtil.dart';
 import '../../utils/SongQueryMatcher.dart';
 import 'PortableSongMapService.dart';
 
@@ -36,13 +37,16 @@ class PortableSongLibrary {
   /// 否则老用户读到的是旧规则算出来的缓存（少歌 / 串歌）。
   /// v1: 初始版本（id / id+10000 + 曲名校验，音源取余）。
   /// v2: 排除宴会场曲目（`PortableLibraryResult.excludedUtageCount`）。
-  static const int cacheVersion = 3;
+  /// v4: 追加 AWMC 独有曲目，并记录其音源优先级。
+  /// v5: Union 全量作为 AWMC/落雪之外的补充索引。
+  static const int cacheVersion = 5;
 
   static const String _prefsKey = 'portable_song_library_v$cacheVersion';
 
   List<PortableSong>? _songs;
   int _skippedCount = 0;
   int _excludedUtageCount = 0;
+  int _divingFishSongCount = 0;
   Future<List<PortableSong>>? _loadFuture;
 
   /// 已在内存里的曲库（未加载则返回 null）。给同步 UI 判断用。
@@ -79,6 +83,7 @@ class PortableSongLibrary {
       _songs = fromDisk.songs;
       _skippedCount = fromDisk.skippedCount;
       _excludedUtageCount = fromDisk.excludedUtageCount;
+      _divingFishSongCount = fromDisk.divingFishSongCount;
       return fromDisk.songs;
     }
 
@@ -89,16 +94,17 @@ class PortableSongLibrary {
 
   /// 强制重新构建（忽略落盘缓存），并写回缓存。
   Future<List<PortableSong>> rebuild() async {
-    final lxnsSongs = await _loadLuoXueSongs();
-    if (lxnsSongs.isEmpty) {
-      debugPrint('[Portable] 落雪曲库为空，随身听曲库无法构建');
-      _songs = const <PortableSong>[];
-      return _songs!;
-    }
-
-    final divingFishSongs = await _loadDivingFishSongs();
-    if (divingFishSongs.isEmpty) {
-      debugPrint('[Portable] 水鱼曲库为空，随身听曲库无法构建');
+    // 四份目录互不依赖，并行拉取，Union 补充不会把随身听首帧再拖慢数秒。
+    final lxnsFuture = _loadLuoXueSongs();
+    final awmcFuture = _loadAwmcSongs();
+    final divingFishFuture = _loadDivingFishSongs();
+    final unionFuture = _loadUnionSongs();
+    final lxnsSongs = await lxnsFuture;
+    final awmcSongs = await awmcFuture;
+    final divingFishSongs = await divingFishFuture;
+    final unionSongs = await unionFuture;
+    if (lxnsSongs.isEmpty && awmcSongs.isEmpty && unionSongs.isEmpty) {
+      debugPrint('[Portable] 落雪、AWMC 与 Union 曲库都为空，随身听曲库无法构建');
       _songs = const <PortableSong>[];
       return _songs!;
     }
@@ -106,15 +112,22 @@ class PortableSongLibrary {
     // 映射是纯 CPU 计算（1344 首），放后台 isolate 免得卡首帧。
     final result = await compute(
       _buildInIsolate,
-      _PortableBuildInput(lxnsSongs, divingFishSongs),
+      _PortableBuildInput(
+        lxnsSongs,
+        divingFishSongs,
+        awmcSongs,
+        unionSongs,
+      ),
     );
 
     _songs = result.songs;
     _skippedCount = result.skippedCount;
     _excludedUtageCount = result.excludedUtageCount;
+    _divingFishSongCount = result.divingFishSongCount;
     debugPrint('[Portable] 曲库构建完成：可播放 ${result.songs.length} 首，'
         '排除宴会场 ${result.excludedUtageCount} 首，'
-        '跳过 ${result.skippedCount} 首（水鱼无对应条目）');
+        '跳过 ${result.skippedCount} 首（水鱼无对应条目），'
+        '追加 AWMC/Union 补充 ${result.songs.where((song) => song.isAwmcExtra).length} 首');
     await _saveToDisk(result);
     return _songs!;
   }
@@ -189,6 +202,93 @@ class PortableSongLibrary {
     return null;
   }
 
+  /// 解析歌曲详情页的播放请求。
+  ///
+  /// 曲库索引是给列表展示用的缓存，落雪或 AWMC 的目录更新存在短暂不同步时，
+  /// 不能把「索引里没有」直接当成「音源不存在」。详情页还掌握水鱼的原始
+  /// `songId`，因此在索引未命中时保留这个 id，交给播放器按 AWMC 的
+  /// `/s/{songId}/track.mp3` 兜底尝试。这样像 11968 这类谱面播放可用、曲库
+  /// 索引尚未收录的歌曲也能播放。
+  ///
+  /// 该条目仍然使用 [PortableAudioCache] 的永久本地缓存；如果两个音源都不可用，
+  /// 播放器才会把失败反馈给页面。
+  PortableSong? resolveForPlayback({
+    required String songId,
+    String? title,
+    String? type,
+    String? artist,
+    String? genre,
+    int? bpm,
+  }) {
+    final rawId = int.tryParse(songId.trim());
+    final audioId = rawId == null ? 0 : LuoXueSongUtil.toLxnsMusicId(songId);
+    final indexed = findSong(songId: songId, title: title, type: type);
+    if (indexed != null) {
+      // findSong 为了列表兼容会按 audioId 取余匹配。详情页如果传入的是
+      // 11968，而索引里只有 1968，必须把原始 id 带到 WMC 兜底 URL，不能
+      // 把它悄悄改成 /s/1968/track.mp3。
+      if (rawId == null || indexed.divingFishId == songId.trim()) {
+        return indexed;
+      }
+      if (audioId <= 0 || indexed.audioId != audioId) return indexed;
+      return PortableSong(
+        lxnsId: indexed.lxnsId,
+        divingFishId: songId.trim(),
+        audioId: indexed.audioId,
+        title: indexed.title,
+        artist: indexed.artist,
+        genre: indexed.genre,
+        bpm: indexed.bpm,
+        difficultyConstants: indexed.difficultyConstants,
+        hasDx: indexed.hasDx,
+        isAwmcExtra: indexed.isAwmcExtra,
+      );
+    }
+
+    if (rawId == null || rawId <= 0) return null;
+    if (audioId <= 0) return null;
+
+    final fallback = PortableSong(
+      // 落雪曲绘和本地缓存使用取余后的 id；AWMC 音源仍使用原始 songId。
+      lxnsId: audioId,
+      divingFishId: songId.trim(),
+      audioId: audioId,
+      title: title?.trim().isNotEmpty == true ? title!.trim() : '未知歌曲',
+      artist: artist?.trim() ?? '',
+      genre: genre?.trim() ?? '',
+      bpm: bpm ?? 0,
+      hasDx: type?.toUpperCase() == 'DX',
+      isAwmcExtra: true,
+    );
+    _rememberPlaybackSong(fallback);
+    return fallback;
+  }
+
+  /// 播放详情页可能先于曲库索引拿到一首新歌。把这条已确认可尝试播放的
+  /// AWMC 条目加入内存/落盘索引，返回随身听后定位按钮就能找到它。
+  void _rememberPlaybackSong(PortableSong song) {
+    final all = _songs;
+    if (all == null ||
+        all.any((item) =>
+            item.lxnsId == song.lxnsId &&
+            item.divingFishId == song.divingFishId)) {
+      return;
+    }
+    final updated = <PortableSong>[...all, song]..sort((a, b) {
+        final byTitle = normalizePortableTitle(a.title)
+            .compareTo(normalizePortableTitle(b.title));
+        if (byTitle != 0) return byTitle;
+        return a.lxnsId.compareTo(b.lxnsId);
+      });
+    _songs = List<PortableSong>.unmodifiable(updated);
+    unawaited(_saveToDisk(PortableLibraryResult(
+      songs: _songs!,
+      skippedCount: _skippedCount,
+      divingFishSongCount: _divingFishSongCount,
+      excludedUtageCount: _excludedUtageCount,
+    )));
+  }
+
   /// 与 `DxRatingCoverService.normalizeSongId` 同口径：10000~19999 减 10000。
   static int? _normalizeSongIdForLookup(String raw) {
     final n = int.tryParse(raw.trim());
@@ -211,6 +311,7 @@ class PortableSongLibrary {
   Future<void> clearCache() async {
     _songs = null;
     _skippedCount = 0;
+    _divingFishSongCount = 0;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_prefsKey);
@@ -266,6 +367,60 @@ class PortableSongLibrary {
     }
   }
 
+  /// AWMC NET 曲库：songId 与 Union 全量一致，只作为落雪基础索引的追加来源。
+  Future<List<Song>> _loadAwmcSongs() async {
+    try {
+      final response =
+          await ApiClient.get(Uri.parse(ApiUrls.AwmcNetMusicDataApi));
+      if (response.statusCode != 200) {
+        debugPrint('[Portable] AWMC 曲库返回 ${response.statusCode}');
+        return const <Song>[];
+      }
+      final dynamic decoded = json.decode(_decodeBody(response));
+      if (decoded is! List) return const <Song>[];
+      final songs = <Song>[];
+      for (final item in decoded.whereType<Map<String, dynamic>>()) {
+        try {
+          songs.add(Song.fromJson(item));
+        } catch (e) {
+          debugPrint('[Portable] 跳过无法解析的 AWMC 曲目: $e');
+        }
+      }
+      debugPrint('[Portable] AWMC 曲库读取 ${songs.length} 首');
+      return songs;
+    } catch (e) {
+      debugPrint('[Portable] 读取 AWMC 曲库失败: $e');
+      return const <Song>[];
+    }
+  }
+
+  /// Union 全量元数据：用于补齐 AWMC 曲库尚未登记的新歌。
+  Future<List<Song>> _loadUnionSongs() async {
+    try {
+      final response =
+          await ApiClient.get(Uri.parse(ApiUrls.UnionMusicDataApi));
+      if (response.statusCode != 200) {
+        debugPrint('[Portable] Union 曲库返回 ${response.statusCode}');
+        return const <Song>[];
+      }
+      final dynamic decoded = json.decode(_decodeBody(response));
+      if (decoded is! List) return const <Song>[];
+      final songs = <Song>[];
+      for (final item in decoded.whereType<Map<String, dynamic>>()) {
+        try {
+          songs.add(Song.fromJson(item));
+        } catch (e) {
+          debugPrint('[Portable] 跳过无法解析的 Union 曲目: $e');
+        }
+      }
+      debugPrint('[Portable] Union 曲库读取 ${songs.length} 首');
+      return songs;
+    } catch (e) {
+      debugPrint('[Portable] 读取 Union 曲库失败: $e');
+      return const <Song>[];
+    }
+  }
+
   /// 与 `LuoXueSongsManager` 一致：优先 utf8，失败再退回 `response.body`。
   String _decodeBody(http.Response response) {
     try {
@@ -307,12 +462,17 @@ class PortableSongLibrary {
 class _PortableBuildInput {
   final List<LuoXueSong> lxnsSongs;
   final List<Song> divingFishSongs;
-  const _PortableBuildInput(this.lxnsSongs, this.divingFishSongs);
+  final List<Song> awmcSongs;
+  final List<Song> unionSongs;
+  const _PortableBuildInput(
+      this.lxnsSongs, this.divingFishSongs, this.awmcSongs, this.unionSongs);
 }
 
 PortableLibraryResult _buildInIsolate(_PortableBuildInput input) {
   return buildPortableLibrary(
     lxnsSongs: input.lxnsSongs,
     divingFishSongs: input.divingFishSongs,
+    awmcSongs: input.awmcSongs,
+    unionSongs: input.unionSongs,
   );
 }

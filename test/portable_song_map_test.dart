@@ -123,8 +123,7 @@ void main() {
       expect(song.divingFishId, '11001');
       // 音源文件名 = 水鱼 id % 10000
       expect(song.audioId, 1001);
-      expect(song.audioUrl,
-          'https://assets2.lxns.net/maimai/music/1001.mp3');
+      expect(song.audioUrl, 'https://assets2.lxns.net/maimai/music/1001.mp3');
     });
 
     test('两条规则同时成立时优先取「落雪 id 原样」（id 更小、更规范）', () {
@@ -177,6 +176,38 @@ void main() {
       expect(result.songs.first.lxnsId, 9);
       expect(result.skippedCount, 1);
     });
+
+    test('AWMC 独有曲目追加到落雪基础索引之后，并优先使用 WMC 音源', () {
+      final result = buildPortableLibrary(
+        lxnsSongs: const <LuoXueSong>[],
+        divingFishSongs: const <Song>[],
+        awmcSongs: [_dfSong(id: '15000', title: 'AWMC New Song')],
+      );
+      expect(result.songs, hasLength(1));
+      expect(result.songs.single.isAwmcExtra, isTrue);
+      expect(result.songs.single.audioUrl,
+          'https://download.wmc.pub/s/15000/track.mp3');
+    });
+
+    test('Union 全量补充落雪未收录的歌曲', () {
+      final result = buildPortableLibrary(
+        lxnsSongs: const <LuoXueSong>[],
+        divingFishSongs: const <Song>[],
+        unionSongs: [
+          _dfSong(
+            id: '11968',
+            title: 'Aegisfortia',
+            artist: 'お月さま交響曲',
+            type: 'DX',
+          ),
+        ],
+      );
+      expect(result.songs, hasLength(1));
+      expect(result.songs.single.divingFishId, '11968');
+      expect(result.songs.single.artist, 'お月さま交響曲');
+      expect(result.songs.single.audioUrls.first,
+          'https://download.wmc.pub/s/11968/track.mp3');
+    });
   });
 
   group('音源文件名（取余规则）', () {
@@ -187,8 +218,7 @@ void main() {
         [_dfSong(id: '11466', title: '群青シグナル', type: 'DX')],
       )!;
       expect(song.audioId, 1466);
-      expect(song.audioUrl,
-          'https://assets2.lxns.net/maimai/music/1466.mp3');
+      expect(song.audioUrl, 'https://assets2.lxns.net/maimai/music/1466.mp3');
     });
 
     test('6 位宴会场**同样取余**：100018 → 18.mp3', () {
@@ -224,8 +254,8 @@ void main() {
       expect(song.coverAssetId, 1466);
       // 网络：covers/11466.png（已核实 200）
       expect(song.coverNetworkId, '11466');
-      expect(song.coverNetworkUrl,
-          'https://www.diving-fish.com/covers/11466.png');
+      expect(
+          song.coverNetworkUrl, 'https://www.diving-fish.com/covers/11466.png');
     });
 
     test('4 位曲目网络 URL 补零：8 → 00008.png', () {

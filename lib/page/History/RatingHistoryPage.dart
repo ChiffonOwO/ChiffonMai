@@ -1,3 +1,4 @@
+import 'package:my_first_flutter_app/widgets/NoRipple.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
@@ -282,6 +283,7 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
@@ -410,10 +412,12 @@ class _RatingHistoryPageState extends State<RatingHistoryPage> {
         for (final entry in options.entries)
           Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(entry.value, style: const TextStyle(fontSize: 12)),
-              selected: _rangeDays == entry.key,
-              onSelected: (_) => setState(() => _rangeDays = entry.key),
+            child: NoRipple(
+              child: ChoiceChip(
+                label: Text(entry.value, style: const TextStyle(fontSize: 12)),
+                selected: _rangeDays == entry.key,
+                onSelected: (_) => setState(() => _rangeDays = entry.key),
+              ),
             ),
           ),
       ],

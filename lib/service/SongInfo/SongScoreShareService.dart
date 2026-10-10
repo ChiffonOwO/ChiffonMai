@@ -12,6 +12,8 @@ import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
 import 'package:my_first_flutter_app/utils/ColorUtil.dart';
 import 'package:my_first_flutter_app/utils/ImageEncodeUtil.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../widgets/LxnsAssetImage.dart';
 
 /// 徽章颜色数据
 class _BadgeColors {
@@ -328,7 +330,11 @@ class SongScoreShareService {
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(color: accentColor, width: 3),
-                                  image: DecorationImage(image: NetworkImage(avatarUrl), fit: BoxFit.cover),
+                                  image: DecorationImage(
+                                    image: CachedNetworkImageProvider(avatarUrl,
+                                        cacheManager: lxnsAssetCacheManager),
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
                               ),
                             Column(

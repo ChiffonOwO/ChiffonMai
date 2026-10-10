@@ -82,6 +82,14 @@ class PageTopBar extends StatelessWidget implements PreferredSizeWidget {
   /// 附着在标题栏下方的部件（如进度条），对应 `AppBar.bottom`。
   final PreferredSizeWidget? bottom;
 
+  /// 标题字符串变化时是否使用淡入滑动过渡。
+  final bool animateTitle;
+
+  /// 标题是否在返回按钮与右侧操作按钮之间的可用区域内居中。
+  ///
+  /// 适合标题栏右侧有多个操作按钮、又希望标题只占左侧空间的页面。
+  final bool centerTitleInAvailableSpace;
+
   const PageTopBar({
     super.key,
     required this.title,
@@ -97,6 +105,8 @@ class PageTopBar extends StatelessWidget implements PreferredSizeWidget {
     this.toolbarHeight,
     this.primary = true,
     this.bottom,
+    this.animateTitle = false,
+    this.centerTitleInAvailableSpace = false,
   });
 
   /// 标题默认字号（与 `appBarTheme.titleTextStyle` 一致）。
@@ -117,6 +127,34 @@ class PageTopBar extends StatelessWidget implements PreferredSizeWidget {
     final resolvedFontSize = fontSize ?? titleFontSize;
     final resolvedWeight = titleWeight ?? FontWeight.bold;
 
+    final titleText = Text(
+      title,
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.ellipsis,
+      textAlign: centerTitleInAvailableSpace ||
+              titleAlign == PageTopBarTitleAlign.center
+          ? TextAlign.center
+          : TextAlign.start,
+      // 字体必须走 AppTheme.font：AppBar 会在标题外再套一层
+      // `DefaultTextStyle(style: appBarTheme.titleTextStyle)`，
+      // 不带族名的裸 TextStyle 会把全局网络字体顶掉（标题变 Roboto）。
+      style: AppTheme.font(
+        color: resolvedColor,
+        fontSize: resolvedFontSize,
+        fontWeight: resolvedWeight,
+      ),
+    );
+
+    // 普通标题交给 NavigationToolbar 自己计算中心点；只有歌曲详情页这类
+    // 明确要求避开右侧操作按钮的标题，才撑满「返回键到操作区」的可用宽度。
+    final titleWidget = centerTitleInAvailableSpace
+        ? SizedBox(width: double.infinity, child: titleText)
+        : titleText;
+    final resolvedTitleWidget = centerTitleInAvailableSpace
+        ? Align(alignment: Alignment.center, child: titleWidget)
+        : titleWidget;
+
     final appBar = AppBar(
       // 有底：由 AppBar 自己的 Material 画，状态栏区域也一起着色
       backgroundColor: barBackground ?? AppColors.cardBackground(brightness),
@@ -134,32 +172,42 @@ class PageTopBar extends StatelessWidget implements PreferredSizeWidget {
       automaticallyImplyLeading: false,
       leading: !showBack
           ? null
-          : onBack == null
-              ? const BackButton()
-              : Builder(
-                  builder: (context) => IconButton(
-                    icon: const Icon(Icons.arrow_back),
-                    tooltip:
-                        MaterialLocalizations.of(context).backButtonTooltip,
-                    onPressed: onBack,
-                  ),
-                ),
-      // 窄屏或动作按钮较多时仅按可用空间缩小，长标题仍完整显示。
-      title: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            // 字体必须走 AppTheme.font：AppBar 会在标题外再套一层
-            // `DefaultTextStyle(style: appBarTheme.titleTextStyle)`，
-            // 不带族名的裸 TextStyle 会把全局网络字体顶掉（标题变 Roboto）。
-            style: AppTheme.font(
-              color: resolvedColor,
-              fontSize: resolvedFontSize,
-              fontWeight: resolvedWeight,
+          : Builder(
+              builder: (context) => IconButton(
+                icon: const Icon(Icons.arrow_back),
+                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                onPressed: () {
+                  FocusManager.instance.primaryFocus?.unfocus();
+                  if (onBack != null) {
+                    onBack!();
+                  } else {
+                    Navigator.of(context).maybePop();
+                  }
+                },
+              ),
             ),
-          )),
+      // 窄屏或动作按钮较多时按可用空间截断，避免字号缩到只剩一条线。
+      title: animateTitle
+          ? AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.12),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              ),
+              child: KeyedSubtree(
+                key: ValueKey(title),
+                child: resolvedTitleWidget,
+              ),
+            )
+          : resolvedTitleWidget,
       actions: actions.isEmpty ? null : actions,
       // 图标色与 appBarTheme.iconTheme 一致（primary）；页面传进来的 actions
       // 若自带 color 则以自带的为准

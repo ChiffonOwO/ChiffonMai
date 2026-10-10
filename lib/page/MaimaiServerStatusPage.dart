@@ -299,15 +299,26 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
   }
 
   Widget _buildStatusChip(String text, Color color) {
-    return CircleAvatar(
-      radius: 16,
-      backgroundColor: color.withValues(alpha: 0.16),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: color,
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
+    final isSingleCharacter = text.runes.length <= 1;
+    return SizedBox(
+      width: isSingleCharacter ? 32 : 68,
+      height: 32,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Center(
+          child: Text(
+            text,
+            maxLines: 1,
+            softWrap: false,
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
       ),
     );

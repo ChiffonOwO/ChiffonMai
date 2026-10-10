@@ -50,8 +50,10 @@ import '../utils/LoginStateNotifier.dart';
 import '../utils/UserProfileNotifier.dart';
 import '../utils/AppTheme.dart';
 import '../utils/ExternalLaunchUtil.dart';
+import '../utils/ExportPathUtil.dart';
 import '../service/CommunityAvatarStore.dart';
 import '../widgets/ErrorMessageDialog.dart';
+import '../entity/FeatureModels.dart';
 
 class SystemHubPage extends StatefulWidget {
   final VoidCallback onAccountManageTap;
@@ -59,7 +61,7 @@ class SystemHubPage extends StatefulWidget {
   const SystemHubPage({super.key, required this.onAccountManageTap});
 
   @override
-  State<SystemHubPage> createState() => _SystemHubPageState();
+  State<SystemHubPage> createState() => SystemHubPageState();
 }
 
 /// 「maidata 管理」对话框的返回值：用户选了哪个动作。
@@ -68,7 +70,30 @@ class SystemHubPage extends StatefulWidget {
 /// 「清除兜底缓存」是瞬时操作，留在对话框内完成，不产生返回值。
 enum _MaidataManageAction { startRefresh }
 
-class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
+class SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
+  /// 首页搜索调用系统 Hub 的原有入口，沿用同一份进度与互斥状态。
+  Future<void> openFeature(ButtonItem item) async {
+    if (anyBusy) {
+      Fluttertoast.showToast(msg: '正在处理其它任务，请稍候');
+      return;
+    }
+    if (item.title == '登录 maimai Score Hub') {
+      await _loginMaimaiHub();
+      return;
+    }
+    if (item.title == '打印日志') {
+      await _exportLogs();
+      return;
+    }
+    if (item.title == 'maidata 管理') {
+      await _showMaidataManageDialog();
+      return;
+    }
+    if (item.title == '刷新数据（高级）') {
+      await _advancedRefreshData();
+    }
+  }
+
   // ===== 账号 / 用户信息（昵称 / QQ 来自 UserProfileNotifier） =====
   String _userNickname = '';
 
@@ -284,9 +309,12 @@ class _SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
           .then((_) => _loadProfile());
 
   Future<void> _exportLogs() async {
+    if (!await ExportPathUtil.prepareForExport(context,
+        subDir: '日志', title: '选择日志保存位置')) {
+      return;
+    }
     try {
-      final file = await LogExportService.instance
-          .export();
+      final file = await LogExportService.instance.export();
       if (!mounted) return;
       await showDialog<void>(
           context: context,

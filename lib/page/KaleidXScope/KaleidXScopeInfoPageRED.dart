@@ -52,6 +52,9 @@ class _KaleidXScopeInfoPageREDState extends State<KaleidXScopeInfoPageRED> {
   late double _coverSize;
   late double _progressBarHeight;
 
+  // 歌曲卡片高度：在 375px 宽度下为 54px，随曲绘尺寸同步缩放。
+  double get _songCardHeight => _coverSize + (_paddingXS * 2) + 6;
+
   void _initSizeParams(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
     final double scaleFactor = screenWidth / 375.0;
@@ -409,6 +412,7 @@ class _KaleidXScopeInfoPageREDState extends State<KaleidXScopeInfoPageRED> {
                     SongInfoPage(songId: song.id, initialLevelIndex: 3)));
       },
       child: Container(
+        constraints: BoxConstraints(minHeight: _songCardHeight),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -532,7 +536,8 @@ class _KaleidXScopeInfoPageREDState extends State<KaleidXScopeInfoPageRED> {
                 crossAxisCount: 2,
                 crossAxisSpacing: _paddingXS,
                 mainAxisSpacing: _paddingXS,
-                childAspectRatio: 2.0),
+                childAspectRatio: 2.0,
+                mainAxisExtent: _songCardHeight),
             itemCount: _songs.length,
             itemBuilder: (context, index) {
               final song = _songs[index];
@@ -669,7 +674,8 @@ class _KaleidXScopeInfoPageREDState extends State<KaleidXScopeInfoPageRED> {
               crossAxisCount: 2,
               crossAxisSpacing: _paddingXS,
               mainAxisSpacing: _paddingXS,
-              childAspectRatio: 2.0),
+              childAspectRatio: 2.0,
+              mainAxisExtent: _songCardHeight),
           itemCount: songs.length,
           itemBuilder: (context, index) {
             final song = songs[index];

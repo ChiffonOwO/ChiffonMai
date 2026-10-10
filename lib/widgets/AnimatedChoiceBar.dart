@@ -7,13 +7,15 @@ class AnimatedChoiceBar<T> extends StatelessWidget {
   final String Function(T) label;
   final ValueChanged<T>? onChanged;
   final bool compact;
+  final bool enableRipple;
   const AnimatedChoiceBar(
       {super.key,
       required this.values,
       required this.value,
       required this.label,
       required this.onChanged,
-      this.compact = false});
+      this.compact = false,
+      this.enableRipple = false});
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +57,12 @@ class AnimatedChoiceBar<T> extends StatelessWidget {
                                 color: Colors.transparent,
                                 child: InkWell(
                                     borderRadius: BorderRadius.circular(14),
+                                    splashFactory: enableRipple
+                                        ? null
+                                        : NoSplash.splashFactory,
+                                    highlightColor: enableRipple
+                                        ? null
+                                        : Colors.transparent,
                                     onTap: onChanged == null
                                         ? null
                                         : () {

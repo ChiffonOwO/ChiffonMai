@@ -5,7 +5,8 @@
  * `stop + dispose`，所以「退出这个页面 = 音乐停」，也不会有通知栏控制。
  *
  * 现在这一页只做三件事：
- *   1. 把水鱼 songId 解析成随身听条目（[PortableSongLibrary.findSong]）；
+ *   1. 把 songId 解析成随身听条目（[PortableSongLibrary.resolveForPlayback]，含落雪基础、
+ *      AWMC 追加，以及目录未及时收录时的原始 songId 兜底）；
  *   2. 交给全局的 [PortablePlayerController] 播放（不持有播放器所有权）；
  *   3. 渲染随身听的全屏播放界面。
  *
@@ -28,12 +29,14 @@ class SongPlayPage extends StatefulWidget {
   final String songId;
   final String songTitle;
   final String songType;
+  final String? songArtist;
 
   const SongPlayPage({
     super.key,
     required this.songId,
     required this.songTitle,
     required this.songType,
+    this.songArtist,
   });
 
   @override
@@ -73,16 +76,17 @@ class _SongPlayPageState extends State<SongPlayPage> {
     try {
       // 曲库可能还没构建过（用户没进过随身听页），先确保加载
       await _library.load();
-      final song = _library.findSong(
+      final song = _library.resolveForPlayback(
         songId: widget.songId,
         title: widget.songTitle,
         type: widget.songType,
+        artist: widget.songArtist,
       );
       if (!mounted) return;
 
       if (song == null) {
         setState(() {
-          _message = '这首歌暂时没有可用的音源（水鱼/落雪曲库里没找到对应条目）';
+          _message = '这首歌暂时没有可用的音源';
         });
         return;
       }
@@ -91,11 +95,20 @@ class _SongPlayPageState extends State<SongPlayPage> {
       final current = _player.currentSong;
       if (current != null && current.lxnsId == song.lxnsId) {
         // 已经就是当前曲目：不动播放状态，只把界面换过来
-        _handedOff = true;
+        setState(() => _handedOff = true);
         return;
       }
-      _handedOff = true;
+
+      // 播放器需要先下载/读取音频并建立 AudioSource。不能在这里提前切到
+      // PortableNowPlayingPage，否则它会在 currentSong 还是 null 时显示「还没有
+      // 在放的音乐」，随后页面退出了，后台下载完成后才真正开始播放。
       await _player.playSong(song);
+      if (!mounted) return;
+      if (_player.currentSong == null) {
+        setState(() => _message = '音源加载失败，请稍后重试');
+        return;
+      }
+      setState(() => _handedOff = true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _message = '打开播放器失败：$e');
@@ -111,6 +124,7 @@ class _SongPlayPageState extends State<SongPlayPage> {
 
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [

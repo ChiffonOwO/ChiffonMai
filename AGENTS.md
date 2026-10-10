@@ -447,3 +447,16 @@ Get-ChildItem lib/page -Recurse -File -Include *.dart |
 确实需要把功能分组时，优先使用 `colorScheme.outlineVariant` 的细边框、底部分隔线或很轻的主题容器；局部卡片只有在信息本身需要明确边界时才保留。页面级大面板、重复的 `surface.withOpacity(0.9)`、大范围阴影都应移除。裁剪工具栏、播放控制等具有明确全屏功能语义的特殊区域可以保留自己的布局。
 
 这条规则同样适用于已经迁移过的页面：迁移完成不代表要保留原来的浮起视觉，后续复查时要继续把能铺平的区域铺平。
+
+## 18. 键盘弹出时的背景布局
+
+- 带有搜索框或输入框、且背景由全屏组件铺设的页面，必须检查 `Scaffold.resizeToAvoidBottomInset`。如果键盘弹出后不应把背景和页面整体向上挤压，应在页面自身及其承载页面的 `Scaffold` 上设为 `false`，让键盘覆盖可用区域而不是改变背景布局。
+- 需要让输入框始终可见时，应单独调整输入框或内容滚动区域，不要恢复整个页面的自动缩放；否则背景会随输入法一起向上压缩，造成明显跳动。
+- `BackgroundPageScaffold` 默认不缩放背景；内外嵌套的 `Scaffold` 和输入对话框下方的页面也要一起检查，不能只修输入框所在的最内层。对话框自身仍保留输入法避让。
+- 页面切换、功能页 push 和顶部返回按钮执行前都要清理 `FocusManager.instance.primaryFocus`；否则离开的 TextField 仍会保持光标，返回或重新显示页面时可能再次拉起输入法。
+
+## 19. Tab 与模式切换不使用波纹
+
+- Tab、来源、类型、模式等切换控件保留选中指示移动、文字淡化等状态动画，但不使用点击波纹和按下高亮遮罩。
+- 标准 `TabBar`、`SegmentedButton` 走 `AppTheme` 三套主题的配置；`AnimatedChoiceBar` 默认关闭波纹。用于切换的 `ChoiceChip` 通过 `NoRipple` 包装，自定义 `InkWell` 则显式设置 `NoSplash.splashFactory` 与透明 `highlightColor`。
+- 再次点击当前选中的选项不应重新加载数据；快速切换时异步结果必须校验当前请求，避免旧选项的数据覆盖新选项。

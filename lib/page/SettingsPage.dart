@@ -172,6 +172,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final c = Theme.of(context).colorScheme.onSurface;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [

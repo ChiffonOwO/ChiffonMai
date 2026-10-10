@@ -1,3 +1,4 @@
+import 'package:my_first_flutter_app/widgets/NoRipple.dart';
 import 'package:flutter/material.dart';
 
 import '../entity/DivingFish/Song.dart';
@@ -86,6 +87,7 @@ class _UnionUpdateComparePageState extends State<UnionUpdateComparePage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
@@ -306,10 +308,12 @@ class _UnionUpdateComparePageState extends State<UnionUpdateComparePage> {
       runSpacing: 8,
       children: [
         for (final (section, label, count) in chips)
-          ChoiceChip(
-            label: Text('$label $count', style: const TextStyle(fontSize: 12)),
-            selected: _section == section,
-            onSelected: (_) => setState(() => _section = section),
+          NoRipple(
+            child: ChoiceChip(
+              label: Text('$label $count', style: const TextStyle(fontSize: 12)),
+              selected: _section == section,
+              onSelected: (_) => setState(() => _section = section),
+            ),
           ),
       ],
     );

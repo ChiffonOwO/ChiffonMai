@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../utils/AppTheme.dart';
 
-/// 首页功能搜索栏 — 置于功能中心白色区域内，用于筛选首页功能按钮
+/// 功能搜索栏，可在首页或功能分类页复用。
 class QuickSearchBar extends StatefulWidget {
   /// 搜索文本变化回调
   final ValueChanged<String> onChanged;
@@ -25,6 +24,8 @@ class _QuickSearchBarState extends State<QuickSearchBar> {
   }
 
   void _onChanged(String value) {
+    // 立即刷新清除按钮，实际筛选仍按短防抖后的值触发。
+    setState(() {});
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 150), () {
       widget.onChanged(value.trim());
@@ -33,10 +34,9 @@ class _QuickSearchBarState extends State<QuickSearchBar> {
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    final isDark = brightness == Brightness.dark;
-    final hintColor = AppColors.greyHint(brightness);
-    final iconColor = AppColors.primaryText(brightness);
+    final scheme = Theme.of(context).colorScheme;
+    final hintColor = scheme.onSurfaceVariant;
+    final iconColor = scheme.primary;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -45,7 +45,7 @@ class _QuickSearchBarState extends State<QuickSearchBar> {
         onChanged: _onChanged,
         style: TextStyle(
           fontSize: 14,
-          color: AppColors.primaryText(brightness),
+          color: scheme.onSurface,
         ),
         decoration: InputDecoration(
           hintText: '搜索功能...',
@@ -55,28 +55,29 @@ class _QuickSearchBarState extends State<QuickSearchBar> {
               ? IconButton(
                   icon: Icon(Icons.clear, color: iconColor, size: 18),
                   onPressed: () {
+                    _debounceTimer?.cancel();
                     _controller.clear();
+                    setState(() {});
                     widget.onChanged('');
                   },
                 )
               : null,
           filled: true,
-          fillColor: isDark
-              ? const Color.fromARGB(60, 255, 255, 255)
-              : Colors.white.withValues(alpha: 0.6),
+          fillColor: scheme.surfaceContainerLow,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: iconColor.withValues(alpha: 0.3)),
+            borderSide: BorderSide(color: scheme.outlineVariant),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: iconColor.withValues(alpha: 0.2)),
+            borderSide: BorderSide(color: scheme.outlineVariant),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide(color: iconColor, width: 1.5),
           ),
-          contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          contentPadding:
+              const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
         ),
       ),
     );

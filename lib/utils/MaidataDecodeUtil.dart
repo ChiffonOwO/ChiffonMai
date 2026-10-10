@@ -191,8 +191,12 @@ class MaidataDecodeUtil {
     // 额外处理：使用正则表达式直接提取 inote 字段（作为备用方法）
     for (int i = 2; i <= 6; i++) {
       // 尝试使用正则表达式提取 inote 字段
-      RegExp inoteRegex = RegExp(r'&inote_' + i.toString() + r'=(.*?)(?=\s*&|$)', 
-          multiLine: true, dotAll: true);
+      // maidata 的 inote 是多行字段，只能在下一个字段（行首的 &）处结束。
+      // 不要使用 multiLine 下的 `$`：它会把每一行末尾都误判成字段结束，
+      // 导致整张谱面只剩第一行，物量和 BREAK 绝赞统计全部变成 0。
+      RegExp inoteRegex = RegExp(
+        r'&inote_' + i.toString() + r'=([\s\S]*?)(?=\r?\n&|$)',
+      );
       Match? match = inoteRegex.firstMatch(content);
       if (match != null) {
         String inoteValue = match.group(1)?.trim() ?? '';

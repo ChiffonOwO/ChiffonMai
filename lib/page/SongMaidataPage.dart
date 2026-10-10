@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:my_first_flutter_app/widgets/ExportSuccessDialog.dart';
 import 'package:flutter/services.dart';
 import 'package:archive/archive.dart';
+import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import '../utils/CoverUtil.dart';
 import '../utils/AppTheme.dart';
@@ -65,14 +66,14 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
 
   Future<void> _checkAndFetchFullCache() async {
     await MaidataManager().initialize();
-    
+
     if (!MaidataManager().isCacheReady) {
       setState(() {
         _isFetchingFullCache = true;
       });
-      
+
       debugPrint('[DEBUG][SongMaidataPage] 全量缓存不存在，开始拉取...');
-      
+
       try {
         await MaidataManager().fetchAndCacheFullMaidata();
         debugPrint('[DEBUG][SongMaidataPage] 全量缓存拉取成功');
@@ -84,7 +85,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
         });
       }
     }
-    
+
     _fetchMaidata();
   }
 
@@ -190,7 +191,13 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
     // codeUnits 返回的是 UTF-16 码元，日文/中文标题会被写成乱码字节，
     // 导出的 maidata.txt 到别的工具里就是一堆问号。
     final maidataBytes = Uint8List.fromList(utf8.encode(_maidataContent));
-    final coverBytes = await _getCoverBytes();
+    final rawCoverBytes = await _getCoverBytes();
+    // 本地曲绘资源通常是 WebP，网络兜底也可能返回 PNG/JPEG。
+    // 导出文件名固定为 bg.jpg 时必须同步转码，否则只是改后缀，
+    // AstroDX 和文件管理器会按 JPEG 解码失败。
+    final coverBytes = rawCoverBytes == null
+        ? null
+        : _encodeCoverAsJpeg(rawCoverBytes);
     final audioBytes = await _getAudioBytes();
     return _ChartExportAssets(
       maidataBytes: maidataBytes,
@@ -202,13 +209,17 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
   /// 导出通用 zip 压缩包（三件套平铺在压缩包根目录）
   Future<void> _exportToZip() async {
     if (_maidataContent.isEmpty || _isExporting) return;
+    if (!await ExportPathUtil.prepareForExport(context,
+        subDir: '谱面', title: '选择谱面包保存位置')) {
+      return;
+    }
     await _runExport(() async {
       final assets = await _collectExportAssets();
 
       final archive = Archive();
       archive.add(ArchiveFile.bytes('maidata.txt', assets.maidataBytes));
       if (assets.coverBytes != null) {
-        archive.add(ArchiveFile.bytes('bg.png', assets.coverBytes!));
+        archive.add(ArchiveFile.bytes('bg.jpg', assets.coverBytes!));
       }
       if (assets.audioBytes != null) {
         archive.add(ArchiveFile.bytes('track.mp3', assets.audioBytes!));
@@ -235,6 +246,10 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
   /// 而不能像通用 zip 那样平铺在压缩包根目录。
   Future<void> _exportAstroDx() async {
     if (_maidataContent.isEmpty || _isExporting) return;
+    if (!await ExportPathUtil.prepareForExport(context,
+        subDir: '谱面', title: '选择 AstroDX 谱面保存位置')) {
+      return;
+    }
     await _runExport(() async {
       final assets = await _collectExportAssets();
       final safeName =
@@ -244,7 +259,7 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
       archive
           .add(ArchiveFile.bytes('$safeName/maidata.txt', assets.maidataBytes));
       if (assets.coverBytes != null) {
-        archive.add(ArchiveFile.bytes('$safeName/bg.png', assets.coverBytes!));
+        archive.add(ArchiveFile.bytes('$safeName/bg.jpg', assets.coverBytes!));
       }
       if (assets.audioBytes != null) {
         archive
@@ -390,6 +405,21 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
     return null;
   }
 
+  /// 将任意支持的曲绘格式统一编码为 JPEG，确保导出内容与 `bg.jpg` 扩展名一致。
+  Uint8List? _encodeCoverAsJpeg(Uint8List bytes) {
+    try {
+      final image = img.decodeImage(bytes);
+      if (image == null) {
+        debugPrint('[DEBUG][SongMaidataPage] 曲绘无法解码，跳过导出');
+        return null;
+      }
+      return Uint8List.fromList(img.encodeJpg(image, quality: 95));
+    } catch (e) {
+      debugPrint('[DEBUG][SongMaidataPage] 曲绘转 JPEG 失败，跳过导出: $e');
+      return null;
+    }
+  }
+
   /// 获取音源字节数据
   Future<Uint8List?> _getAudioBytes() async {
     try {
@@ -419,7 +449,8 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
         return null;
       }
 
-      final audioUrl = 'https://assets2.lxns.net/maimai/music/$luoXueSongId.mp3';
+      final audioUrl =
+          'https://assets2.lxns.net/maimai/music/$luoXueSongId.mp3';
 
       // 先检查本地缓存
       final directory = await getApplicationDocumentsDirectory();
@@ -447,7 +478,8 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
         }
         return response.bodyBytes;
       } else {
-        debugPrint('[DEBUG][SongMaidataPage] 下载音源失败，状态码: ${response.statusCode}');
+        debugPrint(
+            '[DEBUG][SongMaidataPage] 下载音源失败，状态码: ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('[DEBUG][SongMaidataPage] 获取音源失败: $e');
@@ -513,7 +545,9 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Text(
                     '渲染出的谱面仅供参考，不代表官方谱面。对于高密度谱面，请勿频繁拖动进度条，以免造成应用闪退或卡死。',
-                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -567,7 +601,8 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
   }
 
   Color _getInoteColor(String inoteNum) {
-    int colorValue = SongMaidataPageService.inoteColorMap[inoteNum] ?? 0xFF9E9E9E;
+    int colorValue =
+        SongMaidataPageService.inoteColorMap[inoteNum] ?? 0xFF9E9E9E;
     return Color(colorValue);
   }
 
@@ -587,44 +622,45 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
       );
     });
   }
-  
+
   // 提取单个难度的maidata内容
   String _getFilteredMaidata() {
     if (_displayedInote == null || _maidataContent.isEmpty) {
       return _maidataContent;
     }
-    
+
     String targetInote = '&inote_${_displayedInote}';
     String nextInote = '';
-    
+
     // 找到下一个难度的起始位置
     for (String inote in _inoteList) {
       if (inote != _displayedInote) {
         String candidate = '&inote_$inote';
         int targetIndex = _maidataContent.indexOf(targetInote);
         int candidateIndex = _maidataContent.indexOf(candidate);
-        
+
         if (candidateIndex > targetIndex) {
-          if (nextInote.isEmpty || candidateIndex < _maidataContent.indexOf('&inote_$nextInote')) {
+          if (nextInote.isEmpty ||
+              candidateIndex < _maidataContent.indexOf('&inote_$nextInote')) {
             nextInote = inote;
           }
         }
       }
     }
-    
+
     int startIndex = _maidataContent.indexOf(targetInote);
     if (startIndex == -1) {
       return _maidataContent;
     }
-    
-    int endIndex = nextInote.isEmpty 
-        ? _maidataContent.length 
+
+    int endIndex = nextInote.isEmpty
+        ? _maidataContent.length
         : _maidataContent.indexOf('&inote_$nextInote');
-    
+
     if (endIndex == -1) {
       endIndex = _maidataContent.length;
     }
-    
+
     return _maidataContent.substring(startIndex, endIndex);
   }
 
@@ -713,250 +749,266 @@ class _SongMaidataPageState extends State<SongMaidataPage> {
     return BackgroundPageScaffold(
       title: '谱面代码',
       actions: (_isLoading || _maidataContent.isEmpty)
-                    ? const <Widget>[]
-                    : [
-                        IconButton(
-                          icon: const Icon(Icons.copy, size: 20),
-                          onPressed: _copyToClipboard,
-                          tooltip: '复制',
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(4),
-                          constraints: const BoxConstraints(),
+          ? const <Widget>[]
+          : [
+              IconButton(
+                icon: const Icon(Icons.copy, size: 20),
+                onPressed: _copyToClipboard,
+                tooltip: '复制',
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
+              ),
+              IconButton(
+                icon: Icon(
+                  _isExporting ? Icons.hourglass_empty : Icons.download,
+                  size: 20,
+                ),
+                onPressed: _isExporting ? null : _showExportOptions,
+                tooltip: '导出',
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
+              ),
+              IconButton(
+                icon: const Icon(Icons.play_circle_outline, size: 20),
+                onPressed: _navigateToChartPlay,
+                tooltip: '渲染',
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
+              ),
+            ],
+      contentPadding:
+          EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      child: Column(children: [
+        Container(
+          margin: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+          ),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: CoverUtil.buildCoverWidgetWithContext(
+                        context, widget.songId.toString(), 80),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            _buildTypeTag(widget.songType, widget.songId),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                widget.songTitle,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: themeColor,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
-                        IconButton(
-                          icon: Icon(
-                            _isExporting
-                                ? Icons.hourglass_empty
-                                : Icons.download,
-                            size: 20,
-                          ),
-                          onPressed:
-                              _isExporting ? null : _showExportOptions,
-                          tooltip: '导出',
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(4),
-                          constraints: const BoxConstraints(),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.play_circle_outline, size: 20),
-                          onPressed: _navigateToChartPlay,
-                          tooltip: '渲染',
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(4),
-                          constraints: const BoxConstraints(),
-                        ),
+                        const SizedBox(height: 8),
+                        _buildInfoTag('歌曲ID', widget.songId),
+                        const SizedBox(height: 8),
+                        _buildDsDisplay(),
                       ],
-      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
-      child: Column(children: [Container(
-                margin: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: Theme.of(context).colorScheme.outlineVariant,
                     ),
                   ),
-                ),
-                child: Column(
+                ],
+              ),
+              if (_inoteList.isNotEmpty) const SizedBox(height: 12),
+              if (_inoteList.isNotEmpty)
+                Row(
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: CoverUtil.buildCoverWidgetWithContext(context, widget.songId.toString(), 80),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  _buildTypeTag(widget.songType, widget.songId),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      widget.songTitle,
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: themeColor,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              _buildInfoTag('歌曲ID', widget.songId),
-                              const SizedBox(height: 8),
-                              _buildDsDisplay(),
-                            ],
-                          ),
-                        ),
-                      ],
+                    Text(
+                      'INOTE: ',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                    if (_inoteList.isNotEmpty)
-                      const SizedBox(height: 12),
-                    if (_inoteList.isNotEmpty)
-                      Row(
-                        children: [
-                          Text(
-                            'INOTE: ',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: [
-                                  // ALL选项
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                                    child: ElevatedButton(
-                                      onPressed: () => _scrollToInote('ALL'),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: _selectedInote == 'ALL'
-                                            ? Theme.of(context).colorScheme.onSurface
-                                            : Theme.of(context).colorScheme.surfaceContainerHighest,
-                                        foregroundColor: _selectedInote == 'ALL'
-                                            ? Theme.of(context).colorScheme.surface
-                                            : Theme.of(context).colorScheme.onSurface,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 6,
-                                        ),
-                                        textStyle: const TextStyle(fontSize: 12),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                      ),
-                                      child: const Text('ALL'),
-                                    ),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            // ALL选项
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 4),
+                              child: ElevatedButton(
+                                onPressed: () => _scrollToInote('ALL'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _selectedInote == 'ALL'
+                                      ? Theme.of(context).colorScheme.onSurface
+                                      : Theme.of(context)
+                                          .colorScheme
+                                          .surfaceContainerHighest,
+                                  foregroundColor: _selectedInote == 'ALL'
+                                      ? Theme.of(context).colorScheme.surface
+                                      : Theme.of(context).colorScheme.onSurface,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
                                   ),
-                                  // 其他难度选项
-                                  ..._inoteList.map((inote) {
-                                    String difficultyName = _getInoteDifficulty(inote);
-                                    Color inoteColor = _getInoteColor(inote);
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                                      child: ElevatedButton(
-                                        onPressed: () => _scrollToInote(inote),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: _selectedInote == inote
-                                              ? inoteColor
-                                              : Theme.of(context).colorScheme.surfaceContainerHighest,
-                                          foregroundColor: _selectedInote == inote
-                                              ? Colors.white
-                                              : Theme.of(context).colorScheme.onSurface,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 6,
-                                          ),
-                                          textStyle: const TextStyle(fontSize: 12),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                        ),
-                                        child: Text(difficultyName),
-                                      ),
-                                    );
-                                  }).toList(),
-                                ],
+                                  textStyle: const TextStyle(fontSize: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text('ALL'),
                               ),
                             ),
+                            // 其他难度选项
+                            ..._inoteList.map((inote) {
+                              String difficultyName =
+                                  _getInoteDifficulty(inote);
+                              Color inoteColor = _getInoteColor(inote);
+                              return Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                child: ElevatedButton(
+                                  onPressed: () => _scrollToInote(inote),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _selectedInote == inote
+                                        ? inoteColor
+                                        : Theme.of(context)
+                                            .colorScheme
+                                            .surfaceContainerHighest,
+                                    foregroundColor: _selectedInote == inote
+                                        ? Colors.white
+                                        : Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    textStyle: const TextStyle(fontSize: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: Text(difficultyName),
+                                ),
+                              );
+                            }).toList(),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+        Expanded(
+            child: _isFetchingFullCache
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const CircularProgressIndicator(),
+                          const SizedBox(height: 16),
+                          const Text(
+                            '正在获取全量谱面缓存...',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '首次进入需要拉取大量数据，请耐心等待',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant),
+                            textAlign: TextAlign.center,
                           ),
                         ],
                       ),
-                  ],
-                ),
-              ),
-Expanded(child: _isFetchingFullCache
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const CircularProgressIndicator(),
-                                const SizedBox(height: 16),
-                                const Text(
-                                  '正在获取全量谱面缓存...',
-                                  style: TextStyle(fontSize: 16),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  '首次进入需要拉取大量数据，请耐心等待',
-                                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : _isLoading
-                          ? const Center(
-                              child: CircularProgressIndicator(),
-                            )
-                          : _errorMessage != null
-                          ? Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.error_outline,
-                                      size: 48,
+                    ),
+                  )
+                : _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(),
+                      )
+                    : _errorMessage != null
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.error_outline,
+                                    size: 48,
+                                    color: AppColors.errorRed(brightness),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    _errorMessage!,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 16,
                                       color: AppColors.errorRed(brightness),
                                     ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      _errorMessage!,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: AppColors.errorRed(brightness),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    ElevatedButton(
-                                      onPressed: _fetchMaidata,
-                                      child: const Text('重试'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                          : _maidataContent.isEmpty
-                              ? const Center(
-                                  child: Text('暂无谱面代码数据'),
-                                )
-                              : SingleChildScrollView(
-                                  controller: _scrollController,
-                                  padding: const EdgeInsets.all(16),
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      minWidth: double.infinity,
-                                    ),
-                                    child: SelectableText(
-                                      _getFilteredMaidata(),
-                                      style: TextStyle(
-                                        fontFamily: 'Courier New',
-                                        fontSize: 12,
-                                        color: Theme.of(context).colorScheme.onSurface,
-                                        height: 1.4,
-                                      ),
-                                      textAlign: TextAlign.left,
-                                    ),
                                   ),
-                                )),]),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton(
+                                    onPressed: _fetchMaidata,
+                                    child: const Text('重试'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : _maidataContent.isEmpty
+                            ? const Center(
+                                child: Text('暂无谱面代码数据'),
+                              )
+                            : SingleChildScrollView(
+                                controller: _scrollController,
+                                padding: const EdgeInsets.all(16),
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    minWidth: double.infinity,
+                                  ),
+                                  child: SelectableText(
+                                    _getFilteredMaidata(),
+                                    style: TextStyle(
+                                      fontFamily: 'Courier New',
+                                      fontSize: 12,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface,
+                                      height: 1.4,
+                                    ),
+                                    textAlign: TextAlign.left,
+                                  ),
+                                ),
+                              )),
+      ]),
     );
   }
 }

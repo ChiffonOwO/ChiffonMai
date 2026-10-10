@@ -393,6 +393,7 @@ class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.transparent,
       body: Stack(
         fit: StackFit.expand,

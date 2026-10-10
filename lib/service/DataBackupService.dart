@@ -2,9 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:media_scanner/media_scanner.dart';
 
 import '../constant/CacheKeyConstant.dart';
 import '../manager/DivingFish/MaimaiMusicDataManager.dart';
@@ -15,6 +13,7 @@ import '../utils/SyncRouteNotifier.dart';
 import '../utils/ThemeManager.dart';
 import '../utils/UserProfileNotifier.dart';
 import '../utils/SecureCredentialStore.dart';
+import '../utils/ExportPathUtil.dart';
 import 'Best50/CustomBest50Store.dart';
 import 'ChartNoteService.dart';
 import 'ChartPackageHistoryStore.dart';
@@ -139,7 +138,8 @@ class DataBackupService {
 
   /// 导出所有数据到 JSON 文件
   /// 返回保存的文件路径，null 表示用户取消或失败
-  Future<String?> exportToFile() async {
+  Future<String?> exportToFile(
+      {void Function(String fallbackPath)? onFallback}) async {
     try {
       // 1. 读取所有 SharedPreferences 数据（跳过可重新拉取的缓存）
       //
@@ -200,8 +200,7 @@ class DataBackupService {
       final jsonStr = const JsonEncoder.withIndent('  ').convert(backup);
       final bytes = utf8.encode(jsonStr);
 
-      // 4. 让用户选择保存路径
-      //    文件名带时分秒：同一天导出多次不再互相覆盖（旧实现只到日期）
+      // 4. 文件名带时分秒：同一天导出多次不再互相覆盖
       final now = DateTime.now();
       final dateStr = '${now.year}'
           '${now.month.toString().padLeft(2, '0')}'
@@ -211,59 +210,12 @@ class DataBackupService {
           '${now.second.toString().padLeft(2, '0')}';
       final suggestedName = 'ChiffonMai_backup_$dateStr.json';
 
-      // 优先保存到公共目录（用户可访问）
-      Directory? saveDir;
-
-      // 1) 尝试 Download 目录（最容易被用户找到）
-      if (Platform.isAndroid) {
-        try {
-          final downloadDir = Directory('/storage/emulated/0/Download');
-          if (!downloadDir.existsSync()) {
-            downloadDir.createSync(recursive: true);
-          }
-          final testFile = File('${downloadDir.path}/.test_write');
-          await testFile.writeAsString('test');
-          await testFile.delete();
-          saveDir = downloadDir;
-        } catch (_) {
-          debugPrint('DataBackup: Download 目录不可写，尝试 Pictures');
-        }
-      }
-
-      // 2) 尝试 Pictures 目录
-      if (saveDir == null && Platform.isAndroid) {
-        try {
-          final picsDir = Directory('/storage/emulated/0/Pictures');
-          if (!picsDir.existsSync()) {
-            picsDir.createSync(recursive: true);
-          }
-          final testFile = File('${picsDir.path}/.test_write');
-          await testFile.writeAsString('test');
-          await testFile.delete();
-          saveDir = picsDir;
-        } catch (_) {
-          debugPrint('DataBackup: Pictures 目录不可写');
-        }
-      }
-
-      // 3) 回退到应用私有目录
-      if (saveDir == null) {
-        final docDir = await getApplicationDocumentsDirectory();
-        saveDir = Directory('${docDir.path}/backups');
-        if (!saveDir.existsSync()) {
-          saveDir.createSync(recursive: true);
-        }
-      }
-
-      final file = File('${saveDir.path}/$suggestedName');
-      await file.writeAsBytes(bytes);
-
-      // 通知系统扫描新文件（让它在文件管理器中可见）
-      if (Platform.isAndroid) {
-        try {
-          await MediaScanner.loadMedia(path: file.path);
-        } catch (_) {}
-      }
+      final file = await ExportPathUtil.writeExportFile(
+        fileName: suggestedName,
+        bytes: bytes,
+        subDir: '备份',
+        onFallback: onFallback,
+      );
 
       debugPrint('DataBackup: 导出成功 → ${file.path}');
       return file.path;

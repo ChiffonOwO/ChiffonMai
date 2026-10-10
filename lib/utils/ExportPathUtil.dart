@@ -1,8 +1,10 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:media_scanner/media_scanner.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// 统一的「公开导出目录」工具。
 ///
@@ -22,11 +24,143 @@ class ExportPathUtil {
 
   /// 探测用临时文件名，写完即删。
   static const String _probeFileName = '.chiffonmai_write_probe';
+  static const String _customRootKey = 'export_custom_root';
 
   static Directory? _cachedRoot;
+  static String? _customRoot;
+  static bool _customRootLoaded = false;
 
   /// 清缓存：目录探测结果在应用生命周期内复用，权限变化后可手动重置。
   static void resetCache() => _cachedRoot = null;
+
+  static Future<void> _loadCustomRoot() async {
+    if (_customRootLoaded) return;
+    final prefs = await SharedPreferences.getInstance();
+    _customRoot = prefs.getString(_customRootKey);
+    _customRootLoaded = true;
+  }
+
+  static Future<void> _saveCustomRoot(String? path) async {
+    final prefs = await SharedPreferences.getInstance();
+    _customRoot = path;
+    _customRootLoaded = true;
+    if (path == null || path.isEmpty) {
+      await prefs.remove(_customRootKey);
+    } else {
+      await prefs.setString(_customRootKey, path);
+    }
+    resetCache();
+  }
+
+  /// 在一次下载/导出前让用户确认保存位置。
+  ///
+  /// 默认位置仍是应用的公开目录；用户选择的目录会记住，下一次打开时可以
+  /// 直接继续使用，也可以在这里恢复为应用默认目录。
+  static Future<bool> prepareForExport(
+    BuildContext context, {
+    String? subDir,
+    String title = '选择保存位置',
+  }) async {
+    await _loadCustomRoot();
+    if (!context.mounted) return false;
+    final defaultRoot = await _resolvePublicRoot();
+    final docs = await getApplicationDocumentsDirectory();
+    final currentRoot = _customRoot == null
+        ? '${(defaultRoot ?? docs).path}${Platform.pathSeparator}$appFolderName'
+        : _customRoot!;
+    final suffix = subDir == null || subDir.isEmpty
+        ? ''
+        : '${Platform.pathSeparator}$subDir';
+    final currentPath = '$currentRoot$suffix';
+    final choice = await showDialog<_ExportPathChoice>(
+      context: context,
+      builder: (dialogContext) {
+        final scheme = Theme.of(dialogContext).colorScheme;
+        return AlertDialog(
+          title: Text(title),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '当前保存位置：',
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.maxFinite,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: scheme.outlineVariant),
+                ),
+                child: SelectableText(
+                  currentPath,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                    height: 1.4,
+                    color: scheme.onSurface,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '可以使用应用默认公开目录，或选择一个自定义文件夹。',
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                try {
+                  final selected = await FilePicker.getDirectoryPath(
+                    dialogTitle: title,
+                  );
+                  if (selected != null &&
+                      selected.trim().isNotEmpty &&
+                      dialogContext.mounted) {
+                    Navigator.of(dialogContext)
+                        .pop(_ExportPathChoice.custom(selected.trim()));
+                  }
+                } catch (e) {
+                  if (dialogContext.mounted) {
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(content: Text('选择保存目录失败：$e')),
+                    );
+                  }
+                }
+              },
+              child: const Text('选择其他目录'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext)
+                  .pop(const _ExportPathChoice.defaultPath()),
+              child: const Text('使用默认路径'),
+            ),
+          ],
+        );
+      },
+    );
+    if (choice == null) return false;
+    if (choice.path != null) {
+      final dir = Directory(choice.path!);
+      if (!await _isWritable(dir)) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('这个目录不可写，请换一个文件夹。')),
+          );
+        }
+        return false;
+      }
+      await _saveCustomRoot(choice.path);
+    } else {
+      await _saveCustomRoot(null);
+    }
+    return true;
+  }
 
   /// 返回可写的「公开根目录」（尚未拼接 ChiffonMai 子目录）。
   ///
@@ -93,6 +227,21 @@ class ExportPathUtil {
       return Directory(parts.join(Platform.pathSeparator));
     }
 
+    await _loadCustomRoot();
+    if (_customRoot != null) {
+      final custom = Directory(_customRoot!);
+      final dir = subDir == null || subDir.isEmpty
+          ? custom
+          : Directory('${custom.path}${Platform.pathSeparator}$subDir');
+      try {
+        if (!await dir.exists()) await dir.create(recursive: true);
+        if (await _isWritable(dir)) return dir;
+      } catch (e) {
+        debugPrint('[ExportPathUtil] 自定义目录不可写，恢复应用默认目录: $e');
+      }
+      await _saveCustomRoot(null);
+    }
+
     _cachedRoot ??= await _resolvePublicRoot();
 
     if (_cachedRoot != null) {
@@ -151,7 +300,8 @@ class ExportPathUtil {
       allowPrivateFallback: allowPrivateFallback,
     );
     final target = File('${dir.path}${Platform.pathSeparator}$fileName');
-    final temporary = File('${target.path}.${DateTime.now().microsecondsSinceEpoch}.part');
+    final temporary =
+        File('${target.path}.${DateTime.now().microsecondsSinceEpoch}.part');
     final sink = temporary.openWrite();
     // 立即监听文件系统错误，防止流尚在下载时出现未处理的异步异常。
     final sinkDone = sink.done.then<Object?>((_) => null,
@@ -166,7 +316,9 @@ class ExportPathUtil {
       await notifyMediaScanner(file);
       return file;
     } catch (_) {
-      try { await sink.close(); } catch (_) {}
+      try {
+        await sink.close();
+      } catch (_) {}
       if (await temporary.exists()) await temporary.delete();
       rethrow;
     }
@@ -213,4 +365,10 @@ class ExportPathUtil {
     // 防御超长文件名（多数文件系统上限 255 字节）
     return trimmed.length > 80 ? trimmed.substring(0, 80) : trimmed;
   }
+}
+
+class _ExportPathChoice {
+  final String? path;
+  const _ExportPathChoice.defaultPath() : path = null;
+  const _ExportPathChoice.custom(this.path);
 }

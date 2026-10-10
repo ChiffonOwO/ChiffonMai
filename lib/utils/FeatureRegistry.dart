@@ -10,6 +10,58 @@ import 'FeatureFlags.dart';
 class FeatureRegistry {
   FeatureRegistry._();
 
+  /// 功能路径使用各 Hub 页面里的实际分组名；集中维护以供搜索复用。
+  static List<String> pathFor(ButtonCategory category, ButtonItem item) {
+    final root = switch (category.name) {
+      'Best50与排行榜' => 'Best50',
+      '友情链接' => '系统',
+      _ => category.name,
+    };
+    final group = switch (category.name) {
+      '曲库与数据' =>
+        const {'乐曲查询', '国服更新对照'}.contains(item.title) ? '曲库入口' : '数据查询',
+      'Best50与排行榜' => item.title.contains('排行榜') ? '排行榜' : 'Best50 分析',
+      '猜歌游戏' => item.title == '多人猜歌游戏' ? '多人猜歌' : '单人猜歌',
+      '实用工具' => _toolSections[item.title] ?? '玩法与社区',
+      '友情链接' => '关于 ChiffonMai',
+      '系统' => _systemSections[item.title] ?? '数据与账号',
+      _ => category.name,
+    };
+    return [root, group, item.title];
+  }
+
+  static const _toolSections = {
+    '每日推荐': '选曲推荐',
+    '随机乐曲': '选曲推荐',
+    '出勤转盘': '选曲推荐',
+    '基于标签推荐': '选曲推荐',
+    '基于目标 Rating 推荐': '选曲推荐',
+    '基于定数区间推荐': '选曲推荐',
+    '单曲 Rating 计算': '计算与段位',
+    '达成率计算': '计算与段位',
+    '达成率反推': '计算与段位',
+    '段位表': '计算与段位',
+    '版本对照': '计算与段位',
+    '曲绘识别': '识别与收藏',
+    '结算画面识别': '识别与收藏',
+    '定数分布': '识别与收藏',
+    '收藏夹': '识别与收藏',
+  };
+  static const _systemSections = {
+    '主题与交互偏好': '应用',
+    '加载语录管理': '应用',
+    '打印日志': '应用',
+    '检查更新': '应用',
+    '服务器状态': '应用',
+    '最近评论': '应用',
+    '最近评分': '应用',
+    '访问官方网站': '关于 ChiffonMai',
+    '加入 QQ 群': '关于 ChiffonMai',
+    '关于 APP': '关于 ChiffonMai',
+    '支持开发者': '关于 ChiffonMai',
+    '问卷调查': '关于 ChiffonMai',
+  };
+
   static List<ButtonCategory> allCategories(bool isDivingFishLoggedIn) => [
         ButtonCategory(name: '曲库与数据', items: [
           const ButtonItem(
@@ -57,6 +109,14 @@ class FeatureRegistry {
               title: '个性化拟合 Best50',
               subtitle: '按标签查看拟合 Rating 上限'),
           const ButtonItem(
+              icon: Icons.edit_note_rounded,
+              title: '自定义 Best50',
+              subtitle: '手动填写 50 张成绩卡片'),
+          const ButtonItem(
+              icon: Icons.auto_fix_high_rounded,
+              title: '理想 Best50',
+              subtitle: '全员升一档后的 Best50 模拟'),
+          const ButtonItem(
               icon: Icons.leaderboard,
               title: 'Rating 排行榜',
               subtitle: '查看玩家 Rating 排行'),
@@ -93,6 +153,18 @@ class FeatureRegistry {
           const ButtonItem(
               icon: Icons.gamepad, title: '舞萌开字母', subtitle: '看首字母猜歌'),
           const ButtonItem(
+              icon: Icons.flash_on_outlined,
+              title: '曲绘快闪猜歌',
+              subtitle: '曲绘一闪而过，凭记忆猜歌'),
+          const ButtonItem(
+              icon: Icons.grid_on_outlined,
+              title: '曲绘拼图猜歌',
+              subtitle: '曲绘碎块随时间逐步拼合显现'),
+          const ButtonItem(
+              icon: Icons.graphic_eq_outlined,
+              title: '谱面片段猜歌',
+              subtitle: '看一段无声谱面动画猜出歌曲'),
+          const ButtonItem(
               icon: Icons.gamepad, title: '多人猜歌游戏', subtitle: '和朋友一起猜舞萌曲库'),
         ]),
         ButtonCategory(name: '实用工具', icon: Icons.work, items: [
@@ -114,7 +186,10 @@ class FeatureRegistry {
               icon: Icons.tune, title: '基于定数区间推荐', subtitle: '按定数范围挑选谱面'),
           const ButtonItem(
               icon: Icons.shuffle, title: '随机乐曲', subtitle: '自定义数量随机抽取歌曲'),
-          const ButtonItem(icon: Icons.casino_outlined, title: '出勤转盘', subtitle: '等分转盘决定本次出勤选项'),
+          const ButtonItem(
+              icon: Icons.casino_outlined,
+              title: '出勤转盘',
+              subtitle: '等分转盘决定本次出勤选项'),
           const ButtonItem(
               icon: Icons.calculate,
               title: '单曲 Rating 计算',
@@ -163,6 +238,10 @@ class FeatureRegistry {
         ]),
         ButtonCategory(name: '系统', icon: Icons.settings, items: [
           const ButtonItem(
+              icon: Icons.login_rounded,
+              title: '登录 maimai Score Hub',
+              subtitle: '仅登录，不同步成绩；用于 OCR 与 maimai Score Hub 功能'),
+          const ButtonItem(
               icon: Icons.file_upload_sharp,
               title: '刷新数据',
               subtitle: '重新拉取并初始化所有本地缓存'),
@@ -170,6 +249,14 @@ class FeatureRegistry {
               icon: Icons.cleaning_services,
               title: '刷新 maidata',
               subtitle: '手动刷新所有 maidata 缓存'),
+          const ButtonItem(
+              icon: Icons.tune_rounded,
+              title: '刷新数据（高级）',
+              subtitle: '按缓存源勾选强制刷新，并测试各 API 连通性'),
+          const ButtonItem(
+              icon: Icons.tune_rounded,
+              title: 'maidata 管理',
+              subtitle: '重新拉取 chiffonmai.cloud 集 · 清除 wmc.pub 兜底缓存'),
           const ButtonItem(
               icon: Icons.qr_code_scanner,
               title: '同步成绩到水鱼',
@@ -198,6 +285,10 @@ class FeatureRegistry {
               icon: Icons.network_check, title: '服务器状态', subtitle: '查看舞萌服务状态'),
           const ButtonItem(
               icon: Icons.update, title: '检查更新', subtitle: '检查应用是否有新版本'),
+          const ButtonItem(
+              icon: Icons.receipt_long_outlined,
+              title: '打印日志',
+              subtitle: '导出最近运行日志，方便排查问题'),
           const ButtonItem(
               icon: Icons.info_outline, title: '关于 APP', subtitle: '了解项目与版本信息'),
           const ButtonItem(

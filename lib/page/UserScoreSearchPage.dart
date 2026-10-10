@@ -321,6 +321,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
       context: context,
       builder: (BuildContext context) {
         final brightness = Theme.of(context).brightness;
+        final scheme = Theme.of(context).colorScheme;
         return FutureBuilder<List<String>>(
           future: _getLevelOptions(),
           builder: (context, snapshot) {
@@ -374,9 +375,20 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                               child: TextField(
                                 controller: minController,
                                 keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                onChanged: (_) => setState(() {}),
                                 decoration: InputDecoration(
                                   labelText: '下界',
                                   hintText: '1.0',
+                                  suffixIcon: minController.text.isEmpty
+                                      ? null
+                                      : IconButton(
+                                          tooltip: '清除下界',
+                                          icon: Icon(Icons.clear),
+                                          onPressed: () {
+                                            minController.clear();
+                                            setState(() {});
+                                          },
+                                        ),
                                 ),
                               ),
                             ),
@@ -385,9 +397,20 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                               child: TextField(
                                 controller: maxController,
                                 keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                onChanged: (_) => setState(() {}),
                                 decoration: InputDecoration(
                                   labelText: '上界',
                                   hintText: '15.0',
+                                  suffixIcon: maxController.text.isEmpty
+                                      ? null
+                                      : IconButton(
+                                          tooltip: '清除上界',
+                                          icon: Icon(Icons.clear),
+                                          onPressed: () {
+                                            maxController.clear();
+                                            setState(() {});
+                                          },
+                                        ),
                                 ),
                               ),
                             ),
@@ -410,8 +433,8 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                                 });
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.buttonBackground(brightness),
-                                foregroundColor: AppColors.primaryText(brightness),
+                                backgroundColor: scheme.primaryContainer,
+                                foregroundColor: scheme.onPrimaryContainer,
                                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                 textStyle: TextStyle(fontSize: 12),
                               ),
@@ -516,6 +539,7 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
       context: context,
       builder: (BuildContext context) {
         final brightness = Theme.of(context).brightness;
+        final scheme = Theme.of(context).colorScheme;
         // 达成率快捷选项
         List<Map<String, String>> quickOptions = [
           {'label': 'SSS+', 'min': '100.5', 'max': '101'},
@@ -556,9 +580,20 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                           child: TextField(
                             controller: minController,
                             keyboardType: TextInputType.numberWithOptions(decimal: true),
+                            onChanged: (_) => setState(() {}),
                             decoration: InputDecoration(
                               labelText: '下界',
                               hintText: '0',
+                              suffixIcon: minController.text.isEmpty
+                                  ? null
+                                  : IconButton(
+                                      tooltip: '清除下界',
+                                      icon: Icon(Icons.clear),
+                                      onPressed: () {
+                                        minController.clear();
+                                        setState(() {});
+                                      },
+                                    ),
                             ),
                           ),
                         ),
@@ -567,9 +602,20 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                           child: TextField(
                             controller: maxController,
                             keyboardType: TextInputType.numberWithOptions(decimal: true),
+                            onChanged: (_) => setState(() {}),
                             decoration: InputDecoration(
                               labelText: '上界',
                               hintText: '101',
+                              suffixIcon: maxController.text.isEmpty
+                                  ? null
+                                  : IconButton(
+                                      tooltip: '清除上界',
+                                      icon: Icon(Icons.clear),
+                                      onPressed: () {
+                                        maxController.clear();
+                                        setState(() {});
+                                      },
+                                    ),
                             ),
                           ),
                         ),
@@ -592,8 +638,8 @@ class _UserScoreSearchPageState extends State<UserScoreSearchPage> {
                             });
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.buttonBackground(brightness),
-                            foregroundColor: AppColors.primaryText(brightness),
+                            backgroundColor: scheme.primaryContainer,
+                            foregroundColor: scheme.onPrimaryContainer,
                             padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                             textStyle: TextStyle(fontSize: 12),
                           ),

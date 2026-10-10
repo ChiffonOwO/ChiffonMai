@@ -34,6 +34,7 @@ class _NextPlayQueuePageState extends State<NextPlayQueuePage> {
   Widget build(BuildContext context) {
     final entries = _store.entries;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.transparent,
       body: Stack(
         fit: StackFit.expand,

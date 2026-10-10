@@ -1,3 +1,4 @@
+import 'package:my_first_flutter_app/widgets/NoRipple.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../entity/DivingFish/Song.dart';
@@ -148,17 +149,19 @@ class _DifficultyDistributionPageState
     final isSelected = _selectedLevelIndex == index;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        label: Text(label,
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white : color)),
-        selected: isSelected,
-        selectedColor: color,
-        backgroundColor: color.withValues(alpha: 0.12),
-        onSelected: (_) => _onLevelChanged(index),
-        side: BorderSide(color: color.withValues(alpha: 0.4)),
+      child: NoRipple(
+        child: ChoiceChip(
+          label: Text(label,
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : color)),
+          selected: isSelected,
+          selectedColor: color,
+          backgroundColor: color.withValues(alpha: 0.12),
+          onSelected: (_) => _onLevelChanged(index),
+          side: BorderSide(color: color.withValues(alpha: 0.4)),
+        ),
       ),
     );
   }

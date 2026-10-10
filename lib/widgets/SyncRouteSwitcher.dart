@@ -43,6 +43,7 @@ class SyncRouteSwitcher extends StatelessWidget {
             width: 112,
             child: AnimatedChoiceBar<int>(
               compact: true,
+              enableRipple: false,
               values: const [
                 SyncRouteStore.routeAwmc,
                 SyncRouteStore.routeScoreHub

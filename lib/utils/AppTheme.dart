@@ -164,6 +164,16 @@ class AppTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: Colors.transparent,
       pageTransitionsTheme: _backGestureSafeTransitions(),
+      tabBarTheme: const TabBarThemeData(
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: WidgetStatePropertyAll(Colors.transparent),
+      ),
+      segmentedButtonTheme: const SegmentedButtonThemeData(
+        style: ButtonStyle(
+          splashFactory: NoSplash.splashFactory,
+          overlayColor: WidgetStatePropertyAll(Colors.transparent),
+        ),
+      ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         borderRadius: BorderRadius.all(Radius.circular(999)),
       ),
@@ -243,6 +253,16 @@ class AppTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: const Color(0xFF121220),
       pageTransitionsTheme: _backGestureSafeTransitions(),
+      tabBarTheme: const TabBarThemeData(
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: WidgetStatePropertyAll(Colors.transparent),
+      ),
+      segmentedButtonTheme: const SegmentedButtonThemeData(
+        style: ButtonStyle(
+          splashFactory: NoSplash.splashFactory,
+          overlayColor: WidgetStatePropertyAll(Colors.transparent),
+        ),
+      ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         borderRadius: BorderRadius.all(Radius.circular(999)),
       ),
@@ -322,6 +342,16 @@ class AppTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: Colors.black,
       pageTransitionsTheme: _backGestureSafeTransitions(),
+      tabBarTheme: const TabBarThemeData(
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: WidgetStatePropertyAll(Colors.transparent),
+      ),
+      segmentedButtonTheme: const SegmentedButtonThemeData(
+        style: ButtonStyle(
+          splashFactory: NoSplash.splashFactory,
+          overlayColor: WidgetStatePropertyAll(Colors.transparent),
+        ),
+      ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         borderRadius: BorderRadius.all(Radius.circular(999)),
       ),

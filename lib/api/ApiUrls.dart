@@ -10,6 +10,8 @@ class ApiUrls {
   /// 同步耗时统计代理。Redis 凭据只保留在服务端，App 不再直连 Redis。
   static const String SyncStatsUrl = '$BackendBaseUrl/api/sync-stats';
   static const String LoadingTipsUrl = '$BackendBaseUrl/api/loading-tips';
+  static const String FriendLinksUrl = '$BackendBaseUrl/api/friend-links';
+  static const String TranslationUrl = '$BackendBaseUrl/api/translate';
 
   /// App ↔ 后端 OAuth 代理的 API key（与 server 端环境变量 GATEWAY_API_KEY 保持一致）
   /// 只从构建参数注入，源码与默认 APK 不再携带共享密钥。
@@ -167,8 +169,8 @@ class ApiUrls {
   // 单曲 maidata 兜底（wmc.pub）
   //
   // 全量 / 单曲本地缓存都没命中时，最后一道兜底：直接按 songId 拉这家的 maidata.txt。
-  // 只在内存里缓存（进程级，不持久化），重启即丢 —— 避免落盘后长期存着不再维护的副本。
-  // 用户在系统中心「maidata 管理」里可一键清空。
+  // 请求结果先由 MaidataManager 做进程级复用，歌曲详情页还会写入单曲缓存，
+  // 避免用户反复进入同一首歌曲时重复请求。
   static const String WmcMaidataFallbackBaseUrl = 'https://download.wmc.pub';
   static String wmcMaidataUrl(String songId) =>
       '$WmcMaidataFallbackBaseUrl/s/$songId/maidata.txt';

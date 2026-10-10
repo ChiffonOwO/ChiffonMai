@@ -157,6 +157,54 @@ mixin SyncFlowMixin<T extends StatefulWidget> on State<T> {
 
   // ===== 水鱼 =====
 
+  /// 确保水鱼同步所需的 JWT 与 ImportToken 都已缓存。
+  ///
+  /// 线路1、线路2共用这份引导，避免线路1只检查 ImportToken 时弹出另一套
+  /// Toast。登录成功后调用方可以继续原来的同步流程。
+  Future<bool> _ensureDivingFishSyncCredential() async {
+    final jwt = await SecureCredentialStore.read(
+          CacheKeyConstant.probeDivingFishToken,
+        ) ??
+        '';
+    final importToken = await SecureCredentialStore.read(
+          CacheKeyConstant.probeDivingFishImportToken,
+        ) ??
+        '';
+    if (jwt.isNotEmpty && importToken.isNotEmpty) return true;
+    if (!mounted) return false;
+
+    final goToLogin = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('提示'),
+        content: const Text('请先登录你的水鱼账号，再使用同步功能。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('去登录'),
+          ),
+        ],
+      ),
+    );
+    if (goToLogin != true || !mounted) return false;
+
+    await SyncScoreDialogs.showDivingFishLoginDialog(context, syncCallbacks);
+    if (!mounted) return false;
+    final jwtAfterLogin = await SecureCredentialStore.read(
+          CacheKeyConstant.probeDivingFishToken,
+        ) ??
+        '';
+    final importTokenAfterLogin = await SecureCredentialStore.read(
+          CacheKeyConstant.probeDivingFishImportToken,
+        ) ??
+        '';
+    return jwtAfterLogin.isNotEmpty && importTokenAfterLogin.isNotEmpty;
+  }
+
   /// 同步成绩到水鱼（线路2 maimai Score Hub）：输入（二维码 / 排行榜选项）
   /// 在对话框完成，点「开始同步」后对话框立即关闭，抓取 → 推送 → 刷新本地数据
   /// 的进度全部显示在按钮上。
@@ -165,38 +213,7 @@ mixin SyncFlowMixin<T extends StatefulWidget> on State<T> {
   Future<void> syncToDivingFishWithButton() async {
     if (anyBusy) return;
 
-    final hasJwt = (await SecureCredentialStore.read(
-                CacheKeyConstant.probeDivingFishToken) ??
-            '')
-        .isNotEmpty;
-
-    if (!hasJwt) {
-      if (!mounted) return;
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('提示'),
-          content: const Text('请先登录你的水鱼账号，再使用同步功能。'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('去登录'),
-            ),
-          ],
-        ),
-      );
-      if (ok != true || !mounted) return;
-      await SyncScoreDialogs.showDivingFishLoginDialog(context, syncCallbacks);
-      final hasJwt2 = (await SecureCredentialStore.read(
-                  CacheKeyConstant.probeDivingFishToken) ??
-              '')
-          .isNotEmpty;
-      if (!hasJwt2 || !mounted) return;
-    }
+    if (!await _ensureDivingFishSyncCredential()) return;
 
     final prefs = await SharedPreferences.getInstance();
     final bindQQ =
@@ -229,6 +246,7 @@ mixin SyncFlowMixin<T extends StatefulWidget> on State<T> {
     _updateSyncState(divingFish: true, divingFishText: '正在同步成绩...');
     // 记录本次同步耗时 / 成败（Redis，尽力而为）
     final stopwatch = Stopwatch()..start();
+    int? syncDurationMs;
     var syncOk = false;
     // 缺 ImportToken 时会转交给对话框再走一遍完整流程（那一次由对话框上报），
     // 这里就不再记一条，免得同一次用户操作算成两条样本
@@ -237,6 +255,7 @@ mixin SyncFlowMixin<T extends StatefulWidget> on State<T> {
       final outcome = await executeDivingFishSync(
         syncCallbacks,
         input,
+        onSyncFinished: (durationMs) => syncDurationMs = durationMs,
         onProgress: (p, t) => _updateSyncState(
           divingFishText: '$t ${(p * 100).round()}%',
           divingFishProgress: p,
@@ -272,7 +291,7 @@ mixin SyncFlowMixin<T extends StatefulWidget> on State<T> {
         unawaited(SyncStatsService.record(
           line: SyncLine.scoreHub,
           platform: SyncPlatform.divingFish,
-          durationMs: stopwatch.elapsedMilliseconds,
+          durationMs: syncDurationMs ?? stopwatch.elapsedMilliseconds,
           ok: syncOk,
         ));
         SyncRouteNotifier.instance.refreshStatsSoon();
@@ -287,6 +306,7 @@ mixin SyncFlowMixin<T extends StatefulWidget> on State<T> {
     final outcome = await AwmcSyncFlow.run(
       context,
       target: AwmcSyncTarget.divingFish,
+      onMissingCredential: _ensureDivingFishSyncCredential,
       onBusy: (label) =>
           _updateSyncState(divingFish: true, divingFishText: label),
       onProgress: (p, text) => _updateSyncState(
@@ -320,12 +340,17 @@ mixin SyncFlowMixin<T extends StatefulWidget> on State<T> {
 
     _updateSyncState(luoXue: true, luoXueText: '正在同步成绩...');
     final stopwatch = Stopwatch()..start();
+    int? syncDurationMs;
     var syncOk = false;
     try {
-      final count = await executeLuoXueSync(input, onProgress: (p, t) {
-        _updateSyncState(
-            luoXueText: '$t ${(p * 100).round()}%', luoXueProgress: p);
-      });
+      final count = await executeLuoXueSync(
+        input,
+        onSyncFinished: (durationMs) => syncDurationMs = durationMs,
+        onProgress: (p, t) {
+          _updateSyncState(
+              luoXueText: '$t ${(p * 100).round()}%', luoXueProgress: p);
+        },
+      );
       syncOk = true;
       if (!mounted) return;
       Fluttertoast.showToast(msg: '同步完成！共 $count 条成绩已导出到落雪');
@@ -342,7 +367,7 @@ mixin SyncFlowMixin<T extends StatefulWidget> on State<T> {
       unawaited(SyncStatsService.record(
         line: SyncLine.scoreHub,
         platform: SyncPlatform.luoXue,
-        durationMs: stopwatch.elapsedMilliseconds,
+        durationMs: syncDurationMs ?? stopwatch.elapsedMilliseconds,
         ok: syncOk,
       ));
       SyncRouteNotifier.instance.refreshStatsSoon();

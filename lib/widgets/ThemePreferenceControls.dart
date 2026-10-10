@@ -95,6 +95,14 @@ class _ThemePreferenceControlsState extends State<ThemePreferenceControls> {
                     color: scheme.onSurface, fontWeight: FontWeight.w600)),
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
+              value: navigation.liquidGlassEnabled,
+              onChanged: navigation.setLiquidGlassEnabled,
+              title: const Text('液态玻璃导航栏'),
+              subtitle: const Text('使用通透玻璃与高光效果，关闭后恢复原有样式（默认关闭）'),
+              secondary: Icon(Icons.blur_on_rounded, color: scheme.primary),
+            ),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
               value: navigation.transitionEnabled,
               onChanged: navigation.setTransitionEnabled,
               title: const Text('导航栏切换动画'),
@@ -108,6 +116,14 @@ class _ThemePreferenceControlsState extends State<ThemePreferenceControls> {
               title: const Text('左右滑动切换主界面'),
               subtitle: const Text('在主界面内容区域左右滑动即可切换底部导航项'),
               secondary: Icon(Icons.swipe_outlined, color: scheme.primary),
+            ),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              value: navigation.immersiveStatusBarEnabled,
+              onChanged: navigation.setImmersiveStatusBarEnabled,
+              title: const Text('沉浸式状态栏'),
+              subtitle: const Text('隐藏顶部时间、电量等状态信息，保留底部系统导航'),
+              secondary: Icon(Icons.fullscreen_rounded, color: scheme.primary),
             ),
           ],
         );

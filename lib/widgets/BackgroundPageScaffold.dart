@@ -18,10 +18,14 @@ class BackgroundPageScaffold extends StatelessWidget {
   final bool resizeToAvoidBottomInset;
   final bool showDecorativeImage;
   final EdgeInsetsGeometry contentPadding;
+
   /// 仅供收藏夹批量操作等特殊工具栏替换标准标题栏。
   final Widget? headerOverride;
+
   /// 来源说明等随标题栏显示的附加区域。
   final PreferredSizeWidget? bottom;
+  final bool animateTitle;
+  final bool centerTitleInAvailableSpace;
 
   const BackgroundPageScaffold({
     super.key,
@@ -31,11 +35,13 @@ class BackgroundPageScaffold extends StatelessWidget {
     this.onBack,
     this.showBack = true,
     this.titleAlign = PageTopBarTitleAlign.center,
-    this.resizeToAvoidBottomInset = true,
+    this.resizeToAvoidBottomInset = false,
     this.showDecorativeImage = true,
     this.contentPadding = EdgeInsets.zero,
     this.headerOverride,
     this.bottom,
+    this.animateTitle = false,
+    this.centerTitleInAvailableSpace = false,
   });
 
   @override
@@ -52,15 +58,18 @@ class BackgroundPageScaffold extends StatelessWidget {
           ThemeAwareBackground(showDecorativeImage: showDecorativeImage),
           Column(
             children: [
-              headerOverride ?? PageTopBar(
-                title: title,
-                actions: actions,
-                onBack: onBack,
-                showBack: showBack,
-                titleAlign: titleAlign,
-                barBackground: Colors.transparent,
-                bottom: bottom,
-              ),
+              headerOverride ??
+                  PageTopBar(
+                    title: title,
+                    actions: actions,
+                    onBack: onBack,
+                    showBack: showBack,
+                    titleAlign: titleAlign,
+                    barBackground: Colors.transparent,
+                    bottom: bottom,
+                    animateTitle: animateTitle,
+                    centerTitleInAvailableSpace: centerTitleInAvailableSpace,
+                  ),
               Expanded(
                 child: Padding(
                   padding: contentPadding,

@@ -80,6 +80,7 @@ class _LoadingTipsPageState extends State<LoadingTipsPage> {
     return DefaultTabController(
         length: 2,
         child: Scaffold(
+          resizeToAvoidBottomInset: false,
           backgroundColor: Colors.transparent,
           body: Stack(
             fit: StackFit.expand,
@@ -200,6 +201,7 @@ class _LoadingTipInputDialog extends StatefulWidget {
 
 class _LoadingTipInputDialogState extends State<_LoadingTipInputDialog> {
   final TextEditingController _controller = TextEditingController();
+  String? _error;
 
   @override
   void dispose() {
@@ -214,7 +216,14 @@ class _LoadingTipInputDialogState extends State<_LoadingTipInputDialog> {
           controller: _controller,
           autofocus: true,
           maxLines: 3,
-          decoration: const InputDecoration(hintText: '输入加载语录'),
+          onChanged: (value) {
+            final error = value.trim().isEmpty ? '语录内容不能为空' : null;
+            if (error != _error) setState(() => _error = error);
+          },
+          decoration: InputDecoration(
+            hintText: '输入加载语录',
+            errorText: _error,
+          ),
         ),
         actions: [
           TextButton(
@@ -222,7 +231,14 @@ class _LoadingTipInputDialogState extends State<_LoadingTipInputDialog> {
             child: const Text('取消'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(_controller.text),
+            onPressed: () {
+              final value = _controller.text.trim();
+              if (value.isEmpty) {
+                setState(() => _error = '语录内容不能为空');
+                return;
+              }
+              Navigator.of(context).pop(value);
+            },
             child: const Text('保存'),
           ),
         ],

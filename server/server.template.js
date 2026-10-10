@@ -12,6 +12,9 @@
 //   PROBER_SUBJECT_MODE             可选 'ref'(默认、长期) / 'qq'(仅过渡期)
 //   AWMC_GATEWAY_TOKEN               AWMC 网关开发者令牌（只在服务端）
 //   AWMC_NET_DEVELOPER_KEY           AWMC NET 开发者令牌（只在服务端）
+//   BAIDU_TRANSLATE_APP_ID           百度翻译 APP ID（只在服务端）
+//   BAIDU_TRANSLATE_API_KEY          大模型文本翻译 API Key（只在服务端）
+//   BAIDU_TRANSLATE_KEY              可选的签名鉴权密钥（只在服务端）
 // ===========================================================================
 const express = require('express');
 const http = require('http');
@@ -24,6 +27,7 @@ const redis = require('redis');
 const app = express();
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false }));
+require('./baidu-translate').installBaiduTranslate(app);
 // Redis 凭据仅从环境变量读取；原统计 LIST 键名不变，历史样本继续可读。
 const statsRedis = redis.createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -36,6 +40,7 @@ require('./awmc-proxy').installAwmcProxy(app);
 require('./awmc-net-proxy').installAwmcNetProxy(app);
 const loadingTips = require('./loading-tips');
 loadingTips.installLoadingTips(app, () => db);
+require('./friend-links').installFriendLinks(app, () => db);
 require('./special-rankings').installSpecialRankings(app, () => db, () => statsRedis);
 // 生产环境应由 HTTPS 反向代理终止 TLS；应用本身只监听内网端口。
 const server = http.createServer(app);

@@ -56,6 +56,9 @@ class _KaleidXScopeInfoPageYELLOWState
   late double _coverSize;
   late double _progressBarHeight;
 
+  // 歌曲卡片高度：在 375px 宽度下为 54px，随曲绘尺寸同步缩放。
+  double get _songCardHeight => _coverSize + (_paddingXS * 2) + 6;
+
   // 初始化尺寸参数
   void _initSizeParams(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
@@ -441,7 +444,7 @@ class _KaleidXScopeInfoPageYELLOWState
     // 如果歌曲还未加载完成，显示加载状态
     if (song == null) {
       return Container(
-        height: 50 * (MediaQuery.of(context).size.width / 375.0),
+        height: _songCardHeight,
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -465,6 +468,7 @@ class _KaleidXScopeInfoPageYELLOWState
           );
         },
         child: Container(
+          constraints: BoxConstraints(minHeight: _songCardHeight),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -582,6 +586,7 @@ class _KaleidXScopeInfoPageYELLOWState
             crossAxisSpacing: _paddingXS,
             mainAxisSpacing: _paddingXS,
             childAspectRatio: 2.0,
+            mainAxisExtent: _songCardHeight,
           ),
           itemCount: _songs.length,
           itemBuilder: (context, index) {
@@ -746,6 +751,7 @@ class _KaleidXScopeInfoPageYELLOWState
             crossAxisSpacing: _paddingXS,
             mainAxisSpacing: _paddingXS,
             childAspectRatio: 2.0,
+            mainAxisExtent: _songCardHeight,
           ),
           itemCount: songs.length,
           itemBuilder: (context, index) {

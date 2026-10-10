@@ -28,12 +28,15 @@ class _RandomChartPageState extends State<RandomChartPage> {
 
   // 筛选条件
   int _drawCount = 4;
+  late final TextEditingController _drawCountController;
+  String? _drawCountError;
   final List<DateTime> _historyTimes = [];
 
   @override
   void dispose() {
     _minDsController.dispose();
     _maxDsController.dispose();
+    _drawCountController.dispose();
     super.dispose();
   }
 
@@ -56,7 +59,34 @@ class _RandomChartPageState extends State<RandomChartPage> {
   @override
   void initState() {
     super.initState();
+    _drawCountController = TextEditingController(text: '$_drawCount');
     _loadFilterOptions();
+  }
+
+  void _onDrawCountChanged(String raw) {
+    final count = int.tryParse(raw);
+    setState(() {
+      if (count == null) {
+        _drawCountError = '请输入 2–100 之间的整数';
+      } else if (count < 2 || count > 100) {
+        _drawCountError = '抽取数量需在 2–100 之间';
+      } else {
+        _drawCount = count;
+        _drawCountError = null;
+      }
+    });
+  }
+
+  void _setDrawCount(int value) {
+    final count = value.clamp(2, 100);
+    _drawCountController.value = TextEditingValue(
+      text: '$count',
+      selection: TextSelection.collapsed(offset: '$count'.length),
+    );
+    setState(() {
+      _drawCount = count;
+      _drawCountError = null;
+    });
   }
 
   // 加载版本和流派列表
@@ -82,6 +112,10 @@ class _RandomChartPageState extends State<RandomChartPage> {
 
   // 执行抽奖
   Future<void> _drawSongs() async {
+    if (_drawCountError != null || _drawCount < 2 || _drawCount > 100) {
+      setState(() => _drawCountError = '抽取数量需在 2–100 之间');
+      return;
+    }
     setState(() {
       _isDrawing = true;
     });
@@ -309,74 +343,73 @@ class _RandomChartPageState extends State<RandomChartPage> {
   Widget _songCard(Song song) {
     final scheme = Theme.of(context).colorScheme;
     return Card(
-        margin: EdgeInsets.zero,
-        elevation: 0,
-        color: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: scheme.outlineVariant),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) =>
-                      SongInfoPage(songId: song.id, initialLevelIndex: 0))),
-          child: Padding(
-              padding: const EdgeInsets.all(12),
-              child:
-                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: CoverUtil.buildCoverWidgetWithContext(
-                        context, song.id, 72)),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) =>
+                    SongInfoPage(songId: song.id, initialLevelIndex: 0))),
+        child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CoverUtil.buildCoverWidgetWithContext(
+                      context, song.id, 72)),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Row(children: [
+                      SongTypeLabel(type: song.type, songId: song.id),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(song.title,
+                            style: Theme.of(context).textTheme.titleSmall,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                    ]),
+                    const SizedBox(height: 3),
+                    Text(
+                      song.basicInfo.artist.isEmpty
+                          ? '未知艺术家'
+                          : song.basicInfo.artist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
                         children: [
-                      Row(children: [
-                        SongTypeLabel(type: song.type, songId: song.id),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(song.title,
-                              style: Theme.of(context).textTheme.titleSmall,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
-                        ),
-                      ]),
-                      const SizedBox(height: 3),
-                      Text(
-                        song.basicInfo.artist.isEmpty
-                            ? '未知艺术家'
-                            : song.basicInfo.artist,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall,
+                          for (var index = 0; index < song.ds.length; index++)
+                            Padding(
+                              padding: EdgeInsets.only(
+                                  right: index == song.ds.length - 1 ? 0 : 6),
+                              child: DifficultyConstantLabel(
+                                  constant: song.ds[index],
+                                  difficultyIndex: index,
+                                  utage: song.id.length >= 6 ||
+                                      song.type == 'UTAGE'),
+                            ),
+                        ],
                       ),
-                      const SizedBox(height: 8),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            for (var index = 0; index < song.ds.length; index++)
-                              Padding(
-                                padding: EdgeInsets.only(
-                                    right: index == song.ds.length - 1 ? 0 : 6),
-                                child: DifficultyConstantLabel(
-                                    constant: song.ds[index],
-                                    difficultyIndex: index,
-                                    utage: song.id.length >= 6 ||
-                                        song.type == 'UTAGE'),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ])),
-              ])),
-        ),
-      );
+                    ),
+                  ])),
+            ])),
+      ),
+    );
   }
 
   // 曲绘加载使用CoverPathUtil工具类
@@ -400,598 +433,540 @@ class _RandomChartPageState extends State<RandomChartPage> {
     final gridItemSpacing = screenWidth * 0.03; // 网格项间距
 
     return BackgroundPageScaffold(
-        title: '随机抽歌',
-        resizeToAvoidBottomInset: false, // 解决输入法挤压背景的问题
-        contentPadding: EdgeInsets.only(
-          bottom: MediaQuery.paddingOf(context).bottom + 10,
-        ),
-        child: SingleChildScrollView(
-                    padding: EdgeInsets.all(contentPadding),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // 筛选条件区域
-                        Container(
-                          padding: EdgeInsets.all(cardPadding),
-                          decoration: BoxDecoration(
-                            color: brightness == Brightness.light
-                                ? Theme.of(context)
-                                    .colorScheme
-                                    .surfaceContainerHigh
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(borderRadius),
+      title: '随机抽歌',
+      resizeToAvoidBottomInset: false, // 解决输入法挤压背景的问题
+      contentPadding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + 10,
+      ),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.all(contentPadding),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 筛选条件区域
+            Container(
+              padding: EdgeInsets.all(cardPadding),
+              decoration: BoxDecoration(
+                color: brightness == Brightness.light
+                    ? Theme.of(context).colorScheme.surfaceContainerHigh
+                    : Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(borderRadius),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    '筛选条件',
+                    style: TextStyle(
+                      fontSize: textSizeLarge,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: spacingMedium),
+
+                  // 筛选条件三行布局
+                  Column(
+                    children: [
+                      // 第一行：抽取数量
+                      Row(
+                        children: [
+                          Text(
+                            '抽取数量',
+                            style: TextStyle(
+                              fontSize: textSizeSmall,
+                              color: AppColors.greyHint(brightness),
+                            ),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                '筛选条件',
-                                style: TextStyle(
-                                  fontSize: textSizeLarge,
-                                  fontWeight: FontWeight.bold,
+                          SizedBox(width: spacingSmall),
+                          NumberStepper(
+                              value: _drawCount,
+                              suffix: ' 首',
+                              controller: _drawCountController,
+                              errorText: _drawCountError,
+                              onTextChanged: _onDrawCountChanged,
+                              minimum: 2,
+                              maximum: 100,
+                              onChanged: _isDrawing ? null : _setDrawCount),
+                        ],
+                      ),
+                      SizedBox(height: spacingMedium),
+
+                      // 第二行：版本筛选（单独一行）
+                      Container(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '版本筛选',
+                              style: TextStyle(
+                                fontSize: textSizeSmall,
+                                color: AppColors.greyHint(brightness),
+                              ),
+                            ),
+                            SizedBox(height: spacingSmall),
+                            InkWell(
+                              onTap: _showVersionSelector,
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: spacingSmall,
+                                    vertical: spacingSmall),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outlineVariant),
+                                  borderRadius:
+                                      BorderRadius.circular(borderRadius),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        _selectedVersions.isEmpty
+                                            ? '全部版本'
+                                            : '已选 ${_selectedVersions.length} 个版本',
+                                        style:
+                                            TextStyle(fontSize: textSizeSmall),
+                                      ),
+                                    ),
+                                    Icon(Icons.arrow_drop_down, size: 16),
+                                  ],
                                 ),
                               ),
-                              SizedBox(height: spacingMedium),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: spacingMedium),
 
-                              // 筛选条件三行布局
-                              Column(
-                                children: [
-                                  // 第一行：抽取数量
-                                  Row(
-                                    children: [
-                                      Text(
-                                        '抽取数量',
-                                        style: TextStyle(
-                                          fontSize: textSizeSmall,
-                                          color: AppColors.greyHint(brightness),
-                                        ),
+                      // 第三行：类型筛选（单独一行）
+                      Container(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '类型筛选',
+                              style: TextStyle(
+                                fontSize: textSizeSmall,
+                                color: AppColors.greyHint(brightness),
+                              ),
+                            ),
+                            SizedBox(height: spacingSmall),
+                            InkWell(
+                              onTap: _showGenreSelector,
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: spacingSmall,
+                                    vertical: spacingSmall),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outlineVariant),
+                                  borderRadius:
+                                      BorderRadius.circular(borderRadius),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        _selectedGenres.isEmpty
+                                            ? '全部类型'
+                                            : '已选 ${_selectedGenres.length} 个类型',
+                                        style:
+                                            TextStyle(fontSize: textSizeSmall),
                                       ),
-                                      SizedBox(width: spacingSmall),
-                                      NumberStepper(
-                                          value: _drawCount,
-                                          suffix: ' 首',
-                                          onChanged: _isDrawing
-                                              ? null
-                                              : (value) => setState(
-                                                  () => _drawCount = value)),
-                                    ],
-                                  ),
-                                  SizedBox(height: spacingMedium),
-
-                                  // 第二行：版本筛选（单独一行）
-                                  Container(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          '版本筛选',
-                                          style: TextStyle(
-                                            fontSize: textSizeSmall,
-                                            color:
-                                                AppColors.greyHint(brightness),
-                                          ),
-                                        ),
-                                        SizedBox(height: spacingSmall),
-                                        InkWell(
-                                          onTap: _showVersionSelector,
-                                          child: Container(
-                                            padding: EdgeInsets.symmetric(
-                                                horizontal: spacingSmall,
-                                                vertical: spacingSmall),
-                                            decoration: BoxDecoration(
-                                              border: Border.all(
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .outlineVariant),
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                      borderRadius),
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    _selectedVersions.isEmpty
-                                                        ? '全部版本'
-                                                        : '已选 ${_selectedVersions.length} 个版本',
-                                                    style: TextStyle(
-                                                        fontSize:
-                                                            textSizeSmall),
-                                                  ),
-                                                ),
-                                                Icon(Icons.arrow_drop_down,
-                                                    size: 16),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
                                     ),
-                                  ),
-                                  SizedBox(height: spacingMedium),
+                                    Icon(Icons.arrow_drop_down, size: 16),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: spacingMedium),
 
-                                  // 第三行：类型筛选（单独一行）
-                                  Container(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          '类型筛选',
-                                          style: TextStyle(
-                                            fontSize: textSizeSmall,
-                                            color:
-                                                AppColors.greyHint(brightness),
-                                          ),
-                                        ),
-                                        SizedBox(height: spacingSmall),
-                                        InkWell(
-                                          onTap: _showGenreSelector,
-                                          child: Container(
-                                            padding: EdgeInsets.symmetric(
-                                                horizontal: spacingSmall,
-                                                vertical: spacingSmall),
-                                            decoration: BoxDecoration(
-                                              border: Border.all(
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .outlineVariant),
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                      borderRadius),
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    _selectedGenres.isEmpty
-                                                        ? '全部类型'
-                                                        : '已选 ${_selectedGenres.length} 个类型',
-                                                    style: TextStyle(
-                                                        fontSize:
-                                                            textSizeSmall),
-                                                  ),
-                                                ),
-                                                Icon(Icons.arrow_drop_down,
-                                                    size: 16),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                      // 第四行：定数范围
+                      Container(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '定数范围',
+                              style: TextStyle(
+                                fontSize: textSizeSmall,
+                                color: AppColors.greyHint(brightness),
+                              ),
+                            ),
+                            SizedBox(height: spacingSmall),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _minDsController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: InputDecoration(
+                                      hintText: '最小值',
+                                      border: OutlineInputBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(borderRadius),
+                                      ),
+                                      contentPadding: EdgeInsets.symmetric(
+                                          horizontal: spacingSmall,
+                                          vertical: spacingSmall * 1.5),
                                     ),
+                                    style: TextStyle(fontSize: textSizeSmall),
                                   ),
-                                  SizedBox(height: spacingMedium),
-
-                                  // 第四行：定数范围
-                                  Container(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          '定数范围',
-                                          style: TextStyle(
-                                            fontSize: textSizeSmall,
-                                            color:
-                                                AppColors.greyHint(brightness),
-                                          ),
-                                        ),
-                                        SizedBox(height: spacingSmall),
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: TextField(
-                                                controller: _minDsController,
-                                                keyboardType:
-                                                    TextInputType.number,
-                                                decoration: InputDecoration(
-                                                  hintText: '最小值',
-                                                  border: OutlineInputBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            borderRadius),
-                                                  ),
-                                                  contentPadding:
-                                                      EdgeInsets.symmetric(
-                                                          horizontal:
-                                                              spacingSmall,
-                                                          vertical:
-                                                              spacingSmall *
-                                                                  1.5),
-                                                ),
-                                                style: TextStyle(
-                                                    fontSize: textSizeSmall),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            const Text('-'),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: TextField(
-                                                controller: _maxDsController,
-                                                keyboardType:
-                                                    TextInputType.number,
-                                                decoration: InputDecoration(
-                                                  hintText: '最大值',
-                                                  border: OutlineInputBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            borderRadius),
-                                                  ),
-                                                  contentPadding:
-                                                      EdgeInsets.symmetric(
-                                                          horizontal:
-                                                              spacingSmall,
-                                                          vertical:
-                                                              spacingSmall *
-                                                                  1.5),
-                                                ),
-                                                style: TextStyle(
-                                                    fontSize: textSizeSmall),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
+                                ),
+                                const SizedBox(width: 8),
+                                const Text('-'),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _maxDsController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: InputDecoration(
+                                      hintText: '最大值',
+                                      border: OutlineInputBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(borderRadius),
+                                      ),
+                                      contentPadding: EdgeInsets.symmetric(
+                                          horizontal: spacingSmall,
+                                          vertical: spacingSmall * 1.5),
                                     ),
+                                    style: TextStyle(fontSize: textSizeSmall),
                                   ),
-                                  SizedBox(height: spacingMedium),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: spacingMedium),
 
-                                  // 快捷选项
-                                  Container(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          '快捷选项',
-                                          style: TextStyle(
-                                            fontSize: textSizeSmall,
-                                            color:
-                                                AppColors.greyHint(brightness),
-                                          ),
-                                        ),
-                                        SizedBox(height: spacingSmall),
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: ElevatedButton(
-                                                onPressed: () async {
-                                                  debugPrint(
-                                                      '[RandomChartPage] 点击MASTER上级快捷按钮');
-                                                  // 确保版本和流派列表已加载
-                                                  if (_versionList.isEmpty ||
-                                                      _genreList.isEmpty) {
-                                                    debugPrint(
-                                                        '[RandomChartPage] 列表未加载，重新加载...');
-                                                    await _loadFilterOptions();
-                                                  }
-                                                  if (!mounted) return;
-                                                  debugPrint(
-                                                      '[RandomChartPage] _versionList长度: ${_versionList.length}');
-                                                  debugPrint(
-                                                      '[RandomChartPage] _genreList长度: ${_genreList.length}');
-                                                  setState(() {
-                                                    _minDsController.text =
-                                                        '13.2';
-                                                    _maxDsController.text =
-                                                        '14.4';
-                                                    _requireMaster = true;
-                                                    _excludeSixDigitId = true;
-                                                    // 自动选中所有版本
-                                                    _selectedVersions =
-                                                        List.from(_versionList);
-                                                    // 自动选中所有类型，排除"\u5bb4\u4f1a\u5834"
-                                                    _selectedGenres = _genreList
-                                                        .where((genre) =>
-                                                            genre !=
-                                                            '\u5bb4\u4f1a\u5834')
-                                                        .toList();
-                                                  });
-                                                },
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor:
-                                                      Theme.of(context)
-                                                          .colorScheme
-                                                          .secondaryContainer,
-                                                  foregroundColor:
-                                                      Theme.of(context)
-                                                          .colorScheme
-                                                          .onSecondaryContainer,
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            borderRadius),
-                                                  ),
-                                                  padding: EdgeInsets.symmetric(
-                                                      vertical: spacingSmall),
-                                                ),
-                                                child: Text(
-                                                  'MASTER 上级',
-                                                  style: TextStyle(
-                                                      fontSize: textSizeSmall,
-                                                      fontWeight:
-                                                          FontWeight.bold),
-                                                ),
-                                              ),
-                                            ),
-                                            SizedBox(width: spacingSmall),
-                                            Expanded(
-                                              child: ElevatedButton(
-                                                onPressed: () async {
-                                                  debugPrint(
-                                                      '[RandomChartPage] 点击MASTER超上级快捷按钮');
-                                                  // 确保版本和流派列表已加载
-                                                  if (_versionList.isEmpty ||
-                                                      _genreList.isEmpty) {
-                                                    debugPrint(
-                                                        '[RandomChartPage] 列表未加载，重新加载...');
-                                                    await _loadFilterOptions();
-                                                  }
-                                                  if (!mounted) return;
-                                                  setState(() {
-                                                    _minDsController.text =
-                                                        '14.5';
-                                                    _maxDsController.text =
-                                                        '14.9';
-                                                    _requireMaster = true;
-                                                    _excludeSixDigitId = true;
-                                                    // 自动选中所有版本
-                                                    _selectedVersions =
-                                                        List.from(_versionList);
-                                                    // 自动选中所有类型，排除"\u5bb4\u4f1a\u5834"
-                                                    _selectedGenres = _genreList
-                                                        .where((genre) =>
-                                                            genre !=
-                                                            '\u5bb4\u4f1a\u5834')
-                                                        .toList();
-                                                  });
-                                                },
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor:
-                                                      Theme.of(context)
-                                                          .colorScheme
-                                                          .secondaryContainer,
-                                                  foregroundColor:
-                                                      Theme.of(context)
-                                                          .colorScheme
-                                                          .onSecondaryContainer,
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            borderRadius),
-                                                  ),
-                                                  padding: EdgeInsets.symmetric(
-                                                      vertical: spacingSmall),
-                                                ),
-                                                child: Text(
-                                                  'MASTER 超上级',
-                                                  style: TextStyle(
-                                                      fontSize: textSizeSmall,
-                                                      fontWeight:
-                                                          FontWeight.bold),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(height: spacingMedium),
-
-                                  // 抽奖按钮
-                                  ElevatedButton(
-                                    onPressed: _isDrawing ? null : _drawSongs,
+                      // 快捷选项
+                      Container(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '快捷选项',
+                              style: TextStyle(
+                                fontSize: textSizeSmall,
+                                color: AppColors.greyHint(brightness),
+                              ),
+                            ),
+                            SizedBox(height: spacingSmall),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () async {
+                                      debugPrint(
+                                          '[RandomChartPage] 点击MASTER上级快捷按钮');
+                                      // 确保版本和流派列表已加载
+                                      if (_versionList.isEmpty ||
+                                          _genreList.isEmpty) {
+                                        debugPrint(
+                                            '[RandomChartPage] 列表未加载，重新加载...');
+                                        await _loadFilterOptions();
+                                      }
+                                      if (!mounted) return;
+                                      debugPrint(
+                                          '[RandomChartPage] _versionList长度: ${_versionList.length}');
+                                      debugPrint(
+                                          '[RandomChartPage] _genreList长度: ${_genreList.length}');
+                                      setState(() {
+                                        _minDsController.text = '13.2';
+                                        _maxDsController.text = '14.4';
+                                        _requireMaster = true;
+                                        _excludeSixDigitId = true;
+                                        // 自动选中所有版本
+                                        _selectedVersions =
+                                            List.from(_versionList);
+                                        // 自动选中所有类型，排除"\u5bb4\u4f1a\u5834"
+                                        _selectedGenres = _genreList
+                                            .where((genre) =>
+                                                genre != '\u5bb4\u4f1a\u5834')
+                                            .toList();
+                                      });
+                                    },
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor:
-                                          AppColors.linkBlue(brightness),
-                                      padding: EdgeInsets.symmetric(
-                                          vertical: spacingMedium),
+                                      backgroundColor: Theme.of(context)
+                                          .colorScheme
+                                          .secondaryContainer,
+                                      foregroundColor: Theme.of(context)
+                                          .colorScheme
+                                          .onSecondaryContainer,
                                       shape: RoundedRectangleBorder(
                                         borderRadius:
                                             BorderRadius.circular(borderRadius),
                                       ),
+                                      padding: EdgeInsets.symmetric(
+                                          vertical: spacingSmall),
                                     ),
-                                    child: _isDrawing
-                                        ? Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              SizedBox(
-                                                width: iconSize,
-                                                height: iconSize,
-                                                child:
-                                                    const CircularProgressIndicator(
-                                                  color: Colors.white,
-                                                  strokeWidth: 2,
-                                                ),
-                                              ),
-                                              SizedBox(width: spacingSmall),
-                                              Text(
-                                                '抽奖中...',
-                                                style: TextStyle(
-                                                  fontSize: textSizeMedium,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ],
-                                          )
-                                        : Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              const Icon(Icons.refresh),
-                                              SizedBox(width: spacingSmall),
-                                              Text(
-                                                '开始抽奖',
-                                                style: TextStyle(
-                                                  fontSize: textSizeMedium,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
+                                    child: Text(
+                                      'MASTER 上级',
+                                      style: TextStyle(
+                                          fontSize: textSizeSmall,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: spacingSmall),
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () async {
+                                      debugPrint(
+                                          '[RandomChartPage] 点击MASTER超上级快捷按钮');
+                                      // 确保版本和流派列表已加载
+                                      if (_versionList.isEmpty ||
+                                          _genreList.isEmpty) {
+                                        debugPrint(
+                                            '[RandomChartPage] 列表未加载，重新加载...');
+                                        await _loadFilterOptions();
+                                      }
+                                      if (!mounted) return;
+                                      setState(() {
+                                        _minDsController.text = '14.5';
+                                        _maxDsController.text = '14.9';
+                                        _requireMaster = true;
+                                        _excludeSixDigitId = true;
+                                        // 自动选中所有版本
+                                        _selectedVersions =
+                                            List.from(_versionList);
+                                        // 自动选中所有类型，排除"\u5bb4\u4f1a\u5834"
+                                        _selectedGenres = _genreList
+                                            .where((genre) =>
+                                                genre != '\u5bb4\u4f1a\u5834')
+                                            .toList();
+                                      });
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Theme.of(context)
+                                          .colorScheme
+                                          .secondaryContainer,
+                                      foregroundColor: Theme.of(context)
+                                          .colorScheme
+                                          .onSecondaryContainer,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(borderRadius),
+                                      ),
+                                      padding: EdgeInsets.symmetric(
+                                          vertical: spacingSmall),
+                                    ),
+                                    child: Text(
+                                      'MASTER 超上级',
+                                      style: TextStyle(
+                                          fontSize: textSizeSmall,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: spacingMedium),
+
+                      // 抽奖按钮
+                      ElevatedButton(
+                        onPressed: _isDrawing || _drawCountError != null
+                            ? null
+                            : _drawSongs,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.linkBlue(brightness),
+                          padding:
+                              EdgeInsets.symmetric(vertical: spacingMedium),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(borderRadius),
+                          ),
+                        ),
+                        child: _isDrawing
+                            ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: iconSize,
+                                    height: iconSize,
+                                    child: const CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                  SizedBox(width: spacingSmall),
+                                  Text(
+                                    '抽奖中...',
+                                    style: TextStyle(
+                                      fontSize: textSizeMedium,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.refresh),
+                                  SizedBox(width: spacingSmall),
+                                  Text(
+                                    '开始抽奖',
+                                    style: TextStyle(
+                                      fontSize: textSizeMedium,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
-                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
 
-                        SizedBox(height: spacingLarge),
+            SizedBox(height: spacingLarge),
 
-                        // 歌曲抽取区域
-                        Padding(
-                          padding: EdgeInsets.all(cardPadding),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // 抽取结果标题
-                              Text(
-                                '抽取结果',
-                                style: TextStyle(
-                                  fontSize: textSizeLarge,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-
-                              SizedBox(height: spacingLarge),
-
-                              if (_drawnSongs.isEmpty)
-                                const EmptyState(message: '选好条件后，开始抽歌吧')
-                              else ...[
-                                Text('本次抽取 ${_drawnSongs.length} 首',
-                                    style: TextStyle(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant)),
-                                const SizedBox(height: 8),
-                                ListView.separated(
-                                  padding: EdgeInsets.zero,
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: _drawnSongs.length,
-                                  separatorBuilder: (_, __) =>
-                                      const SizedBox(height: 10),
-                                  itemBuilder: (context, index) =>
-                                      _songCard(_drawnSongs[index]),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-
-                        SizedBox(height: spacingLarge),
-
-                        // 历史记录区域
-                        Padding(
-                          padding: EdgeInsets.all(cardPadding),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                '历史抽取记录',
-                                style: TextStyle(
-                                  fontSize: textSizeLarge,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: spacingMedium),
-                              if (_history.isEmpty)
-                                const Center(
-                                  child: Text('暂无历史记录'),
-                                )
-                              else
-                                Column(
-                                  children:
-                                      _history.asMap().entries.map((entry) {
-                                    int index = entry.key;
-                                    List<Song> songs = entry.value;
-
-                                    return Container(
-                                      margin: const EdgeInsets.only(bottom: 16),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Text(
-                                                '${_historyTimes[index].toString().substring(0, 16)}',
-                                                style: TextStyle(
-                                                  fontSize: textSizeSmall,
-                                                  color: AppColors.greyHint(
-                                                      brightness),
-                                                ),
-                                              ),
-                                              IconButton(
-                                                onPressed: () =>
-                                                    _deleteHistory(index),
-                                                icon: const Icon(Icons.delete),
-                                                iconSize: iconSize * 0.8,
-                                              ),
-                                            ],
-                                          ),
-                                          SizedBox(height: spacingSmall),
-                                          GridView.count(
-                                            padding: EdgeInsets.zero,
-                                            shrinkWrap: true,
-                                            physics:
-                                                const NeverScrollableScrollPhysics(),
-                                            crossAxisCount: 4,
-                                            crossAxisSpacing:
-                                                gridItemSpacing * 0.8,
-                                            mainAxisSpacing:
-                                                gridItemSpacing * 0.8,
-                                            children: songs.map((song) {
-                                              return GestureDetector(
-                                                onTap: () {
-                                                  Navigator.push(
-                                                    context,
-                                                    MaterialPageRoute(
-                                                      builder: (context) =>
-                                                          SongInfoPage(
-                                                        songId:
-                                                            song.id.toString(),
-                                                        initialLevelIndex: 0,
-                                                      ),
-                                                    ),
-                                                  );
-                                                },
-                                                child: Container(
-                                                  decoration: BoxDecoration(
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .surfaceContainerHighest,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            borderRadius),
-                                                  ),
-                                                  child: CoverUtil
-                                                      .buildCoverWidgetWithContext(
-                                                          context, song.id, 50),
-                                                ),
-                                              );
-                                            }).toList(),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
+            // 歌曲抽取区域
+            Padding(
+              padding: EdgeInsets.all(cardPadding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 抽取结果标题
+                  Text(
+                    '抽取结果',
+                    style: TextStyle(
+                      fontSize: textSizeLarge,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-        );
+
+                  SizedBox(height: spacingLarge),
+
+                  if (_drawnSongs.isEmpty)
+                    const EmptyState(message: '选好条件后，开始抽歌吧')
+                  else ...[
+                    Text('本次抽取 ${_drawnSongs.length} 首',
+                        style: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant)),
+                    const SizedBox(height: 8),
+                    ListView.separated(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _drawnSongs.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) =>
+                          _songCard(_drawnSongs[index]),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            SizedBox(height: spacingLarge),
+
+            // 历史记录区域
+            Padding(
+              padding: EdgeInsets.all(cardPadding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    '历史抽取记录',
+                    style: TextStyle(
+                      fontSize: textSizeLarge,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: spacingMedium),
+                  if (_history.isEmpty)
+                    const Center(
+                      child: Text('暂无历史记录'),
+                    )
+                  else
+                    Column(
+                      children: _history.asMap().entries.map((entry) {
+                        int index = entry.key;
+                        List<Song> songs = entry.value;
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    '${_historyTimes[index].toString().substring(0, 16)}',
+                                    style: TextStyle(
+                                      fontSize: textSizeSmall,
+                                      color: AppColors.greyHint(brightness),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    onPressed: () => _deleteHistory(index),
+                                    icon: const Icon(Icons.delete),
+                                    iconSize: iconSize * 0.8,
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: spacingSmall),
+                              GridView.count(
+                                padding: EdgeInsets.zero,
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                crossAxisCount: 4,
+                                crossAxisSpacing: gridItemSpacing * 0.8,
+                                mainAxisSpacing: gridItemSpacing * 0.8,
+                                children: songs.map((song) {
+                                  return GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => SongInfoPage(
+                                            songId: song.id.toString(),
+                                            initialLevelIndex: 0,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .surfaceContainerHighest,
+                                        borderRadius:
+                                            BorderRadius.circular(borderRadius),
+                                      ),
+                                      child:
+                                          CoverUtil.buildCoverWidgetWithContext(
+                                              context, song.id, 50),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

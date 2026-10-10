@@ -1,3 +1,4 @@
+import 'package:my_first_flutter_app/widgets/NoRipple.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -438,11 +439,13 @@ class _CustomBest50PageState extends State<CustomBest50Page> {
                       runSpacing: 6,
                       children: [
                         for (var i = 0; i < song!.charts.length; i++)
-                          ChoiceChip(
-                            label: Text(_difficultyName(i)),
-                            selected: levelIndex == i,
-                            onSelected: (_) =>
-                                setSheetState(() => levelIndex = i),
+                          NoRipple(
+                            child: ChoiceChip(
+                              label: Text(_difficultyName(i)),
+                              selected: levelIndex == i,
+                              onSelected: (_) =>
+                                  setSheetState(() => levelIndex = i),
+                            ),
                           ),
                       ],
                     ),
@@ -641,10 +644,12 @@ class _CustomBest50PageState extends State<CustomBest50Page> {
             runSpacing: 6,
             children: [
               for (final v in options)
-                ChoiceChip(
-                  label: Text(labelOf(v)),
-                  selected: current == v,
-                  onSelected: (_) => onPick(v),
+                NoRipple(
+                  child: ChoiceChip(
+                    label: Text(labelOf(v)),
+                    selected: current == v,
+                    onSelected: (_) => onPick(v),
+                  ),
                 ),
             ],
           ),

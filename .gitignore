@@ -73,6 +73,10 @@ test/awmc_*_test.dart
 awmc_secret.json
 awmc_secret*.json
 
+# 本机开发者凭据（通过 --dart-define-from-file 注入，禁止提交）
+developer_secret.json
+developer_secret*.json
+
 # 人工/工具产生的源码备份（用于无 git 历史时回退，不该进版本库）
 tool/backup/
 

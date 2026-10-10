@@ -15,8 +15,8 @@ import '../../utils/StringUtil.dart';
 import '../../utils/TranslationUtil.dart';
 import '../../utils/AppTheme.dart';
 import '../SongInfoPage.dart';
-import 'package:my_first_flutter_app/utils/ApiClient.dart';
 import '../../widgets/BackgroundPageScaffold.dart';
+import '../../widgets/LxnsAssetImage.dart';
 
 class CollectionInfoPage extends StatefulWidget {
   final int collectionId;
@@ -119,14 +119,8 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
         return;
       }
 
-      // 下载图片
-      final response = await ApiClient.get(Uri.parse(imageUrl));
-      if (response.statusCode != 200) {
-        _showToast('图片下载失败');
-        return;
-      }
-
-      Uint8List imageBytes = response.bodyBytes;
+      // 保存也复用收藏品缓存，避免同一张图片再次从第三方下载。
+      Uint8List imageBytes = await lxnsAssetCacheManager.readBytes(imageUrl);
 
       // 保存到相册
       Directory? directory;
@@ -510,11 +504,13 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                 GridView.builder(
                   shrinkWrap: true,
                   physics: NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     crossAxisSpacing: 4, // 进一步减小横向间距
                     mainAxisSpacing: 4, // 进一步减小纵向间距
-                    childAspectRatio: 2.0, // 调整比例，使卡片更紧凑
+                    childAspectRatio: 2.0, // 与 mainAxisExtent 一起给出固定格子高度
+                    mainAxisExtent: 54, // 给曲绘、上下内边距和边框留出完整空间，避免卡片底部溢出
                   ),
                   itemCount: requiredItem.songs!.length,
                   itemBuilder: (context, index) {
@@ -628,7 +624,8 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
-          SizedBox(height: 8),
+          // 距离下方歌曲卡片的小间距（原为 16，配合 GridView 的固定格子高度收紧）
+          SizedBox(height: 6),
         ],
       ));
     }
@@ -1130,7 +1127,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                           )
                                         else if (_translatedName != null)
                                           Text(
-                                            '由腾讯云翻译自${_isEnglishAndJapanese(_collection!.name) ? '日语+英语' : _isEnglish(_collection!.name) ? '英语' : '日语'}',
+                                            '由百度大模型翻译自${_isEnglishAndJapanese(_collection!.name) ? '日语+英语' : _isEnglish(_collection!.name) ? '英语' : '日语'}',
                                             style: TextStyle(
                                               fontSize: 12,
                                               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1241,7 +1238,7 @@ class _CollectionInfoPageState extends State<CollectionInfoPage> {
                                                 )
                                               else if (_translatedDescription != null)
                                                 Text(
-                                                  '由腾讯云翻译自${_isEnglishAndJapanese(_collection!.description!) ? '日语+英语' : _isEnglish(_collection!.description!) ? '英语' : '日语'}',
+                                                  '由百度大模型翻译自${_isEnglishAndJapanese(_collection!.description!) ? '日语+英语' : _isEnglish(_collection!.description!) ? '英语' : '日语'}',
                                                   style: TextStyle(
                                                     fontSize: 12,
                                                     color: Theme.of(context).colorScheme.onSurfaceVariant,

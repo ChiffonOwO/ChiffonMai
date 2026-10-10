@@ -28,9 +28,29 @@ class _MaimaiHubLoginDialogState extends State<_MaimaiHubLoginDialog> {
   bool _loggingIn = false;
   bool _success = false;
   String? _error;
+  String? _inputError;
+
+  @override
+  void initState() {
+    super.initState();
+    _qrController.addListener(_validateQr);
+  }
+
+  void _validateQr() {
+    final value = _qrController.text.trim();
+    setState(() {
+      _inputError = value.isEmpty
+          ? '请粘贴或扫描登入二维码'
+          : !value.startsWith('SGWCMAID')
+              ? '请使用舞萌|中二公众号生成的登入二维码'
+              : null;
+      _error = null;
+    });
+  }
 
   @override
   void dispose() {
+    _qrController.removeListener(_validateQr);
     _qrController.dispose();
     super.dispose();
   }
@@ -38,11 +58,11 @@ class _MaimaiHubLoginDialogState extends State<_MaimaiHubLoginDialog> {
   Future<void> _login() async {
     final qrCode = _qrController.text.trim();
     if (qrCode.isEmpty) {
-      setState(() => _error = '请先粘贴或扫描舞萌|中二登入二维码');
+      _validateQr();
       return;
     }
     if (!qrCode.startsWith('SGWCMAID')) {
-      setState(() => _error = '二维码格式不正确，请使用舞萌|中二公众号生成的登入二维码');
+      _validateQr();
       return;
     }
 
@@ -133,6 +153,8 @@ class _MaimaiHubLoginDialogState extends State<_MaimaiHubLoginDialog> {
                           fontSize: 13,
                           color: AppColors.greyHint(brightness, shade: 400)),
                       border: const OutlineInputBorder(),
+                      errorText: _inputError,
+                      errorMaxLines: 3,
                       contentPadding: const EdgeInsets.all(12),
                     ),
                   ),

@@ -15,7 +15,8 @@ class CollectionSearchPage extends StatefulWidget {
   _CollectionSearchPageState createState() => _CollectionSearchPageState();
 }
 
-class _CollectionSearchPageState extends State<CollectionSearchPage> {
+class _CollectionSearchPageState extends State<CollectionSearchPage>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   final CollectionSearchService _searchService = CollectionSearchService();
   
@@ -24,6 +25,8 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
   List<Collection> _rawResults = []; // 未经过滤和排序的原始结果
   bool _isSearching = false;
   Timer? _debounceTimer;
+  late final TabController _typeTabs;
+  int _searchRequest = 0;
 
   // 筛选：仅显示需要歌曲要求的收藏品
   bool _filterSongRequired = false;
@@ -43,12 +46,18 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
   @override
   void initState() {
     super.initState();
+    _typeTabs = TabController(
+      length: _typeOptions.length,
+      vsync: this,
+      animationDuration: const Duration(milliseconds: 240),
+    );
     // 页面初始化时执行一次搜索，显示全部收藏品
     _performSearch();
   }
 
   @override
   void dispose() {
+    _typeTabs.dispose();
     _searchController.dispose();
     _debounceTimer?.cancel();
     super.dispose();
@@ -56,6 +65,8 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
 
   // 执行搜索
   Future<void> _performSearch() async {
+    if (!mounted) return;
+    final request = ++_searchRequest;
     setState(() {
       _isSearching = true;
     });
@@ -65,20 +76,22 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
         _searchController.text,
         _selectedType,
       );
+      if (!mounted || request != _searchRequest) return;
       setState(() {
         _rawResults = results;
         _applyFilterAndSort();
       });
     } catch (e) {
+      if (!mounted || request != _searchRequest) return;
       debugPrint('搜索出错: $e');
       setState(() {
         _rawResults = [];
         _searchResults = [];
       });
     } finally {
-      setState(() {
-        _isSearching = false;
-      });
+      if (mounted && request == _searchRequest) {
+        setState(() => _isSearching = false);
+      }
     }
   }
 
@@ -126,6 +139,8 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
 
   // 切换收藏品类型
   void _switchType(String type) {
+    if (_selectedType == type) return;
+    _debounceTimer?.cancel();
     setState(() {
       _selectedType = type;
     });
@@ -181,9 +196,6 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    // 按钮相关配置
-    final buttonHeight = 36.0; // 降低按钮高度
-    final buttonBorderRadius = 8.0;
 
     return BackgroundPageScaffold(
       title: '收藏品搜索',
@@ -226,32 +238,18 @@ class _CollectionSearchPageState extends State<CollectionSearchPage> {
                         ),
                         SizedBox(height: 16),
 
-                        // 类型切换按钮
-                        Row(
-                          children: _typeOptions.map((option) {
-                            return Expanded(
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 4),
-                                child: ElevatedButton(
-                                  onPressed: () => _switchType(option['value']!),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: _selectedType == option['value'] 
-                                        ? themeColor 
-                                        : Theme.of(context).colorScheme.surface,
-                                    foregroundColor: _selectedType == option['value'] 
-                                        ? Colors.white 
-                                        : Theme.of(context).colorScheme.onSurface,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(buttonBorderRadius),
-                                    ),
-                                    fixedSize: Size(double.infinity, buttonHeight),
-                                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                                  ),
-                                  child: Text(option['label']!),
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                        // 类型使用 TabBar，指示条移动；重复选择不会重新请求数据。
+                        TabBar(
+                          controller: _typeTabs,
+                          splashFactory: NoSplash.splashFactory,
+                          overlayColor: const WidgetStatePropertyAll(
+                              Colors.transparent),
+                          tabs: [
+                            for (final option in _typeOptions)
+                              Tab(text: option['label']),
+                          ],
+                          onTap: (index) =>
+                              _switchType(_typeOptions[index]['value']!),
                         ),
 
                         SizedBox(height: 8),

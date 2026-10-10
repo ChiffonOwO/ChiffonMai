@@ -96,6 +96,7 @@ class _AttendanceWheelPageState extends State<AttendanceWheelPage>
     final scheme = Theme.of(context).colorScheme;
     final spinning = _controller.isAnimating;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
         backgroundColor: Colors.transparent,
         body: Stack(fit: StackFit.expand, children: [
           ColoredBox(color: scheme.surface),

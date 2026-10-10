@@ -13,6 +13,8 @@ import android.view.Surface
 import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -44,6 +46,10 @@ class MainActivity : AudioServiceActivity() {
      * 谱面播放页必须自己投票要高刷，否则就会一直卡在「几秒 120 → 掉 60」的循环里。
      */
     private val DISPLAY_CHANNEL = "com.example.app/display"
+
+    /** 只控制顶部状态栏；底部导航保持显示，避免沉浸全屏吃掉返回手势。 */
+    private val SYSTEM_UI_CHANNEL = "com.example.app/system_ui"
+    private var statusBarHidden: Boolean? = null
 
     /**
      * 随身听自定义通知栏通道。
@@ -84,6 +90,17 @@ class MainActivity : AudioServiceActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SYSTEM_UI_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                if (call.method == "setStatusBarHidden") {
+                    statusBarHidden = call.argument<Boolean>("hidden") ?: false
+                    applyStatusBarVisibility()
+                    result.success(null)
+                } else {
+                    result.notImplemented()
+                }
+            }
 
         // 随身听通知栏：Dart → 原生
         val notificationChannel = MethodChannel(
@@ -172,6 +189,37 @@ class MainActivity : AudioServiceActivity() {
                 "queryRefreshRate" -> result.success(queryRefreshRateInfo())
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // 键盘、相册和外部应用关闭后重新应用，偏好尚未载入时不干预系统。
+        if (hasFocus) applyStatusBarVisibility()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun applyStatusBarVisibility() {
+        val hidden = statusBarHidden ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.let { controller ->
+                controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_DEFAULT
+                controller.show(WindowInsets.Type.navigationBars())
+                if (hidden) {
+                    controller.hide(WindowInsets.Type.statusBars())
+                } else {
+                    controller.show(WindowInsets.Type.statusBars())
+                }
+            }
+        } else {
+            val decor = window.decorView
+            // 只切换 FULLSCREEN，清理会吞边缘手势的全屏导航标志。
+            var flags = decor.systemUiVisibility and
+                (View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE or
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY).inv()
+            flags = if (hidden) flags or View.SYSTEM_UI_FLAG_FULLSCREEN
+                else flags and View.SYSTEM_UI_FLAG_FULLSCREEN.inv()
+            decor.systemUiVisibility = flags
         }
     }
 

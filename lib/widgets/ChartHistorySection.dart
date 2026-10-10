@@ -1,3 +1,4 @@
+import 'package:my_first_flutter_app/widgets/NoRipple.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
@@ -350,10 +351,12 @@ class _ChartHistorySectionState extends State<ChartHistorySection> {
   }
 
   Widget _metricChip(String label, _HistoryMetric metric) {
-    return ChoiceChip(
-      label: Text(label, style: const TextStyle(fontSize: 11.5)),
-      selected: _metric == metric,
-      onSelected: (_) => setState(() => _metric = metric),
+    return NoRipple(
+      child: ChoiceChip(
+        label: Text(label, style: const TextStyle(fontSize: 11.5)),
+        selected: _metric == metric,
+        onSelected: (_) => setState(() => _metric = metric),
+      ),
     );
   }
 

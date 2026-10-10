@@ -6,11 +6,15 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:simai_flutter/simai_flutter.dart';
 import 'package:my_first_flutter_app/service/ChartPlaySettingsStore.dart';
+import 'package:my_first_flutter_app/service/LoadingTipsStore.dart';
 import 'package:my_first_flutter_app/service/SongPlayService.dart';
+import 'package:my_first_flutter_app/api/ApiUrls.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/PlayerThemeScope.dart';
 import 'package:my_first_flutter_app/utils/RefreshRateUtil.dart';
 import 'package:my_first_flutter_app/utils/ApiClient.dart';
+import 'package:my_first_flutter_app/widgets/SmoothLinearProgressIndicator.dart';
+import 'package:my_first_flutter_app/widgets/MarqueeText.dart';
 
 class ChartPlayPage extends StatefulWidget {
   final String maidataContent;
@@ -45,11 +49,17 @@ class _ChartPlayPageState extends State<ChartPlayPage>
   double _chartOffset = 0.0;
   Key _playerKey = UniqueKey();
   String? _audioUrl;
+  List<String> _audioUrls = const <String>[];
   ImageProvider? _bgImageProvider;
   bool _ignoreAudioLookupResult = false;
   bool _isLeaving = false;
   bool _hasLoggedPlayerBuild = false;
   Timer? _loadingDiagnosticTimer;
+  Timer? _loadingTipTimer;
+  String _loadingStage = '正在准备谱面…';
+  double? _loadingProgress;
+  double _loadingSpeed = 0;
+  String _loadingTip = '';
 
   /// 设置落盘防抖：侧边栏每拖一下滑块都会 notifyListeners，
   /// 不防抖会写爆 SharedPreferences。
@@ -82,7 +92,31 @@ class _ChartPlayPageState extends State<ChartPlayPage>
       );
       if (timer.tick >= 4) timer.cancel();
     });
+    _loadingTip = LoadingTipsStore.instance.randomText();
+    _loadingTipTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted) return;
+      final tip = LoadingTipsStore.instance.randomText();
+      if (tip.isNotEmpty) setState(() => _loadingTip = tip);
+    });
+    unawaited(LoadingTipsStore.instance.ensureLoaded().then((_) {
+      if (!mounted) return;
+      final tip = LoadingTipsStore.instance.randomText();
+      if (tip.isNotEmpty) setState(() => _loadingTip = tip);
+    }));
     _loadChart();
+  }
+
+  void _setLoadingStatus(
+    String stage, {
+    double? progress,
+    double speed = 0,
+  }) {
+    if (!mounted) return;
+    setState(() {
+      _loadingStage = stage;
+      _loadingProgress = progress;
+      _loadingSpeed = speed;
+    });
   }
 
   @override
@@ -149,6 +183,7 @@ class _ChartPlayPageState extends State<ChartPlayPage>
 
   Future<void> _loadChart() async {
     debugPrint('[ChartPlay] load-start songId=${widget.songId}');
+    _setLoadingStatus('正在读取谱面设置…');
     if (widget.maidataContent.isEmpty) {
       debugPrint('[ChartPlay] load-abort: maidata content is empty');
       return;
@@ -165,22 +200,24 @@ class _ChartPlayPageState extends State<ChartPlayPage>
     // 音源是可选资源，不能让曲库接口或音源服务阻塞谱面播放器的创建。
     // 猜歌页面本身就是无声渲染；播放页在音源不可用时也应先显示谱面。
     _ignoreAudioLookupResult = false;
+    _setLoadingStatus('正在查找音频文件…');
     try {
       await _loadAudioUrl().timeout(const Duration(seconds: 8));
     } on TimeoutException {
-      debugPrint('加载音源地址超时，先以无声模式打开谱面');
-      _ignoreAudioLookupResult = true;
-      _audioUrl = null;
+      debugPrint('加载落雪音源索引超时，改试 AWMC 音源');
+      _audioUrl = ApiUrls.wmcAudioUrl(widget.songId);
+      _audioUrls = <String>[_audioUrl!];
     } catch (e) {
-      debugPrint('加载音源地址失败，先以无声模式打开谱面: $e');
-      _ignoreAudioLookupResult = true;
-      _audioUrl = null;
+      debugPrint('加载落雪音源索引失败，改试 AWMC 音源: $e');
+      _audioUrl = ApiUrls.wmcAudioUrl(widget.songId);
+      _audioUrls = <String>[_audioUrl!];
     }
 
     if (!mounted || _isLeaving) return;
     debugPrint('[ChartPlay] audio-lookup-ready hasUrl=${_audioUrl != null}');
 
     // 加载曲绘
+    _setLoadingStatus('正在准备曲绘…');
     await _loadBackgroundImage();
     if (!mounted || _isLeaving) return;
     debugPrint(
@@ -188,6 +225,7 @@ class _ChartPlayPageState extends State<ChartPlayPage>
     );
 
     try {
+      _setLoadingStatus('正在解析谱面数据…');
       var simaiFile = SimaiFile(widget.maidataContent);
 
       String? chartText;
@@ -237,12 +275,14 @@ class _ChartPlayPageState extends State<ChartPlayPage>
 
       // 确定音频来源：本地文件直接使用，远程URL需下载到临时文件
       String? audioPath;
-      if (_audioUrl != null) {
-        if (_audioUrl!.startsWith('http://') ||
-            _audioUrl!.startsWith('https://')) {
-          audioPath = await _downloadAudioToTemp(_audioUrl!);
-        } else {
-          audioPath = _audioUrl;
+      if (_audioUrls.isNotEmpty) {
+        for (final url in _audioUrls) {
+          if (url.startsWith('http://') || url.startsWith('https://')) {
+            audioPath = await _downloadAudioToTemp(url);
+          } else {
+            audioPath = url;
+          }
+          if (audioPath != null) break;
         }
       }
 
@@ -352,6 +392,7 @@ class _ChartPlayPageState extends State<ChartPlayPage>
     // 优先使用本地音频文件
     if (widget.audioFilePath != null && widget.audioFilePath!.isNotEmpty) {
       _audioUrl = widget.audioFilePath;
+      _audioUrls = <String>[widget.audioFilePath!];
       debugPrint("Using local audio file: $_audioUrl");
       return;
     }
@@ -381,6 +422,10 @@ class _ChartPlayPageState extends State<ChartPlayPage>
       if (luoXueSongId != null) {
         if (_ignoreAudioLookupResult) return;
         _audioUrl = 'https://assets2.lxns.net/maimai/music/$luoXueSongId.mp3';
+        _audioUrls = <String>[
+          _audioUrl!,
+          ApiUrls.wmcAudioUrl(widget.songId),
+        ];
         debugPrint("Loaded audio URL: $_audioUrl");
         return;
       }
@@ -389,11 +434,15 @@ class _ChartPlayPageState extends State<ChartPlayPage>
       debugPrint("Error loading audio URL from luoXue: $e");
     }
 
-    // 找不到可用音源时保持无声播放，不能把一个未经验证的兜底地址交给
-    // SimaiPlayerPage；某些错误响应会让播放器一直停留在初始化遮罩。
+    // 落雪索引没有这首歌时，尝试 AWMC/WMC 的同 songId 音源。
     if (!_ignoreAudioLookupResult) {
-      debugPrint("No audio found for song: ${widget.songTitle}");
+      _audioUrl = ApiUrls.wmcAudioUrl(widget.songId);
+      _audioUrls = <String>[_audioUrl!];
+      debugPrint("Loaded AWMC fallback audio URL: $_audioUrl");
+      return;
     }
+    // 找不到可用音源时保持无声播放。
+    debugPrint("No audio found for song: ${widget.songTitle}");
   }
 
   Future<void> _loadBackgroundImage() async {
@@ -415,12 +464,12 @@ class _ChartPlayPageState extends State<ChartPlayPage>
   }
 
   Future<String?> _downloadAudioToTemp(String url) async {
+    _setLoadingStatus('正在下载音频文件…');
     try {
-      final response = await ApiClient.get(Uri.parse(url)).timeout(
-        const Duration(seconds: 12),
-      );
+      final response = await ApiClient.getStream(Uri.parse(url));
       if (response.statusCode != 200) {
         debugPrint("Failed to download audio: ${response.statusCode}");
+        await response.stream.drain<void>();
         return null;
       }
       final contentType = response.headers['content-type']?.toLowerCase();
@@ -428,15 +477,65 @@ class _ChartPlayPageState extends State<ChartPlayPage>
           (contentType.contains('text/html') ||
               contentType.contains('application/json'))) {
         debugPrint('音源响应不是音频文件: $contentType');
-        return null;
-      }
-      if (response.bodyBytes.length < 1024) {
-        debugPrint('音源文件过小，跳过加载: ${response.bodyBytes.length} bytes');
+        await response.stream.drain<void>();
         return null;
       }
       final dir = await getTemporaryDirectory();
       final file = File('${dir.path}/chart_audio_${widget.songId}.mp3');
-      await file.writeAsBytes(response.bodyBytes);
+      final part = File('${file.path}.part');
+      if (await part.exists()) await part.delete();
+      final sink = part.openWrite();
+      final compressed = response.headers['content-encoding'];
+      final total = compressed == null || compressed == 'identity'
+          ? response.contentLength
+          : null;
+      var received = 0;
+      final prefix = <int>[];
+      var validated = false;
+      final stopwatch = Stopwatch()..start();
+      try {
+        await for (final chunk
+            in response.stream.timeout(const Duration(seconds: 30))) {
+          received += chunk.length;
+          if (!validated) {
+            prefix.addAll(chunk);
+            if (prefix.length >= 3) {
+              final isId3 = prefix[0] == 0x49 &&
+                  prefix[1] == 0x44 &&
+                  prefix[2] == 0x33;
+              final isFrame = prefix[0] == 0xff &&
+                  (prefix[1] & 0xe0) == 0xe0;
+              if (!isId3 && !isFrame) {
+                throw const FormatException('音源响应不是有效的 MP3');
+              }
+              validated = true;
+              sink.add(prefix);
+            }
+          } else {
+            sink.add(chunk);
+          }
+          final elapsed = stopwatch.elapsedMicroseconds / 1000000;
+          _setLoadingStatus(
+            '正在下载音频文件…',
+            progress: total != null && total > 0
+                ? (received / total).clamp(0.0, 1.0)
+                : null,
+            speed: elapsed > 0 ? received / elapsed : 0,
+          );
+        }
+        await sink.close();
+      } catch (_) {
+        await sink.close();
+        rethrow;
+      }
+      if (!validated || received < 1024) {
+        debugPrint('音源文件过小或不完整: $received bytes');
+        await part.delete();
+        return null;
+      }
+      if (await file.exists()) await file.delete();
+      await part.rename(file.path);
+      _setLoadingStatus('音频文件准备完成', progress: 1);
       debugPrint("Downloaded audio to: ${file.path}");
       return file.path;
     } catch (e) {
@@ -465,13 +564,13 @@ E
 
       // 确定音频来源
       String? audioPath;
-      if (_audioUrl != null) {
-        if (_audioUrl!.startsWith('http://') ||
-            _audioUrl!.startsWith('https://')) {
-          audioPath = await _downloadAudioToTemp(_audioUrl!);
+      for (final url in _audioUrls) {
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+          audioPath = await _downloadAudioToTemp(url);
         } else {
-          audioPath = _audioUrl;
+          audioPath = url;
         }
+        if (audioPath != null) break;
       }
 
       late final SimaiPlayerController controller;
@@ -501,6 +600,7 @@ E
   void dispose() {
     _isLeaving = true;
     _loadingDiagnosticTimer?.cancel();
+    _loadingTipTimer?.cancel();
     debugPrint('[ChartPlay] dispose');
     WidgetsBinding.instance.removeObserver(this);
     // 离开播放页恢复 App 原本的主题
@@ -535,7 +635,7 @@ E
     return Scaffold(
       backgroundColor: Colors.black,
       body: _controller == null
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          ? _buildLoadingView()
           : SimaiPlayerPage(
               key: _playerKey,
               controller: _controller!,
@@ -546,6 +646,62 @@ E
               onBack: _leavePlayerPage,
               disposeController: false,
             ),
+    );
+  }
+
+  Widget _buildLoadingView() {
+    final scheme = Theme.of(context).colorScheme;
+    final speedText = _loadingSpeed > 0
+        ? '${(_loadingSpeed / 1024).toStringAsFixed(0)} KB/s'
+        : '';
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 340),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.music_note_rounded,
+                  color: Colors.white70, size: 42),
+              const SizedBox(height: 18),
+              Text(
+                _loadingStage,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 15),
+              ),
+              const SizedBox(height: 12),
+              SmoothLinearProgressIndicator(
+                value: _loadingProgress,
+                color: scheme.primary,
+                backgroundColor: Colors.white24,
+                minHeight: 5,
+              ),
+              if (speedText.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(speedText,
+                    style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              ],
+              if (_loadingTip.isNotEmpty) ...[
+                const SizedBox(height: 22),
+                SizedBox(
+                  height: 20,
+                  child: MarqueeText(
+                    key: ValueKey(_loadingTip),
+                    text: _loadingTip,
+                    style: const TextStyle(
+                      color: Colors.white60,
+                      fontSize: 12,
+                      height: 1.5,
+                    ),
+                    gap: 28,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

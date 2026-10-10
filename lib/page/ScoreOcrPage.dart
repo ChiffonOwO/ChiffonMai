@@ -1,3 +1,4 @@
+import 'package:my_first_flutter_app/widgets/NoRipple.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -1085,18 +1086,20 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
                             runSpacing: 6,
                             children: [
                               for (var i = 0; i < count; i++)
-                                ChoiceChip(
-                                  label: Text(_difficultyNameOf(i)),
-                                  selected: diffIndex == i,
-                                  // 带出等级/定数，方便确认选对了没
-                                  tooltip: [
-                                    _levelAtIndex(song, i),
-                                    _dsAtIndex(song, i) == null
-                                        ? null
-                                        : '定数 ${_dsAtIndex(song, i)!.toStringAsFixed(1)}',
-                                  ].whereType<String>().join(' · '),
-                                  onSelected: (_) => apply((e) => e.difficulty =
-                                      _difficultyNameOf(i).toLowerCase()),
+                                NoRipple(
+                                  child: ChoiceChip(
+                                    label: Text(_difficultyNameOf(i)),
+                                    selected: diffIndex == i,
+                                    // 带出等级/定数，方便确认选对了没
+                                    tooltip: [
+                                      _levelAtIndex(song, i),
+                                      _dsAtIndex(song, i) == null
+                                          ? null
+                                          : '定数 ${_dsAtIndex(song, i)!.toStringAsFixed(1)}',
+                                    ].whereType<String>().join(' · '),
+                                    onSelected: (_) => apply((e) => e.difficulty =
+                                        _difficultyNameOf(i).toLowerCase()),
+                                  ),
                                 ),
                             ],
                           ),
@@ -1370,16 +1373,20 @@ class _ScoreOcrPageState extends State<ScoreOcrPage> {
           runSpacing: 6,
           children: [
             // 空选项：选中表示这一项为空（不设置连击/同步标记）
-            ChoiceChip(
-              label: const Text('空'),
-              selected: current == null || current == _emptyOption,
-              onSelected: (_) => onPick(_emptyOption),
+            NoRipple(
+              child: ChoiceChip(
+                label: const Text('空'),
+                selected: current == null || current == _emptyOption,
+                onSelected: (_) => onPick(_emptyOption),
+              ),
             ),
             for (final o in options)
-              ChoiceChip(
-                label: Text(labelOf(o)),
-                selected: current == o,
-                onSelected: (_) => onPick(o),
+              NoRipple(
+                child: ChoiceChip(
+                  label: Text(labelOf(o)),
+                  selected: current == o,
+                  onSelected: (_) => onPick(o),
+                ),
               ),
           ],
         ),

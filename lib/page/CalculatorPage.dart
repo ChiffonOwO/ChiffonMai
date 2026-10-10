@@ -1,3 +1,4 @@
+import 'package:my_first_flutter_app/widgets/NoRipple.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
@@ -416,20 +417,26 @@ class _RatingLineTabState extends State<_RatingLineTab> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  ChoiceChip(
-                    label: const Text('按定数计算'),
-                    selected: _mode == 0,
-                    onSelected: (_) => _selectMode(0),
+                  NoRipple(
+                    child: ChoiceChip(
+                      label: const Text('按定数计算'),
+                      selected: _mode == 0,
+                      onSelected: (_) => _selectMode(0),
+                    ),
                   ),
-                  ChoiceChip(
-                    label: const Text('按达成率计算'),
-                    selected: _mode == 1,
-                    onSelected: (_) => _selectMode(1),
+                  NoRipple(
+                    child: ChoiceChip(
+                      label: const Text('按达成率计算'),
+                      selected: _mode == 1,
+                      onSelected: (_) => _selectMode(1),
+                    ),
                   ),
-                  ChoiceChip(
-                    label: const Text('按Rating计算'),
-                    selected: _mode == 2,
-                    onSelected: (_) => _selectMode(2),
+                  NoRipple(
+                    child: ChoiceChip(
+                      label: const Text('按Rating计算'),
+                      selected: _mode == 2,
+                      onSelected: (_) => _selectMode(2),
+                    ),
                   ),
                 ],
               ),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../widgets/MainNavigationInsets.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:my_first_flutter_app/page/RankingList/AvgScoreRankingListPage.dart';
@@ -38,6 +39,8 @@ import 'Best50/Best50Page.dart';
 import 'Best50/DiffBest50Page.dart';
 import 'Best50/PersonalizedBest50Page.dart';
 import 'Best50/PersonalizedDiffBest50Page.dart';
+import 'Best50/CustomBest50Page.dart';
+import 'Best50/IdealBest50Page.dart';
 import 'History/RatingHistoryPage.dart';
 import 'GlobalArcadeMapPage.dart';
 import 'Collection/CollectionSearchPage.dart';
@@ -47,6 +50,9 @@ import 'GuessChartGame/GuessChartByCoverPage.dart';
 import 'GuessChartGame/GuessChartByInfoPage.dart';
 import 'GuessChartGame/GuessChartBySongExcerptPage.dart';
 import 'GuessChartGame/GuessSongByOpenLettersPage.dart';
+import 'GuessChartGame/GuessChartByFlashCoverPage.dart';
+import 'GuessChartGame/GuessChartByTileRevealPage.dart';
+import 'GuessChartGame/GuessChartByChartPeekPage.dart';
 import 'KaleidXScope/KaleidXScopeSelectPage.dart';
 import 'FavoriteFolderPage.dart';
 import 'MaimaiServerStatusPage.dart';
@@ -107,6 +113,7 @@ import '../utils/UpdateNotifier.dart';
 import '../widgets/SyncRouteFooter.dart';
 import '../widgets/SyncStatsFooter.dart';
 import '../widgets/SyncFlowMixin.dart';
+import '../widgets/QuickSearchBar.dart';
 
 // ds值与歌曲对应关系数据类已随 _calculateRatingLimits 一起抽离到
 // lib/widgets/RefreshDataDialog.dart，不再需要此处的定义。
@@ -114,6 +121,212 @@ import '../widgets/SyncFlowMixin.dart';
 // 首页初始化时间间隔常量
 class _InitInterval {
   static const Duration initializationCooldown = Duration(days: 7);
+}
+
+class _AwmcNetTokenSection extends StatefulWidget {
+  final Brightness brightness;
+
+  const _AwmcNetTokenSection({required this.brightness});
+
+  @override
+  State<_AwmcNetTokenSection> createState() => _AwmcNetTokenSectionState();
+}
+
+class _AwmcNetTokenSectionState extends State<_AwmcNetTokenSection> {
+  final TextEditingController _controller = TextEditingController();
+  bool _checking = true;
+  bool _hasToken = false;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final value =
+        await SecureCredentialStore.read(CacheKeyConstant.awmcNetImportToken);
+    if (!mounted) return;
+    setState(() {
+      _hasToken = value?.isNotEmpty == true;
+      _checking = false;
+    });
+  }
+
+  Future<void> _openGuide() async {
+    final uri = Uri.parse('https://net.wmc.pub/');
+    try {
+      if (!await ExternalLaunchUtil.open(uri) && mounted) {
+        launchUrlFallback(uri.toString(), context);
+      }
+    } catch (e) {
+      debugPrint('打开 AWMC NET 设置链接失败: $e');
+      if (mounted) launchUrlFallback(uri.toString(), context);
+    }
+  }
+
+  Future<void> _save() async {
+    final token = _controller.text.trim();
+    if (token.isEmpty) {
+      Fluttertoast.showToast(msg: '请先输入 AWMC NET Token');
+      return;
+    }
+    setState(() => _saving = true);
+    await SecureCredentialStore.write(
+        CacheKeyConstant.awmcNetImportToken, token);
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      _hasToken = true;
+      _controller.clear();
+    });
+    Fluttertoast.showToast(msg: 'AWMC NET 成绩导入 Token 已保存');
+  }
+
+  Future<void> _clear() async {
+    await SecureCredentialStore.delete(CacheKeyConstant.awmcNetImportToken);
+    if (!mounted) return;
+    setState(() => _hasToken = false);
+    Fluttertoast.showToast(msg: 'AWMC NET 成绩导入 Token 已清除');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final brightness = widget.brightness;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 24),
+        Row(
+          children: [
+            Icon(
+              _hasToken ? Icons.check_circle : Icons.vpn_key,
+              size: 18,
+              color: _hasToken
+                  ? AppColors.successGreen(brightness)
+                  : AppColors.greyHint(brightness),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'AWMC NET 成绩导入 Token',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_checking)
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        else ...[
+          Text(
+            _hasToken ? '已设置' : '未设置',
+            style: TextStyle(
+              color: _hasToken
+                  ? AppColors.successGreen(brightness)
+                  : AppColors.warningOrange(brightness),
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: _openGuide,
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  const TextSpan(text: '访问 ', style: TextStyle(fontSize: 12)),
+                  TextSpan(
+                    text: 'https://net.wmc.pub/ 的设置/个人资料页',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.linkBlue(brightness),
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                  const TextSpan(
+                    text: '，在页面底部生成或轮换 Token。',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  obscureText: true,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  decoration: InputDecoration(
+                    hintText: '在此粘贴 AWMC NET 成绩导入 Token...',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    isDense: true,
+                  ),
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: _saving ? null : _save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.linkBlue(brightness),
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                child: _saving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('保存', style: TextStyle(fontSize: 13)),
+              ),
+            ],
+          ),
+          if (_hasToken) ...[
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _clear,
+              child: Text(
+                '清除 Token',
+                style: TextStyle(
+                    color: AppColors.errorRed(brightness), fontSize: 12),
+              ),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+}
+
+/// 首页功能搜索结果，保留分类信息以便展示功能路径。
+class _HomeFeatureSearchEntry {
+  final ButtonCategory category;
+  final ButtonItem item;
+
+  const _HomeFeatureSearchEntry(this.category, this.item);
 }
 
 // 应用常量类：集中管理所有硬编码的配置值
@@ -201,9 +414,13 @@ class HomeGreetingText extends StatelessWidget {
 class HomePage extends StatefulWidget {
   final VoidCallback? onFirstFrameRendered;
   final VoidCallback? onEntertainmentTap;
+  final Future<void> Function(ButtonItem)? onSystemFeatureTap;
 
   const HomePage(
-      {super.key, this.onFirstFrameRendered, this.onEntertainmentTap});
+      {super.key,
+      this.onFirstFrameRendered,
+      this.onEntertainmentTap,
+      this.onSystemFeatureTap});
 
   @override
   State<HomePage> createState() => HomePageState();
@@ -220,6 +437,7 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
   bool _isBackgroundInitializing = false;
   bool _isInitializationCompleted = false;
   String _initializationProgress = '';
+  String _hubSearchQuery = '';
 
   // 用户数据（昵称 / Rating）：实际数据来自 UserProfileNotifier，字段保留便于本地访问
   String _userNickname = "";
@@ -516,9 +734,16 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
+        bottom: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            18,
+            20,
+            32 + MainNavigationInsets.bottomOf(context),
+          ),
           children: [
             Row(
               children: [
@@ -548,18 +773,179 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
             ),
             const SizedBox(height: 22),
             _buildDashboardSummary(context, brightness),
-            const SizedBox(height: 28),
-            _buildHomeSectionTitle(context, '快捷入口', '现在就去做点什么'),
-            const SizedBox(height: 12),
-            _buildQuickActions(context),
-            const SizedBox(height: 28),
-            // 顶层 ValueListenableBuilder 已保证整页重建，直接用 notifier 传入的 titles 渲染。
-            _buildFavoriteFeaturesSection(context, favoriteTitles),
-            if (_isBackgroundInitializing || _isInitializationCompleted) ...[
-              const SizedBox(height: 16),
-              _buildInitializationStatus(context),
+            const SizedBox(height: 16),
+            _buildHomeFeatureSearch(context),
+            if (_hubSearchQuery.trim().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              _buildHomeFeatureSearchResults(context),
+            ] else ...[
+              const SizedBox(height: 12),
+              // 顶层 ValueListenableBuilder 已保证整页重建，直接用 notifier 传入的 titles 渲染。
+              _buildFavoriteFeaturesSection(context, favoriteTitles),
+              if (_isBackgroundInitializing || _isInitializationCompleted) ...[
+                const SizedBox(height: 16),
+                _buildInitializationStatus(context),
+              ],
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHomeFeatureSearch(BuildContext context) {
+    return QuickSearchBar(
+      onChanged: (query) {
+        if (!mounted) return;
+        setState(() => _hubSearchQuery = query.trim());
+      },
+    );
+  }
+
+  /// 主页搜索支持标题/副标题的连续字符匹配：输入完整词组时走普通包含，
+  /// 只输入几个关键字时也能按顺序匹配到对应功能。
+  bool _matchesHomeFeature(String value, String query) {
+    final text = value.toLowerCase().replaceAll(RegExp(r'\s+'), '');
+    final keyword = query.toLowerCase().replaceAll(RegExp(r'\s+'), '');
+    if (text.contains(keyword)) return true;
+
+    var cursor = 0;
+    for (final rune in keyword.runes) {
+      final index = text.indexOf(String.fromCharCode(rune), cursor);
+      if (index < 0) return false;
+      cursor = index + 1;
+    }
+    return keyword.isNotEmpty;
+  }
+
+  List<_HomeFeatureSearchEntry> _homeFeatureSearchResults(String query) {
+    final results = <_HomeFeatureSearchEntry>[];
+    for (final category in _searchableCategories) {
+      for (final item in category.items) {
+        if (_matchesHomeFeature(item.title, query) ||
+            _matchesHomeFeature(item.subtitle, query)) {
+          results.add(_HomeFeatureSearchEntry(category, item));
+        }
+      }
+    }
+    return results;
+  }
+
+  Widget _buildHomeFeatureSearchResults(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final results = _homeFeatureSearchResults(_hubSearchQuery);
+    final resultBody = results.isEmpty
+        ? Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            child: Center(
+              child: Text(
+                '没有找到匹配的功能',
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
+            ),
+          )
+        : Column(
+            children: [
+              for (final entry in results)
+                Builder(
+                  builder: (context) {
+                    final path =
+                        FeatureRegistry.pathFor(entry.category, entry.item)
+                            .join(' > ');
+                    return Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap:
+                            _isSyncBlockedFeature(entry.item.title) && anyBusy
+                                ? null
+                                : () {
+                                    FocusScope.of(context).unfocus();
+                                    _handleFeatureTap(entry.item);
+                                  },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 11),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: scheme.primary.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(11),
+                                ),
+                                alignment: Alignment.center,
+                                child: Icon(entry.item.icon,
+                                    size: 20, color: scheme.primary),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      entry.item.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w700),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      entry.item.subtitle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: scheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      path,
+                                      softWrap: true,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: scheme.primary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(Icons.chevron_right,
+                                  color: scheme.onSurfaceVariant),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+            ],
+          );
+
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.38;
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 180),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      child: ConstrainedBox(
+        key: ValueKey(_hubSearchQuery),
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: scheme.primary.withValues(alpha: 0.045),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.zero,
+              child: resultBody,
+            ),
+          ),
         ),
       ),
     );
@@ -687,46 +1073,6 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
     );
   }
 
-  Widget _buildHomeSectionTitle(
-      BuildContext context, String title, String subtitle) {
-    final scheme = Theme.of(context).colorScheme;
-    return Row(children: [
-      Expanded(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title,
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(fontWeight: FontWeight.w800)),
-        const SizedBox(height: 3),
-        Text(subtitle,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: scheme.onSurfaceVariant)),
-      ])),
-    ]);
-  }
-
-  Widget _buildQuickActions(BuildContext context) {
-    return Row(children: [
-      Expanded(
-          child:
-              _homeAction(context, Icons.score_outlined, '查成绩', '游玩记录', '查成绩')),
-      const SizedBox(width: 12),
-      Expanded(
-          child: _homeAction(
-              context, Icons.leaderboard_outlined, 'Best50', '评分构成', 'Best50')),
-      const SizedBox(width: 12),
-      Expanded(child: _homeAction(context, Icons.search, '查歌曲', '曲库搜索', '查歌曲')),
-      const SizedBox(width: 12),
-      Expanded(
-          child: _homeAction(
-              context, Icons.today_outlined, '每日推荐', '今日选曲', '每日推荐')),
-    ]);
-  }
-
   // ignore: unused_element
   Widget _buildAllFeaturesList(BuildContext context) {
     final categories = _searchableCategories;
@@ -736,45 +1082,6 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
           _buildCategoryCard(category, context),
       ],
     );
-  }
-
-  Widget _homeAction(BuildContext context, IconData icon, String title,
-      String subtitle, String featureTitle) {
-    return HubQuickAction(
-      icon: icon,
-      title: title,
-      subtitle: subtitle,
-      onTap: () => _tapFeatureTitle(featureTitle),
-    );
-  }
-
-  void _tapFeatureTitle(String title) {
-    switch (title) {
-      case '查成绩':
-        Navigator.push(
-            context, MaterialPageRoute(builder: (_) => UserScoreSearchPage()));
-        return;
-      case 'Best50':
-        Navigator.push(context, MaterialPageRoute(builder: (_) => B50Page()));
-        return;
-      case '查歌曲':
-        Navigator.push(
-            context, MaterialPageRoute(builder: (_) => SongSearchPage()));
-        return;
-      case '每日推荐':
-        Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const DailyRecommendPage()));
-        return;
-      case '我的收藏夹':
-        Navigator.push(
-            context, MaterialPageRoute(builder: (_) => FavoriteFolderPage()));
-        return;
-    }
-    final item = _buttonCategories
-        .expand((category) => category.items)
-        .where((item) => item.title == title)
-        .firstOrNull;
-    if (item != null) _handleFeatureTap(item);
   }
 
   Widget _buildInitializationStatus(BuildContext context) {
@@ -1731,8 +2038,10 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
               value: value,
               minHeight: 4,
               color: Theme.of(context).colorScheme.onInverseSurface,
-              backgroundColor:
-                  Theme.of(context).colorScheme.onInverseSurface.withValues(alpha: 0.2),
+              backgroundColor: Theme.of(context)
+                  .colorScheme
+                  .onInverseSurface
+                  .withValues(alpha: 0.2),
             ),
           ],
         ),
@@ -1789,8 +2098,10 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
               value: value,
               minHeight: 4,
               color: Theme.of(context).colorScheme.onInverseSurface,
-              backgroundColor:
-                  Theme.of(context).colorScheme.onInverseSurface.withValues(alpha: 0.2),
+              backgroundColor: Theme.of(context)
+                  .colorScheme
+                  .onInverseSurface
+                  .withValues(alpha: 0.2),
             ),
           ],
         ),
@@ -1854,8 +2165,8 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
                               Align(
                                 alignment: Alignment.centerLeft,
                                 child: Padding(
-                                  padding: const EdgeInsets.only(
-                                      top: 4, bottom: 6),
+                                  padding:
+                                      const EdgeInsets.only(top: 4, bottom: 6),
                                   child: Text(
                                     '水鱼-个人信息',
                                     style: Theme.of(dialogContext)
@@ -1888,6 +2199,8 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
                               ),
                             // 始终显示：落雪 API 密钥管理（不依赖水鱼登录）
                             _buildLxnsTokenSection(brightness),
+                            // AWMC NET 成绩导入 Token 同样独立于水鱼登录
+                            _buildAwmcNetTokenSection(brightness),
                           ]),
               ),
               actions: [
@@ -2217,6 +2530,11 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
     );
   }
 
+  /// 管理 AWMC NET 成绩导入 Token。
+  Widget _buildAwmcNetTokenSection(Brightness brightness) {
+    return _AwmcNetTokenSection(brightness: brightness);
+  }
+
   Future<Map<String, dynamic>?> _fetchAccountProfile() async {
     final jwt =
         await SecureCredentialStore.read(CacheKeyConstant.probeDivingFishToken);
@@ -2439,7 +2757,25 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
 
   // 功能按钮点击分发（提取为独立方法，作为回调传给 FeatureCategoryPage）
   Future<void> _handleFeatureTap(ButtonItem item) async {
+    FocusManager.instance.primaryFocus?.unfocus();
     debugPrint("点击了：${item.title}");
+    if (const {'登录 maimai Score Hub', '打印日志', 'maidata 管理', '刷新数据（高级）'}
+        .contains(item.title)) {
+      await widget.onSystemFeatureTap?.call(item);
+      return;
+    }
+    final extraPage = switch (item.title) {
+      '自定义 Best50' => const CustomBest50Page(),
+      '理想 Best50' => const IdealBest50Page(),
+      '曲绘快闪猜歌' => const GuessChartByFlashCoverPage(),
+      '曲绘拼图猜歌' => const GuessChartByTileRevealPage(),
+      '谱面片段猜歌' => const GuessChartByChartPeekPage(),
+      _ => null,
+    };
+    if (extraPage != null) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => extraPage));
+      return;
+    }
     // 版本对照按钮点击事件
     if (item.title == '版本对照') {
       Navigator.push(
@@ -2584,7 +2920,8 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
       );
     }
     if (item.title == '出勤转盘') {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const AttendanceWheelPage()));
+      Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const AttendanceWheelPage()));
       return;
     }
     if (item.title == '随机乐曲') {

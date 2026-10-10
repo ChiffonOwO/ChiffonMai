@@ -18,6 +18,10 @@ class _SupportDeveloperPageState extends State<SupportDeveloperPage> {
   bool _saving = false;
 
   Future<void> _downloadCode() async {
+    if (!await ExportPathUtil.prepareForExport(context,
+        subDir: '图片', title: '选择赞赏码保存位置')) {
+      return;
+    }
     setState(() => _saving = true);
     try {
       final data = await rootBundle.load('assets/qrcode/zanshangma.jpg');

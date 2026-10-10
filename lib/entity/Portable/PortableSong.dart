@@ -1,4 +1,4 @@
-/**
+/*
  * 随身听曲库条目。
  *
  * 一条 = 一首**可播放**的歌，把两个数据源拼在一起：
@@ -41,6 +41,9 @@ class PortableSong {
   /// 该曲在水鱼曲库里是否有 DX 谱面条目（只用于列表上的一个小标记）。
   final bool hasDx;
 
+  /// 这条记录是否来自 AWMC 额外曲库。
+  final bool isAwmcExtra;
+
   const PortableSong({
     required this.lxnsId,
     required this.divingFishId,
@@ -51,10 +54,20 @@ class PortableSong {
     required this.bpm,
     this.difficultyConstants = const <double>[],
     this.hasDx = false,
+    this.isAwmcExtra = false,
   });
 
-  /// 音源 URL（**点击歌曲行时才使用**，不要在列表渲染阶段请求它）。
-  String get audioUrl => 'https://assets2.lxns.net/maimai/music/$audioId.mp3';
+  /// 音源候选 URL（**点击歌曲行时才使用**，不要在列表渲染阶段请求它）。
+  /// AWMC 额外条目优先走 WMC 音源，落雪基础条目仍优先走落雪。
+  List<String> get audioUrls => isAwmcExtra
+      ? <String>[wmcAudioUrl, _lxnsAudioUrl]
+      : <String>[_lxnsAudioUrl, wmcAudioUrl];
+
+  String get _lxnsAudioUrl =>
+      'https://assets2.lxns.net/maimai/music/$audioId.mp3';
+
+  /// 首选音源 URL，兼容现有播放器和下载器调用点。
+  String get audioUrl => audioUrls.first;
 
   /// wmc.pub 兜底 URL：落雪 (`assets2.lxns.net`) 拉 404 时尝试这一条。
   ///

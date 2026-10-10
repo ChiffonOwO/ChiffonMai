@@ -29,8 +29,9 @@ void main() {
       expect(stats.count, 3);
       expect(stats.successCount, 2);
       expect(stats.failCount, 1);
-      expect(stats.avgMs, 10000);
-      expect(stats.avgText, '10.0s');
+      // 平均耗时只统计成功样本：(12000 + 10000) / 2。
+      expect(stats.avgMs, 11000);
+      expect(stats.avgText, '11.0s');
       expect(stats.successRateText, '67%');
       expect(stats.minMs, 8000);
       expect(stats.maxMs, 12000);
@@ -95,7 +96,7 @@ void main() {
       expect(stats.count, 100);
       expect(stats.successCount, 75);
       expect(stats.successRateText, '75%');
-      expect(stats.avgMs, 1495); // 1000..1990 的均值
+      expect(stats.avgMs, 1500); // 75 条成功样本的均值
     });
   });
 

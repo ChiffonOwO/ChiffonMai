@@ -422,6 +422,7 @@ class _RatingRankListPageState extends State<RatingRankListPage>
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.transparent,
       body: Stack(
         fit: StackFit.expand,

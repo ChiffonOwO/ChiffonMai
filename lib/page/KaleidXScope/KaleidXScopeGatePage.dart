@@ -47,6 +47,9 @@ class _KaleidXScopeGatePageState extends State<KaleidXScopeGatePage> {
   late double _coverSize;
   late double _progressBarHeight;
 
+  // 歌曲卡片高度：在 375px 宽度下为 54px，随曲绘尺寸同步缩放。
+  double get _songCardHeight => _coverSize + (_paddingXS * 2) + 6;
+
   Color get _accent {
     switch (widget.color) {
       case 'prism':
@@ -506,6 +509,7 @@ class _KaleidXScopeGatePageState extends State<KaleidXScopeGatePage> {
               builder: (_) =>
                   SongInfoPage(songId: song.id, initialLevelIndex: 3))),
       child: Container(
+        constraints: BoxConstraints(minHeight: _songCardHeight),
         decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -561,6 +565,7 @@ class _KaleidXScopeGatePageState extends State<KaleidXScopeGatePage> {
         }
       },
       child: Container(
+        constraints: BoxConstraints(minHeight: _songCardHeight),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(_borderRadiusSmall),
@@ -618,7 +623,8 @@ class _KaleidXScopeGatePageState extends State<KaleidXScopeGatePage> {
             crossAxisCount: 2,
             crossAxisSpacing: _paddingXS,
             mainAxisSpacing: _paddingXS,
-            childAspectRatio: 2.0),
+            childAspectRatio: 2.0,
+            mainAxisExtent: _songCardHeight),
         itemCount: ids.length,
         itemBuilder: (_, index) => _buildSongCard(ids[index]),
       );

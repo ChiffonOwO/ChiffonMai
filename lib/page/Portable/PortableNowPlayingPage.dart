@@ -17,6 +17,7 @@ import '../../service/Portable/PortablePlayerController.dart';
 import '../../service/Portable/PortableSongDownloadService.dart';
 import '../../utils/AppDesignTokens.dart';
 import '../../utils/CommonWidgetUtil.dart';
+import '../../utils/ExportPathUtil.dart';
 import '../../widgets/PageTopBar.dart';
 import '../../widgets/PortablePlayerBadge.dart';
 import '../../widgets/AnimatedChoiceBar.dart';
@@ -40,6 +41,7 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
   double _slideDirection = 1;
   bool _downloading = false;
   double? _downloadProgress;
+  double? _downloadSpeedBytesPerSecond;
 
   @override
   void initState() {
@@ -72,6 +74,7 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
     final song = _player.currentSong;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
@@ -82,24 +85,6 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
             children: [
               PageTopBar(
                 title: '正在播放',
-                actions: [
-                  if (song != null)
-                    IconButton(
-                      tooltip: '下载歌曲',
-                      icon: _downloading
-                          ? SizedBox(
-                              width: 21,
-                              height: 21,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                value: _downloadProgress,
-                              ),
-                            )
-                          : const Icon(Icons.download_outlined),
-                      onPressed: _downloading ? null : () => _downloadSong(song),
-                    ),
-                  const PortablePlaybackModeButton(),
-                ],
               ),
               Expanded(
                 child: Center(
@@ -108,7 +93,9 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
                       maxWidth: AppDesignTokens.maxContentWidth,
                     ),
                     child: song == null
-                        ? _empty(scheme)
+                        ? (_player.isLoading
+                            ? _preparing(scheme)
+                            : _empty(scheme))
                         : _content(context, scheme, song),
                   ),
                 ),
@@ -136,10 +123,31 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
     );
   }
 
+  Widget _preparing(ColorScheme scheme) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircularProgressIndicator(color: scheme.primary),
+          const SizedBox(height: 12),
+          Text(
+            '正在准备音源…',
+            style: TextStyle(color: scheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _downloadSong(PortableSong song) async {
+    if (!await ExportPathUtil.prepareForExport(context,
+        subDir: '歌曲', title: '选择歌曲保存位置')) {
+      return;
+    }
     setState(() {
       _downloading = true;
       _downloadProgress = null;
+      _downloadSpeedBytesPerSecond = null;
     });
     String? fallbackPath;
     try {
@@ -147,6 +155,9 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
         song,
         onProgress: (progress) {
           if (mounted) setState(() => _downloadProgress = progress);
+        },
+        onSpeed: (speed) {
+          if (mounted) setState(() => _downloadSpeedBytesPerSecond = speed);
         },
         onFallback: (path) => fallbackPath = path,
       );
@@ -169,6 +180,7 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
         setState(() {
           _downloading = false;
           _downloadProgress = null;
+          _downloadSpeedBytesPerSecond = null;
         });
       }
     }
@@ -265,6 +277,8 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
             children: [
               IconButton(
                 iconSize: 40,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                 tooltip: '上一首',
                 icon: Icon(Icons.skip_previous,
                     color: theme.colorScheme.onSurface),
@@ -276,10 +290,19 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
               const SizedBox(width: 18),
               IconButton(
                 iconSize: 40,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                 tooltip: '下一首',
                 icon: Icon(Icons.skip_next, color: theme.colorScheme.onSurface),
                 onPressed: _player.hasNext ? () => _changeSong(true) : null,
               ),
+              if (song != null) ...[
+                const SizedBox(width: 8),
+                _downloadControl(scheme, song),
+                const SizedBox(width: 4),
+                const PortablePlaybackModeButton(
+                    density: VisualDensity.compact, iconSize: 20),
+              ],
             ],
           ),
         ],
@@ -391,13 +414,15 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 260),
       curve: Curves.easeInOutCubic,
-      width: 68,
-      height: 68,
+      width: 60,
+      height: 60,
       decoration: BoxDecoration(color: scheme.primary, borderRadius: radius),
       child: Material(
           color: Colors.transparent,
           child: InkWell(
             borderRadius: radius,
+            splashFactory: NoSplash.splashFactory,
+            highlightColor: Colors.transparent,
             onTap: _player.isLoading ? null : () => _player.togglePlayPause(),
             child: Center(
                 child: FadeContent(
@@ -415,6 +440,47 @@ class _PortableNowPlayingPageState extends State<PortableNowPlayingPage> {
                             color: scheme.onPrimary))),
           )),
     );
+  }
+
+  Widget _downloadControl(ColorScheme scheme, PortableSong song) {
+    if (!_downloading) {
+      return IconButton(
+        tooltip: '下载歌曲',
+        icon: const Icon(Icons.download_outlined),
+        onPressed: () => _downloadSong(song),
+      );
+    }
+    return SizedBox(
+      width: 42,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              value: _downloadProgress,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            _formatDownloadSpeed(_downloadSpeedBytesPerSecond),
+            maxLines: 1,
+            overflow: TextOverflow.clip,
+            style: TextStyle(fontSize: 9, color: scheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _formatDownloadSpeed(double? bytesPerSecond) {
+    if (bytesPerSecond == null || bytesPerSecond <= 0) return '计算中';
+    if (bytesPerSecond >= 1024 * 1024) {
+      return '${(bytesPerSecond / (1024 * 1024)).toStringAsFixed(1)} MB/s';
+    }
+    return '${(bytesPerSecond / 1024).toStringAsFixed(0)} KB/s';
   }
 
   static String _fmt(Duration d) {

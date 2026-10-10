@@ -26,6 +26,7 @@ import '../../service/Portable/PortableSongDownloadService.dart';
 import '../NextPlayQueuePage.dart';
 import '../../widgets/NextPlayAddDialog.dart';
 import '../../utils/AppDesignTokens.dart';
+import '../../utils/ExportPathUtil.dart';
 import '../../utils/PortablePlayerScope.dart';
 import '../../widgets/BackgroundPageScaffold.dart';
 import '../../widgets/PortablePlaybackModeButton.dart';
@@ -64,6 +65,7 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
   int? _pendingLxnsId;
   int? _downloadingLxnsId;
   double? _downloadProgress;
+  double? _downloadSpeedBytesPerSecond;
 
   /// 拖动进度条时的临时值（0~1）。拖动期间以它为准，松手 seek 完再交还给
   /// positionStream —— 否则 200ms 一跳的流会把拇指拽回旧位置。
@@ -230,9 +232,14 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
 
   Future<void> _downloadSong(PortableSong song) async {
     if (_downloadingLxnsId != null) return;
+    if (!await ExportPathUtil.prepareForExport(context,
+        subDir: '歌曲', title: '选择歌曲保存位置')) {
+      return;
+    }
     setState(() {
       _downloadingLxnsId = song.lxnsId;
       _downloadProgress = null;
+      _downloadSpeedBytesPerSecond = null;
     });
     String? fallbackPath;
     try {
@@ -241,6 +248,11 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
         onProgress: (progress) {
           if (mounted && _downloadingLxnsId == song.lxnsId) {
             setState(() => _downloadProgress = progress);
+          }
+        },
+        onSpeed: (speed) {
+          if (mounted && _downloadingLxnsId == song.lxnsId) {
+            setState(() => _downloadSpeedBytesPerSecond = speed);
           }
         },
         onFallback: (path) => fallbackPath = path,
@@ -264,6 +276,7 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
         setState(() {
           _downloadingLxnsId = null;
           _downloadProgress = null;
+          _downloadSpeedBytesPerSecond = null;
         });
       }
     }
@@ -281,10 +294,23 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
   /// 8×2 + 分隔线 1），[_rowExtentOf] 按当前字体缩放算出同一个值。比
   /// `Scrollable.ensureVisible` 稳 —— 后者要求目标行**已经**被 build 出来，
   /// 而 1200 首的列表里目标行通常还在屏幕外。
-  void _locateCurrentSong() {
+  Future<void> _locateCurrentSong() async {
     final current = _player.currentSong;
     if (current == null) return;
     var index = _filtered.indexWhere((s) => s.lxnsId == current.lxnsId);
+    if (index < 0) {
+      // 播放页可能刚刚通过 AWMC 兜底拿到一首尚未进入列表的歌曲；重新读取
+      // 共享曲库，接上播放入口刚记住的这条索引。
+      final latest = await _library.load();
+      if (!mounted) return;
+      if (latest.length != _all.length) {
+        setState(() {
+          _all = latest;
+          _filtered = _applyFilter(latest);
+        });
+      }
+      index = _filtered.indexWhere((s) => s.lxnsId == current.lxnsId);
+    }
     if (index < 0 && _searchController.text.isNotEmpty) {
       // 当前曲目被搜索过滤掉了：先清搜索，否则怎么找都找不到那一行
       _searchController.clear();
@@ -329,60 +355,59 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
     return BackgroundPageScaffold(
       title: '随身听',
       actions: [
-                  IconButton(
-                    icon: const Icon(Icons.my_location),
-                    tooltip: '定位到正在播放',
-                    onPressed: _player.hasSong ? _locateCurrentSong : null,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    tooltip: '重建曲库',
-                    onPressed:
-                        _loading ? null : () => _loadLibrary(force: true),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.settings_outlined),
-                    tooltip: '随身听设置',
-                    onPressed: _showPortableSettings,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.queue_music),
-                    tooltip: '下次想玩',
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                          builder: (_) => const NextPlayQueuePage()),
-                    ),
-                  ),
-                ],
+        IconButton(
+          icon: const Icon(Icons.my_location),
+          tooltip: '定位到正在播放',
+          onPressed:
+              _player.hasSong ? () => unawaited(_locateCurrentSong()) : null,
+        ),
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: '重建曲库',
+          onPressed: _loading ? null : () => _loadLibrary(force: true),
+        ),
+        IconButton(
+          icon: const Icon(Icons.settings_outlined),
+          tooltip: '随身听设置',
+          onPressed: _showPortableSettings,
+        ),
+        IconButton(
+          icon: const Icon(Icons.queue_music),
+          tooltip: '下次想玩',
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const NextPlayQueuePage()),
+          ),
+        ),
+      ],
       resizeToAvoidBottomInset: false,
-      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      contentPadding:
+          EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
       child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      maxWidth: AppDesignTokens.maxContentWidth,
-                    ),
-                    child: Column(
-                        children: [
-                          _buildSearchBar(scheme),
-                          Divider(
-                            height: 1,
-                            color: scheme.outlineVariant.withValues(alpha: 0.6),
-                          ),
-                          Expanded(child: _buildBody(scheme)),
-                          // 「正在播放」钉在**最下面**：单手够得着进度条，
-                          // 而且不再压着列表（原来贴顶要吃掉约 110px 的滚动高度）
-                          if (_player.hasSong) ...[
-                            Divider(
-                              height: 1,
-                              color:
-                                  scheme.outlineVariant.withValues(alpha: 0.6),
-                            ),
-                            _buildCurrentBar(scheme),
-                          ],
-                        ],
-                    ),
-                  ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: AppDesignTokens.maxContentWidth,
+          ),
+          child: Column(
+            children: [
+              _buildSearchBar(scheme),
+              Divider(
+                height: 1,
+                color: scheme.outlineVariant.withValues(alpha: 0.6),
+              ),
+              Expanded(child: _buildBody(scheme)),
+              // 「正在播放」钉在**最下面**：单手够得着进度条，
+              // 而且不再压着列表（原来贴顶要吃掉约 110px 的滚动高度）
+              if (_player.hasSong) ...[
+                Divider(
+                  height: 1,
+                  color: scheme.outlineVariant.withValues(alpha: 0.6),
                 ),
+                _buildCurrentBar(scheme),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -735,18 +760,10 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
             IconButton(
               tooltip: '下载歌曲',
               icon: _downloadingLxnsId == song.lxnsId
-                  ? SizedBox(
-                      width: 21,
-                      height: 21,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        value: _downloadProgress,
-                      ),
-                    )
+                  ? _downloadProgressIndicator(scheme)
                   : const Icon(Icons.download_outlined, size: 21),
-              onPressed: _downloadingLxnsId == null
-                  ? () => _downloadSong(song)
-                  : null,
+              onPressed:
+                  _downloadingLxnsId == null ? () => _downloadSong(song) : null,
             ),
             IconButton(
               tooltip: '加入下次想玩',
@@ -767,8 +784,8 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
                           .toList(),
                     ));
                 if (mounted && added) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('已加入下次想玩')));
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(const SnackBar(content: Text('已加入下次想玩')));
                 }
               },
             ),
@@ -794,6 +811,40 @@ class _PortablePlayerPageState extends State<PortablePlayerPage> {
         ),
       ),
     );
+  }
+
+  Widget _downloadProgressIndicator(ColorScheme scheme) {
+    return SizedBox(
+      width: 50,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 21,
+            height: 21,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              value: _downloadProgress,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            _formatDownloadSpeed(_downloadSpeedBytesPerSecond),
+            maxLines: 1,
+            overflow: TextOverflow.clip,
+            style: TextStyle(fontSize: 8, color: scheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _formatDownloadSpeed(double? bytesPerSecond) {
+    if (bytesPerSecond == null || bytesPerSecond <= 0) return '计算中';
+    if (bytesPerSecond >= 1024 * 1024) {
+      return '${(bytesPerSecond / (1024 * 1024)).toStringAsFixed(1)} MB/s';
+    }
+    return '${(bytesPerSecond / 1024).toStringAsFixed(0)} KB/s';
   }
 
   Widget _badge(String text, ColorScheme scheme) {

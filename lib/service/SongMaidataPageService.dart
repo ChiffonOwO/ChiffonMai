@@ -247,6 +247,8 @@ class SongMaidataPageService {
     final wmcContent = await MaidataManager().getMaidataFromWmcFallback(songId);
     if (wmcContent != null) {
       debugPrint('[DEBUG][Maidata] 使用 wmc.pub 兜底内容, songId=$songId');
+      // 网络兜底也写入已有的单曲持久缓存，下次进入详情页无需再次下载。
+      await cacheMaidata(wmcContent);
       List<String> inoteList = _parseInoteList(wmcContent);
       onInoteParsed(inoteList);
       return wmcContent;

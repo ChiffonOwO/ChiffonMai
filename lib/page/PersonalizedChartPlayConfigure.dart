@@ -792,6 +792,7 @@ class _PersonalizedChartPlayConfigureState extends State<PersonalizedChartPlayCo
     final brightness = Theme.of(context).brightness;
     final safeBottom = MediaQuery.of(context).padding.bottom;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       // 不要用 backgroundColor: AppColors.scaffoldBackground(brightness)：
       // 它在浅色模式返回 Colors.transparent，而本页是被 Navigator.push 出来的
       // 独立路由，底下没有 AppShell 的背景兜底，于是浅色模式下整页会漏出窗口底色（黑）。

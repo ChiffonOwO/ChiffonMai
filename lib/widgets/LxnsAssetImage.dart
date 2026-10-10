@@ -1,31 +1,58 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
-/// 落雪（`assets2.lxns.net/maimai/**`）静态素材的**专属磁盘缓存**。
-///
-/// 为什么要单开一个（与 `dxRatingCoverCacheManager` 是同一套理由）：
-/// `CachedNetworkImage` 默认走 `DefaultCacheManager`，它只有 **200 个对象**的
-/// 容量，而且**全 App 共用** —— 排行榜头像、收藏品图、通知栏曲绘等都在同一个
-/// 池子里。落雪这边光头像就有 1000+、姓名框 400、背景 350，随便滚一遍就超过
-/// 上限；超限且**超过一天没被访问**的对象会被清理（见 flutter_cache_manager
-/// 的 `CacheObjectProvider.getObjectsOverCapacity`），于是下次打开又变成
-/// 「真·重新下载」。
-///
-/// 关于「缓存时间」有一个容易误解的点：`stalePeriod` **不是**回源的判据，
-/// 它只用于磁盘清理。真正决定要不要联网的是响应头算出来的 `validTill` ——
-/// 落雪给的是 `cache-control: max-age=3600`，也就是**一小时**。一小时后会发
-/// 一次条件请求（`If-None-Match`），服务端命中 ETag 时回 304、不下发图片字节。
-/// 这里按 30 天保留磁盘副本，就是为了让那次条件请求永远能在本地拿到文件。
-final CacheManager lxnsAssetCacheManager = CacheManager(
-  Config(
-    'lxns_assets_v1',
-    stalePeriod: const Duration(days: 30),
-    maxNrOfCacheObjects: 2000,
-  ),
-);
+/// 收藏品专属缓存：Flutter ImageCache 复用内存中的解码结果，磁盘副本用于
+/// 进程重启或内存淘汰后的读取。文件在应用缓存目录，卸载时随应用清除。
+/// 保留旧缓存标识以复用已下载的素材；只在本地文件缺失时联网。
+final LxnsAssetCacheManager lxnsAssetCacheManager = LxnsAssetCacheManager();
+
+class LxnsAssetCacheManager extends CacheManager {
+  LxnsAssetCacheManager()
+      : super(Config(
+          'lxns_assets_v1',
+          stalePeriod: const Duration(days: 3650),
+          maxNrOfCacheObjects: 10000,
+        ));
+
+  final Map<String, Future<FileInfo>> _downloads = {};
+
+  Future<Uint8List> readBytes(String url) async {
+    final result = await getFileStream(url).first;
+    return (result as FileInfo).file.readAsBytes();
+  }
+
+  @override
+  Stream<FileResponse> getFileStream(
+    String url, {
+    String? key,
+    Map<String, String>? headers,
+    bool withProgress = false,
+  }) async* {
+    final cacheKey = key ?? url;
+    final cached = await getFileFromCache(cacheKey);
+    // 不按服务端的 max-age 重复回源：收藏品本地命中即返回。
+    if (cached != null && await cached.file.exists()) {
+      yield cached;
+      return;
+    }
+
+    final download = _downloads.putIfAbsent(
+      cacheKey,
+      () => downloadFile(url, key: cacheKey, authHeaders: headers),
+    );
+    try {
+      yield await download;
+    } finally {
+      if (identical(_downloads[cacheKey], download)) {
+        _downloads.remove(cacheKey);
+      }
+    }
+  }
+}
 
 /// 落雪静态素材的 URL 前缀（头像 / 姓名框 / 背景）。
 const String lxnsAssetBaseUrl = 'https://assets2.lxns.net/maimai';

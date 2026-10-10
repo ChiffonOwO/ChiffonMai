@@ -404,6 +404,8 @@ class _PlaybackModeMenu extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final selected = mode == value;
     return InkWell(
+      splashFactory: NoSplash.splashFactory,
+      highlightColor: Colors.transparent,
       onTap: () => onSelectMode(value),
       child: AnimatedContainer(
         duration: _switchDuration,

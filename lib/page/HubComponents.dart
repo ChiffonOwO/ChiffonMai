@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/MainNavigationInsets.dart';
 import '../widgets/SmoothLinearProgressIndicator.dart';
 import '../utils/AppDesignTokens.dart';
 import '../widgets/MarqueeText.dart';
@@ -326,14 +327,15 @@ class HubActionTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (_hasProgress) Text(
-                    '(${progressCurrent!} / $progressTotal)',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: scheme.primary,
-                      fontWeight: FontWeight.w600,
+                  if (_hasProgress)
+                    Text(
+                      '(${progressCurrent!} / $progressTotal)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
                   if (!_hasProgress)
                     _MarqueeSubtitle(
                       text: loadingText ?? subtitle,
@@ -345,10 +347,9 @@ class HubActionTile extends StatelessWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(2),
                     child: SmoothLinearProgressIndicator(
-                      value:
-                          _hasProgress
-                              ? (progressCurrent! / progressTotal!).clamp(0.0, 1.0)
-                              : progressValue?.clamp(0.0, 1.0),
+                      value: _hasProgress
+                          ? (progressCurrent! / progressTotal!).clamp(0.0, 1.0)
+                          : progressValue?.clamp(0.0, 1.0),
                       minHeight: 4,
                       backgroundColor: scheme.primary.withValues(alpha: 0.12),
                       color: scheme.primary,
@@ -559,10 +560,14 @@ class HubPageScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.transparent,
       body: SafeArea(
+        bottom: false,
         child: ListView(
-          padding: AppDesignTokens.pagePadding,
+          padding: AppDesignTokens.pagePadding.add(
+            EdgeInsets.only(bottom: MainNavigationInsets.bottomOf(context)),
+          ),
           children: [
             // ===== 顶部标题栏 =====
             Row(

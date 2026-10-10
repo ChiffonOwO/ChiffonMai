@@ -4,8 +4,10 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:marquee/marquee.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import '../service/FriendLinksService.dart';
 import '../utils/AppTheme.dart';
 import '../widgets/BackgroundPageScaffold.dart';
+import '../widgets/SmoothLinearProgressIndicator.dart';
 
 /// 友情链接页面：以卡片形式展示推广同行的项目，点击通过外部浏览器打开。
 class FriendLinksPage extends StatefulWidget {
@@ -24,7 +26,7 @@ class _FriendLinksPageState extends State<FriendLinksPage> {
   /// - [url]       跳转链接（点击卡片打开外部浏览器）
   /// - [iconType]  图标类型（从预定义范围内选择，避免依赖外部图片）
   /// - [iconBg]    图标主题色（背景底色 + 图标前景色）
-  static const List<_FriendLink> _friendLinks = [
+  static const List<_FriendLink> _fallbackFriendLinks = [
     _FriendLink(
       name: '中二查歌',
       desc: '这是ChiffonChu，一站式中二工具()',
@@ -40,10 +42,10 @@ class _FriendLinksPageState extends State<FriendLinksPage> {
       iconBg: Color(0xFF26A69A),
     ),
     _FriendLink(
-      name: '溯光的个人主页',
-      desc: '此人正开发原创音游中...',
-      url: 'https://su-guang.rth1.xyz/',
-      iconType: FriendLinkIconType.music,
+      name: 'BeatRail',
+      desc: '融合铁路元素的创新音游',
+      url: 'https://beatrail-suguang.rth1.xyz/',
+      iconType: FriendLinkIconType.web,
       iconBg: Color(0xFF5C6BC0),
     ),
     _FriendLink(
@@ -54,6 +56,54 @@ class _FriendLinksPageState extends State<FriendLinksPage> {
       iconBg: Color(0xFFEF6C00),
     ),
   ];
+
+  List<_FriendLink> _friendLinks = _fallbackFriendLinks;
+  bool _isLoading = true;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFriendLinks();
+  }
+
+  Future<void> _loadFriendLinks() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      final records = await const FriendLinksService().fetch();
+      if (!mounted) return;
+      setState(() {
+        _friendLinks = records.map(_fromRecord).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('[FriendLinksPage] 获取友链失败: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = '在线友链暂时不可用，当前显示本地缓存';
+      });
+    }
+  }
+
+  static _FriendLink _fromRecord(FriendLinkRecord record) {
+    final iconType = FriendLinkIconType.values.firstWhere(
+      (value) => value.name == record.iconType,
+      orElse: () => FriendLinkIconType.web,
+    );
+    final colorText = record.iconColor.replaceFirst('#', '');
+    final parsedColor = int.tryParse(colorText, radix: 16);
+    return _FriendLink(
+      name: record.name,
+      desc: record.description,
+      url: record.url,
+      iconType: iconType,
+      iconBg: Color(parsedColor == null ? 0xFF5C6BC0 : 0xFF000000 | parsedColor),
+    );
+  }
 
   Future<void> _open(String url) async {
     final uri = Uri.tryParse(url);
@@ -116,6 +166,32 @@ class _FriendLinksPageState extends State<FriendLinksPage> {
                             ),
                           ),
                           const SizedBox(height: 8),
+                          if (_isLoading)
+                            const Padding(
+                              padding: EdgeInsets.only(bottom: 10),
+                              child: SmoothLinearProgressIndicator(minHeight: 2),
+                            ),
+                          if (_loadError != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _loadError!,
+                                      style: TextStyle(
+                                        color: textSecondaryColor,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: _loadFriendLinks,
+                                    child: const Text('重试'),
+                                  ),
+                                ],
+                              ),
+                            ),
                           // 友链列表（1列N行）
                           ListView.separated(
                             shrinkWrap: true,

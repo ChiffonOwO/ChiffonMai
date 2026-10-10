@@ -14,12 +14,12 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:my_first_flutter_app/manager/SongAliasManager.dart';
 import 'package:my_first_flutter_app/manager/DivingFish/MaimaiMusicDataManager.dart';
-import 'package:my_first_flutter_app/manager/MaidataManager.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/DiffSong.dart';
 import 'package:my_first_flutter_app/entity/LuoXue/Collection.dart';
 import 'package:my_first_flutter_app/entity/DivingFish/Song.dart';
 import 'package:my_first_flutter_app/page/SongMaidataPage.dart';
 import 'package:my_first_flutter_app/service/SongInfoService.dart';
+import 'package:my_first_flutter_app/service/SongMaidataPageService.dart';
 import 'package:my_first_flutter_app/service/SongPlayService.dart';
 import 'package:my_first_flutter_app/utils/CoverUtil.dart';
 import 'package:my_first_flutter_app/utils/CommentTextValidator.dart';
@@ -51,6 +51,7 @@ import 'package:my_first_flutter_app/utils/AppTheme.dart';
 import 'package:my_first_flutter_app/utils/ScoreInputValidator.dart';
 import 'package:my_first_flutter_app/utils/SongFilterUtil.dart';
 import 'package:my_first_flutter_app/widgets/BackgroundPageScaffold.dart';
+import 'package:my_first_flutter_app/widgets/PageTopBar.dart';
 import 'package:my_first_flutter_app/widgets/NextPlayAddDialog.dart';
 import 'package:my_first_flutter_app/widgets/ChartHistorySection.dart';
 import 'package:my_first_flutter_app/widgets/CommunityAvatar.dart';
@@ -71,6 +72,12 @@ class SongInfoPage extends StatefulWidget {
 }
 
 class _SongInfoPageState extends State<SongInfoPage> {
+  final ScrollController _songScrollController = ScrollController();
+  final GlobalKey _songScrollKey = GlobalKey();
+  final GlobalKey _songTitleKey = GlobalKey();
+  bool _showSongTitleInAppBar = false;
+  bool _titleVisibilityCheckScheduled = false;
+
   Future<void> _addToNextPlayQueue() async {
     final basic = _songData?['basic_info'];
     if (basic is! Map) return;
@@ -246,6 +253,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
   void initState() {
     super.initState();
     _currentDiffIndex = widget.initialLevelIndex;
+    _songScrollController.addListener(_updateSongTitleVisibility);
     _commentInputController.addListener(_onCommentInputChanged);
     _loadData();
     _loadDxData();
@@ -273,6 +281,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
   @override
   void dispose() {
+    _songScrollController
+      ..removeListener(_updateSongTitleVisibility)
+      ..dispose();
     _break50Controller.dispose();
     _break100Controller.dispose();
     _break80Controller.dispose();
@@ -284,16 +295,49 @@ class _SongInfoPageState extends State<SongInfoPage> {
     super.dispose();
   }
 
+  void _scheduleSongTitleVisibilityCheck() {
+    if (_titleVisibilityCheckScheduled) return;
+    _titleVisibilityCheckScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _titleVisibilityCheckScheduled = false;
+      if (mounted) _updateSongTitleVisibility();
+    });
+  }
+
+  void _updateSongTitleVisibility() {
+    if (!mounted || !_songScrollController.hasClients) return;
+    final titleBox =
+        _songTitleKey.currentContext?.findRenderObject() as RenderBox?;
+    final scrollBox =
+        _songScrollKey.currentContext?.findRenderObject() as RenderBox?;
+    if (titleBox == null || scrollBox == null || !titleBox.hasSize) return;
+
+    final viewportTop = scrollBox.localToGlobal(Offset.zero).dy;
+    final titleBottom = titleBox
+        .localToGlobal(
+          Offset(0, titleBox.size.height),
+        )
+        .dy;
+    final shouldShow = titleBottom <= viewportTop + 1;
+    if (shouldShow != _showSongTitleInAppBar) {
+      setState(() => _showSongTitleInAppBar = shouldShow);
+    }
+  }
+
   // 加载所有数据
   Future<void> _loadData() async {
     try {
       // 使用SongInfoService加载数据
       final result = await SongInfoService().loadData(widget.songId);
+      if (!mounted) return;
       _songData = result['songData'];
       _diffData = result['diffData'];
       _userData = result['userData'];
       _tagData = result['tagData'];
       _tagSongsData = result['tagSongsData'];
+
+      // 单曲缺失时后台补齐，网络请求不阻塞详情页；解析完成后即时刷新统计。
+      unawaited(_loadMaidataNoteCounts());
 
       // 加载相关收藏品数量
       if (_songData != null) {
@@ -305,8 +349,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
         await _checkAlternativeSong(songTitle, songType);
       }
 
-      // 从MaidataManager获取并解析物量统计
-      await _loadMaidataNoteCounts();
+      if (!mounted) return;
 
       // 加载参考时长
       _loadReferenceDuration();
@@ -316,6 +359,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
       // 加载评论者身份信息
       final identity = await SongInfoService.getCommentIdentity();
+      if (!mounted) return;
       if (identity != null) {
         setState(() {
           _commentDataSource = identity.dataSource;
@@ -338,6 +382,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
     } catch (e) {
       debugPrint('加载数据失败: $e');
     } finally {
+      if (!mounted) return;
       // 调整_currentDiffIndex，确保不超过实际难度数量
       if (_songData != null) {
         final levels = _songData!['level'];
@@ -443,14 +488,15 @@ class _SongInfoPageState extends State<SongInfoPage> {
       if (matched == null || matched.basicInfo.isNew != isNew) continue;
       categoryRecords.add(Map<String, dynamic>.from(raw));
     }
-    categoryRecords.sort((a, b) =>
-        ((b['ra'] as num?)?.toInt() ?? 0).compareTo((a['ra'] as num?)?.toInt() ?? 0));
+    categoryRecords.sort((a, b) => ((b['ra'] as num?)?.toInt() ?? 0)
+        .compareTo((a['ra'] as num?)?.toInt() ?? 0));
     final cutoff = categoryRecords.length >= limit
         ? ((categoryRecords[limit - 1]['ra'] as num?)?.toInt() ?? 0)
         : 0;
     final threshold = cutoff + 1;
     final current = _getUserBestRecord();
-    final currentAchievement = (current?['achievements'] as num?)?.toDouble() ?? 0;
+    final currentAchievement =
+        (current?['achievements'] as num?)?.toDouble() ?? 0;
     final currentRa = (current?['ra'] as num?)?.toInt() ?? 0;
     final bestLabel = 'Best${isNew ? 15 : 35}';
     // 下限成绩也属于 Best 区间，不能只比较「进入区间需要的下一分」。
@@ -469,9 +515,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
     );
     if (targetAchievement == null) {
       if (mounted) {
-        setState(() => _best50OpportunityText = alreadyInBest
-            ? '该谱面已在${bestLabel}区间内且无提升空间'
-            : '该谱面无法进入$bestLabel');
+        setState(() => _best50OpportunityText =
+            alreadyInBest ? '该谱面已在${bestLabel}区间内且无提升空间' : '该谱面无法进入$bestLabel');
       }
       return;
     }
@@ -879,12 +924,25 @@ class _SongInfoPageState extends State<SongInfoPage> {
     }
   }
 
-  // 从MaidataManager加载并解析物量统计
+  // 优先读取全量和单曲缓存，缺失时联网补齐并持久化，再即时更新物量与绝赞统计。
   Future<void> _loadMaidataNoteCounts() async {
     try {
-      await MaidataManager().initialize();
-
-      String? maidataContent = MaidataManager().getMaidata(widget.songId);
+      final song = _songData;
+      if (song == null) return;
+      final basicInfo = song['basic_info'] is Map
+          ? Map<String, dynamic>.from(song['basic_info'] as Map)
+          : const <String, dynamic>{};
+      final service = SongMaidataPageService(
+        songId: widget.songId,
+        songTitle: basicInfo['title']?.toString() ?? '',
+        genre: basicInfo['genre']?.toString() ?? '',
+        songType: song['type']?.toString() ?? '',
+      );
+      final maidataContent = await service.fetchMaidata(
+        onInoteParsed: (_) {},
+      );
+      // 离开页面后缓存仍可保存，但不能再刷新已销毁的页面。
+      if (!mounted) return;
 
       // 日志：输出当前歌曲ID
       debugPrint('[MaidataDecode] 正在解析歌曲ID: ${widget.songId}');
@@ -961,14 +1019,9 @@ class _SongInfoPageState extends State<SongInfoPage> {
         }
 
         // 更新状态并刷新界面
-        if (newNoteCounts.isNotEmpty) {
+        if (newNoteCounts.isNotEmpty || newBreakCounts.isNotEmpty) {
           setState(() {
             _maidataNoteCounts = newNoteCounts;
-            _maidataDecodedSuccessfully = true;
-          });
-        }
-        if (newBreakCounts.isNotEmpty) {
-          setState(() {
             _maidataBreakCounts = newBreakCounts;
             _maidataDecodedSuccessfully = true;
           });
@@ -980,7 +1033,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
             '[MaidataDecode] 严格查询失败, songId=${widget.songId}，不再使用 short_id 或 title 顶替');
       }
     } catch (e) {
-      // 静默处理，继续使用默认数据
+      // 获取失败保留原来的统计兜底，不打断详情页。
+      debugPrint('[MaidataDecode] 加载歌曲 ${widget.songId} 的统计失败: $e');
     }
   }
 
@@ -2481,872 +2535,845 @@ class _SongInfoPageState extends State<SongInfoPage> {
         _getSecondaryThemeColor(_currentDiffIndex, brightness);
     final accentColor = _getAccentColor(_currentDiffIndex, brightness);
 
+    _scheduleSongTitleVisibilityCheck();
 
     // 曲绘将使用CoverPathUtil工具类加载
 
     return BackgroundPageScaffold(
-      title: '歌曲详情',
+      title: _showSongTitleInAppBar
+          ? (_songData!['basic_info']?['title']?.toString() ?? '歌曲详情')
+          : '歌曲详情',
+      titleAlign: PageTopBarTitleAlign.start,
+      animateTitle: true,
+      centerTitleInAvailableSpace: true,
       actions: [
-                IconButton(
-                icon: const Icon(Icons.image_outlined),
-                tooltip: '导出歌曲信息',
-                onPressed: _exportSongInfoToImage,
-                ),
-                // 计算工具按钮（打开独立的 CalculatorPage）
-                IconButton(
-                icon: const Icon(Icons.calculate_outlined),
-                tooltip: '计算工具',
-                onPressed: _openCalculator,
-                ),
-                  IconButton(
-                    icon: const Icon(Icons.playlist_add),
-                    tooltip: '加入下次想玩',
-                    onPressed: _isLoading ? null : _addToNextPlayQueue,
-                  ),
-                ],
+        IconButton(
+          icon: const Icon(Icons.image_outlined),
+          tooltip: '导出歌曲信息',
+          onPressed: _exportSongInfoToImage,
+        ),
+        // 计算工具按钮（打开独立的 CalculatorPage）
+        IconButton(
+          icon: const Icon(Icons.calculate_outlined),
+          tooltip: '计算工具',
+          onPressed: _openCalculator,
+        ),
+        IconButton(
+          icon: const Icon(Icons.playlist_add),
+          tooltip: '加入下次想玩',
+          onPressed: _isLoading ? null : _addToNextPlayQueue,
+        ),
+      ],
       resizeToAvoidBottomInset: false,
-      contentPadding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
+      contentPadding:
+          EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 10),
       child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // 卡片区域
-                        Container(
+        key: _songScrollKey,
+        controller: _songScrollController,
+        // 标题栏下方只保留 8px，避免浅色底色形成明显的白色空带。
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 卡片区域
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    themeColor,
+                    secondaryThemeColor,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 歌曲信息头部
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 封面（可点击放大）
+                      GestureDetector(
+                        onTap: () {
+                          // 显示放大的封面
+                          showDialog(
+                            context: context,
+                            builder: (BuildContext context) {
+                              return Dialog(
+                                child: Container(
+                                  padding: EdgeInsets.all(16),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        basicInfo['title'],
+                                        style: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: accentColor,
+                                        ),
+                                      ),
+                                      SizedBox(height: 16),
+                                      Container(
+                                        width: 250,
+                                        height: 250,
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          child: CoverUtil
+                                              .buildCoverWidgetWithContext(
+                                                  context,
+                                                  widget.songId.toString(),
+                                                  300),
+                                        ),
+                                      ),
+                                      SizedBox(height: 16),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceEvenly,
+                                        children: [
+                                          ElevatedButton(
+                                            onPressed: () async {
+                                              await _saveCoverToGallery(
+                                                  widget.songId.toString(),
+                                                  basicInfo['title']
+                                                          ?.toString() ??
+                                                      'cover');
+                                            },
+                                            child: Text('保存到相册'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: accentColor,
+                                              foregroundColor: Colors.white,
+                                            ),
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: () {
+                                              Navigator.of(context).pop();
+                                            },
+                                            child: Text('关闭'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  AppColors.greyHint(
+                                                      brightness),
+                                              foregroundColor: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                        child: Container(
+                          width: MediaQuery.of(context).size.width * 0.3,
+                          height: MediaQuery.of(context).size.width * 0.3,
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                themeColor,
-                                secondaryThemeColor,
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withOpacity(0.1),
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
                           ),
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                          child: Stack(
+                            clipBehavior: Clip.none,
                             children: [
-                              // 歌曲信息头部
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // 封面（可点击放大）
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: CoverUtil.buildCoverWidgetWithContext(
+                                    context, widget.songId.toString(), 120),
+                              ),
+                              if (widget.songId == '11820' ||
+                                  widget.songId == '11821')
+                                Positioned(
+                                  top: -2,
+                                  left: -14,
+                                  child: Image.asset(
+                                    'assets/cover/UI_Long_Song.webp',
+                                    width: MediaQuery.of(context).size.width *
+                                        0.16,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 16),
+
+                      // 歌曲信息
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // 根据标题长度决定是否使用滚动
+                            GestureDetector(
+                              key: _songTitleKey,
+                              onTap: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return AlertDialog(
+                                      title: Text('歌曲标题'),
+                                      content: Text(basicInfo['title']),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () {
+                                            Clipboard.setData(ClipboardData(
+                                                text: basicInfo['title']));
+                                            Navigator.of(context).pop();
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                  content: Text('已复制到剪贴板')),
+                                            );
+                                          },
+                                          child: Text('复制'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.of(context).pop();
+                                          },
+                                          child: Text('关闭'),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                              child: LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final style = TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: accentColor,
+                                  );
+
+                                  // 计算文本宽度
+                                  final TextPainter textPainter = TextPainter(
+                                    text: TextSpan(
+                                        text: basicInfo['title'], style: style),
+                                    maxLines: 1,
+                                    textDirection: TextDirection.ltr,
+                                  )..layout(
+                                      minWidth: 0, maxWidth: double.infinity);
+
+                                  final textWidth = textPainter.width;
+                                  final safeWidth = constraints.maxWidth;
+
+                                  // 如果文本宽度小于安全宽度，不需要滚动
+                                  if (textWidth <= safeWidth) {
+                                    return Text(
+                                      basicInfo['title'],
+                                      style: style,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    );
+                                  } else {
+                                    // 否则使用Marquee组件
+                                    return SizedBox(
+                                      height: 40,
+                                      child: Marquee(
+                                        text: basicInfo['title'],
+                                        style: style,
+                                        scrollAxis: Axis.horizontal,
+                                        blankSpace: 20.0,
+                                        velocity: 30.0,
+                                        pauseAfterRound: Duration(seconds: 3),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+
+                            const SizedBox(height: 12),
+                            // 显示歌曲别名
+                            _buildAliasSection(basicInfo['title']),
+
+                            const SizedBox(height: 8),
+
+                            // 显示类型和序号
+                            Row(
+                              children: [
+                                Text(
+                                  widget.songId.length == 6
+                                      ? 'UTAGE'
+                                      : '${_songData!['type'] == 'SD' ? 'ST' : _songData!['type']}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: widget.songId.length == 6
+                                        ? Color(0xFFFF6B8B)
+                                        : (_songData!['type'] == 'SD'
+                                            ? AppColors.linkBlue(brightness)
+                                            : AppColors.warningOrange(
+                                                brightness)),
+                                  ),
+                                ),
+                                Text(
+                                  '  #${widget.songId}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                                ),
+                                // 如果存在另一种谱面，显示切换按钮
+                                if (_alternativeSongId != null)
                                   GestureDetector(
                                     onTap: () {
-                                      // 显示放大的封面
-                                      showDialog(
-                                        context: context,
-                                        builder: (BuildContext context) {
-                                          return Dialog(
-                                            child: Container(
-                                              padding: EdgeInsets.all(16),
-                                              child: Column(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Text(
-                                                    basicInfo['title'],
-                                                    style: TextStyle(
-                                                      fontSize: 20,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color: accentColor,
-                                                    ),
-                                                  ),
-                                                  SizedBox(height: 16),
-                                                  Container(
-                                                    width: 250,
-                                                    height: 250,
-                                                    child: ClipRRect(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              8),
-                                                      child: CoverUtil
-                                                          .buildCoverWidgetWithContext(
-                                                              context,
-                                                              widget.songId
-                                                                  .toString(),
-                                                              300),
-                                                    ),
-                                                  ),
-                                                  SizedBox(height: 16),
-                                                  Row(
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .spaceEvenly,
-                                                    children: [
-                                                      ElevatedButton(
-                                                        onPressed: () async {
-                                                          await _saveCoverToGallery(
-                                                              widget.songId
-                                                                  .toString(),
-                                                              basicInfo['title']
-                                                                      ?.toString() ??
-                                                                  'cover');
-                                                        },
-                                                        child: Text('保存到相册'),
-                                                        style: ElevatedButton
-                                                            .styleFrom(
-                                                          backgroundColor:
-                                                              accentColor,
-                                                          foregroundColor:
-                                                              Colors.white,
-                                                        ),
-                                                      ),
-                                                      ElevatedButton(
-                                                        onPressed: () {
-                                                          Navigator.of(context)
-                                                              .pop();
-                                                        },
-                                                        child: Text('关闭'),
-                                                        style: ElevatedButton
-                                                            .styleFrom(
-                                                          backgroundColor:
-                                                              AppColors.greyHint(
-                                                                  brightness),
-                                                          foregroundColor:
-                                                              Colors.white,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          );
-                                        },
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => SongInfoPage(
+                                            songId: _alternativeSongId!,
+                                            initialLevelIndex:
+                                                _currentDiffIndex,
+                                            isDefaultLevelIndex: false,
+                                          ),
+                                        ),
                                       );
                                     },
                                     child: Container(
-                                      width: MediaQuery.of(context).size.width *
-                                          0.3,
-                                      height:
-                                          MediaQuery.of(context).size.width *
-                                              0.3,
+                                      margin: const EdgeInsets.only(left: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 4),
                                       decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(12),
+                                        color: _songData!['type'] == 'SD'
+                                            ? AppColors.warningOrange(
+                                                brightness)
+                                            : AppColors.linkBlue(brightness),
+                                        borderRadius: BorderRadius.circular(8),
                                         boxShadow: [
                                           BoxShadow(
                                             color: Theme.of(context)
                                                 .colorScheme
                                                 .onSurface
-                                                .withOpacity(0.1),
-                                            blurRadius: 4,
-                                            offset: Offset(0, 2),
+                                                .withValues(alpha: 0.12),
+                                            blurRadius: 2,
+                                            offset: Offset(1, 1),
                                           ),
                                         ],
                                       ),
-                                      child: Stack(
-                                        clipBehavior: Clip.none,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          ClipRRect(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                            child: CoverUtil
-                                                .buildCoverWidgetWithContext(
-                                                    context,
-                                                    widget.songId.toString(),
-                                                    120),
+                                          Icon(
+                                            Icons.swap_horizontal_circle,
+                                            size: 14,
+                                            color: Colors.white,
                                           ),
-                                          if (widget.songId == '11820' ||
-                                              widget.songId == '11821')
-                                            Positioned(
-                                              top: -2,
-                                              left: -14,
-                                              child: Image.asset(
-                                                'assets/cover/UI_Long_Song.webp',
-                                                width: MediaQuery.of(context)
-                                                        .size
-                                                        .width *
-                                                    0.16,
-                                                fit: BoxFit.contain,
-                                              ),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            _songData!['type'] == 'SD'
+                                                ? 'DX'
+                                                : 'ST',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
                                             ),
+                                          ),
                                         ],
                                       ),
                                     ),
                                   ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
 
-                                  const SizedBox(width: 16),
+                  const SizedBox(height: 10),
 
-                                  // 歌曲信息
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        // 根据标题长度决定是否使用滚动
-                                        GestureDetector(
-                                          onTap: () {
-                                            showDialog(
-                                              context: context,
-                                              builder: (BuildContext context) {
-                                                return AlertDialog(
-                                                  title: Text('歌曲标题'),
-                                                  content:
-                                                      Text(basicInfo['title']),
-                                                  actions: [
-                                                    TextButton(
-                                                      onPressed: () {
-                                                        Clipboard.setData(
-                                                            ClipboardData(
-                                                                text: basicInfo[
-                                                                    'title']));
-                                                        Navigator.of(context)
-                                                            .pop();
-                                                        ScaffoldMessenger.of(
-                                                                context)
-                                                            .showSnackBar(
-                                                          SnackBar(
-                                                              content: Text(
-                                                                  '已复制到剪贴板')),
-                                                        );
-                                                      },
-                                                      child: Text('复制'),
-                                                    ),
-                                                    TextButton(
-                                                      onPressed: () {
-                                                        Navigator.of(context)
-                                                            .pop();
-                                                      },
-                                                      child: Text('关闭'),
-                                                    ),
-                                                  ],
-                                                );
-                                              },
-                                            );
-                                          },
-                                          child: LayoutBuilder(
-                                            builder: (context, constraints) {
-                                              final style = TextStyle(
-                                                fontSize: 22,
-                                                fontWeight: FontWeight.bold,
-                                                color: accentColor,
-                                              );
-
-                                              // 计算文本宽度
-                                              final TextPainter textPainter =
-                                                  TextPainter(
-                                                text: TextSpan(
-                                                    text: basicInfo['title'],
-                                                    style: style),
-                                                maxLines: 1,
-                                                textDirection:
-                                                    TextDirection.ltr,
-                                              )..layout(
-                                                      minWidth: 0,
-                                                      maxWidth:
-                                                          double.infinity);
-
-                                              final textWidth =
-                                                  textPainter.width;
-                                              final safeWidth =
-                                                  constraints.maxWidth;
-
-                                              // 如果文本宽度小于安全宽度，不需要滚动
-                                              if (textWidth <= safeWidth) {
-                                                return Text(
-                                                  basicInfo['title'],
-                                                  style: style,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                );
-                                              } else {
-                                                // 否则使用Marquee组件
-                                                return SizedBox(
-                                                  height: 40,
-                                                  child: Marquee(
-                                                    text: basicInfo['title'],
-                                                    style: style,
-                                                    scrollAxis: Axis.horizontal,
-                                                    blankSpace: 20.0,
-                                                    velocity: 30.0,
-                                                    pauseAfterRound:
-                                                        Duration(seconds: 3),
-                                                  ),
-                                                );
-                                              }
-                                            },
-                                          ),
-                                        ),
-
-                                        const SizedBox(height: 12),
-                                        // 显示歌曲别名
-                                        _buildAliasSection(basicInfo['title']),
-
-                                        const SizedBox(height: 8),
-
-                                        // 显示类型和序号
-                                        Row(
-                                          children: [
-                                            Text(
-                                              widget.songId.length == 6
-                                                  ? 'UTAGE'
-                                                  : '${_songData!['type'] == 'SD' ? 'ST' : _songData!['type']}',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                                color: widget.songId.length == 6
-                                                    ? Color(0xFFFF6B8B)
-                                                    : (_songData!['type'] ==
-                                                            'SD'
-                                                        ? AppColors.linkBlue(
-                                                            brightness)
-                                                        : AppColors
-                                                            .warningOrange(
-                                                                brightness)),
-                                              ),
-                                            ),
-                                            Text(
-                                              '  #${widget.songId}',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .onSurfaceVariant,
-                                              ),
-                                            ),
-                                            // 如果存在另一种谱面，显示切换按钮
-                                            if (_alternativeSongId != null)
-                                              GestureDetector(
-                                                onTap: () {
-                                                  Navigator.pushReplacement(
-                                                    context,
-                                                    MaterialPageRoute(
-                                                      builder: (context) =>
-                                                          SongInfoPage(
-                                                        songId:
-                                                            _alternativeSongId!,
-                                                        initialLevelIndex:
-                                                            _currentDiffIndex,
-                                                        isDefaultLevelIndex:
-                                                            false,
-                                                      ),
-                                                    ),
-                                                  );
-                                                },
-                                                child: Container(
-                                                  margin: const EdgeInsets.only(
-                                                      left: 8),
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                      horizontal: 6,
-                                                      vertical: 4),
-                                                  decoration: BoxDecoration(
-                                                    color: _songData!['type'] ==
-                                                            'SD'
-                                                        ? AppColors
-                                                            .warningOrange(
-                                                                brightness)
-                                                        : AppColors.linkBlue(
-                                                            brightness),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            8),
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: Theme.of(context)
-                                                            .colorScheme
-                                                            .onSurface
-                                                            .withValues(
-                                                                alpha: 0.12),
-                                                        blurRadius: 2,
-                                                        offset: Offset(1, 1),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      Icon(
-                                                        Icons
-                                                            .swap_horizontal_circle,
-                                                        size: 14,
-                                                        color: Colors.white,
-                                                      ),
-                                                      SizedBox(width: 4),
-                                                      Text(
-                                                        _songData!['type'] ==
-                                                                'SD'
-                                                            ? 'DX'
-                                                            : 'ST',
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          color: Colors.white,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              const SizedBox(height: 10),
-
-                              // 难度标签页
-                              Row(
-                                children: List.generate(
-                                  levels.length,
-                                  (index) => Expanded(
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        BiliSearchService().cancel();
-                                        setState(() {
-                                          _currentDiffIndex = index;
-                                          _biliPlayCount = null;
-                                          _biliPlayCountLoading = false;
-                                          _biliBvid = null;
-                                          _biliFromRedis = false;
-                                          _biliFromUser = false;
-                                        });
-                                        _loadChartRating();
-                                        _loadComments();
-                                        _checkBookmarkStatus();
-                                        _checkNoteStatus();
-                                        _loadBiliPlayCount();
-                                        _loadBest50Opportunity();
-                                      },
-                                      child: Container(
-                                        margin: const EdgeInsets.symmetric(
-                                            horizontal: 2),
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 8, horizontal: 4),
-                                        decoration: BoxDecoration(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                          color: _currentDiffIndex == index
-                                              ? accentColor
-                                              : themeColor,
-                                        ),
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            FittedBox(
-                                              fit: BoxFit.scaleDown,
-                                              child: Text(
-                                                _getDiffLabel(index),
-                                                textAlign: TextAlign.center,
-                                                maxLines: 1,
-                                                softWrap: false,
-                                                style: TextStyle(
-                                                  fontSize:
-                                                      MediaQuery.of(context)
-                                                          .size
-                                                          .width *
-                                                      0.025,
-                                                  fontWeight: FontWeight.bold,
-                                                  color:
-                                                      _currentDiffIndex == index
-                                                      ? Colors.white
-                                                      : accentColor,
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              'Lv.${levels[index]}',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                fontSize: MediaQuery.of(context)
-                                                        .size
-                                                        .width *
-                                                    0.03,
-                                                fontWeight: FontWeight.bold,
-                                                color:
-                                                    _currentDiffIndex == index
-                                                        ? Colors.white
-                                                        : accentColor,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                  // 难度标签页
+                  Row(
+                    children: List.generate(
+                      levels.length,
+                      (index) => Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            BiliSearchService().cancel();
+                            setState(() {
+                              _currentDiffIndex = index;
+                              _biliPlayCount = null;
+                              _biliPlayCountLoading = false;
+                              _biliBvid = null;
+                              _biliFromRedis = false;
+                              _biliFromUser = false;
+                            });
+                            _loadChartRating();
+                            _loadComments();
+                            _checkBookmarkStatus();
+                            _checkNoteStatus();
+                            _loadBiliPlayCount();
+                            _loadBest50Opportunity();
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 2),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 8, horizontal: 4),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              color: _currentDiffIndex == index
+                                  ? accentColor
+                                  : themeColor,
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    _getDiffLabel(index),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    softWrap: false,
+                                    style: TextStyle(
+                                      fontSize:
+                                          MediaQuery.of(context).size.width *
+                                              0.025,
+                                      fontWeight: FontWeight.bold,
+                                      color: _currentDiffIndex == index
+                                          ? Colors.white
+                                          : accentColor,
                                     ),
                                   ),
                                 ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Lv.${levels[index]}',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize:
+                                        MediaQuery.of(context).size.width *
+                                            0.03,
+                                    fontWeight: FontWeight.bold,
+                                    color: _currentDiffIndex == index
+                                        ? Colors.white
+                                        : accentColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // 统计信息行 - 第一行
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildStatItem('类别', basicInfo['genre']),
+                      _buildStatItem('BPM', basicInfo['bpm'].toString()),
+                      _buildStatItem('参考时长', _formatReferenceDuration()),
+                      _buildBiliPlayCountStat(),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // 统计信息行 - 第二行
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildStatItem('曲师', basicInfo['artist'].split('/').last),
+                      _buildStatItem(
+                          '版本',
+                          StringUtil.formatVersion2WithFlag(
+                              basicInfo['from'], _isExtraSong)),
+                      _buildStatItem('谱师', currentChart['charter']),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // 统计信息行 - 首次上线 + 可游玩地区
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildStatItem('首次上线',
+                          _formatReleaseDate(basicInfo['release_date'] ?? '')),
+                      _buildPlayableRegionStat(context),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // 统计信息行 - 第三行
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildStatItem(
+                          '官方定数',
+                          (_songData!['ds'][_currentDiffIndex] as num)
+                              .toDouble()
+                              .toStringAsFixed(1)),
+                      _buildStatItem(
+                          '拟合定数',
+                          currentDiffData != null
+                              ? (currentDiffData is DiffData
+                                      ? currentDiffData.fitDiff
+                                      : (currentDiffData['fit_diff'] as num)
+                                          .toDouble())
+                                  .toStringAsFixed(2)
+                              : '-'),
+                      Builder(builder: (ctx) {
+                        if (currentDiffData == null) {
+                          return _buildStatItem('定数差值', '-');
+                        }
+                        final ds = (_songData!['ds'][_currentDiffIndex] as num)
+                            .toDouble();
+                        final fd = currentDiffData is DiffData
+                            ? currentDiffData.fitDiff
+                            : (currentDiffData['fit_diff'] as num).toDouble();
+                        final diff = fd - ds;
+                        return _buildStatItem(
+                          '定数差值',
+                          '${diff >= 0 ? "+" : ""}${diff.toStringAsFixed(2)}',
+                          valueColor: diff < 0
+                              ? AppColors.successGreen(brightness)
+                              : AppColors.errorRed(brightness),
+                        );
+                      }),
+                      _buildStatItem(
+                          '平均达成',
+                          currentDiffData != null
+                              ? '${(currentDiffData is DiffData ? currentDiffData.avg : (currentDiffData['avg'] as num).toDouble()).toStringAsFixed(2)}%'
+                              : '-'),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 定数历史（横向滑动表格）；当无历史数据时不占位（连同前后间距一起收缩）
+                  Builder(
+                    builder: (ctx) {
+                      if (_buildDxHistory().isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 2),
+                          _buildDxHistoryTable(),
+                          const SizedBox(height: 20),
+                        ],
+                      );
+                    },
+                  ),
+
+                  // 音符分布网格（优先使用Maidata解析的物量统计）
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                          child: _buildNoteItem('TAP',
+                              _getNoteCounts(currentChart)[0].toString())),
+                      SizedBox(width: 4),
+                      Expanded(
+                          child: _buildNoteItem('HOLD',
+                              _getNoteCounts(currentChart)[1].toString())),
+                      SizedBox(width: 4),
+                      Expanded(
+                          child: _buildNoteItem('SLIDE',
+                              _getNoteCounts(currentChart)[2].toString())),
+                      SizedBox(width: 4),
+                      Expanded(
+                          child: _buildNoteItem('BREAK',
+                              _getNoteCounts(currentChart)[4].toString())),
+                      SizedBox(width: 4),
+                      Expanded(
+                          child: _buildNoteItem('TOUCH',
+                              _getNoteCounts(currentChart)[3].toString())),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Break统计区域
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                          child: _buildBreakItem(
+                              '真绝赞TAP', _getBreakCountDisplay(0))),
+                      SizedBox(width: 4),
+                      Expanded(
+                          child: _buildBreakItem(
+                              '真绝赞HOLD', _getBreakCountDisplay(1))),
+                      SizedBox(width: 4),
+                      Expanded(
+                          child: _buildBreakItem(
+                              '保护套绝赞', _getBreakCountDisplay(2))),
+                      SizedBox(width: 4),
+                      Expanded(
+                          child: _buildBreakItem(
+                              '绝赞星星', _getBreakCountDisplay(3))),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // 玩家最佳成绩
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        // 标题 + 分享按钮
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '玩家最佳成绩',
+                                style: TextStyle(
+                                  fontSize:
+                                      MediaQuery.of(context).size.width * 0.035,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
                               ),
-
-                              const SizedBox(height: 10),
-
-                              // 统计信息行 - 第一行
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  _buildStatItem('类别', basicInfo['genre']),
-                                  _buildStatItem(
-                                      'BPM', basicInfo['bpm'].toString()),
-                                  _buildStatItem(
-                                      '参考时长', _formatReferenceDuration()),
-                                  _buildBiliPlayCountStat(),
-                                ],
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              // 统计信息行 - 第二行
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  _buildStatItem('曲师',
-                                      basicInfo['artist'].split('/').last),
-                                  _buildStatItem(
-                                      '版本',
-                                      StringUtil.formatVersion2WithFlag(
-                                          basicInfo['from'], _isExtraSong)),
-                                  _buildStatItem('谱师', currentChart['charter']),
-                                ],
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              // 统计信息行 - 首次上线 + 可游玩地区
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  _buildStatItem(
-                                      '首次上线',
-                                      _formatReleaseDate(
-                                          basicInfo['release_date'] ?? '')),
-                                  _buildPlayableRegionStat(context),
-                                ],
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              // 统计信息行 - 第三行
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  _buildStatItem(
-                                      '官方定数',
-                                      (_songData!['ds'][_currentDiffIndex]
-                                              as num)
-                                          .toDouble()
-                                          .toStringAsFixed(1)),
-                                  _buildStatItem(
-                                      '拟合定数',
-                                      currentDiffData != null
-                                          ? (currentDiffData is DiffData
-                                                  ? currentDiffData.fitDiff
-                                                  : (currentDiffData['fit_diff']
-                                                          as num)
-                                                      .toDouble())
-                                              .toStringAsFixed(2)
-                                          : '-'),
-                                  Builder(builder: (ctx) {
-                                      if (currentDiffData == null) {
-                                        return _buildStatItem('定数差值', '-');
-                                      }
-                                    final ds = (_songData!['ds']
-                                            [_currentDiffIndex] as num)
-                                        .toDouble();
-                                      final fd = currentDiffData is DiffData
-                                          ? currentDiffData.fitDiff
-                                        : (currentDiffData['fit_diff'] as num)
-                                            .toDouble();
-                                      final diff = fd - ds;
-                                      return _buildStatItem(
-                                        '定数差值',
-                                        '${diff >= 0 ? "+" : ""}${diff.toStringAsFixed(2)}',
-                                      valueColor: diff < 0
-                                          ? AppColors.successGreen(brightness)
-                                          : AppColors.errorRed(brightness),
-                                      );
-                                    }),
-                                  _buildStatItem(
-                                      '平均达成',
-                                      currentDiffData != null
-                                          ? '${(currentDiffData is DiffData ? currentDiffData.avg : (currentDiffData['avg'] as num).toDouble()).toStringAsFixed(2)}%'
-                                          : '-'),
-                                ],
-                              ),
-
-                              const SizedBox(height: 16),
-
-                              // 定数历史（横向滑动表格）；当无历史数据时不占位（连同前后间距一起收缩）
-                              Builder(
-                                builder: (ctx) {
-                                  if (_buildDxHistory().isEmpty) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  return Column(
+                            ),
+                            if (userRecord != null)
+                              GestureDetector(
+                                onTap: () => _shareScoreCard(
+                                  userRecord: userRecord,
+                                  basicInfo: basicInfo,
+                                  levels: levels,
+                                ),
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Theme.of(context).colorScheme.primary,
+                                        Theme.of(context)
+                                            .colorScheme
+                                            .primary
+                                            .withOpacity(0.85),
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(14),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary
+                                            .withAlpha(60),
+                                        blurRadius: 6,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
                                     mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.share,
+                                          size: 14,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onPrimary),
+                                      SizedBox(width: 4),
+                                      Text('分享成绩',
+                                          style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onPrimary)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+
+                        // 内容（始终展开）
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // 达成率行 + 收藏按钮
+                                  Row(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      const SizedBox(height: 2),
-                                      _buildDxHistoryTable(),
-                                      const SizedBox(height: 20),
+                                      Expanded(
+                                        child: Text(
+                                          userRecord != null
+                                              ? '${(userRecord['achievements'] as num).toDouble().toStringAsFixed(4)}%'
+                                              : '无记录',
+                                          style: TextStyle(
+                                            fontSize: MediaQuery.of(context)
+                                                    .size
+                                                    .width *
+                                                0.08,
+                                            fontWeight: FontWeight.bold,
+                                            foreground: Paint()
+                                              ..shader = LinearGradient(
+                                                colors: [
+                                                  AppColors.errorRed(
+                                                      brightness),
+                                                  Colors.yellow,
+                                                ],
+                                                begin: Alignment.centerLeft,
+                                                end: Alignment.centerRight,
+                                              ).createShader(Rect.fromLTWH(
+                                                  0,
+                                                  0,
+                                                  MediaQuery.of(context)
+                                                          .size
+                                                          .width *
+                                                      0.5,
+                                                  50)),
+                                          ),
+                                        ),
+                                      ),
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          GestureDetector(
+                                            onTap: () => _showBookmarkDialog(),
+                                            child: Padding(
+                                              padding: EdgeInsets.all(3),
+                                              child: Icon(
+                                                  _isBookmarked
+                                                      ? Icons.favorite
+                                                      : Icons.favorite_border,
+                                                  color: Colors.pink.shade400,
+                                                  size: 23),
+                                            ),
+                                          ),
+                                          GestureDetector(
+                                            onTap: () => _showNoteDialog(),
+                                            child: Padding(
+                                              padding: EdgeInsets.all(3),
+                                              child: Icon(
+                                                  _hasNote
+                                                      ? Icons.note
+                                                      : Icons.note_add_outlined,
+                                                  color: Colors.amber.shade700,
+                                                  size: 23),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ],
-                                  );
-                                },
-                              ),
-
-                              // 音符分布网格（优先使用Maidata解析的物量统计）
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                      child: _buildNoteItem(
-                                          'TAP',
-                                          _getNoteCounts(currentChart)[0]
-                                              .toString())),
-                                  SizedBox(width: 4),
-                                  Expanded(
-                                      child: _buildNoteItem(
-                                          'HOLD',
-                                          _getNoteCounts(currentChart)[1]
-                                              .toString())),
-                                  SizedBox(width: 4),
-                                  Expanded(
-                                      child: _buildNoteItem(
-                                          'SLIDE',
-                                          _getNoteCounts(currentChart)[2]
-                                              .toString())),
-                                  SizedBox(width: 4),
-                                  Expanded(
-                                      child: _buildNoteItem(
-                                          'BREAK',
-                                          _getNoteCounts(currentChart)[4]
-                                              .toString())),
-                                  SizedBox(width: 4),
-                                  Expanded(
-                                      child: _buildNoteItem(
-                                          'TOUCH',
-                                          _getNoteCounts(currentChart)[3]
-                                              .toString())),
-                                ],
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              // Break统计区域
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                      child: _buildBreakItem(
-                                          '真绝赞TAP', _getBreakCountDisplay(0))),
-                                  SizedBox(width: 4),
-                                  Expanded(
-                                      child: _buildBreakItem(
-                                          '真绝赞HOLD', _getBreakCountDisplay(1))),
-                                  SizedBox(width: 4),
-                                  Expanded(
-                                      child: _buildBreakItem(
-                                          '保护套绝赞', _getBreakCountDisplay(2))),
-                                  SizedBox(width: 4),
-                                  Expanded(
-                                      child: _buildBreakItem(
-                                          '绝赞星星', _getBreakCountDisplay(3))),
-                                ],
-                              ),
-
-                              const SizedBox(height: 20),
-
-                              // 玩家最佳成绩
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.surface,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  children: [
-                                    // 标题 + 分享按钮
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            '玩家最佳成绩',
-                                            style: TextStyle(
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    userRecord != null
+                                        ? 'Rating: ${userRecord['ra']}'
+                                        : '',
+                                    style: TextStyle(
+                                      fontSize:
+                                          MediaQuery.of(context).size.width *
+                                              0.042,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
+                                  ),
+                                  // 游玩次数（来自 AWMC 网关 /v1/user/music
+                                  // 的 (musicId, level, playCount) 缓存）：
+                                  // 单起一行放在 Rating 下面，没有该难度的
+                                  // 记录时整行不显示
+                                  if (userRecord != null &&
+                                      _currentPlayCount != null) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      '游玩次数: ${_currentPlayCount!}',
+                                      style: TextStyle(
+                                        fontSize:
+                                            MediaQuery.of(context).size.width *
+                                                0.042,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                  // 成绩趋势曲线不在这里 —— 它已经
+                                  // 移到「玩家最佳成绩」卡片**下方**，
+                                  // 作为独立板块（见 _buildChartHistoryCard）。
+                                  if (userRecord != null) ...[
+                                    // ⚠️ 这里的 8dp 间距必须和上面
+                                    // Rating / 游玩次数 两行保持一致：
+                                    // 「玩家最佳成绩」四行（Rating、
+                                    // 游玩次数、DX分数、DX分数达成率）
+                                    // 的行间距统一是 8dp，缺一处就会
+                                    // 看起来某两行贴得特别近。
+                                    const SizedBox(height: 8),
+                                    RichText(
+                                      text: TextSpan(
+                                        children: [
+                                          TextStyleUtil.span(
+                                            'DX分数: ${userRecord['dxScore']} / ${_calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex)}  ',
+                                            TextStyle(
                                               fontSize: MediaQuery.of(context)
                                                       .size
                                                       .width *
-                                                  0.035,
+                                                  0.042,
                                               color: Theme.of(context)
                                                   .colorScheme
                                                   .onSurfaceVariant,
                                             ),
                                           ),
-                                        ),
-                                        if (userRecord != null)
-                                          GestureDetector(
-                                            onTap: () => _shareScoreCard(
-                                              userRecord: userRecord,
-                                              basicInfo: basicInfo,
-                                              levels: levels,
-                                            ),
-                                            child: Container(
-                                              padding: EdgeInsets.symmetric(
-                                                  horizontal: 10, vertical: 5),
-                                              decoration: BoxDecoration(
-                                                gradient: LinearGradient(
-                                                  colors: [
-                                                    Theme.of(context)
-                                                        .colorScheme
-                                                        .primary,
-                                                    Theme.of(context)
-                                                        .colorScheme
-                                                        .primary
-                                                        .withOpacity(0.85),
-                                                  ],
-                                                ),
-                                                borderRadius:
-                                                    BorderRadius.circular(14),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .primary
-                                                        .withAlpha(60),
-                                                    blurRadius: 6,
-                                                    offset: Offset(0, 2),
-                                                  ),
-                                                ],
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(Icons.share,
-                                                      size: 14,
-                                                      color: Theme.of(context)
-                                                          .colorScheme
-                                                          .onPrimary),
-                                                  SizedBox(width: 4),
-                                                  Text('分享成绩',
-                                                      style: TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          color:
-                                                              Theme.of(context)
-                                                                  .colorScheme
-                                                                  .onPrimary)),
-                                                ],
-                                              ),
+                                          TextStyleUtil.span(
+                                            '(MAX -${_calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex) - userRecord['dxScore']})',
+                                            TextStyle(
+                                              fontSize: MediaQuery.of(context)
+                                                      .size
+                                                      .width *
+                                                  0.042,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
                                             ),
                                           ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-
-                                    // 内容（始终展开）
                                     const SizedBox(height: 8),
                                     Row(
                                       children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
+                                        RichText(
+                                          text: TextSpan(
                                             children: [
-                                              // 达成率行 + 收藏按钮
-                                              Row(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Expanded(
-                                                    child: Text(
-                                                      userRecord != null
-                                                          ? '${(userRecord['achievements'] as num).toDouble().toStringAsFixed(4)}%'
-                                                          : '无记录',
-                                                      style: TextStyle(
-                                                        fontSize: MediaQuery.of(
-                                                                    context)
-                                                                    .size
-                                                                    .width *
-                                                                0.08,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        foreground: Paint()
-                                                          ..shader =
-                                                              LinearGradient(
-                                                            colors: [
-                                                              AppColors.errorRed(
-                                                                  brightness),
-                                                              Colors.yellow,
-                                                            ],
-                                                            begin: Alignment
-                                                                .centerLeft,
-                                                            end: Alignment
-                                                                .centerRight,
-                                                          ).createShader(Rect.fromLTWH(
-                                                                  0,
-                                                                  0,
-                                                                  MediaQuery.of(
-                                                                              context)
-                                                                          .size
-                                                                          .width *
-                                                                      0.5,
-                                                                  50)),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  Row(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      GestureDetector(
-                                                        onTap: () =>
-                                                            _showBookmarkDialog(),
-                                                        child: Padding(
-                                                          padding:
-                                                              EdgeInsets.all(3),
-                                                          child: Icon(
-                                                              _isBookmarked
-                                                                  ? Icons
-                                                                      .favorite
-                                                                  : Icons
-                                                                      .favorite_border,
-                                                              color: Colors.pink
-                                                                  .shade400,
-                                                              size: 23),
-                                                        ),
-                                                      ),
-                                                      GestureDetector(
-                                                        onTap: () =>
-                                                            _showNoteDialog(),
-                                                        child: Padding(
-                                                          padding:
-                                                              EdgeInsets.all(3),
-                                                          child: Icon(
-                                                              _hasNote
-                                                                  ? Icons.note
-                                                                  : Icons
-                                                                      .note_add_outlined,
-                                                              color: Colors
-                                                                  .amber
-                                                                  .shade700,
-                                                              size: 23),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 8),
-                                              Text(
-                                                userRecord != null
-                                                    ? 'Rating: ${userRecord['ra']}'
-                                                    : '',
-                                                style: TextStyle(
+                                              TextStyleUtil.span(
+                                                'DX分数达成率: ',
+                                                TextStyle(
                                                   fontSize:
                                                       MediaQuery.of(context)
                                                               .size
@@ -3357,632 +3384,503 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                                       .onSurfaceVariant,
                                                 ),
                                               ),
-                                              // 游玩次数（来自 AWMC 网关 /v1/user/music
-                                              // 的 (musicId, level, playCount) 缓存）：
-                                              // 单起一行放在 Rating 下面，没有该难度的
-                                              // 记录时整行不显示
-                                              if (userRecord != null &&
-                                                  _currentPlayCount !=
-                                                      null) ...[
-                                                const SizedBox(height: 8),
-                                                Text(
-                                                  '游玩次数: ${_currentPlayCount!}',
-                                                  style: TextStyle(
-                                                    fontSize:
-                                                        MediaQuery.of(context)
-                                                                .size
-                                                                .width *
-                                                            0.042,
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .onSurfaceVariant,
-                                                  ),
+                                              TextStyleUtil.span(
+                                                '${((userRecord['dxScore'] as num).toDouble() / _calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex) * 100).toStringAsFixed(2)}%  ',
+                                                TextStyle(
+                                                  fontSize:
+                                                      MediaQuery.of(context)
+                                                              .size
+                                                              .width *
+                                                          0.042,
+                                                  color: _getStarsColor(
+                                                      _calculateStars(
+                                                          int.parse(
+                                                              widget.songId),
+                                                          _currentDiffIndex,
+                                                          userRecord[
+                                                              'dxScore']),
+                                                      Theme.of(context)
+                                                          .brightness),
                                                 ),
-                                              ],
-                                              // 成绩趋势曲线不在这里 —— 它已经
-                                              // 移到「玩家最佳成绩」卡片**下方**，
-                                              // 作为独立板块（见 _buildChartHistoryCard）。
-                                              if (userRecord != null) ...[
-                                                // ⚠️ 这里的 8dp 间距必须和上面
-                                                // Rating / 游玩次数 两行保持一致：
-                                                // 「玩家最佳成绩」四行（Rating、
-                                                // 游玩次数、DX分数、DX分数达成率）
-                                                // 的行间距统一是 8dp，缺一处就会
-                                                // 看起来某两行贴得特别近。
-                                                const SizedBox(height: 8),
-                                                RichText(
-                                                  text: TextSpan(
-                                                    children: [
-                                                      TextStyleUtil.span(
-                                                        'DX分数: ${userRecord['dxScore']} / ${_calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex)}  ',
-                                                        TextStyle(
-                                                          fontSize: MediaQuery.of(
-                                                                      context)
-                                                                  .size
-                                                                  .width *
-                                                              0.042,
-                                                          color: Theme.of(
-                                                                  context)
-                                                              .colorScheme
-                                                              .onSurfaceVariant,
-                                                        ),
-                                                      ),
-                                                      TextStyleUtil.span(
-                                                        '(MAX -${_calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex) - userRecord['dxScore']})',
-                                                        TextStyle(
-                                                          fontSize: MediaQuery.of(
-                                                                      context)
-                                                                  .size
-                                                                  .width *
-                                                              0.042,
-                                                          color: Theme.of(
-                                                                  context)
-                                                              .colorScheme
-                                                              .onSurfaceVariant,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 8),
-                                                Row(
-                                                  children: [
-                                                    RichText(
-                                                      text: TextSpan(
-                                                        children: [
-                                                          TextStyleUtil.span(
-                                                            'DX分数达成率: ',
-                                                            TextStyle(
-                                                              fontSize: MediaQuery.of(
-                                                                          context)
-                                                                      .size
-                                                                      .width *
-                                                                  0.042,
-                                                              color: Theme.of(
-                                                                      context)
-                                                                  .colorScheme
-                                                                  .onSurfaceVariant,
-                                                            ),
-                                                          ),
-                                                          TextStyleUtil.span(
-                                                            '${((userRecord['dxScore'] as num).toDouble() / _calculateMaxDxScore(int.parse(widget.songId), _currentDiffIndex) * 100).toStringAsFixed(2)}%  ',
-                                                            TextStyle(
-                                                              fontSize: MediaQuery.of(
-                                                                          context)
-                                                                      .size
-                                                                      .width *
-                                                                  0.042,
-                                                              color: _getStarsColor(
-                                                                  _calculateStars(
-                                                                      int.parse(
-                                                                          widget
-                                                                      .songId),
-                                                                  _currentDiffIndex,
-                                                                  userRecord[
-                                                                      'dxScore']),
-                                                                  Theme.of(
-                                                                          context)
-                                                                      .brightness),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    GestureDetector(
-                                                      onTap: () {
-                                                        setState(() {
-                                                          _showNextStarDiff =
-                                                              !_showNextStarDiff;
-                                                        });
-                                                      },
-                                                      child: Text(
-                                                        _showNextStarDiff
-                                                            ? _calculateNextStarDiff(
-                                                                int.parse(widget
-                                                                    .songId),
-                                                                _currentDiffIndex,
-                                                                userRecord[
-                                                                    'dxScore'])
-                                                            : _calculateStarsBonus(
-                                                                int.parse(widget
-                                                                    .songId),
-                                                                _currentDiffIndex,
-                                                                userRecord[
-                                                                    'dxScore']),
-                                                        style: TextStyle(
-                                                          fontSize: MediaQuery.of(
-                                                                      context)
-                                                                  .size
-                                                                  .width *
-                                                              0.042,
-                                                          color: _getStarsColor(
-                                                              _calculateStars(
-                                                                  int.parse(widget
-                                                                      .songId),
-                                                                  _currentDiffIndex,
-                                                                  userRecord[
-                                                                      'dxScore']),
-                                                              Theme.of(context)
-                                                                  .brightness),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 8),
-                                                const SizedBox(height: 8),
-                                              ],
-                                              Row(
-                                                children: [
-                                                  Text('连击,同步：'),
-                                                  if (userRecord != null) ...[
-                                                    userRecord['fc'].isNotEmpty
-                                                        ? _buildBadge(
-                                                            userRecord['fc'])
-                                                        : _buildPlaceholder(),
-                                                    userRecord['fs'].isNotEmpty
-                                                        ? _buildBadge(
-                                                            userRecord['fs'])
-                                                        : _buildPlaceholder(),
-                                                  ] else ...[
-                                                    _buildPlaceholder(),
-                                                    _buildPlaceholder(),
-                                                  ],
-                                                ],
                                               ),
                                             ],
                                           ),
                                         ),
+                                        GestureDetector(
+                                          onTap: () {
+                                            setState(() {
+                                              _showNextStarDiff =
+                                                  !_showNextStarDiff;
+                                            });
+                                          },
+                                          child: Text(
+                                            _showNextStarDiff
+                                                ? _calculateNextStarDiff(
+                                                    int.parse(widget.songId),
+                                                    _currentDiffIndex,
+                                                    userRecord['dxScore'])
+                                                : _calculateStarsBonus(
+                                                    int.parse(widget.songId),
+                                                    _currentDiffIndex,
+                                                    userRecord['dxScore']),
+                                            style: TextStyle(
+                                              fontSize: MediaQuery.of(context)
+                                                      .size
+                                                      .width *
+                                                  0.042,
+                                              color: _getStarsColor(
+                                                  _calculateStars(
+                                                      int.parse(widget.songId),
+                                                      _currentDiffIndex,
+                                                      userRecord['dxScore']),
+                                                  Theme.of(context).brightness),
+                                            ),
+                                          ),
+                                        ),
                                       ],
                                     ),
+                                    const SizedBox(height: 8),
+                                    const SizedBox(height: 8),
                                   ],
-                                ),
-                              ),
-
-                              if (_best50OpportunityText != null) ...[
-                                const SizedBox(height: 8),
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .primaryContainer
-                                        .withValues(alpha: 0.7),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Row(
+                                  Row(
                                     children: [
-                                      Icon(Icons.trending_up,
-                                          size: 18,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(_best50OpportunityText!,
-                                            style: TextStyle(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .onPrimaryContainer,
-                                                fontWeight: FontWeight.w600)),
-                                      ),
+                                      Text('连击,同步：'),
+                                      if (userRecord != null) ...[
+                                        userRecord['fc'].isNotEmpty
+                                            ? _buildBadge(userRecord['fc'])
+                                            : _buildPlaceholder(),
+                                        userRecord['fs'].isNotEmpty
+                                            ? _buildBadge(userRecord['fs'])
+                                            : _buildPlaceholder(),
+                                      ] else ...[
+                                        _buildPlaceholder(),
+                                        _buildPlaceholder(),
+                                      ],
                                     ],
                                   ),
-                                ),
-                              ],
-
-                              // 成绩趋势：**独立于「玩家最佳成绩」卡片之外的板块**。
-                              // 没有历史时它整块高度为 0（见 _buildChartHistoryCard），
-                              // 所以这个 10dp 间隔**只服务于"有曲线"的情形** ——
-                              // 没有历史时它就是"卡片 → 按钮行"的正常间距，
-                              // 不会凭空多留一块空白。
-                              const SizedBox(height: 10),
-                              _buildChartHistoryCard(),
-
-                              SizedBox(height: 12),
-
-                              // 按钮行（跳转到B站、播放音乐、查看谱面代码和查看收藏品）
-                              Container(
-                                margin: const EdgeInsets.only(top: 0),
-                                child: GridView.builder(
-                                  shrinkWrap: true,
-                                  physics: NeverScrollableScrollPhysics(),
-                                  padding: EdgeInsets.zero,
-                                  gridDelegate:
-                                      SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
-                                    crossAxisSpacing: 8,
-                                    mainAxisSpacing: 8,
-                                    childAspectRatio: 3.0,
-                                  ),
-                                  itemCount: 6,
-                                  itemBuilder: (context, index) {
-                                    switch (index) {
-                                      case 0:
-                                        return ElevatedButton(
-                                          onPressed: _jumpToBilibili,
-                                          child: const Text('B站谱面确认'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.pink,
-                                            foregroundColor: Colors.white,
-                                            padding: EdgeInsets.symmetric(
-                                                vertical: 6, horizontal: 12),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                          ),
-                                        );
-                                      case 1:
-                                        return ElevatedButton(
-                                          onPressed: _playMusic,
-                                          child: const Text('播放音乐'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                AppColors.linkBlue(brightness),
-                                            foregroundColor: Colors.white,
-                                            padding: EdgeInsets.symmetric(
-                                                vertical: 6, horizontal: 12),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                          ),
-                                        );
-                                      case 2:
-                                        return ElevatedButton(
-                                          onPressed: _viewMaidata,
-                                          child: const Text('查看谱面代码'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                AppColors.successGreen(
-                                                    brightness),
-                                            foregroundColor: Colors.white,
-                                            padding: EdgeInsets.symmetric(
-                                                vertical: 6, horizontal: 12),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                          ),
-                                        );
-                                      case 3:
-                                        return ElevatedButton(
-                                          onPressed: _viewRelatedCollectibles,
-                                          child: Text(
-                                              '相关收藏品 $_relatedCollectionsCount'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.purple,
-                                            foregroundColor: Colors.white,
-                                            padding: EdgeInsets.symmetric(
-                                                vertical: 6, horizontal: 12),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                          ),
-                                        );
-                                      case 4:
-                                        return ElevatedButton(
-                                          onPressed: _viewAchievementRanking,
-                                          child: const Text('达成率排行榜'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                AppColors.warningOrange(
-                                                    brightness),
-                                            foregroundColor: Colors.white,
-                                            padding: EdgeInsets.symmetric(
-                                                vertical: 6, horizontal: 12),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                          ),
-                                        );
-                                      case 5:
-                                        return ElevatedButton(
-                                          onPressed: _viewDxScoreRanking,
-                                          child: const Text('DX分数排行榜'),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                AppColors.linkBlue(brightness),
-                                            foregroundColor: Colors.white,
-                                            padding: EdgeInsets.symmetric(
-                                                vertical: 6, horizontal: 12),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                          ),
-                                        );
-                                      default:
-                                        return Container();
-                                    }
-                                  },
-                                ),
+                                ],
                               ),
-
-                              const SizedBox(height: 20),
-
-                              // 评级分布
-                              _buildRatingDistribution(currentDiffData),
-
-                              const SizedBox(height: 20),
-
-                              // 连击分布
-                              _buildComboDistribution(currentDiffData),
-
-                              const SizedBox(height: 20),
-
-                              // 谱面标签
-                              Container(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // 标题和展开收起按钮（整行可点击）
-                                    InkWell(
-                                      onTap: () {
-                                        setState(() {
-                                          _tagsTableExpanded =
-                                              !_tagsTableExpanded;
-                                        });
-                                      },
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 8),
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              '谱面标签(仅供参考)',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
-                                                color: accentColor,
-                                              ),
-                                            ),
-                                            Icon(
-                                              _tagsTableExpanded
-                                                  ? Icons.expand_less
-                                                  : Icons.expand_more,
-                                              color: accentColor,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-
-                                    const SizedBox(height: 10),
-
-                                    // 标签分组（根据展开状态显示）
-                                    if (_tagsTableExpanded) ...[
-                                      for (var group in groupedTags.entries)
-                                        Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              group.key,
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: accentColor,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 6),
-                                            if (group.value.isNotEmpty)
-                                              Wrap(
-                                                spacing: 8,
-                                                runSpacing: 8,
-                                                children: group.value
-                                                    .map(
-                                                      (tag) => GestureDetector(
-                                                        onTap: () {
-                                                          final description =
-                                                              tag['description']
-                                                                  ?.toString();
-                                                          if (description !=
-                                                                  null &&
-                                                              description
-                                                                  .isNotEmpty) {
-                                                            showDialog(
-                                                              context: context,
-                                                              builder: (ctx) =>
-                                                                  AlertDialog(
-                                                                contentPadding:
-                                                                    const EdgeInsets
-                                                                        .symmetric(
-                                                                        horizontal:
-                                                                            20,
-                                                                        vertical:
-                                                                            16),
-                                                                shape: RoundedRectangleBorder(
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                            12)),
-                                                                content: Column(
-                                                                  mainAxisSize:
-                                                                      MainAxisSize
-                                                                          .min,
-                                                                  crossAxisAlignment:
-                                                                      CrossAxisAlignment
-                                                                          .start,
-                                                                  children: [
-                                                                    Text(
-                                                                      tag['name']
-                                                                              ?.toString() ??
-                                                                          '',
-                                                                      style:
-                                                                          TextStyle(
-                                                                        fontSize:
-                                                                            16,
-                                                                        fontWeight:
-                                                                            FontWeight.bold,
-                                                                        color: Theme.of(ctx)
-                                                                            .colorScheme
-                                                                            .onSurface,
-                                                                      ),
-                                                                    ),
-                                                                    const SizedBox(
-                                                                        height:
-                                                                            8),
-                                                                    Text(
-                                                                      description,
-                                                                      style:
-                                                                          TextStyle(
-                                                                        fontSize:
-                                                                            14,
-                                                                        color: Theme.of(ctx)
-                                                                            .colorScheme
-                                                                            .onSurface,
-                                                                      ),
-                                                                    ),
-                                                                    const SizedBox(
-                                                                        height:
-                                                                            12),
-                                                                    RichText(
-                                                                      text:
-                                                                          TextSpan(
-                                                                        style: const TextStyle(
-                                                                            fontSize:
-                                                                                11),
-                                                                        children: [
-                                                                          TextSpan(
-                                                                            text:
-                                                                                '标签数据来源自 ',
-                                                                            style:
-                                                                                TextStyle(color: AppColors.greyHint(brightness)),
-                                                                          ),
-                                                                          TextSpan(
-                                                                            text:
-                                                                                'https://dxrating.net/',
-                                                                            style:
-                                                                                TextStyle(
-                                                                              color: AppColors.linkBlue(brightness),
-                                                                              decoration: TextDecoration.underline,
-                                                                            ),
-                                                                            recognizer: TapGestureRecognizer()
-                                                                              ..onTap = () async {
-                                                                                final uri = Uri.parse('https://dxrating.net/');
-                                                                                await ExternalLaunchUtil.open(uri);
-                                                                              },
-                                                                          ),
-                                                                        ],
-                                                                      ),
-                                                                    ),
-                                                                  ],
-                                                                ),
-                                                                actions: [
-                                                                  TextButton(
-                                                                    onPressed: () =>
-                                                                        Navigator.of(ctx)
-                                                                            .pop(),
-                                                                    child:
-                                                                        const Text(
-                                                                            '关闭'),
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                            );
-                                                          }
-                                                        },
-                                                        child: Container(
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .symmetric(
-                                                            horizontal: 12,
-                                                            vertical: 6,
-                                                          ),
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            borderRadius:
-                                                                BorderRadius
-                                                                    .circular(
-                                                                        20),
-                                                            color: _getTagColor(
-                                                                group.key),
-                                                            border: Border.all(
-                                                              color:
-                                                                  _getTagBorderColor(
-                                                                      group
-                                                                          .key),
-                                                              width: 1,
-                                                            ),
-                                                          ),
-                                                          child: Text(
-                                                            tag['name']
-                                                                    ?.toString() ??
-                                                                '未知标签',
-                                                            style: TextStyle(
-                                                              fontSize: 12,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w500,
-                                                              color:
-                                                                  _getTagTextColor(
-                                                                      group
-                                                                          .key),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    )
-                                                    .toList(),
-                                              )
-                                            else
-                                              Text(
-                                                '当前分类暂无标签',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .onSurfaceVariant,
-                                                ),
-                                              ),
-                                            const SizedBox(height: 12),
-                                          ],
-                                        ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-
-                              const SizedBox(height: 20),
-
-                              // 容错计算
-                              _buildToleranceCalculation(),
-
-                              const SizedBox(height: 20),
-
-                              // 星星等级最低DX分对照表
-                              _buildStarScoreTable(),
-
-                              const SizedBox(height: 20),
-
-                              // 达成率-得分对照表
-                              _buildAchievementScoreTable(),
-
-                              const SizedBox(height: 20),
-
-                              // 谱面评分
-                              _buildChartRatingSection(accentColor),
-
-                              const SizedBox(height: 20),
-
-                              // 评论区
-                              _buildCommentsSection(),
-
-                              const SizedBox(height: 20),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
+
+                  if (_best50OpportunityText != null) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primaryContainer
+                            .withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.trending_up,
+                              size: 18,
+                              color: Theme.of(context).colorScheme.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(_best50OpportunityText!,
+                                style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onPrimaryContainer,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                    height: 1.3)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // 成绩趋势：**独立于「玩家最佳成绩」卡片之外的板块**。
+                  // 没有历史时它整块高度为 0（见 _buildChartHistoryCard），
+                  // 所以这个 10dp 间隔**只服务于"有曲线"的情形** ——
+                  // 没有历史时它就是"卡片 → 按钮行"的正常间距，
+                  // 不会凭空多留一块空白。
+                  const SizedBox(height: 10),
+                  _buildChartHistoryCard(),
+
+                  SizedBox(height: 12),
+
+                  // 按钮行（跳转到B站、播放音乐、查看谱面代码和查看收藏品）
+                  Container(
+                    margin: const EdgeInsets.only(top: 0),
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
+                      padding: EdgeInsets.zero,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                        childAspectRatio: 3.0,
+                      ),
+                      itemCount: 6,
+                      itemBuilder: (context, index) {
+                        switch (index) {
+                          case 0:
+                            return ElevatedButton(
+                              onPressed: _jumpToBilibili,
+                              child: const Text('B站谱面确认'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.pink,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(
+                                    vertical: 6, horizontal: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            );
+                          case 1:
+                            return ElevatedButton(
+                              onPressed: _playMusic,
+                              child: const Text('播放音乐'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.linkBlue(brightness),
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(
+                                    vertical: 6, horizontal: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            );
+                          case 2:
+                            return ElevatedButton(
+                              onPressed: _viewMaidata,
+                              child: const Text('查看谱面代码'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    AppColors.successGreen(brightness),
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(
+                                    vertical: 6, horizontal: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            );
+                          case 3:
+                            return ElevatedButton(
+                              onPressed: _viewRelatedCollectibles,
+                              child: Text('相关收藏品 $_relatedCollectionsCount'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.purple,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(
+                                    vertical: 6, horizontal: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            );
+                          case 4:
+                            return ElevatedButton(
+                              onPressed: _viewAchievementRanking,
+                              child: const Text('达成率排行榜'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    AppColors.warningOrange(brightness),
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(
+                                    vertical: 6, horizontal: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            );
+                          case 5:
+                            return ElevatedButton(
+                              onPressed: _viewDxScoreRanking,
+                              child: const Text('DX分数排行榜'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.linkBlue(brightness),
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(
+                                    vertical: 6, horizontal: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            );
+                          default:
+                            return Container();
+                        }
+                      },
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // 评级分布
+                  _buildRatingDistribution(currentDiffData),
+
+                  const SizedBox(height: 20),
+
+                  // 连击分布
+                  _buildComboDistribution(currentDiffData),
+
+                  const SizedBox(height: 20),
+
+                  // 谱面标签
+                  Container(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 标题和展开收起按钮（整行可点击）
+                        InkWell(
+                          onTap: () {
+                            setState(() {
+                              _tagsTableExpanded = !_tagsTableExpanded;
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '谱面标签(仅供参考)',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: accentColor,
+                                  ),
+                                ),
+                                Icon(
+                                  _tagsTableExpanded
+                                      ? Icons.expand_less
+                                      : Icons.expand_more,
+                                  color: accentColor,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        // 标签分组（根据展开状态显示）
+                        if (_tagsTableExpanded) ...[
+                          for (var group in groupedTags.entries)
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  group.key,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: accentColor,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                if (group.value.isNotEmpty)
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: group.value
+                                        .map(
+                                          (tag) => GestureDetector(
+                                            onTap: () {
+                                              final description =
+                                                  tag['description']
+                                                      ?.toString();
+                                              if (description != null &&
+                                                  description.isNotEmpty) {
+                                                showDialog(
+                                                  context: context,
+                                                  builder: (ctx) => AlertDialog(
+                                                    contentPadding:
+                                                        const EdgeInsets
+                                                            .symmetric(
+                                                            horizontal: 20,
+                                                            vertical: 16),
+                                                    shape:
+                                                        RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        12)),
+                                                    content: Column(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          tag['name']
+                                                                  ?.toString() ??
+                                                              '',
+                                                          style: TextStyle(
+                                                            fontSize: 16,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            color: Theme.of(ctx)
+                                                                .colorScheme
+                                                                .onSurface,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                            height: 8),
+                                                        Text(
+                                                          description,
+                                                          style: TextStyle(
+                                                            fontSize: 14,
+                                                            color: Theme.of(ctx)
+                                                                .colorScheme
+                                                                .onSurface,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                            height: 12),
+                                                        RichText(
+                                                          text: TextSpan(
+                                                            style:
+                                                                const TextStyle(
+                                                                    fontSize:
+                                                                        11),
+                                                            children: [
+                                                              TextSpan(
+                                                                text:
+                                                                    '标签数据来源自 ',
+                                                                style: TextStyle(
+                                                                    color: AppColors
+                                                                        .greyHint(
+                                                                            brightness)),
+                                                              ),
+                                                              TextSpan(
+                                                                text:
+                                                                    'https://dxrating.net/',
+                                                                style:
+                                                                    TextStyle(
+                                                                  color: AppColors
+                                                                      .linkBlue(
+                                                                          brightness),
+                                                                  decoration:
+                                                                      TextDecoration
+                                                                          .underline,
+                                                                ),
+                                                                recognizer:
+                                                                    TapGestureRecognizer()
+                                                                      ..onTap =
+                                                                          () async {
+                                                                        final uri =
+                                                                            Uri.parse('https://dxrating.net/');
+                                                                        await ExternalLaunchUtil.open(
+                                                                            uri);
+                                                                      },
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    actions: [
+                                                      TextButton(
+                                                        onPressed: () =>
+                                                            Navigator.of(ctx)
+                                                                .pop(),
+                                                        child: const Text('关闭'),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 6,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                                color: _getTagColor(group.key),
+                                                border: Border.all(
+                                                  color: _getTagBorderColor(
+                                                      group.key),
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: Text(
+                                                tag['name']?.toString() ??
+                                                    '未知标签',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: _getTagTextColor(
+                                                      group.key),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
+                                  )
+                                else
+                                  Text(
+                                    '当前分类暂无标签',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
+                                  ),
+                                const SizedBox(height: 12),
+                              ],
+                            ),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // 容错计算
+                  _buildToleranceCalculation(),
+
+                  const SizedBox(height: 20),
+
+                  // 星星等级最低DX分对照表
+                  _buildStarScoreTable(),
+
+                  const SizedBox(height: 20),
+
+                  // 达成率-得分对照表
+                  _buildAchievementScoreTable(),
+
+                  const SizedBox(height: 20),
+
+                  // 谱面评分
+                  _buildChartRatingSection(accentColor),
+
+                  const SizedBox(height: 20),
+
+                  // 评论区
+                  _buildCommentsSection(),
+
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -4180,37 +4078,37 @@ class _SongInfoPageState extends State<SongInfoPage> {
       builder: (ctx) {
         final brightness = Theme.of(ctx).brightness;
         return AlertDialog(
-        title: const Text('确认删除'),
-        content: const Text('确定要删除您的评分吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              try {
-                final result = await SongInfoService.deleteChartRating(
-                  songId: widget.songId,
-                  levelIndex: _currentDiffIndex,
-                );
-                if (result['success'] == true) {
-                  Fluttertoast.showToast(msg: '评分删除成功');
-                  _loadChartRating();
-                } else {
-                  Fluttertoast.showToast(msg: result['message'] ?? '评分删除失败');
+          title: const Text('确认删除'),
+          content: const Text('确定要删除您的评分吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(ctx).pop();
+                try {
+                  final result = await SongInfoService.deleteChartRating(
+                    songId: widget.songId,
+                    levelIndex: _currentDiffIndex,
+                  );
+                  if (result['success'] == true) {
+                    Fluttertoast.showToast(msg: '评分删除成功');
+                    _loadChartRating();
+                  } else {
+                    Fluttertoast.showToast(msg: result['message'] ?? '评分删除失败');
+                  }
+                } catch (e) {
+                  debugPrint('删除谱面评分失败: $e');
+                  Fluttertoast.showToast(msg: '评分删除失败');
                 }
-              } catch (e) {
-                debugPrint('删除谱面评分失败: $e');
-                Fluttertoast.showToast(msg: '评分删除失败');
-              }
-            },
+              },
               child: Text('删除',
                   style: TextStyle(color: AppColors.errorRed(brightness))),
-          ),
-        ],
-      );
+            ),
+          ],
+        );
       },
     );
   }
@@ -4364,11 +4262,13 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                 final fill = _chartAverageScore! - index;
                                 if (fill >= 1) {
                                   return Icon(Icons.star_rounded,
-                                      color: _getRatingColor(_chartAverageScore!),
+                                      color:
+                                          _getRatingColor(_chartAverageScore!),
                                       size: 24);
                                 } else if (fill > 0) {
                                   return Icon(Icons.star_half_rounded,
-                                      color: _getRatingColor(_chartAverageScore!),
+                                      color:
+                                          _getRatingColor(_chartAverageScore!),
                                       size: 24);
                                 } else {
                                   return Icon(Icons.star_outline_rounded,
@@ -4618,8 +4518,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                                           AppColors.greyHint(brightness),
                                       disabledForegroundColor:
                                           brightness == Brightness.dark
-                                          ? Colors.white54
-                                          : Colors.white70,
+                                              ? Colors.white54
+                                              : Colors.white70,
                                       padding: const EdgeInsets.symmetric(
                                           vertical: 10),
                                       shape: RoundedRectangleBorder(
@@ -4982,20 +4882,20 @@ class _SongInfoPageState extends State<SongInfoPage> {
       builder: (ctx) {
         final brightness = Theme.of(ctx).brightness;
         return AlertDialog(
-        title: const Text('确认删除'),
-        content: const Text('确定要删除这条评论吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
+          title: const Text('确认删除'),
+          content: const Text('确定要删除这条评论吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
               child: Text('删除',
                   style: TextStyle(color: AppColors.errorRed(brightness))),
-          ),
-        ],
-      );
+            ),
+          ],
+        );
       },
     );
 
@@ -6978,14 +6878,13 @@ class _SongInfoPageState extends State<SongInfoPage> {
     if (_maidataDecodedSuccessfully &&
         _maidataBreakCounts.containsKey(_currentDiffIndex)) {
       List<int> counts = _maidataBreakCounts[_currentDiffIndex]!;
-      bool allZero = counts.every((count) => count == 0);
-      // 只有当解析出的绝赞数量不全为0时，才使用maidata结果
-      if (!allZero && index >= 0 && index < counts.length) {
+      // 零绝赞谱面也属于有效解析结果，不应退回未知值或旧统计。
+      if (index >= 0 && index < counts.length) {
         return counts[index].toString();
       }
     }
 
-    // 兜底方案：解析失败或解析结果全为0时
+    // 兜底方案：当前难度没有有效解析结果时
     if (_songData != null) {
       String songType = _songData!['type'] ?? '';
       // ST谱面（type为SD）
@@ -7170,8 +7069,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
       final bpm = _safeToInt(basicInfo['bpm']);
       final ds = _safeToDouble(_songData!['ds'] != null &&
               (_songData!['ds'] as List).length > _currentDiffIndex
-            ? (_songData!['ds'] as List)[_currentDiffIndex]
-            : 0.0);
+          ? (_songData!['ds'] as List)[_currentDiffIndex]
+          : 0.0);
 
       // 调用导出服务
       final file = await SongScoreShareService.convertToImage(
@@ -7883,6 +7782,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
           songId: widget.songId,
           songTitle: _songData!['basic_info']['title'],
           songType: _songData!['type'],
+          songArtist: _songData!['basic_info']['artist'],
         ),
       ),
     );
@@ -8085,7 +7985,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                           border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8)),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(8),
                               borderSide: BorderSide(
                                   color: Colors.amber.shade700, width: 2)),
                         ),
@@ -8095,8 +7995,8 @@ class _SongInfoPageState extends State<SongInfoPage> {
                       if (existingNote != null) ...[
                         SizedBox(height: 8),
                         Text(
-                          '创建于: ${_formatTimestamp(existingNote.createdAt)}'
-                          '${existingNote.updatedAt != existingNote.createdAt ? '\n更新于: ${_formatTimestamp(existingNote.updatedAt)}' : ''}',
+                            '创建于: ${_formatTimestamp(existingNote.createdAt)}'
+                            '${existingNote.updatedAt != existingNote.createdAt ? '\n更新于: ${_formatTimestamp(existingNote.updatedAt)}' : ''}',
                             style: TextStyle(
                                 fontSize: 11,
                                 color: AppColors.greyHint(brightness))),
@@ -9020,45 +8920,10 @@ class _BookmarkFolderSelectorDialogState
 
   /// 创建新收藏夹
   Future<void> _createNewFolder() async {
-    final nameController = TextEditingController();
     final name = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('新建收藏夹'),
-        content: TextField(
-          controller: nameController,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '请输入收藏夹名称',
-            border: OutlineInputBorder(),
-          ),
-          inputFormatters: [LengthLimitingTextInputFormatter(30)],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              final text = nameController.text.trim();
-              if (text.isEmpty) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('名称不能为空')),
-                );
-                return;
-              }
-              Navigator.of(ctx).pop(text);
-            },
-            child: const Text('创建'),
-          ),
-        ],
-      ),
+      builder: (_) => const _BookmarkFolderNameDialog(),
     );
-    // 延迟释放控制器，避免对话框撤销动画期间被使用
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      nameController.dispose();
-    });
     if (name != null && name.isNotEmpty) {
       final newFolder = await _service.createFolder(name);
       // 自动将当前谱面加入新创建的收藏夹
@@ -9363,6 +9228,65 @@ class _BookmarkFolderSelectorDialogState
           color: textColor,
         ),
       ),
+    );
+  }
+}
+
+class _BookmarkFolderNameDialog extends StatefulWidget {
+  const _BookmarkFolderNameDialog();
+
+  @override
+  State<_BookmarkFolderNameDialog> createState() =>
+      _BookmarkFolderNameDialogState();
+}
+
+class _BookmarkFolderNameDialogState extends State<_BookmarkFolderNameDialog> {
+  final TextEditingController _controller = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _validate(String value) {
+    final error = value.trim().isEmpty ? '收藏夹名称不能为空' : null;
+    if (error != _error) setState(() => _error = error);
+  }
+
+  void _submit() {
+    final value = _controller.text.trim();
+    if (value.isEmpty) {
+      setState(() => _error = '收藏夹名称不能为空');
+      return;
+    }
+    Navigator.of(context).pop(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('新建收藏夹'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        onChanged: _validate,
+        onSubmitted: (_) => _submit(),
+        decoration: InputDecoration(
+          hintText: '请输入收藏夹名称',
+          errorText: _error,
+          border: const OutlineInputBorder(),
+        ),
+        inputFormatters: [LengthLimitingTextInputFormatter(30)],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        TextButton(onPressed: _submit, child: const Text('创建')),
+      ],
     );
   }
 }

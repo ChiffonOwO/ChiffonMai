@@ -52,7 +52,7 @@ class SyncStats {
   /// 其中成功的次数。
   final int successCount;
 
-  /// 平均耗时（毫秒）。
+  /// 成功样本的平均耗时（毫秒）。
   final double avgMs;
 
   final int minMs;
@@ -121,7 +121,9 @@ class SyncStats {
   factory SyncStats.fromRawEntries(Iterable<String> rawEntries) {
     var count = 0;
     var successCount = 0;
-    var sum = 0;
+    // 平均耗时只统计成功样本。失败请求常常会经历超时或重试，
+    // 把它们混进平均值会把一次正常同步的耗时拉高。
+    var successSum = 0;
     var minMs = 0;
     var maxMs = 0;
     var lastMs = 0;
@@ -139,8 +141,10 @@ class SyncStats {
         final t = (decoded['t'] as num?)?.toInt() ?? 0;
 
         count++;
-        sum += d;
-        if (ok) successCount++;
+        if (ok) {
+          successCount++;
+          successSum += d;
+        }
         if (count == 1 || d < minMs) minMs = d;
         if (count == 1 || d > maxMs) maxMs = d;
         if (t >= lastAtMs) {
@@ -157,7 +161,7 @@ class SyncStats {
     return SyncStats(
       count: count,
       successCount: successCount,
-      avgMs: sum / count,
+      avgMs: successCount == 0 ? 0 : successSum / successCount,
       minMs: minMs,
       maxMs: maxMs,
       lastMs: lastMs,

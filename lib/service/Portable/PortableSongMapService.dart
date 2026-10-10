@@ -224,9 +224,15 @@ PortableMapResult mapOneLuoXueSong(
 PortableLibraryResult buildPortableLibrary({
   required List<LuoXueSong> lxnsSongs,
   required List<Song> divingFishSongs,
+  List<Song> awmcSongs = const <Song>[],
+  List<Song> unionSongs = const <Song>[],
   bool excludeUtage = true,
 }) {
-  final index = DivingFishSongIndex(divingFishSongs);
+  final index = DivingFishSongIndex([
+    ...divingFishSongs,
+    ...awmcSongs,
+    ...unionSongs,
+  ]);
   final songs = <PortableSong>[];
   var skipped = 0;
   var excludedUtage = 0;
@@ -244,6 +250,36 @@ PortableLibraryResult buildPortableLibrary({
     songs.add(result.song!);
   }
 
+  // AWMC 的 songId 与 Union 全量一致，优先追加 AWMC 曲库里的条目。
+  // Union 进度更快，补上 AWMC 尚未登记但 Union 已有的歌曲；如果 WMC 暂时
+  // 没有对应音源，用户点播时再提示暂无音源，不让索引因为目录不同步而缺歌。
+  final seenAudioIds = songs.map((song) => song.audioId).toSet();
+  for (final extraSong in <Song>[
+    ...awmcSongs,
+    ...unionSongs,
+    // 主曲库缓存可能本身就是「水鱼 + Union」的合并结果；即使 Union
+    // 这次网络请求失败，也不要把其中的补充歌曲丢掉。
+    ...divingFishSongs.where((song) => song.isExtra),
+  ]) {
+    final rawId = int.tryParse(extraSong.id.trim());
+    if (rawId == null || rawId <= 0) continue;
+    if (excludeUtage && rawId >= kUtageIdFloor) continue;
+    final audioId = rawId % kDivingFishDxIdOffset;
+    if (audioId <= 0 || !seenAudioIds.add(audioId)) continue;
+    songs.add(PortableSong(
+      lxnsId: audioId,
+      divingFishId: extraSong.id,
+      audioId: audioId,
+      title: extraSong.title.trim(),
+      artist: extraSong.basicInfo.artist.trim(),
+      genre: extraSong.basicInfo.genre.trim(),
+      bpm: extraSong.basicInfo.bpm,
+      difficultyConstants: extraSong.ds,
+      hasDx: extraSong.type.toUpperCase() == 'DX',
+      isAwmcExtra: true,
+    ));
+  }
+
   songs.sort((a, b) {
     final byTitle = normalizePortableTitle(a.title)
         .compareTo(normalizePortableTitle(b.title));
@@ -254,7 +290,10 @@ PortableLibraryResult buildPortableLibrary({
   return PortableLibraryResult(
     songs: songs,
     skippedCount: skipped,
-    divingFishSongCount: divingFishSongs.length,
+    divingFishSongCount: <String>{
+      ...divingFishSongs.map((song) => song.id),
+      ...unionSongs.map((song) => song.id)
+    }.length,
     excludedUtageCount: excludedUtage,
   );
 }
@@ -293,6 +332,7 @@ class PortableLibraryResult {
                   'bpm': s.bpm,
                   'difficultyConstants': s.difficultyConstants,
                   'hasDx': s.hasDx,
+                  'isAwmcExtra': s.isAwmcExtra,
                 })
             .toList(),
       };
@@ -325,6 +365,7 @@ class PortableLibraryResult {
                   .toList()
               : const <double>[],
           hasDx: item['hasDx'] == true,
+          isAwmcExtra: item['isAwmcExtra'] == true,
         ));
       }
       if (songs.isEmpty) return null;

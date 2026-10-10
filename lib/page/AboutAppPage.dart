@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../utils/CommonWidgetUtil.dart';
 import '../utils/ExternalLaunchUtil.dart';
@@ -75,6 +76,17 @@ class _AboutAppPageState extends State<AboutAppPage> {
     _Credit('Union', '提供曲目数据库', 'https://union.godserver.cn/'),
   ];
 
+  /// 设计思路借鉴，排名不分先后。
+  static const List<_Credit> _designCredits = [
+    _Credit('EasyMai', '设计思路借鉴', 'https://github.com/Lista233/EasyMai'),
+    _Credit('舞萌猜猜呗之潘一把', '设计思路借鉴',
+        'https://github.com/yukineko2233/v0-maimai-wordle'),
+    _Credit('MaiScan Rev', '设计思路借鉴',
+        'https://github.com/PojavAnge/MaiScan-Rev'),
+    _Credit('中二查歌', '设计思路借鉴',
+        'https://github.com/k4641321/chusearchsong_flutter'),
+  ];
+
   /// 捐献支持名单。
   static const List<_Credit> _donationCredits = [
     _Credit('Pokcet', '感谢对本项目的捐献支持'),
@@ -140,6 +152,7 @@ class _AboutAppPageState extends State<AboutAppPage> {
     final safeBottom = MediaQuery.paddingOf(context).bottom;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
@@ -190,6 +203,13 @@ class _AboutAppPageState extends State<AboutAppPage> {
                               title: '数据与服务',
                               icon: Icons.hub_outlined,
                               credits: _credits.skip(6).toList(),
+                              personal: false,
+                            ),
+                            const SizedBox(height: 24),
+                            _buildCreditGroup(
+                              title: '设计思路借鉴',
+                              icon: Icons.lightbulb_outline_rounded,
+                              credits: _designCredits,
                               personal: false,
                             ),
                             const SizedBox(height: 28),
@@ -336,7 +356,7 @@ class _AboutAppPageState extends State<AboutAppPage> {
             _buildContactButton(Icons.play_circle_outline_rounded, 'B 站',
                 () => _openUrl(_bilibiliUrl)),
             _buildContactButton(
-                Icons.code_rounded, 'GitHub', () => _openUrl(_githubUrl)),
+                FontAwesomeIcons.github, 'GitHub', () => _openUrl(_githubUrl)),
             _buildContactButton(Icons.email_outlined, '邮箱', _openEmail),
           ]),
           const SizedBox(height: 8),
@@ -417,14 +437,11 @@ class _AboutAppPageState extends State<AboutAppPage> {
           child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
             CircleAvatar(
               radius: 22,
-              backgroundColor:
-                  personal ? scheme.primaryContainer : scheme.tertiaryContainer,
+              backgroundColor: scheme.primaryContainer,
               child: Icon(
                 _creditIcon(credit, personal: personal),
                 size: 22,
-                color: personal
-                    ? scheme.onPrimaryContainer
-                    : scheme.onTertiaryContainer,
+                color: scheme.onPrimaryContainer,
               ),
             ),
             const SizedBox(width: 12),
@@ -458,11 +475,10 @@ class _AboutAppPageState extends State<AboutAppPage> {
 
   /// 创作与支持、捐献名单使用统一默认头像；服务类致谢按链接性质区分图标。
   IconData _creditIcon(_Credit credit, {required bool personal}) {
-    if (personal) return Icons.person_rounded;
-
     final url = credit.url?.toLowerCase() ?? '';
     final name = credit.name.toLowerCase();
-    if (url.contains('github.com')) return Icons.code_rounded;
+    if (Uri.tryParse(url)?.host == 'github.com') return FontAwesomeIcons.github;
+    if (personal) return Icons.person_rounded;
     if (url.contains('bilibili.com') || url.contains('huajia.163.com')) {
       return Icons.play_circle_outline_rounded;
     }

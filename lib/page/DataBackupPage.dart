@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:my_first_flutter_app/service/DataBackupService.dart';
 import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import 'package:my_first_flutter_app/utils/ExportPathUtil.dart';
 import '../widgets/BackgroundPageScaffold.dart';
 import '../widgets/ExportSuccessDialog.dart';
 
@@ -40,102 +41,101 @@ class _DataBackupPageState extends State<DataBackupPage> {
       ),
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // 说明
-                        Container(
-                          padding: EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppColors.tableBorder(brightness)),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.info_outline,
-                                  color: AppColors.linkBlue(brightness), size: 24),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  '数据备份功能可以将你的本地数据（收藏夹、谱面笔记、账号凭据、设置偏好等）导出为 JSON 文件，方便换手机或恢复数据时使用。\n\n'
-                                  '可重新拉取的缓存（曲库、maidata、排行榜等）不会写进备份文件，恢复后首次进入相关页面会自动重新拉取。',
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurface,
-                                    fontSize: 14,
-                                    height: 1.5,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: 24),
-
-                        // 导出区域
-                        _buildSectionCard(
-                          icon: Icons.file_upload,
-                          title: '导出备份',
-                          subtitle: '将当前所有本地数据导出为 JSON 文件',
-                          buttonText: _isExporting ? '导出中...' : '导出备份文件',
-                          isLoading: _isExporting,
-                          onPressed: _busy ? null : _handleExport,
-                          color: AppColors.successGreen(brightness),
-                        ),
-
-                        // 上次导出路径
-                        if (_lastExportPath != null) ...[
-                          SizedBox(height: 8),
-                          Container(
-                            padding: EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.check_circle,
-                                    size: 18, color: AppColors.successGreen(brightness)),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    '已导出到: $_lastExportPath',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Theme.of(context).colorScheme.onSurface,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-
-                        SizedBox(height: 24),
-                        Divider(),
-                        SizedBox(height: 24),
-
-                        // 导入区域
-                        _buildSectionCard(
-                          icon: Icons.file_download,
-                          title: '导入备份',
-                          subtitle: '从 JSON 文件恢复之前备份的数据',
-                          buttonText: _isRestoring
-                              ? '正在恢复数据...'
-                              : (_isImporting ? '导入中...' : '选择备份文件'),
-                          isLoading: _isImporting || _isRestoring,
-                          onPressed: _busy ? null : _handleImport,
-                          color: AppColors.warningOrange(brightness),
-                          warningText:
-                              '⚠ 导入会先清空当前所有本地数据，再写入备份内容；\n'
-                              '　 备份里没有的项目（含各类缓存）会被一并抹掉。\n'
-                              '　 恢复过程中请不要退出页面。',
-                        ),
-                      ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 说明
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.tableBorder(brightness)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline,
+                      color: AppColors.linkBlue(brightness), size: 24),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '数据备份功能可以将你的本地数据（收藏夹、谱面笔记、账号凭据、设置偏好等）导出为 JSON 文件，方便换手机或恢复数据时使用。\n\n'
+                      '可重新拉取的缓存（曲库、maidata、排行榜等）不会写进备份文件，恢复后首次进入相关页面会自动重新拉取。',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
                     ),
                   ),
+                ],
+              ),
+            ),
+            SizedBox(height: 24),
+
+            // 导出区域
+            _buildSectionCard(
+              icon: Icons.file_upload,
+              title: '导出备份',
+              subtitle: '将当前所有本地数据导出为 JSON 文件',
+              buttonText: _isExporting ? '导出中...' : '导出备份文件',
+              isLoading: _isExporting,
+              onPressed: _busy ? null : _handleExport,
+              color: AppColors.successGreen(brightness),
+            ),
+
+            // 上次导出路径
+            if (_lastExportPath != null) ...[
+              SizedBox(height: 8),
+              Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle,
+                        size: 18, color: AppColors.successGreen(brightness)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '已导出到: $_lastExportPath',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            SizedBox(height: 24),
+            Divider(),
+            SizedBox(height: 24),
+
+            // 导入区域
+            _buildSectionCard(
+              icon: Icons.file_download,
+              title: '导入备份',
+              subtitle: '从 JSON 文件恢复之前备份的数据',
+              buttonText: _isRestoring
+                  ? '正在恢复数据...'
+                  : (_isImporting ? '导入中...' : '选择备份文件'),
+              isLoading: _isImporting || _isRestoring,
+              onPressed: _busy ? null : _handleImport,
+              color: AppColors.warningOrange(brightness),
+              warningText: '⚠ 导入会先清空当前所有本地数据，再写入备份内容；\n'
+                  '　 备份里没有的项目（含各类缓存）会被一并抹掉。\n'
+                  '　 恢复过程中请不要退出页面。',
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -152,7 +152,8 @@ class _DataBackupPageState extends State<DataBackupPage> {
     return Container(
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.tableBorder(Theme.of(context).brightness)),
+        border: Border.all(
+            color: AppColors.tableBorder(Theme.of(context).brightness)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -233,10 +234,17 @@ class _DataBackupPageState extends State<DataBackupPage> {
   }
 
   Future<void> _handleExport() async {
+    if (!await ExportPathUtil.prepareForExport(context,
+        subDir: '备份', title: '选择备份保存位置')) {
+      return;
+    }
     setState(() => _isExporting = true);
 
     try {
-      final path = await _service.exportToFile();
+      String? fallbackPath;
+      final path = await _service.exportToFile(
+        onFallback: (value) => fallbackPath = value,
+      );
       if (path != null && mounted) {
         setState(() {
           _lastExportPath = path;
@@ -246,9 +254,9 @@ class _DataBackupPageState extends State<DataBackupPage> {
           context,
           filePath: path,
           fileName: '备份文件',
-          warning: path.contains('/Download')
-              ? '可在文件管理器的「下载」文件夹中找到该文件。'
-              : null,
+          warning: fallbackPath == null
+              ? '可在文件管理器的「下载/ChiffonMai/备份」文件夹中找到该文件。'
+              : '公开目录不可写，已保存到应用文档目录。',
         );
       } else {
         if (mounted) {
@@ -294,7 +302,9 @@ class _DataBackupPageState extends State<DataBackupPage> {
         builder: (ctx) => AlertDialog(
           title: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: AppColors.warningOrange(Theme.of(context).brightness), size: 28),
+              Icon(Icons.warning_amber_rounded,
+                  color: AppColors.warningOrange(Theme.of(context).brightness),
+                  size: 28),
               SizedBox(width: 8),
               Text('确认恢复数据'),
             ],
@@ -315,12 +325,9 @@ class _DataBackupPageState extends State<DataBackupPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('备份版本: v$version',
-                        style: TextStyle(fontSize: 13)),
-                    Text('导出时间: $exportedAt',
-                        style: TextStyle(fontSize: 13)),
-                    Text('包含 $keyCount 个数据项',
-                        style: TextStyle(fontSize: 13)),
+                    Text('备份版本: v$version', style: TextStyle(fontSize: 13)),
+                    Text('导出时间: $exportedAt', style: TextStyle(fontSize: 13)),
+                    Text('包含 $keyCount 个数据项', style: TextStyle(fontSize: 13)),
                     if (skippedCacheKeys != null)
                       Text('已排除 $skippedCacheKeys 个缓存项',
                           style: TextStyle(fontSize: 13)),
@@ -353,7 +360,8 @@ class _DataBackupPageState extends State<DataBackupPage> {
             ElevatedButton(
               onPressed: () => Navigator.of(ctx).pop(true),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.warningOrange(Theme.of(context).brightness),
+                backgroundColor:
+                    AppColors.warningOrange(Theme.of(context).brightness),
                 foregroundColor: Colors.white,
               ),
               child: Text('确认恢复'),
