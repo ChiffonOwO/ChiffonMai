@@ -3,7 +3,7 @@
 <div align="center">
   <img src="https://img.shields.io/badge/Platform-Android-blue.svg" alt="Platform">
   <img src="https://img.shields.io/badge/Flutter-3.x-02569B.svg?logo=flutter&logoColor=white" alt="Flutter">
-  <img src="https://img.shields.io/badge/Version-2.7.1%2B46-6C63FF.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Version-2.7.1%2B47-6C63FF.svg" alt="Version">
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
 </div>
 
@@ -163,7 +163,7 @@ iOS 版本目前尚未正式发布。
 - **Bakapiano**：提供水鱼查分器和落雪查分器成绩同步支持。[项目地址](https://github.com/bakapiano/maimai-score-hub)
 - **k4641321**：提供落雪查分器成绩同步支持。[项目地址](https://github.com/k4641321/chusearchsong_flutter/tree/master)
 - **Union**：提供曲目数据库。[官网](https://union.godserver.cn/)
-- **NearCade**：提供谱面数据库。[官网](https://nearcade.cn/)
+- **NearCade**：提供全球机厅相关数据。[官网](https://nearcade.cn/)
 - **SilentBlue.RemyWiki**：提供高清版本图片。[官网](https://silentblue.remywiki.com/Main_Page)
 
 ### 设计思路借鉴
