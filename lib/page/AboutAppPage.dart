@@ -42,18 +42,24 @@ class _AboutAppPageState extends State<AboutAppPage> {
       'ChiffonMai 是一款专为 舞萌DX 2026（maimai DX 2026）玩家打造的一站式移动端工具类应用，'
       '聚合了曲库查询、成绩统计、Rating 计算、曲目推荐等多种实用功能，助力玩家提升游玩体验。';
 
-  /// 特别致谢（排名不分先后）。
-  ///
-  /// 创作与支持、数据与服务分组由页面分别截取，捐献名单单独维护。
-  static const List<_Credit> _credits = [
-    _Credit('Xn1xUfguF1GiNg', '为本 APP 提供背景图和戚风小狐狸（真的非常可爱）',
+  /// 创作与支持（排名不分先后）。
+  static const List<_Credit> _creativeCredits = [
+    _Credit('Xn1xUfguF1GiNg', '为本项目提供的背景图和戚风小狐狸（真的非常可爱）',
         'https://huajia.163.com/main/profile/RrwM5xQB'),
-    _Credit('Takanashi Rikkkkkkka', '为本 APP 的个性化谱面推荐功能提供宝贵设计思路'),
-    _Credit('三由yyyh', '为本 APP 的页面设计提供宝贵意见'),
-    _Credit('MYD', '提供用于测试开发的个人游玩数据'),
+    _Credit('Takanashi Rikkkkkkka', '为本项目的个性化谱面推荐功能提供宝贵设计思路'),
+    _Credit('三由yyyh', '为本项目的页面设计提供了宝贵意见'),
+    _Credit('MYD', '提供了用于测试开发的个人游玩数据'),
     _Credit('乐观的熊猫', '提议开发 ChiffonMai，为本项目诞生提供最初契机',
         'https://space.bilibili.com/438391224'),
-    _Credit('迪拉熊重度依赖', '为本APP在前端细节与交互体验上提供的诸多宝贵建议'),
+    _Credit('迪拉熊重度依赖', '为本项目在前端细节与交互体验上提供了诸多宝贵建议',
+        'https://github.com/Timome-Sudo'),
+    _Credit('Michaelwucoc', '为本项目的开发提供了技术支持和经济支持，为项目的推进提供了极大的帮助',
+        'https://github.com/Michaelwucoc'),
+    _Credit('ChiffonMai交流群的全体群友', '为本项目开发提供了诸多宝贵建议和反馈'),
+  ];
+
+  /// 数据与服务（排名不分先后）。
+  static const List<_Credit> _dataCredits = [
     _Credit('水鱼查分器', '提供曲目数据库和玩家游玩记录数据库',
         'https://www.diving-fish.com/maimaidx/prober/'),
     _Credit('DXRating.net', '提供谱面标签数据库和别名数据库', 'https://dxrating.net'),
@@ -63,17 +69,19 @@ class _AboutAppPageState extends State<AboutAppPage> {
         '落雪咖啡屋', '提供收藏品数据库、歌曲音源支持、曲目数据库和玩家游玩记录数据库', 'https://maimai.lxns.net'),
     _Credit('Neskol', '提供谱面转换支持',
         'https://github.com/Neskol/Maichart-Converts/tree/master'),
-    _Credit('status.awmc.cc', '提供舞萌服务器状态查询支持',
+    _Credit('status.awmc.cc', '提供舞萌服务器状态信息',
         'https://status.awmc.cc/status/maimai'),
-    _Credit('mai.chongxi.us', '提供舞萌服务器状态信息',
-        'https://mai.chongxi.us/'),
+    _Credit('mai.chongxi.us', '提供舞萌服务器状态信息', 'https://mai.chongxi.us/'),
     _Credit('AWMC NET.', '提供水鱼查分器同步支持、落雪查分器同步支持和对本项目开发的经济支持',
         'https://net.wmc.pub/'),
     _Credit('Bakapiano', '提供水鱼查分器和落雪查分器成绩同步支持',
         'https://github.com/bakapiano/maimai-score-hub'),
     _Credit('k4641321', '提供落雪查分器成绩同步支持',
-        'https://github.com/k4641321/chusearchsong_flutter/tree/main'),
+        'https://github.com/k4641321/chusearchsong_flutter/tree/master'),
     _Credit('Union', '提供曲目数据库', 'https://union.godserver.cn/'),
+    _Credit('NearCade', '提供全球机厅相关数据', 'https://nearcade.cn/'),
+    _Credit('SilentBlue.RemyWiki', '提供高清版本图片',
+        'https://silentblue.remywiki.com/Main_Page'),
   ];
 
   /// 设计思路借鉴，排名不分先后。
@@ -81,10 +89,10 @@ class _AboutAppPageState extends State<AboutAppPage> {
     _Credit('EasyMai', '设计思路借鉴', 'https://github.com/Lista233/EasyMai'),
     _Credit('舞萌猜猜呗之潘一把', '设计思路借鉴',
         'https://github.com/yukineko2233/v0-maimai-wordle'),
-    _Credit('MaiScan Rev', '设计思路借鉴',
-        'https://github.com/PojavAnge/MaiScan-Rev'),
-    _Credit('中二查歌', '设计思路借鉴',
-        'https://github.com/k4641321/chusearchsong_flutter'),
+    _Credit(
+        'MaiScan Rev', '设计思路借鉴', 'https://github.com/PojavAnge/MaiScan-Rev'),
+    _Credit(
+        '中二查歌', '设计思路借鉴', 'https://github.com/k4641321/chusearchsong_flutter'),
   ];
 
   /// 捐献支持名单。
@@ -188,7 +196,7 @@ class _AboutAppPageState extends State<AboutAppPage> {
                             _buildCreditGroup(
                               title: '创作与支持',
                               icon: Icons.favorite_outline_rounded,
-                              credits: _credits.take(6).toList(),
+                              credits: _creativeCredits,
                               personal: true,
                             ),
                             const SizedBox(height: 24),
@@ -202,7 +210,7 @@ class _AboutAppPageState extends State<AboutAppPage> {
                             _buildCreditGroup(
                               title: '数据与服务',
                               icon: Icons.hub_outlined,
-                              credits: _credits.skip(6).toList(),
+                              credits: _dataCredits,
                               personal: false,
                             ),
                             const SizedBox(height: 24),

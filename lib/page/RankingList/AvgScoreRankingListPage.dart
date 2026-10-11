@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../constant/CacheKeyConstant.dart';
 import '../../service/RankingList/AvgRankingListService.dart';
@@ -14,10 +15,12 @@ import '../../utils/RankingRowExtent.dart';
 class AvgScoreRankingListPage extends StatefulWidget {
   final AvgMetric initialMetric;
 
-  const AvgScoreRankingListPage({super.key, this.initialMetric = AvgMetric.achievement});
+  const AvgScoreRankingListPage(
+      {super.key, this.initialMetric = AvgMetric.achievement});
 
   @override
-  State<AvgScoreRankingListPage> createState() => _AvgScoreRankingListPageState();
+  State<AvgScoreRankingListPage> createState() =>
+      _AvgScoreRankingListPageState();
 }
 
 class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
@@ -109,19 +112,25 @@ class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
     if (_currentUserRankItem == null) {
       return;
     }
+    if (_currentUserRankItem!.rank > 100) {
+      Fluttertoast.showToast(msg: '抱歉，您不在前100名内');
+      return;
+    }
     final userIndex =
         _rankList.indexWhere((item) => item.playerId == _currentUserId);
     if (userIndex != -1) {
       // 精确落位：行高由 [RankingRowExtent] 实测，不再写 `index * 72` 那种估算
       // （真实行高只有 64，估高每行多 8dp，到第 40 名就滑过头 320dp）。
       _rowExtent.scrollRowToTop(_scrollController, userIndex);
+    } else {
+      Fluttertoast.showToast(msg: '抱歉，您不在前100名内');
     }
   }
 
   // 重新按当前指标排序并划分排名（从 _allItems 计算，不触发网络）
   void _applyRanking() {
-    final ranked =
-        AvgRankingListService.calculateRankedPositions(_allItems, _currentMetric);
+    final ranked = AvgRankingListService.calculateRankedPositions(
+        _allItems, _currentMetric);
 
     AvgRankItem? userItem;
     if (_currentUserId != null) {
@@ -146,8 +155,7 @@ class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
     });
 
     try {
-      final items =
-          await AvgRankingListService.getAverages(refresh: refresh);
+      final items = await AvgRankingListService.getAverages(refresh: refresh);
 
       if (!mounted) return;
       _allItems = items;
@@ -176,9 +184,8 @@ class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
   String _formatValue(double value) => '${value.toStringAsFixed(4)}%';
 
   // 指标名称
-  String _metricName() => _currentMetric == AvgMetric.achievement
-      ? '平均达成率排行榜'
-      : '平均DX得分达成率排行榜';
+  String _metricName() =>
+      _currentMetric == AvgMetric.achievement ? '平均达成率排行榜' : '平均DX分数达成率排行榜';
 
   // 记录条目数
   int _recordCountOf(AvgRankItem item) =>
@@ -244,9 +251,8 @@ class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
   Widget _buildValueCell(AvgRankItem item, {required Brightness brightness}) {
     // 仅在平均DX分数达成率榜单显示星级（scoreRate = 平均DX达成率 / 100）
     final bool showStars = _currentMetric == AvgMetric.dx;
-    final String? stars = showStars
-        ? StringUtil.formatStars(item.avgDxAchievement / 100)
-        : null;
+    final String? stars =
+        showStars ? StringUtil.formatStars(item.avgDxAchievement / 100) : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -316,8 +322,8 @@ class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
           // 排名
           SizedBox(
             width: 40,
-            child:
-                Center(child: _buildRankBadge(item.rank, brightness: brightness)),
+            child: Center(
+                child: _buildRankBadge(item.rank, brightness: brightness)),
           ),
 
           Expanded(
@@ -331,8 +337,7 @@ class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
               avatarMatchesTextHeight: true,
               nameStyle: TextStyle(
                 fontSize: 14,
-                fontWeight:
-                    isCurrentUser ? FontWeight.bold : FontWeight.w500,
+                fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.w500,
                 color: isCurrentUser
                     ? AppColors.primaryText(brightness)
                     : AppColors.secondaryText(brightness),
@@ -375,7 +380,8 @@ class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.bar_chart, size: 64, color: AppColors.greyHint(brightness)),
+          Icon(Icons.bar_chart,
+              size: 64, color: AppColors.greyHint(brightness)),
           const SizedBox(height: 16),
           Text(
             _errorMessage.isNotEmpty ? _errorMessage : '暂无排行数据',
@@ -404,142 +410,154 @@ class _AvgScoreRankingListPageState extends State<AvgScoreRankingListPage> {
           const ThemeAwareBackground(),
           Column(
             children: [
-          // 顶部栏统一走公共组件（标题 = 思源黑体 20 / bold / primary / 居中）。
-          // 以前是 `Scaffold.appBar: AppBar`，标题被 `Text('…')` 自带的空
-          // TextStyle 顶掉了全局字体族，会渲染成系统 Roboto —— 与其它页面不一致。
-          PageTopBar(
-            title: _metricName(),
-            actions: [
-              IconButton(
-                icon: _isLoading
-                    ? CircularProgressIndicator(
-                        color: AppColors.primaryText(brightness), strokeWidth: 2)
-                    : Icon(Icons.refresh,
-                        color: AppColors.primaryText(brightness)),
-                onPressed: (_isLoading || _isButtonDisabled) ? null : _onRefresh,
-                tooltip: '刷新',
-              ),
-              if (_currentUserRankItem != null)
-                IconButton(
-                  icon: Icon(Icons.location_searching,
-                      color: AppColors.primaryText(brightness)),
-                  onPressed: _scrollToCurrentUser,
-                  tooltip: '跳转到我的排名',
-                ),
-            ],
-          ),
-          // 免责声明
-          Container(
-            width: double.infinity,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color:
-                  AppColors.warningOrange(brightness).withValues(alpha: 0.08),
-              border: Border(
-                  bottom: BorderSide(
-                      color: AppColors.warningOrange(brightness)
-                          .withValues(alpha: 0.3))),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.info_outline,
-                    size: 16, color: AppColors.warningOrange(brightness)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '本排行榜数据仅供参考和娱乐使用，不代表任何官方立场或权威性排名。平均达成率 / 平均DX得分达成率基于玩家自愿上传的全量成绩记录计算，可能存在误差或延迟。请理性看待排名结果，享受游戏乐趣。',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.warningOrange(brightness),
-                      height: 1.4,
+              // 顶部栏统一走公共组件（标题 = 思源黑体 20 / bold / primary / 居中）。
+              // 以前是 `Scaffold.appBar: AppBar`，标题被 `Text('…')` 自带的空
+              // TextStyle 顶掉了全局字体族，会渲染成系统 Roboto —— 与其它页面不一致。
+              PageTopBar(
+                title: _metricName(),
+                centerTitleInAvailableSpace: true,
+                actions: [
+                  IconButton(
+                    icon: _isLoading
+                        ? CircularProgressIndicator(
+                            color: AppColors.primaryText(brightness),
+                            strokeWidth: 2)
+                        : Icon(Icons.refresh,
+                            color: AppColors.primaryText(brightness)),
+                    onPressed:
+                        (_isLoading || _isButtonDisabled) ? null : _onRefresh,
+                    tooltip: '刷新',
+                  ),
+                  if (_currentUserRankItem != null)
+                    IconButton(
+                      icon: Icon(Icons.location_searching,
+                          color: AppColors.primaryText(brightness)),
+                      onPressed: _scrollToCurrentUser,
+                      tooltip: '跳转到我的排名',
                     ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // 排行榜列表
-          Expanded(
-            child: _isLoading
-                ? Center(
-                    child: CircularProgressIndicator(
-                        color: AppColors.primaryText(brightness)))
-                : _rankList.isEmpty
-                    ? _buildEmptyState(brightness)
-                    : ListView.builder(
-                        controller: _scrollController,
-                        // 必须显式清零：`Scaffold` 在没有 `appBar:` 时不会消耗顶部安全区，
-                        // `ListView` 会把 `MediaQuery.padding.top`（状态栏 24dp）当成
-                        // 内边距垫在列表最上面，而状态栏已被 `PageTopBar` 占掉 ——
-                        // 结果就是「第一名那行上方多出一块空白」（实测 24dp）。
-                        padding: EdgeInsets.zero,
-                        // 每行都排成原型行的高度：定位按钮才能用
-                        // `index × 行高` 精确落位（行高不再靠 72 这种估算）
-                        prototypeItem: _buildRowPrototype(brightness),
-                        itemCount: _rankList.length,
-                        itemBuilder: (context, index) {
-                          final item = _rankList[index];
-                          final isCurrentUser = _currentUserId != null &&
-                              item.playerId == _currentUserId;
-                          return _buildRankItem(
-                            item,
-                            isCurrentUser: isCurrentUser,
-                            brightness: brightness,
-                          );
-                        },
-                      ),
-          ),
-
-          // 底部固定显示当前用户
-          if (!_isLoading && _currentUserRankItem != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                border: Border(
-                    top: BorderSide(color: AppColors.primaryText(brightness))),
-                color: AppColors.linkBlue(brightness).withValues(alpha: 0.08),
-              ),
-              child: Row(
-                children: [
-                  // 排名
-                  SizedBox(
-                    width: 40,
-                    child: Center(
-                      child: _buildRankBadge(_currentUserRankItem!.rank,
-                          brightness: brightness),
-                    ),
-                  ),
-
-                  Expanded(
-                    child: CommunityPlayerIdentity(
-                      avatarId: _currentUserRankItem!.avatarId,
-                      dataSource: _currentUserRankItem!.dataSource,
-                      playerId: _currentUserRankItem!.playerId,
-                      name: _currentUserRankItem!.playerName.isEmpty
-                          ? '未知玩家'
-                          : _currentUserRankItem!.playerName,
-                      avatarMatchesTextHeight: true,
-                      nameStyle: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primaryText(brightness),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-
-                  // 数值信息
-                  SizedBox(
-                    width: 140,
-                    child: _buildValueCell(_currentUserRankItem!,
-                        brightness: brightness),
-                  ),
                 ],
               ),
-            ),
+              // 免责声明
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.warningOrange(brightness)
+                      .withValues(alpha: 0.08),
+                  border: Border(
+                      bottom: BorderSide(
+                          color: AppColors.warningOrange(brightness)
+                              .withValues(alpha: 0.3))),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 16, color: AppColors.warningOrange(brightness)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '本排行榜数据仅供参考和娱乐使用，不代表任何官方立场或权威性排名。平均达成率 / 平均DX分数达成率基于玩家自愿上传的全量成绩记录计算，可能存在误差或延迟。请理性看待排名结果，享受游戏乐趣。',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.warningOrange(brightness),
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 排行榜列表
+              Expanded(
+                child: _isLoading
+                    ? Center(
+                        child: CircularProgressIndicator(
+                            color: AppColors.primaryText(brightness)))
+                    : _rankList.isEmpty
+                        ? _buildEmptyState(brightness)
+                        : ListView.builder(
+                            controller: _scrollController,
+                            // 必须显式清零：`Scaffold` 在没有 `appBar:` 时不会消耗顶部安全区，
+                            // `ListView` 会把 `MediaQuery.padding.top`（状态栏 24dp）当成
+                            // 内边距垫在列表最上面，而状态栏已被 `PageTopBar` 占掉 ——
+                            // 结果就是「第一名那行上方多出一块空白」（实测 24dp）。
+                            padding: EdgeInsets.zero,
+                            // 每行都排成原型行的高度：定位按钮才能用
+                            // `index × 行高` 精确落位（行高不再靠 72 这种估算）
+                            prototypeItem: _buildRowPrototype(brightness),
+                            itemCount: _rankList.length,
+                            itemBuilder: (context, index) {
+                              final item = _rankList[index];
+                              final isCurrentUser = _currentUserId != null &&
+                                  item.playerId == _currentUserId;
+                              return _buildRankItem(
+                                item,
+                                isCurrentUser: isCurrentUser,
+                                brightness: brightness,
+                              );
+                            },
+                          ),
+              ),
+
+              // 底部固定显示当前用户
+              if (!_isLoading && _currentUserRankItem != null)
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _scrollToCurrentUser,
+                    child: Ink(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        border: Border(
+                            top: BorderSide(
+                                color: AppColors.primaryText(brightness))),
+                        color: AppColors.linkBlue(brightness)
+                            .withValues(alpha: 0.08),
+                      ),
+                      child: Row(
+                        children: [
+                          // 排名
+                          SizedBox(
+                            width: 40,
+                            child: Center(
+                              child: _buildRankBadge(_currentUserRankItem!.rank,
+                                  brightness: brightness),
+                            ),
+                          ),
+
+                          Expanded(
+                            child: CommunityPlayerIdentity(
+                              avatarId: _currentUserRankItem!.avatarId,
+                              dataSource: _currentUserRankItem!.dataSource,
+                              playerId: _currentUserRankItem!.playerId,
+                              name: _currentUserRankItem!.playerName.isEmpty
+                                  ? '未知玩家'
+                                  : _currentUserRankItem!.playerName,
+                              avatarMatchesTextHeight: true,
+                              nameStyle: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primaryText(brightness),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+
+                          // 数值信息
+                          SizedBox(
+                            width: 140,
+                            child: _buildValueCell(_currentUserRankItem!,
+                                brightness: brightness),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ],
