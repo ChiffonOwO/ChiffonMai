@@ -86,6 +86,7 @@ import '../widgets/RefreshDataDialog.dart'
         showRefreshDataDialog,
         executeRefreshData,
         executeAdvancedRefreshData,
+        RefreshDataRequest,
         CurrentDataSourceNotifier,
         RefreshDataSource,
         refreshBest50DataWithProgress,
@@ -107,6 +108,7 @@ import 'package:my_first_flutter_app/utils/ApiClient.dart';
 import '../widgets/QrQuickFillButtons.dart';
 import '../service/SyncStatsService.dart';
 import '../utils/SyncRouteNotifier.dart';
+import '../utils/HomeRefreshNotifier.dart';
 import '../utils/RefreshErrorPresenter.dart';
 import '../widgets/ErrorMessageDialog.dart';
 import '../utils/UpdateNotifier.dart';
@@ -114,6 +116,7 @@ import '../widgets/SyncRouteFooter.dart';
 import '../widgets/SyncStatsFooter.dart';
 import '../widgets/SyncFlowMixin.dart';
 import '../widgets/QuickSearchBar.dart';
+import '../widgets/MarqueeText.dart';
 
 // ds值与歌曲对应关系数据类已随 _calculateRatingLimits 一起抽离到
 // lib/widgets/RefreshDataDialog.dart，不再需要此处的定义。
@@ -161,7 +164,7 @@ class _AwmcNetTokenSectionState extends State<_AwmcNetTokenSection> {
   }
 
   Future<void> _openGuide() async {
-    final uri = Uri.parse('https://net.wmc.pub/');
+    final uri = Uri.parse('https://net.wmc.pub/settings/');
     try {
       if (!await ExternalLaunchUtil.open(uri) && mounted) {
         launchUrlFallback(uri.toString(), context);
@@ -247,9 +250,9 @@ class _AwmcNetTokenSectionState extends State<_AwmcNetTokenSection> {
             child: Text.rich(
               TextSpan(
                 children: [
-                  const TextSpan(text: '访问 ', style: TextStyle(fontSize: 12)),
+                  const TextSpan(text: '访问', style: TextStyle(fontSize: 12)),
                   TextSpan(
-                    text: 'https://net.wmc.pub/ 的设置/个人资料页',
+                    text: 'https://net.wmc.pub/settings/',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.linkBlue(brightness),
@@ -257,7 +260,7 @@ class _AwmcNetTokenSectionState extends State<_AwmcNetTokenSection> {
                     ),
                   ),
                   const TextSpan(
-                    text: '，在页面底部生成或轮换 Token。',
+                    text: '，在页面底部生成或轮换Token。',
                     style: TextStyle(fontSize: 12),
                   ),
                 ],
@@ -451,7 +454,7 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
   /// 任意长任务进行中：收藏区那三个同步入口之间也要互斥，
   /// 否则能同时点起两个同步互相踩缓存（「系统」hub 页一直有这个保护）。
   @override
-  bool get anyBusy => !syncFlowsIdle;
+  bool get anyBusy => !syncFlowsIdle || _isRefreshing;
 
   // 初始化方法，用于从本地存储加载数据
   @override
@@ -773,6 +776,10 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
             ),
             const SizedBox(height: 22),
             _buildDashboardSummary(context, brightness),
+            if (_refreshText.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _buildRefreshProgress(context),
+            ],
             const SizedBox(height: 16),
             _buildHomeFeatureSearch(context),
             if (_hubSearchQuery.trim().isNotEmpty) ...[
@@ -799,6 +806,38 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
         if (!mounted) return;
         setState(() => _hubSearchQuery = query.trim());
       },
+    );
+  }
+
+  Widget _buildRefreshProgress(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          MarqueeText(
+            text: _refreshText,
+            style: TextStyle(
+              fontSize: 12,
+              color: scheme.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 7),
+          SmoothLinearProgressIndicator(
+            value: _refreshProgress,
+            minHeight: 5,
+            color: scheme.primary,
+          ),
+        ],
+      ),
     );
   }
 
@@ -972,7 +1011,7 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
         Material(
           type: MaterialType.transparency,
           child: InkWell(
-            onTap: anySyncBusy ? null : _openAdvancedRefreshData,
+            onTap: anyBusy ? null : _openAdvancedRefreshData,
             splashFactory: NoSplash.splashFactory,
             highlightColor: Colors.transparent,
             hoverColor: Colors.transparent,
@@ -2009,121 +2048,81 @@ class HomePageState extends State<HomePage> with SyncFlowMixin {
   // 显示账号管理对话框
   /// 打开「切换账号」底部面板；目标无缓存时引导去刷新对应数据源。
   Future<void> _showAccountSwitchSheet() async {
+    if (anyBusy) return;
     await showAccountSwitchSheet(
       context,
       onNeedRefresh: (source) => _openRefreshData(initialSource: source),
     );
   }
 
-  /// 跑一遍「刷新数据」流程（首页用常驻 SnackBar 显示进度）。
+  /// 首页普通刷新与高级刷新共用摘要下方的进度条。
   Future<void> _openRefreshData({RefreshDataSource? initialSource}) async {
+    if (anyBusy) return;
     final request = await showRefreshDataDialog(
       context,
       initialSource: initialSource,
     );
     if (request == null || !mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    // SnackBar 同一时刻只保留一条，所以每次进度更新前先清空旧的，
-    // 否则高频 onProgress 会把 SnackBar 排成长队。
-    void showProgress(String text, [double? value]) {
-      messenger.clearSnackBars();
-      messenger.showSnackBar(SnackBar(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(text),
-            const SizedBox(height: 8),
-            SmoothLinearProgressIndicator(
-              value: value,
-              minHeight: 4,
-              color: Theme.of(context).colorScheme.onInverseSurface,
-              backgroundColor: Theme.of(context)
-                  .colorScheme
-                  .onInverseSurface
-                  .withValues(alpha: 0.2),
-            ),
-          ],
-        ),
-        duration: const Duration(minutes: 10),
-      ));
-    }
-
-    showProgress('正在刷新数据...');
-    var failed = false;
-    try {
-      await executeRefreshData(request, onProgress: (p, t) {
-        if (!mounted) return;
-        showProgress('$t ($p%)', (p / 100).clamp(0.0, 1.0));
-      });
-    } catch (e) {
-      failed = true;
-      // 水鱼未授权时直接拉起授权页（与「系统」Tab 的刷新入口行为一致）
-      if (mounted) await presentRefreshError(context, e, qq: request.qq);
-    } finally {
-      messenger.clearSnackBars();
-    }
-    if (!failed && mounted) Fluttertoast.showToast(msg: '数据刷新成功!');
+    await _runHomeRefresh(request, advanced: false);
   }
 
   /// 高级模式刷新数据：和「系统」Tab 的入口同源，只是这里把入口挂在
   /// PLAYER OVERVIEW 卡片的上半部分（标题 + 总分）上。
   ///
   /// 高级对话框返回的 [RefreshDataRequest.forceSourceIds] 非空，
-  /// 交给 executeAdvancedRefreshData 按缓存源强制刷新；进度沿用首页常驻
-  /// SnackBar 的写法（同一时刻只留一条，避免高频进度排成长队）。
-  bool _isAdvancedRefreshing = false;
+  /// 交给 executeAdvancedRefreshData 按缓存源强制刷新；进度条显示在
+  /// PLAYER OVERVIEW 下方，避免刷新过程中反复弹出底部提示。
+  bool _isRefreshing = false;
+  String _refreshText = '';
+  double _refreshProgress = 0;
 
   Future<void> _openAdvancedRefreshData(
       {RefreshDataSource? initialSource}) async {
-    if (_isAdvancedRefreshing) return;
+    if (anyBusy) return;
     final request = await showAdvancedRefreshDataDialog(
       context,
       initialSource: initialSource,
     );
     if (request == null || !mounted) return;
+    await _runHomeRefresh(request, advanced: true);
+  }
 
-    setState(() => _isAdvancedRefreshing = true);
-    final messenger = ScaffoldMessenger.of(context);
-    void showProgress(String text, [double? value]) {
-      messenger.clearSnackBars();
-      messenger.showSnackBar(SnackBar(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(text),
-            const SizedBox(height: 8),
-            SmoothLinearProgressIndicator(
-              value: value,
-              minHeight: 4,
-              color: Theme.of(context).colorScheme.onInverseSurface,
-              backgroundColor: Theme.of(context)
-                  .colorScheme
-                  .onInverseSurface
-                  .withValues(alpha: 0.2),
-            ),
-          ],
-        ),
-        duration: const Duration(minutes: 10),
-      ));
-    }
-
-    showProgress('正在刷新数据（高级）...');
-    var failed = false;
+  Future<void> _runHomeRefresh(RefreshDataRequest request,
+      {required bool advanced}) async {
+    if (anyBusy) return;
+    setState(() {
+      _isRefreshing = true;
+      _refreshText = advanced ? '正在刷新数据（高级）...' : '正在刷新数据...';
+      _refreshProgress = 0;
+    });
+    HomeRefreshNotifier.setBusy(true);
     try {
-      await executeAdvancedRefreshData(request, onProgress: (p, t) {
+      void updateProgress(int p, String t) {
         if (!mounted) return;
-        showProgress('$t ($p%)', (p / 100).clamp(0.0, 1.0));
-      });
+        setState(() {
+          _refreshText = '$t ($p%)';
+          _refreshProgress = (p / 100).clamp(0.0, 1.0);
+        });
+      }
+
+      if (advanced) {
+        await executeAdvancedRefreshData(request, onProgress: updateProgress);
+      } else {
+        await executeRefreshData(request, onProgress: updateProgress);
+      }
+      if (mounted) Fluttertoast.showToast(msg: '数据刷新成功!');
     } catch (e) {
-      failed = true;
       if (mounted) await presentRefreshError(context, e, qq: request.qq);
     } finally {
-      messenger.clearSnackBars();
-      if (mounted) setState(() => _isAdvancedRefreshing = false);
+      HomeRefreshNotifier.setBusy(false);
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+          _refreshText = '';
+          _refreshProgress = 0;
+        });
+      }
     }
-    if (!failed && mounted) Fluttertoast.showToast(msg: '数据刷新成功!');
   }
 
   void _showAccountManageDialog(BuildContext context) {

@@ -1,28 +1,46 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:io';
-import 'dart:typed_data';
+import 'package:media_scanner/media_scanner.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:media_scanner/media_scanner.dart';
+
+import 'package:my_first_flutter_app/constant/VersionListConstant.dart';
 import 'package:my_first_flutter_app/utils/StringUtil.dart';
-import 'package:my_first_flutter_app/utils/AppTheme.dart';
+import '../widgets/AnimatedChoiceBar.dart';
 import '../widgets/BackgroundPageScaffold.dart';
 
-// 版本数据模型
+/// 一个版本在日服与国服中的显示信息。
+///
+/// 标准版本的 [key] 直接使用 [VersionListConstant] 的值，列表顺序也只从常量类读取，
+/// 避免版本筛选、歌曲详情和版本对照页各维护一份不同的世代列表。
 class VersionData {
-  final String name;
+  final String key;
+  final String japaneseName;
   final String imagePath;
   final String code;
+  final String? chineseImagePath;
+  final String? chineseCode;
 
-  VersionData({
-    required this.name,
+  const VersionData({
+    required this.key,
+    required this.japaneseName,
     required this.imagePath,
     required this.code,
+    this.chineseImagePath,
+    this.chineseCode,
   });
+
+  String get chineseName => StringUtil.formatVersion2(key);
+
+  String imagePathFor(bool japanese) =>
+      japanese ? imagePath : (chineseImagePath ?? imagePath);
+
+  String codeFor(bool japanese) => japanese ? code : (chineseCode ?? code);
 }
 
-// 图片预览对话框
+/// 版本图片预览与保存对话框。
 class ImagePreviewDialog extends StatelessWidget {
   final String imagePath;
   final String versionName;
@@ -33,151 +51,115 @@ class ImagePreviewDialog extends StatelessWidget {
     required this.versionName,
   });
 
-  // 请求存储权限（参考 DiffBest50Page 的实现）
   Future<bool> _requestStoragePermission() async {
     if (Platform.isAndroid) {
-      PermissionStatus storageStatus = await Permission.storage.status;
-      PermissionStatus photosStatus = await Permission.photos.status;
-      PermissionStatus videosStatus = await Permission.videos.status;
-
-      // 如果任何一个权限已授予，直接返回成功
-      if (storageStatus.isGranted || photosStatus.isGranted || videosStatus.isGranted) {
-        return true;
-      }
-
-      // 请求权限：同时请求 storage、photos 和 videos
-      Map<Permission, PermissionStatus> statuses = await [
+      final current = await [
         Permission.storage,
         Permission.photos,
         Permission.videos,
       ].request();
-
-      bool storageGranted = statuses[Permission.storage]?.isGranted ?? false;
-      bool photosGranted = statuses[Permission.photos]?.isGranted ?? false;
-      bool videosGranted = statuses[Permission.videos]?.isGranted ?? false;
-
-      return storageGranted || photosGranted || videosGranted;
-    } else {
-      // 非 Android 平台
-      PermissionStatus status = await Permission.storage.request();
-      return status.isGranted;
+      return current.values.any((status) => status.isGranted);
     }
+    return (await Permission.storage.request()).isGranted;
   }
 
-  // 保存图片到本地
   Future<void> _saveImage(BuildContext context) async {
     try {
-      // 请求存储权限
-      bool hasPermission = await _requestStoragePermission();
-      if (!hasPermission) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('权限不足'),
-            content: const Text('需要存储权限才能导出图片到相册，请在设置中开启权限'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('确定'),
-              ),
-            ],
-          ),
-        );
+      if (!await _requestStoragePermission()) {
+        if (context.mounted) {
+          _showMessage(context, '需要存储权限才能保存版本图，请在设置中开启权限');
+        }
         return;
       }
 
-      // 加载图片
-      final ByteData imageData = await rootBundle.load(imagePath);
-      final Uint8List bytes = imageData.buffer.asUint8List();
-
-      // 获取保存目录
-      Directory? directory;
-      if (Platform.isAndroid) {
-        // 使用相册目录
-        String picturesPath = '/storage/emulated/0/Pictures';
-        directory = Directory(picturesPath);
-        if (!directory.existsSync()) {
-          directory.createSync(recursive: true);
-        }
-      } else {
-        directory = await getApplicationDocumentsDirectory();
+      final data = await rootBundle.load(imagePath);
+      final bytes = data.buffer.asUint8List();
+      final directory = Platform.isAndroid
+          ? Directory('/storage/emulated/0/Pictures')
+          : await getApplicationDocumentsDirectory();
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
       }
-
-      // 生成文件名
-      final String fileName = 'maimai_${versionName.replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.png';
-      final File file = File('${directory.path}/$fileName');
-
-      // 写入文件
+      final safeName = versionName.replaceAll(RegExp(r'[^\w\-一-龥]+'), '_');
+      final file = File(
+        '${directory.path}/maimai_${safeName}_${DateTime.now().millisecondsSinceEpoch}.png',
+      );
       await file.writeAsBytes(bytes);
-
-      // 通知系统刷新相册
       if (Platform.isAndroid) {
         await MediaScanner.loadMedia(path: file.path);
       }
-
-      _showSnackBar(context, '图片已保存到相册');
-    } catch (e) {
-      _showSnackBar(context, '保存失败：$e');
+      if (context.mounted) _showMessage(context, '图片已保存到相册');
+    } catch (error) {
+      if (context.mounted) _showMessage(context, '保存失败：$error');
     }
   }
 
-  // 显示提示信息
-  void _showSnackBar(BuildContext context, String message) {
+  void _showMessage(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 2),
-      ),
+      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final dialogHeight = screenHeight * 0.3;
-    
+    final scheme = Theme.of(context).colorScheme;
     return Dialog(
-      backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-      child: SizedBox(
-        height: dialogHeight,
-        child: Stack(
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440, maxHeight: 620),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Center(
-              child: InteractiveViewer(
-                maxScale: 5.0,
-                child: Image.asset(
-                  imagePath,
-                  fit: BoxFit.contain,
-                  height: dialogHeight,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Center(
-                      child: Text(
-                        '图片加载失败',
-                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 8, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      versionName,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '关闭',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: InteractiveViewer(
+                  minScale: 0.8,
+                  maxScale: 5,
+                  child: Image.asset(
+                    imagePath,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Icon(
+                        Icons.image_not_supported_outlined,
+                        size: 56,
+                        color: scheme.onSurfaceVariant,
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
               ),
             ),
-
-            Positioned(
-              bottom: 20,
-              right: 20,
-              child: FloatingActionButton(
-                onPressed: () => _saveImage(context),
-                backgroundColor: AppColors.linkBlue(brightness),
-                child: const Icon(Icons.save_alt),
-              ),
-            ),
-
-            Positioned(
-              top: 20,
-              right: 20,
-              child: IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: Icon(Icons.close, color: Theme.of(context).colorScheme.onSurface, size: 30),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonalIcon(
+                  onPressed: () => _saveImage(context),
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('保存图片'),
+                ),
               ),
             ),
           ],
@@ -187,253 +169,391 @@ class ImagePreviewDialog extends StatelessWidget {
   }
 }
 
-// 版本对照表页面
 class VersionView extends StatefulWidget {
-  VersionView({super.key});
+  const VersionView({super.key});
 
   @override
   State<VersionView> createState() => _VersionViewState();
 }
 
 class _VersionViewState extends State<VersionView> {
-  // 切换状态：true为日服，false为国服
   bool _isJapaneseVersion = false;
-  
-  // 日服版本数据（保持原有数据）
-  final List<VersionData> _japaneseVersionList = [
-    VersionData(name: "maimai", imagePath: "assets/version/maimai.webp", code: "真"),
-    VersionData(name: "maimai PLUS", imagePath: "assets/version/maimai_PLUS.webp", code: "真"),
-    VersionData(name: "GreeN", imagePath: "assets/version/maimai_GreeN.webp", code: "超"),
-    VersionData(name: "GreeN PLUS", imagePath: "assets/version/maimai_GreeN_PLUS.webp", code: "檄"),
-    VersionData(name: "ORANGE", imagePath: "assets/version/maimai_ORANGE.webp", code: "橙"),
-    VersionData(name: "ORANGE PLUS", imagePath: "assets/version/maimai_ORANGE_PLUS.webp", code: "晓"),
-    VersionData(name: "PiNK", imagePath: "assets/version/maimai_PiNK.webp", code: "桃"),
-    VersionData(name: "PiNK PLUS", imagePath: "assets/version/maimai_PiNK_PLUS.webp", code: "樱"),
-    VersionData(name: "MURASAKi", imagePath: "assets/version/maimai_MURASAKi.webp", code: "紫"),
-    VersionData(name: "MURASAKi PLUS", imagePath: "assets/version/maimai_MURASAKi_PLUS.webp", code: "堇"),
-    VersionData(name: "MiLK", imagePath: "assets/version/maimai_MiLK.webp", code: "白"),
-    VersionData(name: "MiLK PLUS", imagePath: "assets/version/maimai_MiLK_PLUS.webp", code: "雪"),
-    VersionData(name: "FiNALE", imagePath: "assets/version/maimai_FiNALE.webp", code: "辉"),
-    VersionData(name: "DX", imagePath: "assets/version/maimai_DX.webp", code: "熊"),
-    VersionData(name: "DX PLUS", imagePath: "assets/version/maimai_DX_PLUS.webp", code: "華"),
-    VersionData(name: "Splash", imagePath: "assets/version/maimai_DX_Splash.webp", code: "爽"),
-    VersionData(name: "Splash PLUS", imagePath: "assets/version/maimai_DX_Splash_PLUS.webp", code: "煌"),
-    VersionData(name: "UNiVERSE", imagePath: "assets/version/maimai_DX_UNiVERSE.webp", code: "宙"),
-    VersionData(name: "UNiVERSE PLUS", imagePath: "assets/version/maimai_DX_UNiVERSE_PLUS.webp", code: "星"),
-    VersionData(name: "FESTiVAL", imagePath: "assets/version/maimai_DX_FESTiVAL.webp", code: "祭"),
-    VersionData(name: "FESTiVAL PLUS", imagePath: "assets/version/maimai_DX_FESTiVAL_PLUS.webp", code: "祝"),
-    VersionData(name: "BUDDiES", imagePath: "assets/version/maimai_DX_BUDDiES.webp", code: "双"),
-    VersionData(name: "BUDDiES PLUS", imagePath: "assets/version/maimai_DX_BUDDiES_PLUS.webp", code: "宴"),
-    VersionData(name: "PRiSM", imagePath: "assets/version/maimai_DX_PRiSM.webp", code: "镜"),
-    VersionData(name: "PRiSM PLUS", imagePath: "assets/version/maimai_DX_PRiSM_PLUS.webp", code: "彩"),
-    VersionData(name: "CiRCLE", imagePath: "assets/version/maimai_DX_CiRCLE.webp", code: "丸"),
-    VersionData(name: "CiRCLE PLUS", imagePath: "assets/version/maimai_DX_CiRCLE_PLUS.webp", code: "-"),
+
+  static const Map<String, VersionData> _catalog = {
+    'maimai': VersionData(
+      key: 'maimai',
+      japaneseName: 'maimai',
+      imagePath: 'assets/version/maimai.webp',
+      code: '真',
+    ),
+    'maimai PLUS': VersionData(
+      key: 'maimai PLUS',
+      japaneseName: 'maimai PLUS',
+      imagePath: 'assets/version/maimai_PLUS.webp',
+      code: '真',
+    ),
+    'maimai GreeN': VersionData(
+      key: 'maimai GreeN',
+      japaneseName: 'GreeN',
+      imagePath: 'assets/version/maimai_GreeN.webp',
+      code: '超',
+    ),
+    'maimai GreeN PLUS': VersionData(
+      key: 'maimai GreeN PLUS',
+      japaneseName: 'GreeN PLUS',
+      imagePath: 'assets/version/maimai_GreeN_PLUS.webp',
+      code: '檄',
+    ),
+    'maimai ORANGE': VersionData(
+      key: 'maimai ORANGE',
+      japaneseName: 'ORANGE',
+      imagePath: 'assets/version/maimai_ORANGE.webp',
+      code: '橙',
+    ),
+    'maimai ORANGE PLUS': VersionData(
+      key: 'maimai ORANGE PLUS',
+      japaneseName: 'ORANGE PLUS',
+      imagePath: 'assets/version/maimai_ORANGE_PLUS.webp',
+      code: '晓',
+    ),
+    'maimai PiNK': VersionData(
+      key: 'maimai PiNK',
+      japaneseName: 'PiNK',
+      imagePath: 'assets/version/maimai_PiNK.webp',
+      code: '桃',
+    ),
+    'maimai PiNK PLUS': VersionData(
+      key: 'maimai PiNK PLUS',
+      japaneseName: 'PiNK PLUS',
+      imagePath: 'assets/version/maimai_PiNK_PLUS.webp',
+      code: '樱',
+    ),
+    'maimai MURASAKi': VersionData(
+      key: 'maimai MURASAKi',
+      japaneseName: 'MURASAKi',
+      imagePath: 'assets/version/maimai_MURASAKi.webp',
+      code: '紫',
+    ),
+    'maimai MURASAKi PLUS': VersionData(
+      key: 'maimai MURASAKi PLUS',
+      japaneseName: 'MURASAKi PLUS',
+      imagePath: 'assets/version/maimai_MURASAKi_PLUS.webp',
+      code: '堇',
+    ),
+    'maimai MiLK': VersionData(
+      key: 'maimai MiLK',
+      japaneseName: 'MiLK',
+      imagePath: 'assets/version/maimai_MiLK.webp',
+      code: '白',
+    ),
+    'MiLK PLUS': VersionData(
+      key: 'MiLK PLUS',
+      japaneseName: 'MiLK PLUS',
+      imagePath: 'assets/version/maimai_MiLK_PLUS.webp',
+      code: '雪',
+    ),
+    'maimai FiNALE': VersionData(
+      key: 'maimai FiNALE',
+      japaneseName: 'FiNALE',
+      imagePath: 'assets/version/maimai_FiNALE.webp',
+      code: '辉',
+    ),
+    'maimai でらっくす': VersionData(
+      key: 'maimai でらっくす',
+      japaneseName: 'DX',
+      imagePath: 'assets/version/maimai_DX.webp',
+      code: '熊',
+      chineseImagePath: 'assets/version/maimai_2020.webp',
+      chineseCode: '熊/華',
+    ),
+    'maimai でらっくす Splash': VersionData(
+      key: 'maimai でらっくす Splash',
+      japaneseName: 'Splash',
+      imagePath: 'assets/version/maimai_DX_Splash.webp',
+      code: '爽',
+      chineseImagePath: 'assets/version/maimai_2021.webp',
+      chineseCode: '爽/煌',
+    ),
+    'maimai でらっくす UNiVERSE': VersionData(
+      key: 'maimai でらっくす UNiVERSE',
+      japaneseName: 'UNiVERSE',
+      imagePath: 'assets/version/maimai_DX_UNiVERSE.webp',
+      code: '宙',
+      chineseImagePath: 'assets/version/maimai_2022.webp',
+      chineseCode: '宙/星',
+    ),
+    'maimai でらっくす FESTiVAL': VersionData(
+      key: 'maimai でらっくす FESTiVAL',
+      japaneseName: 'FESTiVAL',
+      imagePath: 'assets/version/maimai_DX_FESTiVAL.webp',
+      code: '祭',
+      chineseImagePath: 'assets/version/maimai_2023.webp',
+      chineseCode: '祭/祝',
+    ),
+    'maimai でらっくす BUDDiES': VersionData(
+      key: 'maimai でらっくす BUDDiES',
+      japaneseName: 'BUDDiES',
+      imagePath: 'assets/version/maimai_DX_BUDDiES.webp',
+      code: '双',
+      chineseImagePath: 'assets/version/maimai_2024.webp',
+      chineseCode: '双/宴',
+    ),
+    'maimai でらっくす PRiSM': VersionData(
+      key: 'maimai でらっくす PRiSM',
+      japaneseName: 'PRiSM',
+      imagePath: 'assets/version/maimai_DX_PRiSM.webp',
+      code: '镜',
+      chineseImagePath: 'assets/version/maimai_2025.webp',
+    ),
+    'maimai でらっくす PRiSM PLUS': VersionData(
+      key: 'maimai でらっくす PRiSM PLUS',
+      japaneseName: 'PRiSM PLUS',
+      imagePath: 'assets/version/maimai_DX_PRiSM_PLUS.webp',
+      code: '彩',
+      chineseImagePath: 'assets/version/maimai_2026.webp',
+    ),
+  };
+
+  static const List<VersionData> _japaneseTail = [
+    VersionData(
+      key: 'maimai でらっくす CiRCLE',
+      japaneseName: 'CiRCLE',
+      imagePath: 'assets/version/maimai_DX_CiRCLE.webp',
+      code: '丸',
+    ),
+    VersionData(
+      key: 'maimai でらっくす CiRCLE PLUS',
+      japaneseName: 'CiRCLE PLUS',
+      imagePath: 'assets/version/maimai_DX_CiRCLE_PLUS.webp',
+      code: '廻',
+    ),
+    VersionData(
+      key: 'maimai でらっくす MAGiCAL',
+      japaneseName: 'MAGiCAL',
+      imagePath: 'assets/version/maimai_DX_MAGiCAL.webp',
+      code: '—',
+    ),
   ];
-  
-  // 国服版本数据（按照formatVersion2中的顺序）
-  final List<VersionData> _chineseVersionList = [
-    VersionData(name: "maimai", imagePath: "assets/version/maimai.webp", code: "真"),
-    VersionData(name: "maimai PLUS", imagePath: "assets/version/maimai_PLUS.webp", code: "真"),
-    VersionData(name: "maimai GreeN", imagePath: "assets/version/maimai_GreeN.webp", code: "超"),
-    VersionData(name: "maimai GreeN PLUS", imagePath: "assets/version/maimai_GreeN_PLUS.webp", code: "檄"),
-    VersionData(name: "maimai ORANGE", imagePath: "assets/version/maimai_ORANGE.webp", code: "橙"),
-    VersionData(name: "maimai ORANGE PLUS", imagePath: "assets/version/maimai_ORANGE_PLUS.webp", code: "晓"),
-    VersionData(name: "maimai PiNK", imagePath: "assets/version/maimai_PiNK.webp", code: "桃"),
-    VersionData(name: "maimai PiNK PLUS", imagePath: "assets/version/maimai_PiNK_PLUS.webp", code: "樱"),
-    VersionData(name: "maimai MURASAKi", imagePath: "assets/version/maimai_MURASAKi.webp", code: "紫"),
-    VersionData(name: "maimai MURASAKi PLUS", imagePath: "assets/version/maimai_MURASAKi_PLUS.webp", code: "堇"),
-    VersionData(name: "maimai MiLK", imagePath: "assets/version/maimai_MiLK.webp", code: "白"),
-    VersionData(name: "MiLK PLUS", imagePath: "assets/version/maimai_MiLK_PLUS.webp", code: "雪"),
-    VersionData(name: "maimai FiNALE", imagePath: "assets/version/maimai_FiNALE.webp", code: "辉"),
-    VersionData(name: "maimai でらっくす", imagePath: "assets/version/maimai_2020.webp", code: "熊/華"),
-    VersionData(name: "maimai でらっくす Splash", imagePath: "assets/version/maimai_2021.webp", code: "爽/煌"),
-    VersionData(name: "maimai でらっくす UNiVERSE", imagePath: "assets/version/maimai_2022.webp", code: "宙/星"),
-    VersionData(name: "maimai でらっくす FESTiVAL", imagePath: "assets/version/maimai_2023.webp", code: "祭/祝"),
-    VersionData(name: "maimai でらっくす BUDDiES", imagePath: "assets/version/maimai_2024.webp", code: "双/宴"),
-    VersionData(name: "maimai でらっくす PRiSM", imagePath: "assets/version/maimai_2025.webp", code: "镜"),
-    VersionData(name: "maimai でらっくす PRiSM PLUS", imagePath: "assets/version/maimai_2026.webp", code: "彩"),
-  ];
-  
-  // 切换版本
-  void _toggleVersion() {
-    setState(() {
-      _isJapaneseVersion = !_isJapaneseVersion;
-    });
+
+  List<VersionData> get _standardVersions => [
+        for (final key in VersionListConstant.versionOrderList) _catalog[key]!,
+      ];
+
+  List<VersionData> get _versions => _isJapaneseVersion
+      ? [..._standardVersions, ..._japaneseTail]
+      : _standardVersions;
+
+  void _showPreview(VersionData version) {
+    final imagePath = version.imagePathFor(_isJapaneseVersion);
+    if (imagePath.isEmpty) return;
+    showDialog<void>(
+      context: context,
+      builder: (_) => ImagePreviewDialog(
+        imagePath: imagePath,
+        versionName:
+            _isJapaneseVersion ? version.japaneseName : version.chineseName,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    final screenWidth = MediaQuery.of(context).size.width;
-    
-    final tableHeaderFontSize = screenWidth * 0.035;
-    final tableContentFontSize = screenWidth * 0.03;
-    
-    final imageContainerSize = screenWidth * 0.15;
-    final imageSize = screenWidth * 0.12;
-    
+    final scheme = Theme.of(context).colorScheme;
+    final versions = _versions;
+
     return BackgroundPageScaffold(
-      title: 'maimai版本对照表',
-      actions: [
-  ElevatedButton(
-                        onPressed: _toggleVersion,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _isJapaneseVersion ? AppColors.linkBlue(brightness) : AppColors.successGreen(brightness),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: Text(
-                          _isJapaneseVersion ? '日服' : '国服',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-],
-      resizeToAvoidBottomInset: false,
+      title: 'maimai 版本对照',
       contentPadding: EdgeInsets.only(
         bottom: MediaQuery.paddingOf(context).bottom + 10,
       ),
       child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final tableWidth = constraints.maxWidth;
-                      final column1Width = tableWidth * 0.3;
-                      final column2Width = tableWidth * 0.35;
-                      final column3Width = tableWidth * 0.35;
-                      
-                      final headerTextColor = Theme.of(context).colorScheme.onSurface;
-                      final contentTextColor = Theme.of(context).colorScheme.onSurfaceVariant;
-                      final placeholderBgColor = AppColors.scaffoldBackground(brightness) == Colors.transparent
-                          ? AppColors.tableBorder(brightness)
-                          : AppColors.greyHint(brightness).withValues(alpha: 0.2);
-                      
-                      return SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: DataTable(
-                          columnSpacing: 0,
-                          columns: [
-                            DataColumn(
-                              label: SizedBox(
-                                width: column1Width,
-                                child: Center(
-                                  child: Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      '版本名称',
-                                      style: TextStyle(
-                                        color: headerTextColor,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: tableHeaderFontSize,
-                                      ),
-                                    ),
-                                  )
-                                ),
-                              ),
-                            ),
-                            DataColumn(
-                              label: SizedBox(
-                                width: column2Width,
-                                child: Center(
-                                  child: Text(
-                                    '版本图',
-                                    style: TextStyle(
-                                      color: headerTextColor,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: tableHeaderFontSize,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            DataColumn(
-                              label: SizedBox(
-                                width: column3Width,
-                                child: Center(
-                                  child: Text(
-                                    '版本代号',
-                                    style: TextStyle(
-                                      color: headerTextColor,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: tableHeaderFontSize,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                      rows: (_isJapaneseVersion ? _japaneseVersionList : _chineseVersionList).map((version) {
-                        String displayName = _isJapaneseVersion ? version.name : StringUtil.formatVersion2(version.name);
-                        
-                        return DataRow(cells: [
-                          DataCell(
-                            SizedBox(
-                              width: column1Width,
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(displayName, style: TextStyle(fontSize: tableContentFontSize, color: contentTextColor)),
-                              )
-                            ),
-                          ),
-                          DataCell(
-                            SizedBox(
-                              width: column2Width,
-                              child: Center(
-                                child: Container(
-                                  width: imageContainerSize,
-                                  height: imageContainerSize,
-                                  alignment: Alignment.center,
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      if (version.imagePath.isNotEmpty) {
-                                        showDialog(
-                                          context: context,
-                                          builder: (context) => ImagePreviewDialog(
-                                            imagePath: version.imagePath,
-                                            versionName: version.name,
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    child: version.imagePath.isNotEmpty
-                                        ? Image.asset(
-                                            version.imagePath,
-                                            width: imageSize,
-                                            height: imageSize,
-                                            fit: BoxFit.contain,
-                                            errorBuilder: (context, error, stackTrace) {
-                                              return Container(
-                                                width: imageSize,
-                                                height: imageSize,
-                                                color: placeholderBgColor,
-                                                child: Center(child: Text('图片缺失', style: TextStyle(fontSize: tableContentFontSize, color: contentTextColor))),
-                                              );
-                                            },
-                                          )
-                                        : Container(
-                                            width: imageSize,
-                                            height: imageSize,
-                                            color: placeholderBgColor,
-                                            child: Center(child: Text('暂无图片', style: TextStyle(fontSize: tableContentFontSize, color: contentTextColor))),
-                                          ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          DataCell(
-                            SizedBox(
-                              width: column3Width,
-                              child: Center(child: Text(version.code, style: TextStyle(fontSize: tableContentFontSize, color: contentTextColor))),
-                            ),
-                          ),
-                        ]);
-                      }).toList(),
-                    ),
-                  );
-                },
+        builder: (context, constraints) {
+          final columns = constraints.maxWidth >= 720
+              ? 4
+              : constraints.maxWidth >= 480
+                  ? 3
+                  : 2;
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            children: [
+              AnimatedChoiceBar<bool>(
+                values: const [false, true],
+                value: _isJapaneseVersion,
+                label: (isJapanese) => isJapanese ? '日服' : '国服',
+                onChanged: (value) =>
+                    setState(() => _isJapaneseVersion = value),
               ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: scheme.outlineVariant),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.auto_awesome_rounded,
+                        color: scheme.primary, size: 24),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _isJapaneseVersion ? '日服版本' : '国服版本',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '共 ${versions.length} 个版本，按发行顺序排列。点击版本图可放大查看或保存。',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Transform.translate(
+                offset: const Offset(0, -23),
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: versions.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: columns == 2 ? 0.86 : 0.9,
+                  ),
+                  itemBuilder: (context, index) => _buildVersionCard(
+                    context,
+                    versions[index],
+                    index,
+                    scheme,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildVersionCard(
+    BuildContext context,
+    VersionData version,
+    int index,
+    ColorScheme scheme,
+  ) {
+    final name =
+        _isJapaneseVersion ? version.japaneseName : version.chineseName;
+    final imagePath = version.imagePathFor(_isJapaneseVersion);
+    final code = version.codeFor(_isJapaneseVersion);
+    return Semantics(
+      button: true,
+      label: imagePath.isEmpty ? '$name，版本图待补充' : '$name，点击查看版本图',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: imagePath.isEmpty ? null : () => _showPreview(version),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${index + 1}'.padLeft(2, '0'),
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 11,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: scheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        child: Text(
+                          code,
+                          maxLines: 1,
+                          softWrap: false,
+                          style: TextStyle(
+                            color: scheme.onPrimaryContainer,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: Center(
+                    child: imagePath.isEmpty
+                        ? Text(
+                            '图片待补',
+                            style: TextStyle(
+                              color: scheme.onSurfaceVariant,
+                              fontSize: 12,
+                            ),
+                          )
+                        : Image.asset(
+                            imagePath,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 48,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  imagePath.isEmpty ? '等待补充版本图' : '点击查看大图',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

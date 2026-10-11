@@ -23,6 +23,7 @@ import '../entity/LuoXue/Collection.dart';
 import '../service/ConnectivityService.dart';
 import '../service/SyncStatsService.dart';
 import '../utils/SyncRouteNotifier.dart';
+import '../utils/HomeRefreshNotifier.dart';
 import '../utils/RefreshErrorPresenter.dart';
 import '../utils/UpdateNotifier.dart';
 import '../widgets/SyncRouteFooter.dart';
@@ -132,7 +133,8 @@ class SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
       _refreshing ||
       _refreshingAdvanced ||
       !syncFlowsIdle ||
-      _refreshingMaidata;
+      _refreshingMaidata ||
+      HomeRefreshNotifier.isBusy.value;
 
   @override
   void initState() {
@@ -151,6 +153,7 @@ class SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
     // 线路 + 统计（与首页收藏区共享同一份状态；重复调用幂等）
     SyncRouteNotifier.instance.addListener(_onSyncRouteChanged);
     SyncRouteNotifier.instance.ensureLoaded();
+    HomeRefreshNotifier.isBusy.addListener(_onHomeRefreshBusyChanged);
   }
 
   Future<void> _refreshMaimaiHubLoginState() async {
@@ -168,7 +171,12 @@ class SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
     LoginStateNotifier.instance.removeListener(_onAvatarLoginChanged);
     UserProfileNotifier.instance.removeListener(_onUserProfileChanged);
     SyncRouteNotifier.instance.removeListener(_onSyncRouteChanged);
+    HomeRefreshNotifier.isBusy.removeListener(_onHomeRefreshBusyChanged);
     super.dispose();
+  }
+
+  void _onHomeRefreshBusyChanged() {
+    if (mounted) setState(() {});
   }
 
   /// 共享用户档案变更回调：把 notifier 中的值同步到本地字段，
@@ -760,7 +768,10 @@ class SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
                     loadingText: syncText,
                     showProgress: true,
                     progressValue: divingFishProgress,
-                    disabled: syncingLuoXue || syncingAwmcNet || syncingMulti,
+                    disabled: HomeRefreshNotifier.isBusy.value ||
+                        syncingLuoXue ||
+                        syncingAwmcNet ||
+                        syncingMulti,
                     // 线路切换 + 统计：与首页「收藏的功能」区共用同一份状态
                     footer: SyncRouteFooter(
                       platform: SyncPlatform.divingFish,
@@ -778,8 +789,10 @@ class SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
                     loadingText: luoXueText,
                     showProgress: true,
                     progressValue: luoXueProgress,
-                    disabled:
-                        syncingDivingFish || syncingAwmcNet || syncingMulti,
+                    disabled: HomeRefreshNotifier.isBusy.value ||
+                        syncingDivingFish ||
+                        syncingAwmcNet ||
+                        syncingMulti,
                     footer: SyncRouteFooter(
                       platform: SyncPlatform.luoXue,
                       enabled: !anyBusy,
@@ -800,8 +813,10 @@ class SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
                     loadingText: awmcNetText,
                     showProgress: true,
                     progressValue: awmcNetProgress,
-                    disabled:
-                        syncingDivingFish || syncingLuoXue || syncingMulti,
+                    disabled: HomeRefreshNotifier.isBusy.value ||
+                        syncingDivingFish ||
+                        syncingLuoXue ||
+                        syncingMulti,
                     // 统计行上提一点贴紧按钮：tile 底部本来就空着约 23px，
                     // 一行小字挂在那里会显得离按钮太远（见 SyncStatsFooter.footerLift）
                     footerLift: SyncStatsFooter.footerLift,
@@ -820,8 +835,10 @@ class SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
                     loadingText: multiSyncText,
                     showProgress: true,
                     progressValue: multiSyncProgress,
-                    disabled:
-                        syncingDivingFish || syncingLuoXue || syncingAwmcNet,
+                    disabled: HomeRefreshNotifier.isBusy.value ||
+                        syncingDivingFish ||
+                        syncingLuoXue ||
+                        syncingAwmcNet,
                   ),
                   HubActionTile(
                     title: '账号管理',
@@ -850,7 +867,9 @@ class SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
                     loadingText: _refreshText,
                     showProgress: true,
                     progressValue: _refreshProgress,
-                    disabled: _refreshingAdvanced || anySyncBusy,
+                    disabled: HomeRefreshNotifier.isBusy.value ||
+                        _refreshingAdvanced ||
+                        anySyncBusy,
                   ),
                   HubActionTile(
                     title: '刷新数据（高级）',
@@ -863,7 +882,9 @@ class SystemHubPageState extends State<SystemHubPage> with SyncFlowMixin {
                     loadingText: _refreshAdvancedText,
                     showProgress: true,
                     progressValue: _refreshAdvancedProgress,
-                    disabled: _refreshing || anySyncBusy,
+                    disabled: HomeRefreshNotifier.isBusy.value ||
+                        _refreshing ||
+                        anySyncBusy,
                   ),
                   HubActionTile(
                     title: 'maidata 管理',

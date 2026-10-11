@@ -280,11 +280,14 @@ class _CollectionSearchPageState extends State<CollectionSearchPage>
                                     'ID',
                                     style: TextStyle(fontSize: 13),
                                   ),
-                                  Icon(
-                                    _sortDescending
-                                        ? Icons.arrow_downward
-                                        : Icons.arrow_upward,
-                                    size: 16,
+                                  AnimatedRotation(
+                                    turns: _sortDescending ? 0.5 : 0,
+                                    duration: const Duration(milliseconds: 240),
+                                    curve: Curves.easeInOut,
+                                    child: const Icon(
+                                      Icons.arrow_upward,
+                                      size: 16,
+                                    ),
                                   ),
                                 ],
                               ),

@@ -8,7 +8,7 @@ import '../widgets/BackgroundPageScaffold.dart';
 /// 舞萌服务器状态页面。
 ///
 /// 数据来自 mai.chongxi.us 的机器人状态接口，页面直接展示接口提供的总览、
-/// 各服务状态、延迟和最近上报记录。
+/// 各服务状态与延迟。
 class MaimaiServerStatusPage extends StatefulWidget {
   const MaimaiServerStatusPage({super.key});
 
@@ -103,7 +103,7 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
     return RefreshIndicator(
       onRefresh: _loadServerStatus,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         children: [
           TextButton.icon(
             onPressed: () => ExternalLaunchUtil.open(
@@ -126,17 +126,6 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
           ),
           const SizedBox(height: 8),
           ...status.services.map(_buildServiceCard),
-          if (status.recentLogs.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Text(
-              '最近上报',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            _buildRecentLogs(status.recentLogs),
-          ],
         ],
       ),
     );
@@ -269,31 +258,6 @@ class _MaimaiServerStatusPageState extends State<MaimaiServerStatusPage> {
               ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildRecentLogs(List<MaimaiRecentLog> logs) {
-    return Card(
-      elevation: 0,
-      color: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      child: Column(
-        children: [
-          for (var i = 0; i < logs.length; i++) ...[
-            ListTile(
-              dense: true,
-              leading: const Icon(Icons.history_rounded, size: 20),
-              title: Text(logs[i].type),
-              subtitle: Text(logs[i].region),
-              trailing: Text(logs[i].timeAgo),
-            ),
-            if (i != logs.length - 1) const Divider(height: 1),
-          ],
-        ],
       ),
     );
   }

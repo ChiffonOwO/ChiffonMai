@@ -231,6 +231,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
   static const int _commentsPerPage = 10;
   final TextEditingController _commentInputController = TextEditingController();
   String? _commentError;
+  bool _commentSubmitting = false;
   String? _commentDataSource;
   bool _commentRefreshCooldown = false;
   String? _commentOriginalId;
@@ -4783,6 +4784,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
   // 加载评论列表
   Future<void> _loadComments({bool serverRefresh = false}) async {
+    if (!mounted) return;
     setState(() {
       _commentsLoading = true;
     });
@@ -4792,6 +4794,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
           levelIndex: _currentDiffIndex,
           forceRefresh: true,
           serverRefresh: serverRefresh);
+      if (!mounted) return;
       setState(() {
         _comments = comments;
         _commentPage = 0;
@@ -4801,6 +4804,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
           'SongInfoPage: 评论加载完成，数量=${comments.length}，levelIndex=$_currentDiffIndex');
     } catch (e) {
       debugPrint('SongInfoPage: 评论加载失败: $e');
+      if (!mounted) return;
       setState(() {
         _commentsLoading = false;
       });
@@ -4809,65 +4813,114 @@ class _SongInfoPageState extends State<SongInfoPage> {
 
   // 提交评论（自动构建评论身份）
   Future<void> _submitComment() async {
+    if (_commentSubmitting) return;
+    setState(() => _commentSubmitting = true);
+
     final content = _commentInputController.text.trim();
-    if (content.isEmpty) {
-      setState(() => _commentError = '内容不能为空');
-      return;
-    }
-    if (content.length > 500) {
-      setState(() => _commentError = '评论内容不能超过500字');
-      return;
-    }
-
-    final validationError = await CommentTextValidator.validate(content);
-    if (validationError != null) {
-      setState(() => _commentError = validationError);
-      return;
-    }
-
-    // 如果尚未加载身份信息，自动从HomePage缓存构建
-    if (_commentDataSource == null || _commentOriginalId == null) {
-      final identity = await SongInfoService.getCommentIdentity();
-      if (identity != null) {
-        setState(() {
-          _commentDataSource = identity.dataSource;
-          _commentOriginalId = identity.originalId;
-          _commentNickname = identity.nickname;
-        });
-      } else {
-        Fluttertoast.showToast(msg: '请先在首页刷新数据以获取用户身份');
+    final levelIndex = _currentDiffIndex;
+    DialogRoute<void>? sendingDialog;
+    final navigator = Navigator.of(context, rootNavigator: true);
+    try {
+      if (content.isEmpty) {
+        setState(() => _commentError = '内容不能为空');
         return;
       }
-    }
+      if (content.length > 500) {
+        setState(() => _commentError = '评论内容不能超过500字');
+        return;
+      }
 
-    _doSubmitComment(content);
+      FocusManager.instance.primaryFocus?.unfocus();
+      sendingDialog = _createCommentSendingDialog();
+      // 先显示忙碌状态，再进行异步词句校验和身份查询，避免首轮校验时没有反馈。
+      unawaited(navigator.push(sendingDialog));
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      final validationError = await CommentTextValidator.validate(content);
+      if (!mounted) return;
+      if (validationError != null) {
+        setState(() => _commentError = validationError);
+        return;
+      }
+
+      // 如果尚未加载身份信息，自动从HomePage缓存构建
+      if (_commentDataSource == null || _commentOriginalId == null) {
+        final identity = await SongInfoService.getCommentIdentity();
+        if (identity != null) {
+          if (!mounted) return;
+          setState(() {
+            _commentDataSource = identity.dataSource;
+            _commentOriginalId = identity.originalId;
+            _commentNickname = identity.nickname;
+          });
+        } else {
+          Fluttertoast.showToast(msg: '请先在首页刷新数据以获取用户身份');
+          return;
+        }
+      }
+
+      if (_commentDataSource == null || _commentOriginalId == null) {
+        Fluttertoast.showToast(msg: '请先设置身份信息');
+        return;
+      }
+
+      final result = await SongInfoService.createComment(
+        songId: widget.songId,
+        levelIndex: levelIndex,
+        dataSource: _commentDataSource!,
+        originalId: _commentOriginalId!,
+        nickname: _commentNickname,
+        content: content,
+      );
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        _commentInputController.clear();
+        setState(() => _commentError = null);
+        Fluttertoast.showToast(msg: '评论发布成功');
+        // 重新加载评论
+        _loadComments();
+      } else {
+        Fluttertoast.showToast(msg: result['message'] ?? '评论发布失败');
+      }
+    } catch (e) {
+      if (mounted) Fluttertoast.showToast(msg: '评论发布失败：$e');
+    } finally {
+      // 只关闭本次发送框，避免其它路由被弹出；返回键也不能绕过发送锁。
+      if (navigator.mounted && sendingDialog?.isActive == true) {
+        if (sendingDialog!.isCurrent) {
+          navigator.pop();
+        } else {
+          navigator.removeRoute(sendingDialog);
+        }
+      }
+      if (mounted) setState(() => _commentSubmitting = false);
+    }
   }
 
-  // 实际执行提交评论
-  Future<void> _doSubmitComment(String content) async {
-    if (_commentDataSource == null || _commentOriginalId == null) {
-      Fluttertoast.showToast(msg: '请先设置身份信息');
-      return;
-    }
-
-    final result = await SongInfoService.createComment(
-      songId: widget.songId,
-      levelIndex: _currentDiffIndex,
-      dataSource: _commentDataSource!,
-      originalId: _commentOriginalId!,
-      nickname: _commentNickname,
-      content: content,
+  DialogRoute<void> _createCommentSendingDialog() {
+    return DialogRoute<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const PopScope(
+        canPop: false,
+        child: AlertDialog(
+          constraints: BoxConstraints(maxWidth: 260),
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 14),
+              Flexible(child: Text('发送中...')),
+            ],
+          ),
+        ),
+      ),
     );
-
-    if (result['success'] == true) {
-      _commentInputController.clear();
-      setState(() => _commentError = null);
-      Fluttertoast.showToast(msg: '评论发布成功');
-      // 重新加载评论
-      _loadComments();
-    } else {
-      Fluttertoast.showToast(msg: result['message'] ?? '评论发布失败');
-    }
   }
 
   // 删除评论
@@ -5181,7 +5234,7 @@ class _SongInfoPageState extends State<SongInfoPage> {
                     SizedBox(
                       width: 100,
                       child: ElevatedButton(
-                        onPressed: _submitComment,
+                        onPressed: _commentSubmitting ? null : _submitComment,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.linkBlue(brightness),
                           foregroundColor:

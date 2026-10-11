@@ -3,7 +3,7 @@
 <div align="center">
   <img src="https://img.shields.io/badge/Platform-Android-blue.svg" alt="Platform">
   <img src="https://img.shields.io/badge/Flutter-3.x-02569B.svg?logo=flutter&logoColor=white" alt="Flutter">
-  <img src="https://img.shields.io/badge/Version-2.7.0%2B46-6C63FF.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Version-2.7.1%2B46-6C63FF.svg" alt="Version">
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
 </div>
 
@@ -113,14 +113,15 @@ iOS 版本目前尚未正式发布。
 
 ## 数据来源
 
-为了提供曲库、成绩、谱面和机厅相关功能，应用会使用多个公开或获得授权的数据服务，包括：
+为了提供曲库、成绩、谱面和机厅相关功能，应用会使用多个公开或获得授权的数据服务，包括但不限于：
 
 - [水鱼查分器](https://www.diving-fish.com/maimaidx/prober/)
 - [DXRating.net](https://dxrating.net/)
 - [落雪咖啡屋](https://maimai.lxns.net/)
+- [AWMC NET.](https://net.wmc.pub/)
 - [Union](https://union.godserver.cn/)
 - [Yuri-YuzuChaN/maimaiDX](https://github.com/Yuri-YuzuChaN/maimaiDX)
-- [NearCade](https://nearcade.com/)
+- [NearCade](https://nearcade.cn/)
 - [isMaiDown by Chongxi](https://mai.chongxi.us/)
 - [status.awmc.cc](https://status.awmc.cc/status/maimai)
 
@@ -140,12 +141,14 @@ iOS 版本目前尚未正式发布。
 
 ### 创作与支持
 
-- **Xn1xUfguF1GiNg**：为本 APP 提供背景图和戚风小狐狸（真的非常可爱）。[个人页面](https://huajia.163.com/main/profile/RrwM5xQB)
-- **Takanashi Rikkkkkkka**：为本 APP 的个性化谱面推荐功能提供宝贵设计思路。
-- **三由yyyh**：为本 APP 的页面设计提供宝贵意见。
-- **MYD**：提供用于测试开发的个人游玩数据。
-- **乐观的熊猫**：提议开发 ChiffonMai，为本项目诞生提供最初契机。[Bilibili](https://space.bilibili.com/438391224)
-- **迪拉熊重度依赖**：为本 APP 在前端细节与交互体验上提供的诸多宝贵建议。
+- **Xn1xUfguF1GiNg**：为本项目提供的背景图和戚风小狐狸（真的非常可爱）。[个人页面](https://huajia.163.com/main/profile/RrwM5xQB)
+- **Takanashi Rikkkkkkka**：为本项目的个性化谱面推荐功能提供宝贵设计思路。
+- **三由yyyh**：为本项目的页面设计提供了宝贵意见。
+- **MYD**：提供了用于测试开发的个人游玩数据。
+- **乐观的熊猫**：提议开发 ChiffonMai，为本项目诞生提供最初契机。[bilibili](https://space.bilibili.com/438391224)
+- **迪拉熊重度依赖**：为本项目在前端细节与交互体验上提供了诸多宝贵建议。[GitHub](https://github.com/Timome-Sudo)
+- **Michaelwucoc**：为本项目的开发提供了技术支持和经济支持，为项目的推进提供了极大的帮助。[GitHub](https://github.com/Michaelwucoc)
+- **ChiffonMai交流群的全体群友**：为本项目开发提供了诸多宝贵建议和反馈。
 
 ### 数据与服务
 
@@ -154,12 +157,14 @@ iOS 版本目前尚未正式发布。
 - **Yuri-YuzuChaN**：提供别名数据库。[项目地址](https://github.com/Yuri-YuzuChaN/maimaiDX)
 - **落雪咖啡屋**：提供收藏品数据库、歌曲音源支持、曲目数据库和玩家游玩记录数据库。[官网](https://maimai.lxns.net)
 - **Neskol**：提供谱面转换支持。[项目地址](https://github.com/Neskol/Maichart-Converts/tree/master)
-- **status.awmc.cc**：提供舞萌服务器状态查询支持。[服务地址](https://status.awmc.cc/status/maimai)
+- **status.awmc.cc**：提供舞萌服务器状态信息。[服务地址](https://status.awmc.cc/status/maimai)
 - **mai.chongxi.us**：提供舞萌服务器状态信息。[服务地址](https://mai.chongxi.us/)
 - **AWMC NET.**：提供水鱼查分器同步支持、落雪查分器同步支持和对本项目开发的经济支持。[官网](https://net.wmc.pub/)
 - **Bakapiano**：提供水鱼查分器和落雪查分器成绩同步支持。[项目地址](https://github.com/bakapiano/maimai-score-hub)
 - **k4641321**：提供落雪查分器成绩同步支持。[项目地址](https://github.com/k4641321/chusearchsong_flutter/tree/master)
 - **Union**：提供曲目数据库。[官网](https://union.godserver.cn/)
+- **NearCade**：提供谱面数据库。[官网](https://nearcade.cn/)
+- **SilentBlue.RemyWiki**：提供高清版本图片。[官网](https://silentblue.remywiki.com/Main_Page)
 
 ### 设计思路借鉴
 

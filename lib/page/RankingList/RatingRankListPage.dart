@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../service/AccountStore.dart';
 import '../../service/RankingList/RatingRankListService.dart';
 import '../../utils/AppTheme.dart';
 import '../../utils/ColorUtil.dart';
@@ -49,6 +51,7 @@ class _RatingRankListPageState extends State<RatingRankListPage>
   // 当前用户信息
   String? _currentUserId;
   String? _currentDataSource;
+  final Map<String, String> _userIdsBySource = <String, String>{};
   RankItem? _currentUserRankItem;
 
   // 防抖相关变量
@@ -67,6 +70,13 @@ class _RatingRankListPageState extends State<RatingRankListPage>
     _loadData();
   }
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _tabs.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadData() async {
     await _loadCurrentUserInfo();
     await _loadRankings();
@@ -81,7 +91,9 @@ class _RatingRankListPageState extends State<RatingRankListPage>
   /// 原来的二元写法只认 水鱼 / 落雪，且 `lastDataSource == 'awmc'` 时会把数据源
   /// 标成水鱼、id 却取水鱼的 QQ —— 拿 AWMC 账号看排行榜会高亮错人。
   Future<void> _loadCurrentUserInfo() async {
+    await CurrentDataSourceNotifier.load();
     final prefs = await SharedPreferences.getInstance();
+    final accounts = await AccountStore.loadAll();
     final current = CurrentDataSourceNotifier.instance.value;
     final ordered = <RefreshDataSource>[
       current,
@@ -90,20 +102,38 @@ class _RatingRankListPageState extends State<RatingRankListPage>
 
     _currentDataSource = null;
     _currentUserId = null;
+    _userIdsBySource.clear();
     for (final source in ordered) {
       final marker = prefs.getString(source.userIdCacheKey);
-      if (marker != null && marker.isNotEmpty) {
-        _currentDataSource = source.key;
-        _currentUserId = marker;
-        return;
+      final validMarker = marker?.startsWith('${source.key}:') == true &&
+              RefreshDataSource.parseUserIdMarker(marker) != null
+          ? marker
+          : null;
+      final archivedId = accounts[source.key]?.id.trim();
+      final archivedMarker = archivedId == null || archivedId.isEmpty
+          ? null
+          : '${source.key}:$archivedId';
+      // 非活动源的标记会在切账号时清空，需要从账号存档恢复身份。
+      final userId = source == current
+          ? validMarker ?? archivedMarker
+          : archivedMarker ?? validMarker;
+      if (userId != null) {
+        _userIdsBySource[source.key] = userId;
+        _currentDataSource ??= source.key;
+        _currentUserId ??= userId;
       }
     }
 
-    // 都没有按源标记，fallback 到 cachedQQ
+    // 共用 cachedQQ 只属于当前活动源，不能把落雪/AWMC 的 ID 当作水鱼 QQ。
     final qq = prefs.getString('cachedQQ');
-    if (qq != null && qq.isNotEmpty) {
-      _currentDataSource = RefreshDataSource.shuiyu.key;
-      _currentUserId = 'shuiyu:$qq';
+    if (current == RefreshDataSource.shuiyu &&
+        !_userIdsBySource.containsKey(current.key) &&
+        qq != null &&
+        qq.isNotEmpty) {
+      final userId = '${current.key}:$qq';
+      _userIdsBySource[current.key] = userId;
+      _currentDataSource = current.key;
+      _currentUserId = userId;
     }
   }
 
@@ -125,6 +155,7 @@ class _RatingRankListPageState extends State<RatingRankListPage>
     _disableButtons();
     // 清除缓存以便重新获取最新数据
     await RatingRankListService.clearRankingsCache();
+    await _loadCurrentUserInfo();
     await _loadRankings();
   }
 
@@ -135,18 +166,65 @@ class _RatingRankListPageState extends State<RatingRankListPage>
     }
 
     // 查找当前用户在列表中的索引
-    final userIndex =
-        _rankList.indexWhere((item) => item.userId == _currentUserId);
+    final userIndex = _rankList
+        .indexWhere((item) => item.userId == _currentUserRankItem!.userId);
     if (userIndex != -1) {
       // 精确落位：行高由 [RankingRowExtent] 实测，不再写 `index * 72` 那种估算
       // （估高每行多 7dp，到第 40 名就滑过头 280dp，自己的行跑到屏幕上方）。
       _rowExtent.scrollRowToTop(_scrollController, userIndex);
+    } else {
+      _showOutsideTop100Message();
     }
+  }
+
+  void _showOutsideTop100Message() {
+    Fluttertoast.showToast(msg: '抱歉，您不在前100名内');
+  }
+
+  RefreshDataSource? get _selectedSource =>
+      _selectedTab == 0 ? null : _tabSources[_selectedTab - 1];
+
+  String? get _selectedUserId {
+    final source = _selectedSource;
+    if (source != null) return _userIdsBySource[source.key];
+    return _userIdsBySource[_currentDataSource] ?? _currentUserId;
+  }
+
+  Future<RankItem?> _findCurrentUserRankItem(
+    List<RankItem> items, {
+    required String? userId,
+    required RefreshDataSource? source,
+  }) async {
+    if (userId == null || userId.isEmpty) return null;
+
+    RankItem? inTop100;
+    for (final item in items) {
+      if (item.userId == userId) {
+        inTop100 = item;
+        break;
+      }
+    }
+    if (inTop100 != null) return inTop100;
+
+    // 榜单接口只返回前 100 名；再查详情与名次，才能显示 100 名外用户的真实数据。
+    final detail = await RatingRankListService.getUserDetail(userId);
+    if (detail == null ||
+        detail.userId != userId ||
+        (source != null && detail.dataSource != source.key)) return null;
+    final rank = await RatingRankListService.getUserRank(
+      userId,
+      source: source,
+    );
+    if (rank == null) return null;
+    detail.rank = rank;
+    return detail;
   }
 
   Future<void> _loadRankings() async {
     if (!mounted) return;
     final generation = ++_requestGeneration;
+    final source = _selectedSource;
+    final userId = _selectedUserId;
     setState(() {
       _isLoading = true;
       _errorMessage = '';
@@ -155,61 +233,29 @@ class _RatingRankListPageState extends State<RatingRankListPage>
 
     try {
       List<RankItem> items;
-      if (_selectedTab == 0) {
+      if (source == null) {
         // 第 0 个 Tab 是跨源总榜
         items = await RatingRankListService.getTotalRankings(limit: 100);
       } else {
         // 其余 Tab 按 _tabSources 取对应数据源的榜（水鱼 / 落雪 / AWMC NET）
-        final index = _selectedTab - 1;
-        items = index >= 0 && index < _tabSources.length
-            ? await RatingRankListService.getSourceRankings(
-                _tabSources[index],
-                limit: 100,
-              )
-            : <RankItem>[];
+        items =
+            await RatingRankListService.getSourceRankings(source, limit: 100);
       }
 
       if (!mounted || generation != _requestGeneration) return;
       // 计算并列排名
       items = RatingRankListService.calculateRankedPositions(items);
 
-      // 查找当前用户的排名
-      if (_currentUserId != null) {
-        print('[DEBUG] 排行榜数据数量: ${items.length}');
-        print('[DEBUG] 当前用户ID: $_currentUserId');
-
-        // 打印前10个排行榜项的用户ID
-        for (int i = 0; i < items.length && i < 10; i++) {
-          print(
-              '[DEBUG] 排行榜项[$i]: userId=${items[i].userId}, nickname=${items[i].nickname}, totalRating=${items[i].totalRating}');
-        }
-
-        // 查找当前用户
-        final foundUser = items.firstWhere(
-          (item) => item.userId == _currentUserId,
-          orElse: () => RankItem(
-            userId: _currentUserId!,
-            dataSource: _currentDataSource ?? '',
-            originalId: '',
-            totalRating: 0,
-            best35Rating: 0,
-            best15Rating: 0,
-          ),
-        );
-
-        _currentUserRankItem = foundUser;
-
-        // 检查是否找到匹配的用户
-        if (foundUser.totalRating > 0) {
-          print(
-              '[DEBUG] ✅ 找到当前用户: rank=${foundUser.rank}, nickname=${foundUser.nickname}, totalRating=${foundUser.totalRating}');
-        } else {
-          print('[DEBUG] ❌ 未找到当前用户，使用默认值');
-        }
-      }
+      final currentUserRankItem = await _findCurrentUserRankItem(
+        items,
+        userId: userId,
+        source: source,
+      );
+      if (!mounted || generation != _requestGeneration) return;
 
       setState(() {
-        _rankList = items;
+        _rankList = items.take(100).toList();
+        _currentUserRankItem = currentUserRankItem;
       });
     } catch (e) {
       if (!mounted || generation != _requestGeneration) return;
@@ -433,196 +479,207 @@ class _RatingRankListPageState extends State<RatingRankListPage>
           const ThemeAwareBackground(),
           Column(
             children: [
-          // 顶部栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
-          // 与 Best50 页、其余 50 多个页面同款。
-          //
-          // 这里原来直接用 `Scaffold.appBar: AppBar(title: Text(...))`：标题那层
-          // `Text` 不带 fontFamily，会被 AppBar 自己的 `DefaultTextStyle`
-          // （`appBarTheme.titleTextStyle`）接管，标题就退化成系统 Roboto，
-          // 于是出现「同一个 App 里排行榜页的标题字体和别人不一样」。
-          PageTopBar(
-            title: 'Rating 排行榜',
-            actions: [
-              IconButton(
-                icon: _isLoading
-                    ? CircularProgressIndicator(
-                        color: AppColors.primaryText(brightness),
-                        strokeWidth: 2)
-                    : Icon(Icons.refresh,
-                        color: AppColors.primaryText(brightness)),
-                onPressed:
-                    (_isLoading || _isButtonDisabled) ? null : _onRefresh,
-                tooltip: '刷新',
-              ),
-              // 快速定位到当前用户的按钮
-              if (_currentUserRankItem != null)
-                IconButton(
-                  icon: Icon(Icons.location_searching,
-                      color: AppColors.primaryText(brightness)),
-                  onPressed: _scrollToCurrentUser,
-                  tooltip: '跳转到我的排名',
-                ),
-            ],
-          ),
-          // 免责声明
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color:
-                  AppColors.warningOrange(brightness).withValues(alpha: 0.08),
-              border: Border(
-                  bottom: BorderSide(
-                      color: AppColors.warningOrange(brightness)
-                          .withValues(alpha: 0.3))),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  size: 16,
-                  color: AppColors.warningOrange(brightness),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '本排行榜数据仅供参考和娱乐使用，不代表任何官方立场或权威性排名。排名数据基于玩家自愿上传的游戏数据，可能存在误差或延迟。请理性看待排名结果，享受游戏乐趣。',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.warningOrange(brightness),
-                      height: 1.4,
-                    ),
+              // 顶部栏统一走公共组件：标题 = 思源黑体 20 / bold / primary / 居中，
+              // 与 Best50 页、其余 50 多个页面同款。
+              //
+              // 这里原来直接用 `Scaffold.appBar: AppBar(title: Text(...))`：标题那层
+              // `Text` 不带 fontFamily，会被 AppBar 自己的 `DefaultTextStyle`
+              // （`appBarTheme.titleTextStyle`）接管，标题就退化成系统 Roboto，
+              // 于是出现「同一个 App 里排行榜页的标题字体和别人不一样」。
+              PageTopBar(
+                title: 'Rating 排行榜',
+                actions: [
+                  IconButton(
+                    icon: _isLoading
+                        ? CircularProgressIndicator(
+                            color: AppColors.primaryText(brightness),
+                            strokeWidth: 2)
+                        : Icon(Icons.refresh,
+                            color: AppColors.primaryText(brightness)),
+                    onPressed:
+                        (_isLoading || _isButtonDisabled) ? null : _onRefresh,
+                    tooltip: '刷新',
                   ),
-                ),
-              ],
-            ),
-          ),
-
-          TabBar(
-            controller: _tabs,
-            labelColor: Theme.of(context).colorScheme.primary,
-            unselectedLabelColor:
-                Theme.of(context).colorScheme.onSurfaceVariant,
-            tabs: [for (final name in _tabNames) Tab(text: name)],
-            onTap: (index) {
-              if (_isButtonDisabled) {
-                _tabs.animateTo(_selectedTab);
-                return;
-              }
-              if (index == _selectedTab) return;
-              setState(() => _selectedTab = index);
-              _disableButtons();
-              _loadRankings();
-            },
-          ),
-
-          // 排行榜列表
-          Expanded(
-            child: _isLoading
-                ? Center(
-                    child: CircularProgressIndicator(
-                        color: AppColors.primaryText(brightness)))
-                : _rankList.isEmpty
-                    ? _buildEmptyState(brightness)
-                    : ListView.builder(
-                        controller: _scrollController,
-                        // 必须显式清零：`Scaffold` 在没有 `appBar:` 时不会消耗顶部安全区，
-                        // 于是 `ListView` 会把 `MediaQuery.padding.top`（状态栏 24dp）
-                        // 当成内边距垫在**列表最上面** —— 而状态栏已经被 `PageTopBar`
-                        // 占掉了，结果就是「第一名那一行上方多出一块空白」（实测 24dp）。
-                        padding: EdgeInsets.zero,
-                        // 每行都排成原型行的高度：定位按钮才能用
-                        // `index × 行高` 精确落位（行高不再靠 72 这种估算）
-                        prototypeItem: _buildRowPrototype(brightness),
-                        itemCount: _rankList.length,
-                        itemBuilder: (context, index) {
-                          final item = _rankList[index];
-                          final isCurrentUser = _currentUserId != null &&
-                              item.userId == _currentUserId;
-                          return _buildRankItem(item,
-                              isCurrentUser: isCurrentUser,
-                              brightness: brightness);
-                        },
-                      ),
-          ),
-
-          // 底部固定显示当前用户
-          if (!_isLoading && _currentUserRankItem != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                border: Border(
-                    top: BorderSide(color: AppColors.primaryText(brightness))),
-                color: AppColors.linkBlue(brightness).withValues(alpha: 0.08),
-              ),
-              child: Row(
-                children: [
-                  // 排名
-                  SizedBox(
-                    width: 40,
-                    child: Center(
-                      child: _buildRankBadge(_currentUserRankItem!.rank,
-                          brightness: brightness),
+                  // 快速定位到当前用户的按钮
+                  if (_currentUserRankItem != null)
+                    IconButton(
+                      icon: Icon(Icons.location_searching,
+                          color: AppColors.primaryText(brightness)),
+                      onPressed: _scrollToCurrentUser,
+                      tooltip: '跳转到我的排名',
                     ),
-                  ),
-
-                  Expanded(
-                    child: CommunityPlayerIdentity(
-                      avatarId: _currentUserRankItem!.avatarId,
-                      dataSource: _currentUserRankItem!.dataSource,
-                      playerId: _currentUserRankItem!.userId,
-                      name: _currentUserRankItem!.nickname ?? '未知玩家',
-                      avatarMatchesTextHeight: true,
-                      nameStyle: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primaryText(brightness),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-
-                  // Rating 信息
-                  SizedBox(
-                    width: 140,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        ColorUtil.buildRatingBadge(
-                          _currentUserRankItem!.totalRating,
-                          height: 24,
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            if (_currentUserRankItem!.best35Rating > 0)
-                              Text(
-                                'B35: ${_currentUserRankItem!.best35Rating}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.greyHint(brightness),
-                                ),
-                              ),
-                            if (_currentUserRankItem!.best35Rating > 0 &&
-                                _currentUserRankItem!.best15Rating > 0)
-                              const SizedBox(width: 8),
-                            if (_currentUserRankItem!.best15Rating > 0)
-                              Text(
-                                'B15: ${_currentUserRankItem!.best15Rating}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.greyHint(brightness),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
-            ),
+              // 免责声明
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.warningOrange(brightness)
+                      .withValues(alpha: 0.08),
+                  border: Border(
+                      bottom: BorderSide(
+                          color: AppColors.warningOrange(brightness)
+                              .withValues(alpha: 0.3))),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: AppColors.warningOrange(brightness),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '本排行榜数据仅供参考和娱乐使用，不代表任何官方立场或权威性排名。排名数据基于玩家自愿上传的游戏数据，可能存在误差或延迟。请理性看待排名结果，享受游戏乐趣。',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.warningOrange(brightness),
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              TabBar(
+                controller: _tabs,
+                labelColor: Theme.of(context).colorScheme.primary,
+                unselectedLabelColor:
+                    Theme.of(context).colorScheme.onSurfaceVariant,
+                tabs: [for (final name in _tabNames) Tab(text: name)],
+                onTap: (index) {
+                  if (_isButtonDisabled) {
+                    _tabs.animateTo(_selectedTab);
+                    return;
+                  }
+                  if (index == _selectedTab) return;
+                  setState(() => _selectedTab = index);
+                  _disableButtons();
+                  _loadRankings();
+                },
+              ),
+
+              // 排行榜列表
+              Expanded(
+                child: _isLoading
+                    ? Center(
+                        child: CircularProgressIndicator(
+                            color: AppColors.primaryText(brightness)))
+                    : _rankList.isEmpty
+                        ? _buildEmptyState(brightness)
+                        : ListView.builder(
+                            controller: _scrollController,
+                            // 必须显式清零：`Scaffold` 在没有 `appBar:` 时不会消耗顶部安全区，
+                            // 于是 `ListView` 会把 `MediaQuery.padding.top`（状态栏 24dp）
+                            // 当成内边距垫在**列表最上面** —— 而状态栏已经被 `PageTopBar`
+                            // 占掉了，结果就是「第一名那一行上方多出一块空白」（实测 24dp）。
+                            padding: EdgeInsets.zero,
+                            // 每行都排成原型行的高度：定位按钮才能用
+                            // `index × 行高` 精确落位（行高不再靠 72 这种估算）
+                            prototypeItem: _buildRowPrototype(brightness),
+                            itemCount: _rankList.length,
+                            itemBuilder: (context, index) {
+                              final item = _rankList[index];
+                              final isCurrentUser = _selectedUserId != null &&
+                                  item.userId == _selectedUserId;
+                              return _buildRankItem(item,
+                                  isCurrentUser: isCurrentUser,
+                                  brightness: brightness);
+                            },
+                          ),
+              ),
+
+              // 底部固定显示当前用户
+              if (!_isLoading && _currentUserRankItem != null)
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _scrollToCurrentUser,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        border: Border(
+                            top: BorderSide(
+                                color: AppColors.primaryText(brightness))),
+                        color: AppColors.linkBlue(brightness)
+                            .withValues(alpha: 0.08),
+                      ),
+                      child: Row(
+                        children: [
+                          // 排名
+                          SizedBox(
+                            width: 40,
+                            child: Center(
+                              child: _buildRankBadge(_currentUserRankItem!.rank,
+                                  brightness: brightness),
+                            ),
+                          ),
+
+                          Expanded(
+                            child: CommunityPlayerIdentity(
+                              avatarId: _currentUserRankItem!.avatarId,
+                              dataSource: _currentUserRankItem!.dataSource,
+                              playerId: _currentUserRankItem!.userId,
+                              name: _currentUserRankItem!.nickname ?? '未知玩家',
+                              avatarMatchesTextHeight: true,
+                              nameStyle: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primaryText(brightness),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+
+                          // Rating 信息
+                          SizedBox(
+                            width: 140,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                ColorUtil.buildRatingBadge(
+                                  _currentUserRankItem!.totalRating,
+                                  height: 24,
+                                ),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    if (_currentUserRankItem!.best35Rating > 0)
+                                      Text(
+                                        'B35: ${_currentUserRankItem!.best35Rating}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.greyHint(brightness),
+                                        ),
+                                      ),
+                                    if (_currentUserRankItem!.best35Rating >
+                                            0 &&
+                                        _currentUserRankItem!.best15Rating > 0)
+                                      const SizedBox(width: 8),
+                                    if (_currentUserRankItem!.best15Rating > 0)
+                                      Text(
+                                        'B15: ${_currentUserRankItem!.best15Rating}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.greyHint(brightness),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ],

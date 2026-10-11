@@ -10,7 +10,8 @@ import '../../utils/CommunityProfileUtil.dart';
 
 class RatingRankListService {
   // 缓存有效期：从常量文件读取（分钟转秒）
-  static int get _cacheExpirySeconds => CacheTimestampConstant.rankingsCacheMinutes * 60;
+  static int get _cacheExpirySeconds =>
+      CacheTimestampConstant.rankingsCacheMinutes * 60;
 
   /// 测试专用：把排行榜请求打桩掉。
   ///
@@ -131,13 +132,29 @@ class RatingRankListService {
   }
 
   // 获取指定用户排名
-  static Future<int?> getUserRank(String userId) async {
+  static Future<int?> getUserRank(
+    String userId, {
+    RefreshDataSource? source,
+  }) async {
     try {
+      if (source != null) {
+        // 分源榜的名次不能复用总榜接口（总榜会把其它数据源的玩家也算进去）。
+        // 只在用户不在前 100 名时调用这里，拉取该源的完整榜单并按同一规则计算名次。
+        final allItems = await _fetch(
+          '${ApiUrls.RankingsBaseUrl}/${source.key}?limit=100000',
+        );
+        final ranked = calculateRankedPositions(allItems);
+        for (final item in ranked) {
+          if (item.userId == userId) return item.rank;
+        }
+        return null;
+      }
       final response = await ApiClient.get(
-        Uri.parse('${ApiUrls.RankingsBaseUrl}/user/$userId'),
+        Uri.parse(
+            '${ApiUrls.RankingsBaseUrl}/user/${Uri.encodeComponent(userId)}'),
         headers: {'Content-Type': 'application/json'},
       );
-      
+
       if (response.statusCode == 200) {
         final result = json.decode(response.body);
         if (result['success'] == true) {
@@ -154,10 +171,11 @@ class RatingRankListService {
   static Future<RankItem?> getUserDetail(String userId) async {
     try {
       final response = await ApiClient.get(
-        Uri.parse('${ApiUrls.RankingsBaseUrl}/user/detail/$userId'),
+        Uri.parse(
+            '${ApiUrls.RankingsBaseUrl}/user/detail/${Uri.encodeComponent(userId)}'),
         headers: {'Content-Type': 'application/json'},
       );
-      
+
       if (response.statusCode == 200) {
         final result = json.decode(response.body);
         if (result['success'] == true) {
@@ -178,11 +196,11 @@ class RatingRankListService {
   // 计算并列排名
   static List<RankItem> calculateRankedPositions(List<RankItem> items) {
     if (items.isEmpty) return items;
-    
+
     // 按总Rating降序排序（确保排序正确）
     List<RankItem> sortedItems = List.from(items)
       ..sort((a, b) => b.totalRating.compareTo(a.totalRating));
-    
+
     // 计算并列排名
     for (int i = 0; i < sortedItems.length; i++) {
       if (i == 0) {
@@ -197,15 +215,16 @@ class RatingRankListService {
         }
       }
     }
-    
+
     return sortedItems;
   }
 
   // 从缓存获取排行榜数据
-  static Future<List<RankItem>?> _getCachedRankings(String cacheKey, String timestampKey) async {
+  static Future<List<RankItem>?> _getCachedRankings(
+      String cacheKey, String timestampKey) async {
     final prefs = await SharedPreferences.getInstance();
     final timestamp = prefs.getInt(timestampKey);
-    
+
     // 检查缓存是否存在且未过期
     if (timestamp != null) {
       final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
@@ -225,12 +244,15 @@ class RatingRankListService {
   }
 
   // 保存排行榜数据到缓存
-  static Future<void> _cacheRankings(List<RankItem> items, String cacheKey, String timestampKey) async {
+  static Future<void> _cacheRankings(
+      List<RankItem> items, String cacheKey, String timestampKey) async {
     final prefs = await SharedPreferences.getInstance();
     try {
-      final jsonString = json.encode(items.map((item) => item.toJson()).toList());
+      final jsonString =
+          json.encode(items.map((item) => item.toJson()).toList());
       await prefs.setString(cacheKey, jsonString);
-      await prefs.setInt(timestampKey, DateTime.now().millisecondsSinceEpoch ~/ 1000);
+      await prefs.setInt(
+          timestampKey, DateTime.now().millisecondsSinceEpoch ~/ 1000);
     } catch (e) {
       print('保存排行榜缓存失败: $e');
     }
